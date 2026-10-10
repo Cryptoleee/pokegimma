@@ -91,6 +91,11 @@ export class Mon {
   thinkT = 0
   aggressive = false
   legendary = false
+  /** Raid boss: huge, can't be caught, HP scaled by bossMul. */
+  boss = false
+  bossMul = 1
+  /** Frozen in place (Kyurem's ice) for this many seconds. */
+  frozenT = 0
   /** Weakened wild: reserved for this trainer (who knocked it out) for claimT seconds. */
   claim: Trainer | null = null
   claimT = 0
@@ -106,6 +111,7 @@ export class Mon {
   }
 
   get maxHp() {
+    if (this.boss) return statHp(this.species, this.level) * this.bossMul
     return statHp(this.species, this.level) * (this.legendary && !this.owner ? 2.2 : 1)
   }
   get atk() {
@@ -125,7 +131,7 @@ export class Mon {
   }
   /** Scale in world px per sprite px. */
   get scale() {
-    return this.legendary ? 0.68 : 0.55
+    return this.boss ? 1.3 : this.legendary ? 0.68 : 0.55
   }
 }
 
@@ -175,6 +181,14 @@ export class Trainer {
   /** Remote player's last input strength (drives the follow behaviour of their Pokémon). */
   netMoving = 0
   regenFxT = 0
+  /** Current velocity (tiles/s): momentum on ice. */
+  slideX = 0
+  slideY = 0
+  /** Raid: lives left and seconds until you're back after going down. */
+  lives = 0
+  respawnT = 0
+  /** Raid: total damage dealt to the boss (results screen). */
+  bossDmg = 0
   /** Bots: wait before throwing another ball after a legendary broke free. */
   catchCd = 0
   /** Who this player is watching after being knocked out. */

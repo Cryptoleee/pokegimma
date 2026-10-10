@@ -4,7 +4,9 @@ import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
 import { sfx } from '../audio'
 import { NAME_MAX, profile, setName } from '../profile'
 import { CHAT_MAX, cleanCode, MAX_PLAYERS, type Room } from '../net/room'
-import type { ChatLine } from '../net/protocol'
+import type { ChatLine, MatchChoice } from '../net/protocol'
+import { ROYALE_THEMES, THEMES } from '../data/themes'
+import { BOSS_LIST, BOSSES } from '../data/bosses'
 import { SEATS } from '../game/game'
 
 /**
@@ -21,8 +23,47 @@ function gif(id: number, cls = '') {
 /** Quick chat phrases: one tap on a phone. */
 export const QUICK_CHAT = ['GG!', 'Klaar?', 'Even wachten', 'Haha 😂', 'Let op!', 'Help!']
 
+/**
+ * Mode picker: Battle Royale with a world, or Raid with a boss. Editable for
+ * you (solo) or the host; read-only for guests in a lobby.
+ */
+export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: MatchChoice) => void) | null) {
+  const paint = () => {
+    const c = get()
+    const ro = !set
+    el.innerHTML = `
+      <div class="cp-modes">
+        <button data-kind="royale" class="${c.kind === 'royale' ? 'on' : ''}" ${ro ? 'disabled' : ''}><b>Battle Royale</b><small>12 trainers · 1 winnaar</small></button>
+        <button data-kind="raid" class="${c.kind === 'raid' ? 'on' : ''}" ${ro ? 'disabled' : ''}><b>Raid</b><small>samen tegen een eindbaas</small></button>
+      </div>
+      ${c.kind === 'royale'
+        ? `<div class="cp-worlds">${(['random', ...ROYALE_THEMES] as const).map((t) => {
+            const th = t === 'random' ? null : THEMES[t]
+            return `<button data-theme="${t}" class="${c.theme === t ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${th ? th.grass[0] : '#5a6a9a'};--c2:${th ? th.tall[0] : '#3a4470'}"><i>${th ? th.icon : '🎲'}</i>${th ? th.name : 'Willekeurig'}</button>`
+          }).join('')}</div>`
+        : `<div class="cp-bosses">${BOSS_LIST.map((b) => {
+            const d = BOSSES[b]
+            return `<button data-boss="${b}" class="${c.boss === b ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${d.color}">${gif(d.species, 'cp-boss')}<span><b>${d.name}</b><small>${d.title}</small><em>${d.blurb}</em></span></button>`
+          }).join('')}</div>`}`
+    el.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
+      b.addEventListener('click', () => {
+        if (!set) return
+        sfx.select()
+        const c = { ...get() }
+        if (b.dataset.kind) c.kind = b.dataset.kind as MatchChoice['kind']
+        if (b.dataset.theme) c.theme = b.dataset.theme as MatchChoice['theme']
+        if (b.dataset.boss) c.boss = b.dataset.boss as MatchChoice['boss']
+        set(c)
+        paint()
+      }),
+    )
+  }
+  paint()
+  return { paint }
+}
+
 export interface MenuActions {
-  solo(): void
+  solo(c: MatchChoice): void
   host(): void
   join(code: string): void
   team(): void
@@ -32,6 +73,8 @@ export interface MenuActions {
 export interface MenuState {
   trainer: TrainerDef
   team: number[]
+  /** Last solo choice (mode + world/boss). */
+  choice: MatchChoice
   /** Pre-filled join code (from a shared link). */
   code?: string
   error?: string
@@ -62,12 +105,21 @@ export function showMenu(st: MenuState, on: MenuActions) {
         <input id="mm-name" maxlength="${NAME_MAX}" autocomplete="nickname" spellcheck="false" placeholder="Typ je naam" value="${esc(profile().name)}">
       </div>
       <div class="home-modes">
-        <button class="mode solo"><i>▶</i><b>Solo</b><small>tegen ${SEATS - 1} bots</small></button>
+        <button class="mode solo"><i>▶</i><b>Solo</b><small>battle royale of raid</small></button>
         <button class="mode multi"><i>👥</i><b>Multiplayer</b><small>met vrienden, ook online</small></button>
       </div>
       <div class="mm-msg ${st.error && !sheetOpen ? 'err' : ''}"></div>
 
-      <div class="sheet ${sheetOpen ? 'open' : ''}">
+      <div class="sheet solo-sheet">
+        <div class="sheet-card">
+          <button class="sheet-x" aria-label="Sluiten">✕</button>
+          <h3>Solo</h3>
+          <div class="cp"></div>
+          <button class="cta solo-go"></button>
+        </div>
+      </div>
+
+      <div class="sheet mp-sheet ${sheetOpen ? 'open' : ''}">
         <div class="sheet-card">
           <button class="sheet-x" aria-label="Sluiten">✕</button>
           <h3>Multiplayer</h3>
@@ -85,7 +137,18 @@ export function showMenu(st: MenuState, on: MenuActions) {
 
   const name = el.querySelector('#mm-name') as HTMLInputElement
   const code = el.querySelector('#mm-code') as HTMLInputElement
-  const sheet = el.querySelector('.sheet') as HTMLElement
+  const sheet = el.querySelector('.mp-sheet') as HTMLElement
+  const solo = el.querySelector('.solo-sheet') as HTMLElement
+  let choice = { ...st.choice }
+  const goBtn = el.querySelector('.solo-go') as HTMLButtonElement
+  const goLabel = () => (goBtn.innerHTML = choice.kind === 'raid'
+    ? `Start raid ▶<small>jouw ${mon ? SPECIES[mon].name : 'partner'} wordt Lv 50 en volledig geëvolueerd</small>`
+    : `Start battle royale ▶<small>tegen ${SEATS - 1} bots</small>`)
+  choicePicker(el.querySelector('.solo-sheet .cp') as HTMLElement, () => choice, (c) => {
+    choice = c
+    goLabel()
+  })
+  goLabel()
   const msg = el.querySelector('.sheet-msg') as HTMLElement
   name.addEventListener('input', () => setName(name.value))
   name.addEventListener('keydown', (e) => e.key === 'Enter' && name.blur())
@@ -124,14 +187,18 @@ export function showMenu(st: MenuState, on: MenuActions) {
   })
   click('.mode.solo', () => {
     setName(name.value)
-    on.solo()
+    solo.classList.add('open')
   })
+  click('.solo-go', () => on.solo(choice))
   click('.mode.multi', () => {
     if (!named()) return
     sheet.classList.add('open')
   })
-  click('.sheet-x', () => sheet.classList.remove('open'))
-  sheet.addEventListener('click', (e) => e.target === sheet && sheet.classList.remove('open'))
+  el.querySelectorAll('.sheet-x').forEach((x) => x.addEventListener('click', () => {
+    sfx.select()
+    el.querySelectorAll('.sheet').forEach((sh) => sh.classList.remove('open'))
+  }))
+  el.querySelectorAll<HTMLElement>('.sheet').forEach((sh) => sh.addEventListener('click', (e) => e.target === sh && sh.classList.remove('open')))
   click('.mm-host', () => {
     if (!named()) return
     busy('Potje aanmaken…')
@@ -159,6 +226,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
 
 export interface LobbyActions {
   start(): void
+  choice(c: MatchChoice): void
   team(): void
   ready(on: boolean): void
   leave(): void
@@ -184,6 +252,7 @@ export function showLobby(room: Room, on: LobbyActions) {
           <button class="ghost2 lb-share">Link delen ⤴</button>
         </div>
       </div>
+      <div class="lb-choice"><div class="cp"></div></div>
       <div class="lb-steps"></div>
       <div class="lb-list"></div>
       <div class="lb-chat">
@@ -202,11 +271,14 @@ export function showLobby(room: Room, on: LobbyActions) {
   const start = el.querySelector('.lb-start') as HTMLButtonElement
   const head = el.querySelector('.sel-title small') as HTMLElement
   const log = el.querySelector('.lb-log') as HTMLElement
+  const picker = choicePicker(el.querySelector('.lb-choice .cp') as HTMLElement, () => room.choice, room.isHost ? (c) => on.choice(c) : null)
   const others = () => room.players.filter((p) => p.pid !== room.players[0]?.pid)
   const refresh = () => {
     const bots = Math.max(0, SEATS - room.players.length)
     const me = room.players.find((p) => p.pid === room.me.pid) ?? room.me
     head.textContent = `${room.isHost ? 'JOUW POTJE' : 'LOBBY'} · ${room.players.length}/${MAX_PLAYERS} SPELERS`
+    if (!room.isHost) picker.paint()
+    const raid = room.choice.kind === 'raid'
     list.innerHTML = room.players.map((p, i) => {
       const tr = TRAINERS.find((t) => t.key === p.trainer) ?? TRAINERS[0]
       const isMe = p.pid === room.me.pid
@@ -218,7 +290,7 @@ export function showLobby(room: Room, on: LobbyActions) {
           ${p.team[0] ? gif(p.team[0], 'lb-mon') : ''}
           <span class="lb-state">${i === 0 ? 'HOST' : p.ready ? 'KLAAR ✓' : 'kiest…'}</span>
         </div>`
-    }).join('') + `<div class="lb-bots">+ ${bots} bot${bots === 1 ? '' : 's'} vullen de arena aan</div>`
+    }).join('') + (raid ? `<div class="lb-bots">Raid: samen tegen ${BOSSES[room.choice.boss].name}</div>` : `<div class="lb-bots">+ ${bots} bot${bots === 1 ? '' : 's'} vullen de arena aan</div>`)
 
     const waiting = others().filter((p) => !p.ready)
     if (room.isHost) {
@@ -232,7 +304,9 @@ export function showLobby(room: Room, on: LobbyActions) {
         ? 'Potje loopt nog…'
         : waiting.length
           ? `Wachten… <small>${others().length - waiting.length}/${others().length} klaar</small>`
-          : `Start! ▶<small>${room.players.length} speler${room.players.length === 1 ? '' : 's'} + ${bots} bots</small>`
+          : raid
+            ? `Start raid! ▶<small>${room.players.length} speler${room.players.length === 1 ? '' : 's'} tegen ${BOSSES[room.choice.boss].name}</small>`
+            : `Start! ▶<small>${room.players.length} speler${room.players.length === 1 ? '' : 's'} + ${bots} bots</small>`
     } else {
       steps.innerHTML = me.ready
         ? `<b>Je bent klaar ✓</b><span>Wachten tot ${esc(room.players[0]?.name ?? 'de host')} het potje start.</span>`

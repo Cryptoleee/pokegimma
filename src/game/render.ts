@@ -7,6 +7,9 @@ import { trainerSpriteUrl } from '../data/trainers'
 import { drawCharge, drawDashAura, drawIncoming, drawMelee, drawProjectile } from './moveFx'
 import { drawGlow } from './vfx'
 import { T, TILE } from './world'
+import type { Weather } from '../data/themes'
+import { drawEvents } from './events'
+import { drawHazards } from './boss'
 
 const FONT = '"Pixelify Sans", monospace'
 
@@ -37,7 +40,8 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
 
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.imageSmoothingEnabled = false
-  ctx.fillStyle = '#1c4a28'
+  const theme = g.world.theme
+  ctx.fillStyle = theme.border
   ctx.fillRect(0, 0, cw, ch)
   ctx.setTransform(Z, 0, 0, Z, -ox * Z, -oy * Z)
 
@@ -54,6 +58,8 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   drawWater(g, ctx, ox, oy, vw, vh, time)
   g.vfx.drawDecals(ctx)
   g.vfx.drawUnder(ctx)
+  // Raid: boss attacks telegraphed on the ground
+  drawHazards(g, ctx, time)
   drawItems(g, ctx, inView)
 
   // Team rings on the ground + target reticle base + aim preview (under actors)
@@ -78,6 +84,9 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // Canopies and roofs
   ctx.drawImage(g.world.overlay, sx, sy, sw, sh, sx, sy, sw, sh)
 
+  // Supply drops coming down
+  drawEvents(g, ctx, time)
+
   // Ultimates dim the world so the effect pops (like BW's battle backdrop fade)
   g.vfx.drawDim(ctx, ox - 4, oy - 4, vw + 8, vh + 8)
 
@@ -93,14 +102,20 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   drawFx(g, ctx)
   for (const tr of g.trainers) if (tr.throwFx) drawThrow(ctx, tr.throwFx)
 
-  // Cloud shadows drift across the land
-  drawClouds(ctx, ox, oy, vw, vh, time)
+  // Cloud shadows drift across the land (not in caves and craters)
+  if (!g.world.arena) drawClouds(ctx, ox, oy, vw, vh, time)
+
+  // World mood: night darkness, heat haze, cold light
+  if (theme.tint) {
+    ctx.fillStyle = theme.tint
+    ctx.fillRect(ox - 2, oy - 2, vw + 4, vh + 4)
+  }
 
   // Storm: tinted, rain-swept outside, a crackling energy wall on the edge
-  drawStorm(g, ctx, ox, oy, vw, vh, time)
+  if (g.kind === 'royale') drawStorm(g, ctx, ox, oy, vw, vh, time)
 
-  // Ambient pollen
-  drawMotes(ctx, ox, oy, vw, vh, time)
+  // Weather and ambient particles
+  drawWeather(theme.weather, ctx, ox, oy, vw, vh, time)
 
   // Brawl-style nameplates on top of everything
   for (const tr of g.trainers) {
@@ -130,15 +145,16 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   }
   const p = g.player
   for (const w of g.wilds) {
-    if (!inView(w.x, w.y) || w.state === 'weak' || w.catching) continue
+    if (!inView(w.x, w.y) || w.state === 'weak' || w.catching || w.boss) continue
     const near = Math.hypot(w.x - p.x, w.y - p.y) < 7
     if (w.state === 'aggro' || w.hp < w.maxHp || w.rarity !== 'common' || near || g.playerTarget === w)
       plate(ctx, w, 'wild', `${w.shiny ? '✦' : ''}Lv${w.level}${w.legendary ? ' ★' : w.rarity === 'rare' ? ' ◆' : ''}`)
   }
   if (g.playerTarget && p.alive && g.introT <= 0) drawReticle(ctx, g.playerTarget, time)
   ctx.setTransform(1, 0, 0, 1, 0, 0)
-  // Cinematic vignette
+  // Cinematic vignette (heavier at night)
   ctx.drawImage(vignette(), 0, 0, cw, ch)
+  if (theme.dark) ctx.drawImage(vignette(), -cw * 0.1, -ch * 0.1, cw * 1.2, ch * 1.2)
   if (g.vfx.screenFlash > 0) {
     ctx.fillStyle = `rgba(${g.vfx.screenFlashCol},${Math.min(0.75, g.vfx.screenFlash * 0.6)})`
     ctx.fillRect(0, 0, cw, ch)
@@ -752,15 +768,30 @@ function drawClouds(ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: n
 }
 
 function drawWater(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number) {
+  const liquid = g.world.theme.liquid
   const tx0 = Math.max(0, Math.floor(ox / TILE)), ty0 = Math.max(0, Math.floor(oy / TILE))
   const tx1 = Math.min(127, Math.ceil((ox + vw) / TILE)), ty1 = Math.min(127, Math.ceil((oy + vh) / TILE))
   if ((tx1 - tx0) * (ty1 - ty0) > 9000) return
   for (let ty = ty0; ty <= ty1; ty++)
     for (let tx = tx0; tx <= tx1; tx++) {
-      if (g.world.at(tx, ty) !== T.WATER) continue
+      const tile = g.world.at(tx, ty)
+      const lava = tile === T.LAVA || (tile === T.WATER && liquid === 'lava')
+      if (tile !== T.WATER && !lava) continue
       const seed = (tx * 73856093) ^ (ty * 19349663)
       const ph = (seed & 1023) / 163
       const k = Math.sin(time * 1.6 + ph)
+      if (lava) {
+        // Pulsing glow and the odd bubble
+        ctx.fillStyle = `rgba(255,${180 + Math.round(60 * k)},60,${0.18 + 0.14 * k})`
+        ctx.fillRect(tx * TILE + 1, ty * TILE + 1, TILE - 2, TILE - 2)
+        if (k > 0.9) {
+          const bx = tx * TILE + (seed & 11) + 2, by = ty * TILE + ((seed >> 4) & 11) + 2
+          ctx.fillStyle = '#fff0a0'
+          ctx.fillRect(bx, by, 2, 2)
+        }
+        continue
+      }
+      if (liquid === 'ice') continue
       // Rolling wave line
       const wy = ty * TILE + 4 + ((time * 6 + ph * 3) % 10)
       ctx.fillStyle = 'rgba(200,228,255,0.45)'
@@ -775,22 +806,59 @@ function drawWater(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: numbe
     }
 }
 
-const motes: { x: number; y: number; s: number; ph: number }[] = []
-function drawMotes(ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number) {
-  while (motes.length < 26) motes.push({ x: ox + Math.random() * vw, y: oy + Math.random() * vh, s: 0.6 + Math.random(), ph: Math.random() * 6 })
-  ctx.fillStyle = 'rgba(255,250,210,0.75)'
+const motes: { x: number; y: number; s: number; ph: number; v: number }[] = []
+/** Ambient particles per world: pollen, rain, snow, sand, ash, embers or fireflies. */
+function drawWeather(w: Weather, ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number) {
+  const n = w === 'rain' ? 90 : w === 'snow' || w === 'sand' ? 70 : w === 'ash' ? 50 : 30
+  while (motes.length < n) motes.push({ x: ox + Math.random() * vw, y: oy + Math.random() * vh, s: 0.6 + Math.random(), ph: Math.random() * 6, v: 0.6 + Math.random() * 0.8 })
+  motes.length = n
   for (const m of motes) {
-    m.x += Math.sin(time * 0.7 + m.ph) * 0.15 + 0.12
-    m.y += Math.cos(time * 0.5 + m.ph) * 0.1 - 0.05
+    switch (w) {
+      case 'rain': m.x -= 0.6 * m.v; m.y += 5 * m.v; break
+      case 'snow': m.x += Math.sin(time + m.ph) * 0.25; m.y += 0.45 * m.v; break
+      case 'sand': m.x += 3.2 * m.v; m.y += Math.sin(time * 3 + m.ph) * 0.3; break
+      case 'ash': m.x += Math.sin(time * 0.6 + m.ph) * 0.2 + 0.1; m.y += 0.25 * m.v; break
+      case 'embers': m.x += Math.sin(time * 1.3 + m.ph) * 0.3; m.y -= 0.5 * m.v; break
+      default: m.x += Math.sin(time * 0.7 + m.ph) * 0.15 + 0.12; m.y += Math.cos(time * 0.5 + m.ph) * 0.1 - 0.05
+    }
     if (m.x < ox - 10 || m.x > ox + vw + 10 || m.y < oy - 10 || m.y > oy + vh + 10) {
       m.x = ox + Math.random() * vw
-      m.y = oy + Math.random() * vh
+      m.y = w === 'rain' || w === 'snow' || w === 'ash' ? oy - 5 : w === 'embers' ? oy + vh + 5 : oy + Math.random() * vh
+      if (w === 'sand') m.x = ox - 5
     }
-    const a = 0.4 + 0.4 * Math.sin(time * 2 + m.ph)
-    ctx.globalAlpha = a
-    ctx.fillRect(m.x, m.y, m.s, m.s)
+    const tw = 0.5 + 0.5 * Math.sin(time * 2 + m.ph)
+    switch (w) {
+      case 'rain':
+        ctx.fillStyle = 'rgba(190,215,255,0.45)'
+        ctx.fillRect(m.x, m.y, 1, 5)
+        break
+      case 'snow':
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'
+        ctx.fillRect(m.x, m.y, 1.5 * m.s, 1.5 * m.s)
+        break
+      case 'sand':
+        ctx.fillStyle = 'rgba(240,210,150,0.5)'
+        ctx.fillRect(m.x, m.y, 4 * m.s, 1)
+        break
+      case 'ash':
+        ctx.fillStyle = 'rgba(70,64,62,0.7)'
+        ctx.fillRect(m.x, m.y, 1.4 * m.s, 1.4 * m.s)
+        break
+      case 'embers':
+        ctx.fillStyle = `rgba(255,${140 + Math.round(80 * tw)},40,${0.5 + 0.5 * tw})`
+        ctx.fillRect(m.x, m.y, 1.5, 1.5)
+        break
+      case 'fireflies':
+        ctx.fillStyle = `rgba(220,255,120,${0.2 + 0.8 * tw * tw})`
+        ctx.fillRect(m.x, m.y, 1.5, 1.5)
+        break
+      default:
+        ctx.globalAlpha = 0.4 + 0.4 * Math.sin(time * 2 + m.ph)
+        ctx.fillStyle = 'rgba(255,250,210,0.75)'
+        ctx.fillRect(m.x, m.y, m.s, m.s)
+        ctx.globalAlpha = 1
+    }
   }
-  ctx.globalAlpha = 1
 }
 
 let stormBolt = { t: 0, a: 0, seedT: 0 }

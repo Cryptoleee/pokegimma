@@ -17,7 +17,8 @@ import { wipe } from './ui/transition'
 import { playMusic, setTempo } from './music'
 import { profile } from './profile'
 import { cleanCode, Room } from './net/room'
-import type { ChatLine, HostMsg, LobbyPlayer } from './net/protocol'
+import type { ChatLine, HostMsg, LobbyPlayer, MatchChoice } from './net/protocol'
+import { pickTheme } from './data/themes'
 import { applyEvents, applySnapshot, initClient, recordVfx, remoteViewer, runCommand, snapshot, type RemoteViewer } from './net/sync'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
@@ -67,6 +68,15 @@ function resize() {
 window.addEventListener('resize', resize)
 resize()
 
+/** Mode and world / boss: last solo pick, and the host's default for a new room. */
+let choice: MatchChoice = { kind: 'royale', theme: 'random', boss: 'reshiram', ...store.get<Partial<MatchChoice>>('choice', {}) }
+
+/** A concrete match setup from a choice (random world resolved from the seed). */
+function setupFor(c: MatchChoice, humans: LobbyPlayer[]): MatchSetup {
+  const seed = Date.now() % 1e9
+  return { seed, humans, kind: c.kind, theme: pickTheme(c.theme, seed), boss: c.boss }
+}
+
 /** Lobby: you picked a team and tapped "Klaar". */
 let ready = false
 
@@ -86,8 +96,12 @@ function toMenu(extra: Partial<MenuState> = {}) {
   lobbyUi = null
   playMusic('menu')
   const code = pendingJoin
-  showMenu({ trainer, team, code: code || undefined, ...extra }, {
-    solo: () => wipe(startSolo, { flash: true }),
+  showMenu({ trainer, team, choice, code: code || undefined, ...extra }, {
+    solo: (c) => {
+      choice = c
+      store.set('choice', c)
+      wipe(startSolo, { flash: true })
+    },
     host: hostRoom,
     join: joinRoom,
     team: () => wipe(() => pickTeam(() => wipe(() => toMenu()), () => wipe(() => toMenu()), 'Klaar ▶')),
@@ -97,7 +111,7 @@ function toMenu(extra: Partial<MenuState> = {}) {
   if (code && profile().name && !extra.error) {
     pendingJoin = ''
     const none = () => {}
-    showMenu({ trainer, team, code, busy: `Verbinden met ${code}…` }, { solo: none, host: none, join: none, team: none, back: none })
+    showMenu({ trainer, team, choice, code, busy: `Verbinden met ${code}…` }, { solo: none, host: none, join: none, team: none, back: none })
     joinRoom(code)
   }
 }
@@ -160,12 +174,12 @@ function loadingThen(setup: MatchSetup, skippable: boolean, start: () => void) {
     sprite: (TRAINERS.find((t) => t.key === h.trainer) ?? TRAINERS[0]).sprite,
     mon: h.team[0],
   }))
-  showLoading({ seconds: LOADING_TIME, players, skippable, bots: Math.max(0, SEATS - players.length) }, start)
+  showLoading({ seconds: LOADING_TIME, players, skippable, bots: Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined }, start)
 }
 
 function startSolo() {
   if (team.length !== TEAM_SIZE) return toMenu()
-  const setup: MatchSetup = { seed: Date.now() % 1e9, humans: [me()] }
+  const setup = setupFor(choice, [me()])
   const g = new Game(setup, 0, hooks(), 'solo')
   loadingThen(setup, true, () => enterMatch(g))
 }
@@ -230,6 +244,7 @@ function hostRoom() {
   Room.create(me(), roomEvents())
     .then((r) => {
       room = r
+      r.choice = { ...choice }
       wipe(toLobby)
     })
     .catch((e: Error) => toMenu({ error: e.message }))
@@ -265,6 +280,7 @@ function toLobby() {
   playMusic('menu')
   lobbyUi = showLobby(room, {
     start: hostStart,
+    choice: (c) => room?.setChoice(c),
     team: () => {
       lobbyUi = null
       // Picking a new team: not ready until you're done
@@ -300,7 +316,7 @@ function hostStart() {
   r.updateMe(me())
   // The previous match (still kept for the lobby) is done for good
   stopGame()
-  const setup: MatchSetup = { seed: Date.now() % 1e9, humans: r.players }
+  const setup = setupFor(r.choice, r.players)
   const g = new Game(setup, 0, hooks(), 'host')
   recordVfx(g)
   remotes.clear()
@@ -598,7 +614,7 @@ function frame(now: number) {
     g.update(dt)
     if (g.mode === 'host') hostNet(g, dt)
     if (viewing && (g.mode !== 'client' || g.net?.placed)) {
-      setTempo(g.zone.phase >= 4 ? 1.12 : 1)
+      setTempo(g.kind === 'raid' ? ((g.raidView?.phase ?? 0) >= 2 ? 1.22 : 1.12) : g.zone.phase >= 4 ? 1.12 : 1)
       render(g, ctx, canvas.width, canvas.height)
       hud?.update()
     }

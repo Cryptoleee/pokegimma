@@ -3,6 +3,7 @@ import { trainerSpriteUrl } from '../data/trainers'
 import { itemUrl } from '../game/sprites'
 import { sfx } from '../audio'
 import { esc } from './menu'
+import { BOSSES, type BossDef, type BossId } from '../data/bosses'
 
 /**
  * Pre-match splash: who's in, plus rotating tips. People who joined through a
@@ -27,6 +28,18 @@ const TIPS: Tip[] = [
   { icon: `<img class="px" src="${itemUrl('potion')}" alt="">`, title: 'Items', text: 'Potions genezen je Pokémon, met een Revive komt een verslagen Pokémon terug. Tik op je team linksboven om te wisselen.' },
 ]
 
+/** Raid tips: dodging, lives, phases and the arena. */
+function raidTips(boss: BossDef): Tip[] {
+  return [
+    { icon: '<i class="ld-warn">⚠</i>', title: 'Rood op de grond = wegwezen!', text: 'Elke grote aanval van de baas zie je eerst als rode vorm op de grond. Loop eruit voordat hij volloopt.' },
+    { icon: `<img class="px" src="${spriteUrl(boss.species)}" alt="">`, title: boss.name, text: boss.envTip },
+    { icon: '<i class="ld-heart">♥</i>', title: '3 levens', text: 'Ga je neer, dan kom je na 4 seconden terug. Na 3 keer kijk je mee. De raid mislukt als iedereen op is of na 4 minuten.' },
+    { icon: '<i class="ld-up">▲</i>', title: 'Drie fases', text: `Op 66% en 33% HP wordt ${boss.name} woedend: hij brult je weg, krijgt nieuwe aanvallen en laat Potions vallen.` },
+    { icon: `<img class="px" src="${itemUrl('potion')}" alt="">`, title: 'Geen herstel vanzelf', text: 'In een raid herstelt je HP niet vanzelf. Raap de Potions op die in de arena verschijnen.' },
+    { icon: '<i class="ld-aim">◎</i>', title: 'Samen sterker', text: 'Met meer spelers heeft de baas meer HP, maar verdeelt hij zijn aanvallen. Blijf niet allemaal op één plek staan!' },
+  ]
+}
+
 export interface LoadingPlayer {
   name: string
   sprite: string
@@ -37,24 +50,32 @@ export interface LoadingPlayer {
  * Shows the splash for `seconds`, then calls `done`. With `skippable` a button
  * lets you start right away (solo); in multiplayer everyone waits together.
  */
-export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; skippable: boolean; bots: number }, done: () => void) {
+export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; skippable: boolean; bots: number; raid?: BossId }, done: () => void) {
   const app = document.getElementById('app')!
   const el = document.createElement('div')
   el.className = 'loading'
   // Legendary + Master Ball first (most asked), then a random mix
   const rest = TIPS.slice(2).sort(() => Math.random() - 0.5)
-  const tips = [TIPS[Math.random() < 0.5 ? 0 : 1], TIPS[2], ...rest]
+  const boss = opts.raid ? BOSSES[opts.raid] : null
+  const tips = boss ? raidTips(boss) : [TIPS[Math.random() < 0.5 ? 0 : 1], TIPS[2], ...rest]
   el.innerHTML = `
     <div class="ld-bg"></div>
-    <div class="ld-head"><small>BATTLE ROYALE</small><b>Potje wordt geladen</b></div>
+    <div class="ld-l">
+    ${boss
+      ? `<div class="ld-head"><small>RAID · ${boss.title.toUpperCase()}</small><b>${boss.name}</b></div>
+    <div class="ld-boss" style="--c:${boss.color}"><img class="px" src="${animatedUrl(boss.species)}" onerror="this.onerror=null;this.src='${spriteUrl(boss.species)}'" alt=""></div>`
+      : '<div class="ld-head"><small>BATTLE ROYALE</small><b>Potje wordt geladen</b></div>'}
     <div class="ld-players">
       ${opts.players.map((p, i) => `<div class="ld-p" style="--d:${i * 70}ms"><img class="px" src="${trainerSpriteUrl(p.sprite)}" alt="">${p.mon ? `<img class="px ld-mon" src="${spriteUrl(p.mon)}" alt="">` : ''}<span>${esc(p.name)}</span></div>`).join('')}
-      ${opts.bots ? `<div class="ld-p bots" style="--d:${opts.players.length * 70}ms"><b>+${opts.bots}</b><span>bots</span></div>` : ''}
+      ${opts.bots && !boss ? `<div class="ld-p bots" style="--d:${opts.players.length * 70}ms"><b>+${opts.bots}</b><span>bots</span></div>` : ''}
     </div>
+    </div>
+    <div class="ld-r">
     <div class="ld-tip"></div>
     <div class="ld-dots">${tips.map(() => '<i></i>').join('')}</div>
     <div class="ld-bar"><i></i></div>
-    <div class="ld-foot">${opts.skippable ? '<button class="cta ld-go">Ik ben er klaar voor ▶</button>' : '<span class="ld-wait">Iedereen start tegelijk…</span>'}</div>`
+    <div class="ld-foot">${opts.skippable ? '<button class="cta ld-go">Ik ben er klaar voor ▶</button>' : '<span class="ld-wait">Iedereen start tegelijk…</span>'}</div>
+    </div>`
   app.append(el)
   requestAnimationFrame(() => el.classList.add('in'))
 

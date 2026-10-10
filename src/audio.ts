@@ -113,6 +113,11 @@ export const sfx = {
     noise(0.25, 0.08)
     tone(140, 0.3, 'sawtooth', 0.05, -80)
   },
+  /** Raid: a boss attack is coming (two quick alarm beeps). */
+  warn() {
+    tone(880, 0.07, 'square', 0.035)
+    tone(660, 0.09, 'square', 0.035, 0, 0.09)
+  },
 }
 
 // ---------- Pokémon cries (PokéAPI) ----------

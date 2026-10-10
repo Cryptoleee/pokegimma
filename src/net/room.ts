@@ -1,5 +1,5 @@
 import { Peer, type DataConnection, type PeerOptions } from 'peerjs'
-import type { ChatLine, Command, GuestMsg, HostMsg, LobbyPlayer } from './protocol'
+import type { ChatLine, Command, GuestMsg, HostMsg, LobbyPlayer, MatchChoice } from './protocol'
 
 /**
  * A multiplayer room: one phone hosts, the others join with a 4-letter code.
@@ -44,6 +44,8 @@ export class Room {
   peer: Peer | null = null
   code = ''
   players: LobbyPlayer[] = []
+  /** Mode and world/boss for the next match (host decides). */
+  choice: MatchChoice = { kind: 'royale', theme: 'random', boss: 'reshiram' }
   /** Recent chat, oldest first. */
   chatLog: ChatLine[] = []
   /** Host: a match is still being played. Guests get this through the lobby message. */
@@ -198,7 +200,7 @@ export class Room {
 
   broadcastLobby() {
     if (!this.isHost) return
-    const msg: HostMsg = { t: 'lobby', players: this.players, running: this.running }
+    const msg: HostMsg = { t: 'lobby', players: this.players, running: this.running, choice: this.choice }
     for (const c of this.conns.values()) if (c.open) c.send(msg)
   }
 
@@ -216,6 +218,13 @@ export class Room {
       this.broadcastLobby()
       this.on.lobby()
     } else if (this.host?.open) this.host.send({ t: 'hello', p } satisfies GuestMsg)
+  }
+
+  /** Host: change mode / world / boss for the next match. */
+  setChoice(c: MatchChoice) {
+    this.choice = c
+    this.broadcastLobby()
+    this.on.lobby()
   }
 
   setRunning(running: boolean) {
@@ -254,6 +263,7 @@ export class Room {
     if (msg.t === 'lobby') {
       this.players = msg.players
       this.running = msg.running
+      if (msg.choice) this.choice = msg.choice
       this.on.lobby()
     } else if (msg.t === 'bye') this.shut(msg.reason)
     else this.on.host?.(msg)

@@ -1,5 +1,7 @@
 import type { AimDir, Dir } from '../game/entities'
-import type { MatchSetup } from '../game/game'
+import type { MatchKind, MatchSetup } from '../game/game'
+import type { ThemeId } from '../data/themes'
+import type { BossId } from '../data/bosses'
 
 /** A player in the lobby. `pid` is a local profile id for now (an account id later). */
 export interface LobbyPlayer {
@@ -9,6 +11,13 @@ export interface LobbyPlayer {
   team: number[]
   /** Picked a team and tapped "Klaar". */
   ready?: boolean
+}
+
+/** What the next match will be: chosen by the host (or you, solo). */
+export interface MatchChoice {
+  kind: MatchKind
+  theme: ThemeId | 'random'
+  boss: BossId
 }
 
 /** A chat line (lobby and in-game). */
@@ -49,7 +58,7 @@ export type NetEvent =
   | ['full', number, number, boolean]
 
 export type HostMsg =
-  | { t: 'lobby'; players: LobbyPlayer[]; running: boolean }
+  | { t: 'lobby'; players: LobbyPlayer[]; running: boolean; choice?: MatchChoice }
   | { t: 'start'; setup: MatchSetup; roster: RosterEntry[]; you: number }
   | { t: 's'; s: unknown; e: NetEvent[] }
   | { t: 'bye'; reason: string }

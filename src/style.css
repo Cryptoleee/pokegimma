@@ -4405,9 +4405,16 @@ button:disabled {
 .loading.out {
   opacity: 0;
 }
-.loading > * {
+.loading > *,
+.ld-l > *,
+.ld-r > * {
   width: min(460px, 100%);
   position: relative;
+}
+/* Portrait: one column. Landscape phones: boss/players left, tips right. */
+.ld-l,
+.ld-r {
+  display: contents;
 }
 .ld-bg {
   position: absolute !important;
@@ -4749,4 +4756,398 @@ button:disabled {
 .legend,
 .chatbar {
   top: calc(176px + var(--safe-t));
+}
+
+/* =====================================================================
+   Mode / world / boss picker (solo sheet and lobby)
+   ===================================================================== */
+
+.cp {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cp-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.cp-modes button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 12px;
+  font-family: var(--font);
+  text-align: left;
+  color: #fff;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+}
+.cp-modes button b {
+  font-size: 17px;
+}
+.cp-modes button small {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.cp-modes button.on {
+  color: #1a1420;
+  border-color: #1a1420;
+  background: linear-gradient(#fff3a0, #ffd84a 45%, #f0a020);
+  box-shadow: 0 3px 0 #1a1420;
+}
+.cp button:disabled {
+  opacity: 1;
+}
+.cp button:disabled:not(.on) {
+  opacity: 0.45;
+}
+.cp-worlds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cp-worlds button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px 7px 7px;
+  font-family: var(--font);
+  font-size: 14px;
+  color: #fff;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: linear-gradient(135deg, var(--c), var(--c2));
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+.cp-worlds button i {
+  font-style: normal;
+  font-size: 16px;
+}
+.cp-worlds button.on {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--hi), 0 0 14px rgba(255, 216, 74, 0.5);
+}
+.cp-bosses {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cp-bosses button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  font-family: var(--font);
+  text-align: left;
+  color: #fff;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(110deg, color-mix(in srgb, var(--c) 35%, transparent), rgba(16, 22, 44, 0.85));
+}
+.cp-bosses button.on {
+  border-color: var(--c);
+  box-shadow: 0 0 0 2px var(--c), 0 0 18px color-mix(in srgb, var(--c) 60%, transparent);
+}
+.cp-boss {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex: none;
+}
+.cp-bosses span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.cp-bosses b {
+  font-size: 18px;
+}
+.cp-bosses small {
+  font-size: 11px;
+  color: var(--hi);
+  letter-spacing: 1px;
+}
+.cp-bosses em {
+  font-style: normal;
+  font-size: 12px;
+  color: #c8d0f0;
+}
+.solo-sheet .cta small {
+  display: block;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.lb-choice {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  margin: 0 12px 8px;
+}
+.lb-choice .cp-bosses em {
+  display: none;
+}
+.lb-choice .cp-boss {
+  width: 44px;
+  height: 44px;
+}
+/* Event tracker variants of the legend pill */
+.legend.evt.drop {
+  background: linear-gradient(#c8f0ff, #58d0ff 50%, #2a9ad0);
+  box-shadow: 0 4px 0 #1a1420, 0 0 22px rgba(88, 208, 255, 0.6);
+}
+.legend.evt.swarm {
+  background: linear-gradient(#d8ffc8, #7ce07c 50%, #3aa040);
+  box-shadow: 0 4px 0 #1a1420, 0 0 22px rgba(124, 224, 124, 0.6);
+}
+.legend.evt .lg-arrow {
+  color: #fff;
+}
+
+/* =====================================================================
+   Raid HUD
+   ===================================================================== */
+
+.raid-mode .topright .mapframe,
+.raid-mode .topright .chips {
+  display: none;
+}
+.bossbar {
+  --c: #ff7a30;
+  position: absolute;
+  left: calc(10px + var(--safe-l));
+  right: calc(10px + var(--safe-r));
+  top: calc(122px + var(--safe-t));
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px 6px 6px;
+  border-radius: 16px;
+  border: 2px solid #1a1420;
+  background: linear-gradient(180deg, rgba(30, 18, 24, 0.92), rgba(12, 10, 20, 0.92));
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5), 0 0 24px color-mix(in srgb, var(--c) 45%, transparent);
+  color: #fff;
+  pointer-events: none;
+  animation: legendPop 0.6s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+#hud > .bossbar,
+#hud > .respawn {
+  pointer-events: none;
+}
+.bossbar.hidden {
+  display: none;
+}
+.bossbar.enraged {
+  animation: bossRage 1s ease-in-out infinite;
+}
+@keyframes bossRage {
+  50% { box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5), 0 0 36px color-mix(in srgb, var(--c) 90%, transparent); }
+}
+.bb-face {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c) 30%, #1a1420);
+  image-rendering: pixelated;
+}
+.bb-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.bb-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+.bb-top b {
+  font-size: 16px;
+  color: var(--c);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+}
+.bb-top small {
+  font-size: 10px;
+  color: #b8b0c8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.bb-time {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+}
+.bb-time.low {
+  color: #ff6a5a;
+  animation: blink 0.8s steps(2) infinite;
+}
+@keyframes blink {
+  50% { opacity: 0.4; }
+}
+.bb-bar {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: #2a2030;
+  border: 1.5px solid #000;
+  overflow: hidden;
+}
+.bb-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+}
+.bb-lag {
+  background: #ffffff;
+  opacity: 0.6;
+}
+.bb-fill {
+  background: linear-gradient(#ff9a7a, #e83838 55%, #a01818);
+}
+.bb-bar em {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(0, 0, 0, 0.7);
+}
+.bb-team {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  font-size: 11px;
+  color: #ff8aa0;
+}
+.bb-team span {
+  color: #c8c0d8;
+  white-space: nowrap;
+}
+.bb-team span.mine {
+  color: #8ef0a0;
+}
+.bb-team span.out {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+.respawn {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #fff;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.6);
+}
+.respawn.hidden {
+  display: none;
+}
+.respawn b {
+  font-size: 72px;
+  line-height: 1;
+}
+.respawn small,
+.respawn span {
+  font-size: 15px;
+}
+.cd-title.raid small {
+  color: #ff9a6a;
+}
+/* Raid result badge: the boss in a ring */
+.medal.raid {
+  display: grid;
+  place-items: center;
+}
+.medal.raid img {
+  width: 92%;
+  height: 92%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.medal.raid.bronze img {
+  filter: grayscale(0.6) brightness(0.8);
+}
+.ld-boss {
+  display: flex;
+  justify-content: center;
+}
+.ld-boss img {
+  height: 120px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--c) 70%, transparent));
+  animation: bossFloat 2.4s ease-in-out infinite;
+}
+@keyframes bossFloat {
+  50% { transform: translateY(-6px); }
+}
+.ld-warn {
+  color: #ff5a40;
+}
+/* Lobby: scroll as a whole on small phones, buttons stay at the bottom */
+.lobby {
+  overflow-y: auto;
+}
+.lobby .lb-list {
+  flex: none;
+  overflow: visible;
+}
+.lobby .lb-foot {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  background: linear-gradient(transparent, #0a0d1a 30%);
+}
+.lb-choice .cp-bosses {
+  flex-direction: row;
+}
+.lb-choice .cp-bosses button {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+}
+.lb-choice .cp-bosses small {
+  display: none;
+}
+.lb-choice .cp-modes button {
+  padding: 7px 10px;
+}
+.lb-choice .cp-modes small {
+  display: none;
+}
+.bb-team {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .loading {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 28px;
+    padding: calc(14px + var(--safe-t)) calc(20px + var(--safe-r)) calc(14px + var(--safe-b)) calc(20px + var(--safe-l));
+  }
+  .ld-l,
+  .ld-r {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: min(420px, 48%);
+    max-height: 100%;
+  }
+  .ld-head b {
+    font-size: 22px;
+  }
+  .ld-boss img {
+    height: 96px;
+  }
 }

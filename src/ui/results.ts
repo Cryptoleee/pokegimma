@@ -3,6 +3,7 @@ import { trainerSpriteUrl } from '../data/trainers'
 import { cry, sfx } from '../audio'
 import { playMusic } from '../music'
 import type { GameResult } from '../game/game'
+import { BOSSES } from '../data/bosses'
 
 /** End-of-match screen: placement badge, your trainer and best Pokémon, counted stats. */
 export interface ResultAction {
@@ -14,24 +15,32 @@ export interface ResultAction {
 export function showResults(r: GameResult, trainerSprite: string, main: ResultAction, more: ResultAction[]) {
   const el = document.getElementById('screen')!
   const tier = r.won ? 'gold' : r.place <= 3 ? 'silver' : 'bronze'
+  const boss = r.raid ? BOSSES[r.raid.boss] : null
   el.innerHTML = `
     <div class="res ${r.won ? 'won' : ''}">
       <canvas class="confetti"></canvas>
       <div class="res-glow"></div>
       <div class="res-card">
-        <div class="medal ${tier}"><small>${r.won ? 'WINNAAR' : 'PLAATS'}</small><b>#${r.place}</b></div>
+        ${boss
+          ? `<div class="medal raid ${r.won ? 'gold' : 'bronze'}" style="--c:${boss.color}"><img class="px" src="${spriteUrl(boss.species)}" alt=""></div>
+        <div class="res-title">${r.won ? 'Raid geslaagd!' : 'Raid mislukt'}</div>
+        <div class="res-sub">${r.won ? `${boss.name} is verslagen` : `${boss.name} was te sterk… probeer het nog eens`}</div>`
+          : `<div class="medal ${tier}"><small>${r.won ? 'WINNAAR' : 'PLAATS'}</small><b>#${r.place}</b></div>
         <div class="res-title">${r.won ? 'Kampioen van de arena!' : r.place <= 3 ? 'Bijna! Top 3' : 'Uitgeschakeld'}</div>
-        <div class="res-sub">van de ${r.total} trainers</div>
+        <div class="res-sub">van de ${r.total} trainers</div>`}
         <div class="res-stage">
           <img class="px res-tr" src="${trainerSpriteUrl(trainerSprite)}" alt="">
           <img class="px res-mon" src="${animatedUrl(r.best.species.id)}" onerror="this.onerror=null;this.src='${spriteUrl(r.best.species.id)}'" alt="">
           <div class="res-plat"></div>
         </div>
         <div class="res-best"><b>${r.best.name}</b> · Lv ${r.best.level}</div>
-        <div class="res-stats">
-          <div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>Overleefd</span></div>
+        <div class="res-stats">${r.raid
+          ? `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>Tijd</span></div>
+          <div><b data-n="${r.raid.dmg}">0</b><span>Schade (${r.raid.share}%)</span></div>
+          <div><b data-n="${r.raid.lives}">0</b><span>Levens over</span></div>`
+          : `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>Overleefd</span></div>
           <div><b data-n="${r.kos}">0</b><span>Trainers K.O.</span></div>
-          <div><b data-n="${r.caught}">0</b><span>Gevangen</span></div>
+          <div><b data-n="${r.caught}">0</b><span>Gevangen</span></div>`}
         </div>
         <div class="res-actions">
           <button class="cta" data-a="0">${main.label}</button>

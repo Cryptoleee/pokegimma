@@ -1,4 +1,6 @@
-import { PARTY_MAX, ROSTER, SPECIES, TEAM_SIZE, WILD, type Rarity } from '../data/pokemon'
+import { PARTY_MAX, rarityOf, ROSTER, SPECIES, TEAM_SIZE, WILD, type Rarity } from '../data/pokemon'
+import { eventTimes, startEvent, updateEvents, type WorldEvent } from './events'
+import { raidDown, setupRaid, updateRaid, type Hazard, type RaidState } from './boss'
 import { movesetFor, SLOT_UNLOCK, type Move, type MoveFx } from '../data/moves'
 import { Vfx } from './vfx'
 import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpact, onMelee, onZap, pal, projectileEnd, projectileTick } from './moveFx'
@@ -9,6 +11,8 @@ import { LEVEL_CAP, Mon, Trainer, xpNeeded, type AimDir } from './entities'
 import { Rng } from './rng'
 import { preloadMon } from './sprites'
 import { MAP, T, World } from './world'
+import type { ThemeId } from '../data/themes'
+import { BOSSES, type BossId } from '../data/bosses'
 import { botThink } from './ai'
 import type { Dir } from './entities'
 import type { Command } from '../net/protocol'
@@ -163,6 +167,8 @@ export interface GameResult {
   kos: number
   caught: number
   best: Pick<Mon, 'name' | 'level' | 'shiny'> & { species: { id: number } }
+  /** Raid results: your damage to the boss and lives left. */
+  raid?: { boss: BossId; dmg: number; share: number; lives: number }
 }
 
 /** One human in a match (solo = just you). */
@@ -174,9 +180,17 @@ export interface HumanSetup {
   team: number[]
 }
 
+/** Battle royale (last trainer standing) or raid (everyone against a boss). */
+export type MatchKind = 'royale' | 'raid'
+
 export interface MatchSetup {
   seed: number
   humans: HumanSetup[]
+  kind?: MatchKind
+  /** Battle royale world (already resolved from "random"). */
+  theme?: ThemeId
+  /** Raid boss. */
+  boss?: BossId
 }
 
 /** solo = everything local; host = simulates for remote players too; client = renders the host's state. */
@@ -255,6 +269,9 @@ export class Game {
   private legendIdx = 0
   /** When the legendaries show up this match (randomised). */
   private legendTimes: number[] = []
+  /** Battle royale: supply drops and swarms (synced to clients). */
+  events: WorldEvent[] = []
+  private eventPlan: { t: number; kind: WorldEvent['kind'] }[] = []
   private passiveT = 0
   total = SEATS
   /** Everyone watching this match: just you in solo, every human on the host. */
@@ -266,13 +283,21 @@ export class Game {
   send: ((c: Command) => void) | null = null
   /** Client: objects by host id and their network positions. */
   net: ClientState | null = null
+  /** Raid: the boss fight state (host and solo). */
+  raid: RaidState | null = null
+  /** Raid HUD info, on the host and on clients: time left, boss phase, pillars standing. */
+  raidView: { timeLeft: number; phase: number } | null = null
+  /** Raid: telegraphed boss attacks on the ground (synced to clients). */
+  hazards: Hazard[] = []
   /** >0 while spawning effects that clients draw themselves (not sent over the network). */
   vfxMute = 0
   private netT = 0
 
-  constructor(setup: MatchSetup, me: number, public hooks: GameHooks, public mode: GameMode = 'solo') {
+  kind: MatchKind
+  constructor(public setup: MatchSetup, me: number, public hooks: GameHooks, public mode: GameMode = 'solo') {
+    this.kind = setup.kind ?? 'royale'
     this.rng = new Rng(setup.seed)
-    this.world = new World(this.rng)
+    this.world = new World(this.rng, this.kind === 'raid' ? { arena: BOSSES[setup.boss ?? 'reshiram'].arena } : { theme: setup.theme })
     // The client only needs the world: everything else comes from the host.
     if (mode === 'client') return
     this.pickNextZone()
@@ -290,6 +315,14 @@ export class Game {
       }
     })
     if (!this.player) this.player = this.trainers[0]
+
+    if (this.kind === 'raid') {
+      // Everyone against one boss: no bots, no wild Pokémon, no storm
+      setupRaid(this, setup.boss ?? 'reshiram')
+      this.camX = this.player.x
+      this.camY = this.player.y
+      return
+    }
 
     const bots = [...BOT_TRAINERS].sort(() => this.rng.next() - 0.5)
     for (let i = 0; this.trainers.length < SEATS; i++) {
@@ -320,6 +353,7 @@ export class Game {
 
     this.scatterItems()
     this.legendTimes = [this.rng.range(60, 100), this.rng.range(190, 250)]
+    this.eventPlan = eventTimes(this)
     for (let i = 0; i < 22; i++) this.spawnWild(true)
     for (const tr of this.trainers) if (tr.human) tr.party.forEach((m) => preloadMon(m.species.id))
   }
@@ -402,8 +436,7 @@ export class Game {
       // Drop-in cinematic: the camera swoops down while everyone waits for GO.
       this.introT -= dt
       this.updateFx(dt)
-      this.camX = this.player.x
-      this.camY = this.player.y
+      this.introCamera()
       if (this.introT <= 0) this.releasePartner()
       return
     }
@@ -423,7 +456,7 @@ export class Game {
       if (v.endT < 0) this.finish(v)
     }
     this.time += dt
-    this.updateZone(dt)
+    if (this.kind === 'royale') this.updateZone(dt)
 
     // Player intent
     const p = this.player
@@ -441,7 +474,7 @@ export class Game {
       this.updateTrainer(tr, dt)
     }
     this.passiveT += dt
-    if (this.passiveT >= 1) {
+    if (this.passiveT >= 1 && this.kind === 'royale') {
       this.passiveT -= 1
       for (const tr of this.alive)
         tr.party.forEach((m, i) => !m.fainted && this.gainXp(m, i === tr.active ? 4 : 2))
@@ -453,7 +486,12 @@ export class Game {
     this.updateNovas(dt)
     this.updateCatches(dt)
     this.updateItems()
-    this.spawnLoop(dt)
+    if (this.raid) updateRaid(this, dt)
+    else {
+      this.spawnLoop(dt)
+      if (this.eventPlan.length && this.time >= this.eventPlan[0].t) startEvent(this, this.eventPlan.shift()!.kind)
+      updateEvents(this, dt)
+    }
 
     const focus = p.alive ? p : this.spectate && this.spectate.alive ? this.spectate : (this.spectate = this.alive[0] ?? p)
     const k = Math.min(1, dt * 8)
@@ -498,11 +536,13 @@ export class Game {
     m.aimT -= dt
     m.dir = m.aimT > 0 ? dirOf(m.aimX, m.aimY) : len > 0.08 ? tr.dir : m.dir
 
-    // Out-of-combat regeneration (Brawl Stars style)
-    this.regen(tr, dt)
+    m.frozenT = Math.max(0, m.frozenT - dt)
+
+    // Out-of-combat regeneration (Brawl Stars style); a raid has potions instead
+    if (this.kind === 'royale') this.regen(tr, dt)
 
     // Storm
-    if (this.zone.outside(tr.x, tr.y) && !m.fainted) {
+    if (this.kind === 'royale' && this.zone.outside(tr.x, tr.y) && !m.fainted) {
       m.combatT = 0
       m.hp -= m.maxHp * this.zone.dps * dt
       if (m.hp <= 0) {
@@ -520,8 +560,7 @@ export class Game {
     if (!p || !cs?.placed) return
     if (this.introT > 0) {
       this.introT -= dt
-      this.camX = p.x
-      this.camY = p.y
+      this.introCamera()
       if (this.introT <= 0) this.partnerOut = true
       return
     }
@@ -591,6 +630,10 @@ export class Game {
       pr.y += pr.vy * dt
     }
     for (const n of this.novas) n.t = Math.max(0.001, n.t - dt)
+    for (const e of this.events) e.t = Math.max(0, e.t - dt)
+    for (const h of this.hazards) h.t = Math.max(0, h.t - dt)
+    if (this.raidView) this.raidView.timeLeft = Math.max(0, this.raidView.timeLeft - dt)
+    for (const tr of this.trainers) if (tr.respawnT > 0) tr.respawnT = Math.max(0, tr.respawnT - dt)
     for (const tr of this.trainers) if (tr.throwFx) tr.throwFx.t += dt
     this.tickHpLag(dt)
 
@@ -600,10 +643,49 @@ export class Game {
     this.camY += (focus.y - this.camY) * kc
   }
 
+  /** Drop-in camera; in a raid it first shows off the boss, then swings to you. */
+  private introCamera() {
+    const p = this.player
+    const boss = this.kind === 'raid' ? this.wilds.find((w) => w.boss) : null
+    if (boss && this.introT > INTRO_TIME * 0.45) {
+      this.camX = boss.x
+      this.camY = boss.y
+    } else if (boss) {
+      const k = Math.min(1, 0.12)
+      this.camX += (p.x - this.camX) * k
+      this.camY += (p.y - this.camY) * k
+    } else {
+      this.camX = p.x
+      this.camY = p.y
+    }
+  }
+
   /** Walks a trainer along its input vector. Returns the input strength. */
   walk(tr: Trainer, dt: number) {
-    const len = Math.hypot(tr.vx, tr.vy)
+    let len = Math.hypot(tr.vx, tr.vy)
     const speed = 4.4
+    // Frozen solid by an ice attack: can't move for a moment
+    if (tr.mon && tr.mon.frozenT > 0 && !tr.mon.fainted) len = 0
+    // Ice floor: you keep sliding and turn slowly
+    if (this.world.at(Math.floor(tr.x), Math.floor(tr.y)) === T.ICE) {
+      const n = Math.min(1, len)
+      const tx = len > 0.08 ? (tr.vx / len) * n * speed * 1.1 : 0, ty = len > 0.08 ? (tr.vy / len) * n * speed * 1.1 : 0
+      const k = Math.min(1, dt * 2.4)
+      tr.slideX += (tx - tr.slideX) * k
+      tr.slideY += (ty - tr.slideY) * k
+      if (!this.tryMove(tr, tr.slideX * dt, tr.slideY * dt, 0.3)) tr.slideX = tr.slideY = 0
+      const sp = Math.hypot(tr.slideX, tr.slideY)
+      if (len > 0.08) {
+        tr.dir = dirOf(tr.vx, tr.vy)
+        if (Math.abs(tr.vx) > 0.15) tr.faceRight = tr.vx > 0
+      }
+      tr.walkT = sp > 0.3 && len > 0.08 ? tr.walkT + dt * 7 : 0
+      return Math.max(len, sp / speed)
+    }
+    if (len > 0.08) {
+      tr.slideX = (tr.vx / len) * Math.min(1, len) * speed
+      tr.slideY = (tr.vy / len) * Math.min(1, len) * speed
+    } else tr.slideX = tr.slideY = 0
     if (len > 0.08) {
       const n = Math.min(1, len)
       const dx = (tr.vx / len) * n * speed * dt
@@ -717,7 +799,7 @@ export class Game {
     for (const e of this.enemiesOf(m)) {
       if (!this.canSee(m, e)) continue
       // Prefer trainers' Pokémon slightly over wild ones.
-      const d = Math.hypot(e.x - m.x, e.y - m.y) - (e.owner ? 0.8 : 0)
+      const d = Math.hypot(e.x - m.x, e.y - m.y) - (e.owner ? 0.8 : 0) - bulk(e)
       if (d < bd) { bd = d; best = e }
     }
     return best
@@ -725,7 +807,7 @@ export class Game {
 
   useMove(m: Mon, slot: number, target?: Mon | null, dir?: AimDir): boolean {
     const mv = m.moves[slot]
-    if (!mv || !m.unlocked(slot) || m.cds[slot] > 0 || m.fainted || m.state === 'weak' || m.dash || m.catching || m.charging) return false
+    if (!mv || !m.unlocked(slot) || m.cds[slot] > 0 || m.fainted || m.state === 'weak' || m.dash || m.catching || m.charging || m.frozenT > 0) return false
     const tgt = target ?? (dir ? this.dirTarget(m, mv.range + 1, dir) : this.autoTarget(m, mv.range + 1.5))
     m.aimDist = dir ? Math.max(1.2, mv.range * dir.k) : null
     m.revealT = REVEAL_TIME
@@ -772,7 +854,7 @@ export class Game {
     for (const e of this.enemiesOf(m)) {
       const dx = e.x - m.x, dy = e.y - m.y
       const d = Math.hypot(dx, dy)
-      if (d > range || d < 0.01) continue
+      if (d - bulk(e) > range || d < 0.01) continue
       const cos = (dx * dir.x + dy * dir.y) / d
       if (cos < 0.9) continue
       const score = d * Math.sqrt(1 - cos * cos) + d * 0.05
@@ -889,7 +971,7 @@ export class Game {
       case 'zap': {
         // Hitscan lightning: Thunder Shock zaps one target, Thunderbolt chains.
         const range = mv.range
-        const main = tgt && Math.hypot(tgt.x - m.x, tgt.y - m.y) <= range + 0.5 ? tgt : null
+        const main = tgt && Math.hypot(tgt.x - m.x, tgt.y - m.y) <= range + 0.5 + bulk(tgt) ? tgt : null
         const ex = main ? main.x : ox + ax * range * 0.7
         const ey = main ? main.y - 0.45 : oy + ay * range * 0.7
         const big = mv.tier >= 2
@@ -915,7 +997,7 @@ export class Game {
       }
       case 'beam': {
         const ex = ox + ax * mv.range, ey = oy + ay * mv.range
-        for (const e of this.enemiesOf(m)) if (segDist(e.x, e.y - 0.4, ox, oy, ex, ey) < 0.8) this.hit(m, e, mv)
+        for (const e of this.enemiesOf(m)) if (segDist(e.x, e.y - 0.4, ox, oy, ex, ey) < 0.8 + bulk(e)) this.hit(m, e, mv)
         if (visible) onBeam(v, mv, ox, oy, ex, ey, () => [m.x + m.aimX * 0.3, m.y - 0.45 + m.aimY * 0.3])
         // Pokémon is locked into the beam for a moment
         m.castT = 0.18
@@ -923,7 +1005,7 @@ export class Game {
       }
       case 'burst': {
         const r = mv.tier >= 3 ? 3.4 : mv.range
-        for (const e of this.enemiesOf(m)) if (Math.hypot(e.x - m.x, e.y - m.y) < r) this.hit(m, e, mv)
+        for (const e of this.enemiesOf(m)) if (Math.hypot(e.x - m.x, e.y - m.y) < r + bulk(e)) this.hit(m, e, mv)
         if (visible) onBurst(v, mv, m.x, m.y - 0.1, r)
         break
       }
@@ -990,7 +1072,7 @@ export class Game {
       return
     }
     for (const e of this.enemiesOf(m))
-      if (!d.hit.has(e) && Math.hypot(e.x - m.x, e.y - m.y) < 1) {
+      if (!d.hit.has(e) && Math.hypot(e.x - m.x, e.y - m.y) < 1 + bulk(e)) {
         d.hit.add(e)
         this.hit(m, e, d.move)
       }
@@ -1006,7 +1088,7 @@ export class Game {
     for (const e of this.enemiesOf(m)) {
       const dx = e.x - m.x, dy = e.y - m.y
       const d = Math.hypot(dx, dy)
-      if (d < 1.4 && (d < 0.8 || (dx * ax + dy * ay) / d > 0.2)) {
+      if (d < 1.4 + bulk(e) && (d < 0.8 + bulk(e) || (dx * ax + dy * ay) / d > 0.2)) {
         this.hit(m, e, mv)
         first = first ?? e
       }
@@ -1031,11 +1113,22 @@ export class Game {
 
   hit(src: Mon, tgt: Mon, mv: Move, mult = 1) {
     if (tgt.fainted || tgt.state === 'weak') return
-    const eff = effectiveness(mv.type, tgt.species.types)
+    // Raid boss: shrugs off hits while it roars into a new phase; its ordinary moves hit softer
+    if (tgt.boss && this.raid && this.raid.invulnT > 0) {
+      const v = this.vOf(src.owner)
+      if (v && this.seenBy(v, tgt.x, tgt.y)) v.fx({ kind: 'text', x: tgt.x, y: tgt.y - 2.2, t: 0, life: 0.6, color: '#b8b8c8', text: 'Immuun', small: true })
+      return
+    }
+    // Raid bosses never fully resist: every partner can win the fight
+    const eff = tgt.boss ? Math.max(0.8, effectiveness(mv.type, tgt.species.types)) : effectiveness(mv.type, tgt.species.types)
     const L = src.level
     const raw = (((2 * L) / 5 + 2) * mv.power * (src.atk / tgt.def)) / 50 + 2
-    const dmg = Math.max(1, Math.round(raw * eff * mult * DMG_SCALE * this.rng.range(0.9, 1.05)))
+    // The boss's ordinary moves are chip damage (a share of your HP); its telegraphed attacks are the real threat
+    const dmg = src.boss
+      ? Math.max(1, Math.round(tgt.maxHp * (0.02 + mv.tier * 0.012) * mult * (eff > 1 ? 1.3 : eff < 1 ? 0.75 : 1)))
+      : Math.max(1, Math.round(raw * eff * mult * DMG_SCALE * this.rng.range(0.9, 1.05)))
     tgt.hp -= dmg
+    if (tgt.boss && src.owner) src.owner.bossDmg += Math.min(dmg, tgt.hp + dmg)
     tgt.flash = 0.12
     tgt.revealT = REVEAL_TIME
     tgt.combatT = 0
@@ -1095,6 +1188,10 @@ export class Game {
       }
     }
     m.dash = null
+    m.charging = null
+    // Raid: the boss is down (the raid tick ends the match), or a player loses a life
+    if (m.boss) return
+    if (this.raid && m.owner) return raidDown(this, m.owner)
     const koXp = (8 + m.level * 1.8) * RARITY_XP[m.rarity]
     if (!m.owner) {
       m.state = 'weak'
@@ -1112,6 +1209,53 @@ export class Game {
     if (by?.owner) this.gainXp(by, koXp * 1.5)
     this.vOf(tr)?.hooks.banner({ kind: 'fainted', title: `${m.name} is verslagen!`, sub: tr.healthyIndex() >= 0 ? 'Je volgende Pokémon komt eraan' : undefined, mon: m.species.id })
     if (tr.healthyIndex() < 0) this.eliminate(tr, by?.owner ?? m.lastHitBy)
+  }
+
+  /** Raid: out of lives. You spectate; the raid ends when everyone is out. */
+  eliminateRaid(tr: Trainer) {
+    if (!tr.alive) return
+    tr.alive = false
+    tr.diedAt = this.time
+    for (const v of this.viewers) v.hooks.feed(`${tr === v.tr ? 'Jij bent' : `${tr.name} is`} door je levens heen`, { trainer: tr.def.sprite })
+    const v = this.vOf(tr)
+    if (v) {
+      v.hooks.banner({ kind: 'fainted', title: 'Geen levens meer', sub: 'Je kijkt mee tot de raid voorbij is', mon: tr.mon.species.id })
+      const mate = this.trainers.find((t) => t.alive)
+      tr.spectate = mate ?? null
+      if (tr.isPlayer) this.spectate = mate ?? null
+    }
+  }
+
+  /** Damage that doesn't come from a move (boss hazards, lava). */
+  applyDamage(m: Mon, dmg: number, by: Mon | null, quiet = false) {
+    if (m.fainted) return
+    m.hp -= dmg
+    m.combatT = 0
+    m.revealT = REVEAL_TIME
+    if (!quiet) {
+      m.flash = 0.15
+      m.joltT = 0.25
+      for (const v of this.viewers) {
+        if (!this.seenBy(v, m.x, m.y)) continue
+        const hurt = m.owner === v.tr
+        v.fx({ kind: 'text', x: m.x, y: m.y - 1.5, t: 0, life: 0.9, color: hurt ? '#ff5a50' : '#ffffff', text: `${Math.round(dmg)}`, big: hurt })
+        if (hurt) v.sfx('hit', true)
+      }
+    }
+    if (m.hp <= 0) {
+      m.hp = 0
+      this.onFaint(m, by)
+    }
+  }
+
+  /** A floating label for everyone who can see it (used by the raid module). */
+  addFxPublic(f: Fx) {
+    this.addFx(f)
+  }
+
+  /** Big name over a Pokémon (boss attack callouts). */
+  callout(m: Mon, text: string, color: string) {
+    this.addFx({ kind: 'callout', x: m.x, y: m.y - 2.8, t: 0, life: 1.3, color, text, big: true })
   }
 
   private eliminate(tr: Trainer, by: Trainer | null) {
@@ -1159,10 +1303,12 @@ export class Game {
     v.done = true
     const p = v.tr
     const b = [...p.party].sort((a, b) => b.level - a.level)[0]
+    const r = this.raid
     v.hooks.end({
-      won: p.alive, place: p.alive ? 1 : p.place, total: this.total,
-      time: p.alive ? this.time : p.diedAt, kos: p.kos, caught: p.caught,
+      won: r ? r.result === 'won' : p.alive, place: p.alive ? 1 : p.place, total: this.total,
+      time: r ? this.time : p.alive ? this.time : p.diedAt, kos: p.kos, caught: p.caught,
       best: { name: b.name, level: b.level, shiny: b.shiny, species: { id: b.species.id } },
+      raid: r ? { boss: r.def.id, dmg: Math.round(p.bossDmg), share: Math.round((p.bossDmg / r.boss.maxHp) * 100), lives: p.lives } : undefined,
     })
     if (v.local) this.over = true
     if (this.viewers.every((o) => o.done)) this.allDone = true
@@ -1171,7 +1317,7 @@ export class Game {
   // ---------------- Leveling ----------------
 
   gainXp(m: Mon, amount: number) {
-    if (m.level >= LEVEL_CAP || !m.owner) return
+    if (m.level >= LEVEL_CAP || !m.owner || this.raid) return
     // Bots fight nonstop; a lower XP rate keeps them from out-levelling people
     m.xp += m.owner.brain ? amount * BOT_XP : amount
     while (m.xp >= xpNeeded(m.level) && m.level < LEVEL_CAP) {
@@ -1223,6 +1369,7 @@ export class Game {
 
   /** Try to throw a ball. Normal balls only work on weakened wild Pokémon. */
   throwBall(tr: Trainer, w: Mon, master: boolean): boolean {
+    if (w.boss) return false
     if (this.send) {
       if (!tr.alive || w.catching || (!master && w.state !== 'weak') || (master && tr.masterBalls <= 0) || tr.throwFx) return false
       this.send({ t: 'ball', w: w.id, m: master })
@@ -1446,6 +1593,15 @@ export class Game {
     this.wilds.push(m)
   }
 
+  /** A wild Pokémon at a spot (swarms). */
+  spawnWildAt(id: number, x: number, y: number) {
+    const m = new Mon(id, this.wildLevel(rarityOf(id)), this.rng.chance(1 / 64))
+    m.x = m.homeX = m.goalX = x
+    m.y = m.homeY = m.goalY = y
+    preloadMon(id, m.shiny)
+    this.wilds.push(m)
+  }
+
   private spawnLegendary() {
     const z = this.zone
     const [x, y] = this.world.randomWalkable(
@@ -1493,6 +1649,8 @@ export class Game {
         continue
       }
       this.updateCharge(w, dt)
+      // The raid boss has its own brain (boss.ts)
+      if (w.boss) continue
       let mx = 0, my = 0, speed = 1.1
       if (w.state === 'aggro' && w.aggro) {
         let t = w.aggro
@@ -1603,7 +1761,7 @@ export class Game {
       let hit = false
       if (!dead)
         for (const e of this.enemiesOf(p.src)) {
-          if (Math.hypot(e.x - p.x, e.y - 0.45 - p.y) < (e.legendary ? 0.9 : 0.6)) {
+          if (Math.hypot(e.x - p.x, e.y - (e.boss ? 1 : 0.45) - p.y) < (e.boss ? 1.6 : e.legendary ? 0.9 : 0.6)) {
             this.hit(p.src, e, p.move, p.mult)
             dead = hit = true
             break
@@ -1624,7 +1782,7 @@ export class Game {
       this.novas.splice(this.novas.indexOf(n), 1)
       let any = false
       for (const e of this.enemiesOf(n.src))
-        if (Math.hypot(e.x - n.x, e.y - n.y) < n.r) {
+        if (Math.hypot(e.x - n.x, e.y - n.y) < n.r + bulk(e)) {
           this.hit(n.src, e, n.move, n.mult)
           any = true
         }
@@ -1730,7 +1888,7 @@ export class Game {
   catchable(tr: Trainer): Mon | null {
     let best: Mon | null = null, bd = 2.8
     for (const w of this.wilds) {
-      if (w.state !== 'weak' || w.catching || this.claimedByOther(w, tr)) continue
+      if (w.state !== 'weak' || w.catching || w.boss || this.claimedByOther(w, tr)) continue
       const d = Math.min(Math.hypot(w.x - tr.x, w.y - tr.y), Math.hypot(w.x - tr.mon.x, w.y - tr.mon.y))
       if (d < bd) { bd = d; best = w }
     }
@@ -1742,7 +1900,7 @@ export class Game {
     const order: Rarity[] = ['common', 'uncommon', 'rare', 'legendary']
     let best: Mon | null = null
     for (const w of this.wilds) {
-      if (w.catching || Math.hypot(w.x - tr.x, w.y - tr.y) > range) continue
+      if (w.catching || w.boss || Math.hypot(w.x - tr.x, w.y - tr.y) > range) continue
       if (!best || order.indexOf(w.rarity) > order.indexOf(best.rarity) || (w.rarity === best.rarity && w.level > best.level)) best = w
     }
     return best
@@ -1756,6 +1914,11 @@ export function dirOf(x: number, y: number): Dir {
 
 export function dirVec(d: Dir): [number, number] {
   return d === 'up' ? [0, -1] : d === 'down' ? [0, 1] : d === 'left' ? [-1, 0] : [1, 0]
+}
+
+/** Extra hit radius for the huge raid boss. */
+function bulk(m: Mon) {
+  return m.boss ? 0.9 : 0
 }
 
 function segDist(px: number, py: number, ax: number, ay: number, bx: number, by: number) {

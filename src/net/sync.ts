@@ -6,6 +6,7 @@ import type { Fx, Game, GameHooks, GameResult, ItemKind, Viewer } from '../game/
 import { preloadMon } from '../game/sprites'
 import type { Vfx } from '../game/vfx'
 import type { Command, NetEvent, RosterEntry } from './protocol'
+import type { Hazard } from '../game/boss'
 
 /**
  * Multiplayer state sync. The host runs the real simulation; ~20 times a second
@@ -17,6 +18,7 @@ import type { Command, NetEvent, RosterEntry } from './protocol'
 const DIRS: Dir[] = ['down', 'up', 'left', 'right']
 const STATES: WildState[] = ['roam', 'aggro', 'weak']
 const ITEMS: ItemKind[] = ['master', 'potion', 'candy', 'revive']
+const SHAPES: Hazard['shape'][] = ['circle', 'cone', 'line', 'ring']
 const r2 = (v: number) => Math.round(v * 100) / 100
 const r1 = (v: number) => Math.round(v * 10) / 10
 
@@ -107,6 +109,8 @@ function monState(m: Mon, own: boolean) {
   if (m.state === 'weak') o.wk = r1(m.weakT)
   if (m.claimT > 0 && m.claim) o.cl = [m.claim.id, r1(m.claimT)]
   if (m.catching) o.ca = 1
+  if (m.boss) o.bs = m.bossMul
+  if (m.frozenT > 0) o.fz = r2(m.frozenT)
   if (m.dash) o.ds = [r2(m.dash.vx), r2(m.dash.vy), r2(m.dash.t), m.dash.move.name, m.dash.strike ? 1 : 0]
   if (m.charging) o.ch = [m.charging.move.name, r2(m.charging.t), m.charging.total]
   if (own) {
@@ -133,6 +137,11 @@ export function snapshot(g: Game, v: RemoteViewer) {
       i: tr.id, x: r2(tr.x), y: r2(tr.y), d: DIRS.indexOf(tr.dir), f: tr.faceRight ? 1 : 0, w: r1(tr.walkT),
       a: tr.alive ? 1 : 0, rv: r2(tr.revealT), m: m.id, pl: tr.place,
     }
+    if (g.raid) {
+      o.lv = tr.lives
+      o.rs = r1(tr.respawnT)
+      o.bd = Math.round(tr.bossDmg)
+    }
     if (tr.throwFx) {
       const t = tr.throwFx
       o.th = [r2(t.x), r2(t.y), r2(t.tx), r2(t.ty), r2(t.t), t.master ? 1 : 0]
@@ -149,6 +158,9 @@ export function snapshot(g: Game, v: RemoteViewer) {
     p: g.projs.filter((p) => near(p.x, p.y)).map((p) => [r2(p.x), r2(p.y), r2(p.vx), r2(p.vy), r2(p.life), p.move.name, r2(p.seed)]),
     n: g.novas.filter((n) => near(n.x, n.y)).map((n) => [r2(n.x), r2(n.y), r2(n.t), n.total, n.move.name, n.r, r2(n.sx), r2(n.sy)]),
     z: [r2(z.x), r2(z.y), r2(z.r), r2(z.nx), r2(z.ny), z.nr, z.phase, r2(z.t), z.shrinking ? 1 : 0, r2(z.fromX), r2(z.fromY), r2(z.fromR)],
+    ev: g.events.map((e) => [e.id, e.kind === 'drop' ? 0 : 1, r2(e.x), r2(e.y), r1(e.t), e.total, e.species ?? 0]),
+    hz: g.hazards.map((h) => [h.id, SHAPES.indexOf(h.shape), r2(h.x), r2(h.y), r2(h.ang), h.r, h.inner, h.width, r2(h.t), r2(h.total), h.type, h.both ? 1 : 0]),
+    rv: g.raidView ? [r1(g.raidView.timeLeft), g.raidView.phase, ...g.world.pillars.map((p) => p.hp)] : undefined,
     me: {
       p: me.party.map((m) => m.id), ac: me.active, mb: me.masterBalls, po: me.potions, re: me.revives,
       k: me.kos, c: me.caught, sw: r2(me.swapCd), sp: me.spectate?.id ?? 0, dd: r1(me.diedAt),
@@ -279,6 +291,11 @@ function getMon(cs: ClientState, o: Record<string, number & string & unknown[]>,
   m.claim = cl ? cs.trainers.get(cl[0]) ?? null : null
   m.claimT = cl ? cl[1] : 0
   m.catching = !!o.ca
+  if (o.bs) {
+    m.boss = true
+    m.bossMul = o.bs
+  }
+  m.frozenT = o.fz ?? 0
   const ds = o.ds as unknown as [number, number, number, string, number] | undefined
   m.dash = ds ? { vx: ds[0], vy: ds[1], t: ds[2], move: moveByName(ds[3]), hit: new Set(), strike: !!ds[4] } : null
   const ch = o.ch as unknown as [string, number, number] | undefined
@@ -301,6 +318,9 @@ type Snap = {
   n: [number, number, number, number, string, number, number, number][]
   z: number[]
   it?: [number, number, number][]
+  ev?: [number, number, number, number, number, number, number][]
+  hz?: [number, number, number, number, number, number, number, number, number, number, string, number][]
+  rv?: number[]
   me: Record<string, number & number[]>
 }
 
@@ -323,6 +343,11 @@ export function applySnapshot(g: Game, raw: unknown) {
     tr.alive = !!t.a
     tr.revealT = t.rv ?? 0
     tr.place = t.pl
+    if (t.lv !== undefined) {
+      tr.lives = t.lv
+      tr.respawnT = t.rs
+      tr.bossDmg = t.bd
+    }
     const th = t.th as unknown as number[] | undefined
     tr.throwFx = th ? { x: th[0], y: th[1], tx: th[2], ty: th[3], t: th[4], master: !!th[5] } : null
     // You move yourself; only snap back if the host disagrees a lot (blocked or lagged out)
@@ -375,6 +400,15 @@ export function applySnapshot(g: Game, raw: unknown) {
   ;[z.x, z.y, z.r, z.nx, z.ny, z.nr, z.phase, z.t] = s.z
   z.shrinking = !!s.z[8]
   ;[z.fromX, z.fromY, z.fromR] = [s.z[9], s.z[10], s.z[11]]
+  if (s.hz) g.hazards = s.hz.map(([id, sh, x, y, ang, r, inner, width, t, total, type, both]) => ({
+    id, shape: SHAPES[sh], x, y, ang, r, inner, width, t, total, type: type as Hazard['type'], both: !!both,
+    dmg: 0, fx: 'fireblast' as const, freeze: 0, cover: false,
+  }))
+  if (s.rv) {
+    g.raidView = { timeLeft: s.rv[0], phase: s.rv[1] }
+    s.rv.slice(2).forEach((hp, i) => { if (!hp) g.world.breakPillar(i) })
+  }
+  if (s.ev) g.events = s.ev.map(([id, k, x, y, t, total, species]) => ({ id, kind: k ? 'swarm' : 'drop', x, y, t, total, species: species || undefined }))
   if (s.it) g.items = s.it.map(([x, y, k], i) => ({ x, y, kind: ITEMS[k], bob: g.items[i]?.bob ?? Math.random() * 6 }))
 }
 

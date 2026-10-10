@@ -10,6 +10,7 @@ import { MAP } from '../game/world'
 import type { Mon } from '../game/entities'
 import type { ChatLine } from '../net/protocol'
 import { esc, QUICK_CHAT } from './menu'
+import { BOSSES } from '../data/bosses'
 
 const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = '') => {
   const el = document.createElement(tag)
@@ -60,6 +61,10 @@ export class Hud {
   private legendId = -1
   private chatBar: HTMLElement | null = null
   private chatBtn: HTMLButtonElement | null = null
+  /** Raid: boss bar, team lives and the respawn countdown. */
+  private bossBar = h('div', 'bossbar hidden')
+  private respawnEl = h('div', 'respawn hidden')
+  private bossKey = ''
   /** Resets for every touch control, so a lost touch can never leave one stuck. */
   private releasers: (() => void)[] = []
 
@@ -117,7 +122,9 @@ export class Hud {
     menu.setAttribute('aria-label', 'Pauze')
     menu.onclick = onMenu
     sys.append(menu, mute)
-    root.append(sys, this.toastEl, this.bannerEl, this.legend)
+    root.append(sys, this.toastEl, this.bannerEl, this.legend, this.bossBar, this.respawnEl)
+    if (g.kind === 'raid') root.classList.add('raid-mode')
+    else root.classList.remove('raid-mode')
 
     // Multiplayer chat: a button opens quick phrases and a text field
     if (opts.chat) {
@@ -422,7 +429,12 @@ export class Hud {
       const label = t > INTRO_TIME - 1.6 ? 'title' : String(Math.ceil(t / ((INTRO_TIME - 1.6) / 3)))
       if (label !== this.cdShown) {
         this.cdShown = label
-        if (label === 'title') this.countdown.innerHTML = `<div class="cd-title"><small>${g.total} TRAINERS · 1 WINNAAR</small><b>BATTLE ROYALE</b></div>`
+        if (label === 'title') {
+          const boss = g.kind === 'raid' ? BOSSES[g.setup.boss ?? 'reshiram'] : null
+          this.countdown.innerHTML = boss
+            ? `<div class="cd-title raid"><small>RAID · ${boss.title.toUpperCase()}</small><b>${boss.name.toUpperCase()}</b></div>`
+            : `<div class="cd-title"><small>${g.total} TRAINERS · 1 WINNAAR</small><b>BATTLE ROYALE</b></div>`
+        }
         else {
           this.countdown.innerHTML = `<b class="num">${label}</b>`
           sfx.countdown(false)
@@ -532,6 +544,8 @@ export class Hud {
     this.vLow.classList.toggle('on', p.alive && !m.fainted && k < 0.25)
     this.vStorm.classList.toggle('on', p.alive && g.introT <= 0 && g.zone.outside(p.x, p.y))
 
+    if (g.kind === 'raid') return this.updateRaid()
+
     // Chips
     this.aliveChip.innerHTML = `<i>👤</i>${g.alive.length}`
     this.updateLegend()
@@ -544,12 +558,54 @@ export class Hud {
     this.drawMini()
   }
 
+  /** Raid HUD: the boss bar (HP, phase marks, timer), everyone's lives, respawn countdown. */
+  private updateRaid() {
+    const g = this.g, p = g.player
+    const boss = g.wilds.find((w) => w.boss)
+    const def = BOSSES[g.setup.boss ?? 'reshiram']
+    this.legend.classList.add('hidden')
+    this.bossBar.classList.toggle('hidden', !boss || g.introT > INTRO_TIME * 0.45)
+    if (boss) {
+      if (this.bossKey !== def.id) {
+        this.bossKey = def.id
+        this.bossBar.style.setProperty('--c', def.color)
+        this.bossBar.innerHTML = `
+          <img class="px bb-face" src="${spriteUrl(def.species)}" alt="">
+          <div class="bb-main">
+            <div class="bb-top"><b>${def.name}</b><small>${def.title}</small><span class="bb-time"></span></div>
+            <div class="bb-bar"><i class="bb-lag"></i><i class="bb-fill"></i>${def.phases.map((f) => `<em style="left:${f * 100}%"></em>`).join('')}</div>
+            <div class="bb-team"></div>
+          </div>`
+      }
+      const k = Math.max(0, boss.hp / boss.maxHp)
+      ;(this.bossBar.querySelector('.bb-fill') as HTMLElement).style.width = `${k * 100}%`
+      ;(this.bossBar.querySelector('.bb-lag') as HTMLElement).style.width = `${Math.max(0, boss.hpLag / boss.maxHp) * 100}%`
+      const rv = g.raidView
+      const t = Math.ceil(rv?.timeLeft ?? 0)
+      const time = this.bossBar.querySelector('.bb-time') as HTMLElement
+      time.textContent = `⏱ ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
+      time.classList.toggle('low', t <= 30)
+      this.bossBar.classList.toggle('enraged', (rv?.phase ?? 0) >= 2)
+      const humans = g.trainers.filter((t) => t.human)
+      const team = humans.map((t) => `<span class="${t === p ? 'mine' : ''} ${t.alive ? '' : 'out'}">${esc(t.name)} ${'♥'.repeat(Math.max(0, t.lives))}${'♡'.repeat(Math.max(0, 3 - t.lives))}</span>`).join('')
+      const tEl = this.bossBar.querySelector('.bb-team') as HTMLElement
+      if (tEl.innerHTML !== team) tEl.innerHTML = team
+    }
+    // Down: big countdown until you're back
+    const down = p.alive && p.mon.fainted && p.respawnT > 0
+    this.respawnEl.classList.toggle('hidden', !down)
+    if (down) this.respawnEl.innerHTML = `<small>${p.mon.name} is verslagen</small><b>${Math.ceil(p.respawnT)}</b><span>nog ${p.lives} ${p.lives === 1 ? 'leven' : 'levens'}</span>`
+  }
+
   /** Gold alert while a legendary roams: name, distance, an arrow toward it and how to catch it. */
   private updateLegend() {
     const g = this.g, p = g.player
-    const w: Mon | undefined = g.wilds.find((x) => x.legendary && !x.catching)
+    const w: Mon | undefined = g.wilds.find((x) => x.legendary && !x.catching && !x.boss)
+    // No legendary around: point at a supply drop or swarm instead
+    if (!w && p.alive && g.introT <= 0 && g.events.length) return this.updateEventPill()
     const show = !!w && p.alive && g.introT <= 0
     this.legend.classList.toggle('hidden', !show)
+    this.legend.classList.remove('evt', 'drop', 'swarm')
     if (!show || !w) {
       this.legendId = -1
       return
@@ -568,6 +624,34 @@ export class Hud {
       ? (g.claimedByOther(w, p) ? 'Verzwakt, iemand anders mag eerst' : 'Verzwakt! Snel vangen!')
       : p.masterBalls > 0 ? 'Gooi je Master Ball!' : 'Versla hem, of vang hem met een Master Ball'
     ;(this.legend.querySelector('span') as HTMLElement).textContent = `${Math.round(d)} m · ${how}`
+    this.legend.classList.toggle('near', d < 6)
+  }
+
+  /** Tracker pill for the nearest event (blue = supply drop, green = swarm). */
+  private updateEventPill() {
+    const g = this.g, p = g.player
+    let e = g.events[0], bd = Infinity
+    for (const x of g.events) {
+      const d = Math.hypot(x.x - p.x, x.y - p.y) - (x.kind === 'drop' ? 30 : 0)
+      if (d < bd) { bd = d; e = x }
+    }
+    this.legend.classList.remove('hidden')
+    this.legend.classList.add('evt', e.kind)
+    const key = -1000 - e.id
+    if (this.legendId !== key) {
+      this.legendId = key
+      const icon = e.kind === 'drop' ? `<img class="px" src="${itemUrl('master-ball')}" alt="">` : `<img class="px" src="${spriteUrl(e.species ?? 25)}" alt="">`
+      this.legend.innerHTML = `${icon}<div class="lg-txt"><b>${e.kind === 'drop' ? '📦 Bevoorrading' : '🐾 Zwerm'}</b><span></span></div><i class="lg-arrow">➤</i>`
+      this.legend.classList.remove('pop')
+      void this.legend.offsetWidth
+      this.legend.classList.add('pop')
+    }
+    const dx = e.x - p.x, dy = e.y - p.y
+    const d = Math.hypot(dx, dy)
+    ;(this.legend.querySelector('.lg-arrow') as HTMLElement).style.transform = `rotate(${Math.atan2(dy, dx)}rad)`
+    ;(this.legend.querySelector('span') as HTMLElement).textContent = e.kind === 'drop'
+      ? `${Math.round(d)} m · ${e.t > 0.5 ? `landt over ${Math.ceil(e.t)}s` : 'geland!'}`
+      : `${Math.round(d)} m · zes wilde Pokémon`
     this.legend.classList.toggle('near', d < 6)
   }
 
@@ -598,6 +682,10 @@ export class Hud {
       c.setLineDash([])
     }
     const blink = Math.floor(performance.now() / 300) % 2 === 0
+    for (const e of g.events) {
+      c.fillStyle = blink ? (e.kind === 'drop' ? '#58d0ff' : '#7ce07c') : '#282830'
+      c.fillRect(e.x * s - 4, e.y * s - 4, 8, 8)
+    }
     for (const w of g.wilds)
       if (w.legendary) {
         c.fillStyle = blink ? '#ffd040' : '#282830'
