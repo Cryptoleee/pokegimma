@@ -54,6 +54,11 @@ export class Mon {
   mvy = 0
   catching = false
   castT = 0
+  /** Hit feedback: colour tint, jitter and psychic lift. */
+  tintCol = '#ffffff'
+  tintT = 0
+  joltT = 0
+  liftT = 0
   charging: { move: Move; t: number; total: number; tgt: Mon | null } | null = null
   lastHitBy: Trainer | null = null
 

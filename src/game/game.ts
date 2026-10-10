@@ -1,6 +1,7 @@
 import { PARTY_MAX, ROSTER, SPECIES, WILD, type Rarity } from '../data/pokemon'
 import { movesetFor, SLOT_UNLOCK, type Move, type MoveFx } from '../data/moves'
-import { trail, Vfx } from './vfx'
+import { Vfx } from './vfx'
+import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpact, onMelee, onZap, pal, projectileEnd, projectileTick } from './moveFx'
 import { BOT_TRAINERS, type TrainerDef } from '../data/trainers'
 import { effectiveness, TYPE_COLOR } from '../data/types'
 import { sfx } from '../audio'
@@ -53,10 +54,13 @@ export interface Nova {
   src: Mon
   r: number
   mult: number
+  /** Where the move was cast from (lobbed orbs fly from here). */
+  sx: number
+  sy: number
 }
 
 export interface Fx {
-  kind: 'ring' | 'beam' | 'text' | 'spark' | 'poof' | 'heal' | 'zap' | 'area' | 'impact' | 'melee' | 'callout'
+  kind: 'text' | 'spark' | 'poof' | 'heal' | 'melee' | 'callout'
   style?: MoveFx
   x: number
   y: number
@@ -153,6 +157,7 @@ export class Game {
   novas: Nova[] = []
   fx: Fx[] = []
   vfx = new Vfx()
+  hitStop = 0
   catches: PendingCatch[] = []
   zone = new Zone()
   flow!: Int32Array
@@ -227,6 +232,12 @@ export class Game {
   // ---------------- Main loop ----------------
 
   update(dt: number) {
+    if (this.hitStop > 0) {
+      // Freeze-frame on big hits; only the camera shake keeps going.
+      this.hitStop -= dt
+      this.vfx.shake = Math.max(0, this.vfx.shake - dt * 10)
+      return
+    }
     this.updateFx(dt)
     if (this.paused) return
     if (this.endT >= 0) {
@@ -373,10 +384,11 @@ export class Game {
     const visible = this.onScreen(m.x, m.y)
     if (visible && m.owner?.isPlayer) sfx.cast(mv.tier)
     if (visible && mv.tier >= 1)
-      this.fx.push({ kind: 'callout', x: m.x, y: m.y - 1.9, t: 0, life: 0.9, color: TYPE_COLOR[mv.type], text: mv.name })
+      this.fx.push({ kind: 'callout', x: m.x, y: m.y - 1.9, t: 0, life: 1, color: TYPE_COLOR[mv.type], text: mv.name, big: mv.tier >= 3 })
     this.aim(m, tgt)
     if (mv.charge > 0) {
       m.charging = { move: mv, t: mv.charge, total: mv.charge, tgt }
+      fxCast(this.vfx, mv, m, this.nearCam(m.x, m.y))
       return true
     }
     this.fire(m, mv, tgt)
@@ -406,19 +418,23 @@ export class Game {
       return
     }
     c.t -= dt
-    if (this.onScreen(m.x, m.y) && Math.random() < 0.5) this.vfx.emit(c.move.fx, m.x + this.rng.range(-0.8, 0.8), m.y - 0.5 + this.rng.range(-0.8, 0.5), 1, 0.5, { life: 0.3 })
+    if (this.onScreen(m.x, m.y)) chargeTick(this.vfx, c.move, m.x, m.y - 0.5, 1 - c.t / c.total)
     if (c.t > 0) return
     m.charging = null
     const tgt = c.tgt && !c.tgt.fainted && c.tgt.state !== 'weak' ? c.tgt : this.autoTarget(m, c.move.range + 1.5)
     this.aim(m, tgt)
-    this.fire(m, c.move, tgt)
+    this.fire(m, c.move, tgt, true)
   }
 
-  private fire(m: Mon, mv: Move, tgt: Mon | null) {
+  private fire(m: Mon, mv: Move, tgt: Mon | null, charged = false) {
     const ax = m.aimX, ay = m.aimY
     const ox = m.x, oy = m.y - 0.45
     const visible = this.onScreen(m.x, m.y)
+    const near = this.nearCam(m.x, m.y)
+    const v = this.vfx
     m.castT = 0.18
+    if (!charged) fxCast(v, mv, m, near)
+    else if (near) v.shakeBy(3)
 
     switch (mv.kind) {
       case 'melee': {
@@ -433,7 +449,8 @@ export class Game {
         }
         const fx = hitAny ? hitAny.x : ox + ax * 1.1
         const fy = hitAny ? hitAny.y - 0.45 : oy + ay * 1.1
-        this.fx.push({ kind: 'melee', style: mv.fx, x: fx, y: fy, x2: ax, y2: ay, t: 0, life: 0.28, color: TYPE_COLOR[mv.type] })
+        this.fx.push({ kind: 'melee', style: mv.fx, x: fx, y: fy, x2: ax, y2: ay, t: 0, life: 0.32, color: TYPE_COLOR[mv.type] })
+        if (visible) onMelee(v, mv, fx, fy, ax, ay, !!hitAny)
         break
       }
       case 'bolt':
@@ -451,6 +468,7 @@ export class Game {
       }
       case 'dash':
         m.dash = { vx: ax * 13, vy: ay * 13, t: mv.range / 13, move: mv, hit: new Set() }
+        if (visible) v.ring(m.x, m.y, 0.9, pal(mv.fx).glow, 0.25, 3)
         break
       case 'zap': {
         // Hitscan lightning: Thunder Shock zaps one target, Thunderbolt chains.
@@ -458,49 +476,38 @@ export class Game {
         const main = tgt && Math.hypot(tgt.x - m.x, tgt.y - m.y) <= range + 0.5 ? tgt : null
         const ex = main ? main.x : ox + ax * range * 0.7
         const ey = main ? main.y - 0.45 : oy + ay * range * 0.7
-        this.fx.push({ kind: 'zap', style: mv.fx, x: ox, y: oy, x2: ex, y2: ey, t: 0, life: mv.tier >= 2 ? 0.32 : 0.2, color: '#f8d030', big: mv.tier >= 2 })
-        if (visible) this.vfx.emit(mv.fx, ex, ey, mv.tier >= 2 ? 10 : 5, 4)
+        const big = mv.tier >= 2
+        if (visible) onZap(v, mv, ox, oy, ex, ey, big)
         if (main) {
           this.hit(m, main, mv)
-          if (mv.tier >= 2) {
+          if (big) {
             let from = main
             const done = new Set([main])
             for (let j = 0; j < 2; j++) {
               const next = this.enemiesOf(m).find((e) => !done.has(e) && Math.hypot(e.x - from.x, e.y - from.y) < 3.5)
               if (!next) break
               done.add(next)
-              this.fx.push({ kind: 'zap', style: mv.fx, x: from.x, y: from.y - 0.45, x2: next.x, y2: next.y - 0.45, t: 0, life: 0.28, color: '#f8d030' })
+              if (this.onScreen(next.x, next.y)) onZap(v, mv, from.x, from.y - 0.45, next.x, next.y - 0.45, false, true)
               this.hit(m, next, mv, 0.6)
               from = next
             }
           }
         }
-        if (visible && mv.tier >= 2) this.shakeAt(m.x, m.y, 2)
+        if (near && big) v.shakeBy(4)
         break
       }
       case 'beam': {
         const ex = ox + ax * mv.range, ey = oy + ay * mv.range
-        for (const e of this.enemiesOf(m)) if (segDist(e.x, e.y - 0.4, ox, oy, ex, ey) < 0.75) this.hit(m, e, mv)
-        const life = mv.fx === 'flamethrower' ? 0.45 : mv.tier >= 3 ? 0.5 : 0.35
-        this.fx.push({ kind: 'beam', style: mv.fx, x: ox, y: oy, x2: ex, y2: ey, t: 0, life, color: TYPE_COLOR[mv.type], big: mv.tier >= 3 })
-        if (visible) {
-          for (let s = 0; s < 6; s++) {
-            const k = this.rng.next()
-            this.vfx.emit(mv.fx, ox + (ex - ox) * k, oy + (ey - oy) * k, 2, 2.5)
-          }
-          if (mv.tier >= 3) this.shakeAt(m.x, m.y, 4)
-        }
+        for (const e of this.enemiesOf(m)) if (segDist(e.x, e.y - 0.4, ox, oy, ex, ey) < 0.8) this.hit(m, e, mv)
+        if (visible) onBeam(v, mv, ox, oy, ex, ey, () => [m.x + m.aimX * 0.3, m.y - 0.45 + m.aimY * 0.3])
+        // Pokémon is locked into the beam for a moment
+        m.castT = 0.18
         break
       }
       case 'burst': {
         const r = mv.tier >= 3 ? 3.4 : mv.range
         for (const e of this.enemiesOf(m)) if (Math.hypot(e.x - m.x, e.y - m.y) < r) this.hit(m, e, mv)
-        this.fx.push({ kind: 'area', style: mv.fx, x: m.x, y: m.y - 0.2, t: 0, life: 0.55, color: TYPE_COLOR[mv.type], r })
-        if (visible) {
-          this.vfx.emit(mv.fx, m.x, m.y - 0.3, mv.tier >= 3 ? 26 : 14, r * 2.5)
-          if (mv.fx === 'quake') this.shakeAt(m.x, m.y, mv.tier >= 3 ? 8 : 4)
-          else if (mv.tier >= 3) this.shakeAt(m.x, m.y, 3)
-        }
+        if (visible) onBurst(v, mv, m.x, m.y - 0.1, r)
         break
       }
       case 'nova': {
@@ -509,11 +516,11 @@ export class Game {
         const r = mv.tier >= 3 ? 2.3 : 1.8
         if (mv.fx === 'dracometeor') {
           // A shower of three meteors
-          for (const [dx, dy, delay] of [[0, 0, 0.75], [1.4, 0.6, 0.95], [-1.3, 0.8, 1.15]])
-            this.novas.push({ x: nx + dx, y: ny + dy, t: delay, total: delay, move: mv, src: m, r: 1.6, mult: 0.55 })
+          for (const [dx, dy, delay] of [[0, 0, 0.8], [1.4, 0.6, 1.0], [-1.3, 0.8, 1.2]])
+            this.novas.push({ x: nx + dx, y: ny + dy, t: delay, total: delay, move: mv, src: m, r: 1.6, mult: 0.55, sx: ox, sy: oy })
         } else {
-          const t = mv.fx === 'thunder' ? 0.7 : 0.6
-          this.novas.push({ x: nx, y: ny, t, total: t, move: mv, src: m, r, mult: 1 })
+          const t = mv.fx === 'thunder' ? 0.85 : mv.fx === 'fireblast' || mv.fx === 'focusblast' || mv.fx === 'sludgebomb' ? 0.65 : 0.6
+          this.novas.push({ x: nx, y: ny, t, total: t, move: mv, src: m, r, mult: 1, sx: ox, sy: oy })
         }
         break
       }
@@ -530,7 +537,11 @@ export class Game {
   }
 
   shakeAt(x: number, y: number, amount: number) {
-    if (Math.hypot(x - this.camX, y - this.camY) < 10) this.vfx.shake = Math.max(this.vfx.shake, amount)
+    if (this.nearCam(x, y)) this.vfx.shakeBy(amount)
+  }
+
+  nearCam(x: number, y: number) {
+    return Math.hypot(x - this.camX, y - this.camY) < 11
   }
 
   private updateDash(m: Mon, dt: number) {
@@ -546,7 +557,7 @@ export class Game {
         d.hit.add(e)
         this.hit(m, e, d.move)
       }
-    if (this.onScreen(m.x, m.y)) this.vfx.emit(d.move.fx, m.x, m.y - 0.4, 2, 1.5, { life: 0.35 })
+    if (this.onScreen(m.x, m.y)) dashTick(this.vfx, d.move.fx, m.x, m.y - 0.4, d.vx, d.vy)
     d.t -= dt
     if (d.t <= 0) m.dash = null
   }
@@ -572,7 +583,8 @@ export class Game {
         kind: 'text', x: tgt.x + this.rng.range(-0.3, 0.3), y: tgt.y - 1.4, t: 0, life: 0.8,
         color: eff > 1 ? '#ffd040' : eff < 1 ? '#c8c8c8' : '#ffffff', text: `${dmg}${eff > 1 ? '!' : ''}`, big: eff > 1,
       })
-      this.vfx.emit(mv.fx, tgt.x, tgt.y - 0.5, eff > 1 ? 7 : 4, 3)
+      onHit(this.vfx, mv, tgt, eff, this.nearCam(tgt.x, tgt.y))
+      if ((src.owner?.isPlayer || tgt.owner?.isPlayer) && (mv.tier >= 2 || eff > 1)) this.hitStop = Math.max(this.hitStop, 0.035 + mv.tier * 0.015)
       if (src.owner?.isPlayer || tgt.owner?.isPlayer) sfx.hit(eff > 1)
     }
     if (!tgt.owner) {
@@ -589,6 +601,16 @@ export class Game {
 
   private onFaint(m: Mon, by: Mon | null) {
     if (this.onScreen(m.x, m.y)) sfx.faint()
+    if (this.nearCam(m.x, m.y)) {
+      // KO punctuation: freeze, flash ring and a burst of stars
+      this.vfx.ring(m.x, m.y - 0.2, 1.8, '#ffffff', 0.5, 5)
+      this.vfx.glow(m.x, m.y - 0.5, 30, '#ffffff', 0.3)
+      this.vfx.burst(m.x, m.y - 0.5, { n: 14, speed: 6, cols: ['#ffffff', '#fff0a0', '#ffd040'], shape: 'star', add: true, s0: 3, s1: 0.8, life: 0.6, vr: 12 })
+      if (by?.owner?.isPlayer || m.owner?.isPlayer) {
+        this.hitStop = Math.max(this.hitStop, 0.12)
+        this.vfx.shakeBy(6)
+      }
+    }
     m.dash = null
     const koXp = (5 + m.level * 1.2) * RARITY_XP[m.rarity]
     if (!m.owner) {
@@ -894,6 +916,9 @@ export class Game {
       for (let i = 0; i < 4; i++) w.cds[i] = Math.max(0, w.cds[i] - dt)
       w.aimT -= dt
       w.castT = Math.max(0, w.castT - dt)
+      w.tintT = Math.max(0, w.tintT - dt)
+      w.joltT = Math.max(0, w.joltT - dt)
+      w.liftT = Math.max(0, w.liftT - dt)
       if (w.catching) continue
       if (w.state === 'weak') {
         w.weakT -= dt
@@ -969,6 +994,9 @@ export class Game {
         m.flash = Math.max(0, m.flash - dt)
         m.evolveFx = Math.max(0, m.evolveFx - dt)
         m.castT = Math.max(0, m.castT - dt)
+        m.tintT = Math.max(0, m.tintT - dt)
+        m.joltT = Math.max(0, m.joltT - dt)
+        m.liftT = Math.max(0, m.liftT - dt)
       }
   }
 
@@ -997,23 +1025,24 @@ export class Game {
         p.vx += ((dx / d) * sp - p.vx) * k
         p.vy += ((dy / d) * sp - p.vy) * k
       }
-      if (this.onScreen(p.x, p.y)) trail(this.vfx, p.move.fx, p.x, p.y, p.vx, p.vy)
+      if (this.onScreen(p.x, p.y)) projectileTick(this.vfx, p.move.fx, p.x, p.y, p.vx, p.vy)
       p.x += p.vx * dt
       p.y += p.vy * dt
       p.life -= dt
       const t = this.world.at(Math.floor(p.x), Math.floor(p.y + 0.4))
       let dead = p.life <= 0 || t === T.TREE || t === T.ROCK || t === T.HOUSE
+      let hit = false
       if (!dead)
         for (const e of this.enemiesOf(p.src)) {
           if (Math.hypot(e.x - p.x, e.y - 0.45 - p.y) < (e.legendary ? 0.9 : 0.6)) {
             this.hit(p.src, e, p.move, p.mult)
-            dead = true
+            dead = hit = true
             break
           }
         }
       if (dead) {
         this.projs.splice(this.projs.indexOf(p), 1)
-        if (this.onScreen(p.x, p.y)) this.vfx.emit(p.move.fx, p.x, p.y, 6, 3)
+        if (this.onScreen(p.x, p.y)) projectileEnd(this.vfx, p.move.fx, p.x, p.y, hit)
       }
     }
   }
@@ -1024,13 +1053,7 @@ export class Game {
       if (n.t > 0) continue
       this.novas.splice(this.novas.indexOf(n), 1)
       for (const e of this.enemiesOf(n.src)) if (Math.hypot(e.x - n.x, e.y - n.y) < n.r) this.hit(n.src, e, n.move, n.mult)
-      const life = n.move.fx === 'hurricane' ? 0.7 : 0.5
-      this.fx.push({ kind: 'impact', style: n.move.fx, x: n.x, y: n.y, t: 0, life, color: TYPE_COLOR[n.move.type], r: n.r })
-      if (this.onScreen(n.x, n.y)) {
-        this.vfx.emit(n.move.fx, n.x, n.y - 0.3, n.move.tier >= 3 ? 22 : 12, 5, { grav: 8 })
-        this.shakeAt(n.x, n.y, n.move.tier >= 3 ? 5 : 2)
-        if (n.move.fx === 'thunder') this.vfx.flash = 0.5
-      }
+      if (this.onScreen(n.x, n.y)) onImpact(this.vfx, n.move, n.x, n.y, n.r)
     }
   }
 
