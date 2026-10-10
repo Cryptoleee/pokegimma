@@ -148,10 +148,16 @@ function onEnd(r: GameResult) {
   hud?.destroy()
   hud = null
   if (!room) {
-    showResults(r, trainer.sprite, () => wipe(startSolo, { flash: true }), () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), 'Start de battle ▶')))
+    showResults(r, trainer.sprite, { label: 'Nog een keer ▶', run: () => wipe(startSolo, { flash: true }) }, [
+      { label: 'Ander team', run: () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), 'Start de battle ▶')) },
+      { label: 'Hoofdmenu', run: () => wipe(() => toMenu()) },
+    ])
     return
   }
-  showResults(r, trainer.sprite, () => wipe(toLobby), () => spectate(), { again: 'Naar de lobby ▶', other: 'Kijk mee' })
+  showResults(r, trainer.sprite, { label: 'Naar de lobby ▶', run: () => wipe(toLobby) }, [
+    { label: 'Kijk mee', run: () => spectate() },
+    { label: 'Hoofdmenu', run: () => leaveRoom() },
+  ])
 }
 
 /** Watch the rest of the match after you're out. */
@@ -236,14 +242,17 @@ function toLobby() {
         wipe(toLobby)
       }, () => wipe(toLobby), 'Klaar ▶'))
     },
-    leave: () => {
-      room?.leave()
-      room = null
-      remotes.clear()
-      stopGame()
-      wipe(() => toMenu())
-    },
+    leave: leaveRoom,
   })
+}
+
+/** Leave the multiplayer room (as host this closes it for everyone) and go to the main menu. */
+function leaveRoom() {
+  room?.leave()
+  room = null
+  remotes.clear()
+  stopGame()
+  wipe(() => toMenu())
 }
 
 function hostStart() {

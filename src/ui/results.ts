@@ -5,10 +5,13 @@ import { playMusic } from '../music'
 import type { GameResult } from '../game/game'
 
 /** End-of-match screen: placement badge, your trainer and best Pokémon, counted stats. */
-export function showResults(
-  r: GameResult, trainerSprite: string, onAgain: () => void, onMenu: () => void,
-  labels = { again: 'Nog een keer ▶', other: 'Ander team kiezen' },
-) {
+export interface ResultAction {
+  label: string
+  run: () => void
+}
+
+/** `main` is the big button; `more` are the smaller ones below it (e.g. other team, main menu). */
+export function showResults(r: GameResult, trainerSprite: string, main: ResultAction, more: ResultAction[]) {
   const el = document.getElementById('screen')!
   const tier = r.won ? 'gold' : r.place <= 3 ? 'silver' : 'bronze'
   el.innerHTML = `
@@ -31,8 +34,8 @@ export function showResults(
           <div><b data-n="${r.caught}">0</b><span>Gevangen</span></div>
         </div>
         <div class="res-actions">
-          <button class="cta" id="again">${labels.again}</button>
-          <button class="ghost2" id="menu">${labels.other}</button>
+          <button class="cta" data-a="0">${main.label}</button>
+          <div class="res-more">${more.map((a, i) => `<button class="ghost2" data-a="${i + 1}">${a.label}</button>`).join('')}</div>
         </div>
       </div>
     </div>`
@@ -91,12 +94,11 @@ export function showResults(
     requestAnimationFrame(loop)
   }
 
-  el.querySelector('#again')!.addEventListener('click', () => {
-    sfx.select()
-    onAgain()
-  })
-  el.querySelector('#menu')!.addEventListener('click', () => {
-    sfx.select()
-    onMenu()
-  })
+  const actions = [main, ...more]
+  el.querySelectorAll<HTMLElement>('.res-actions [data-a]').forEach((b) =>
+    b.addEventListener('click', () => {
+      sfx.select()
+      actions[Number(b.dataset.a)].run()
+    }),
+  )
 }

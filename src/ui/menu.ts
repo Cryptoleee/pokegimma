@@ -52,9 +52,10 @@ export function showMenu(st: MenuState, on: MenuActions) {
       </div>
       <div class="mm-actions">
         <button class="cta mm-solo">Solo spelen ▶<small>tegen ${SEATS - 1} bots</small></button>
+        <div class="mm-label"><span>Multiplayer</span><small>speel samen met vrienden, ook online</small></div>
         <div class="mm-row">
-          <button class="mm-tile mm-host"><i>＋</i><b>Potje maken</b><small>speel met vrienden</small></button>
-          <button class="mm-tile mm-join"><i>⌗</i><b>Meedoen</b><small>met een code</small></button>
+          <button class="mm-tile mm-host"><i>＋</i><b>Potje maken</b><small>jij bent de host</small></button>
+          <button class="mm-tile mm-join"><i>⌗</i><b>Meedoen</b><small>met een code of link</small></button>
         </div>
         <form class="mm-code ${st.code || st.error ? 'open' : ''}">
           <input id="mm-code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" value="${esc(st.code ?? '')}" inputmode="text">

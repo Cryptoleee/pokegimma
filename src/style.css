@@ -3899,3 +3899,31 @@ button:disabled {
   background: rgba(0, 0, 0, 0.35);
   animation: cardIn 0.4s 0.3s cubic-bezier(0.2, 1.3, 0.4, 1) both;
 }
+
+/* Main menu: multiplayer section header */
+.mm-label {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 6px 2px -4px;
+}
+.mm-label span {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--hi);
+}
+.mm-label small {
+  font-size: 12px;
+  color: #a8b0d0;
+}
+
+/* Results: secondary actions side by side */
+.res-more {
+  display: flex;
+  gap: 8px;
+}
+.res-more .ghost2 {
+  flex: 1;
+}
