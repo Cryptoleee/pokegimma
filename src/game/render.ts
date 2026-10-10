@@ -9,7 +9,7 @@ import { drawGlow } from './vfx'
 import { T, TILE } from './world'
 import type { Weather } from '../data/themes'
 import { drawEvents } from './events'
-import { drawHazards } from './boss'
+import { drawHazards, drawHazardsSky } from './boss'
 
 const FONT = '"Pixelify Sans", monospace'
 
@@ -85,8 +85,9 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // Canopies and roofs
   ctx.drawImage(g.world.overlay, sx, sy, sw, sh, sx, sy, sw, sh)
 
-  // Supply drops coming down
+  // Supply drops coming down; boss attacks on their way (meteors, icicles, the boss charging up)
   drawEvents(g, ctx, time)
+  drawHazardsSky(g, ctx, time)
 
   // Ultimates dim the world so the effect pops (like BW's battle backdrop fade)
   g.vfx.drawDim(ctx, ox - 4, oy - 4, vw + 8, vh + 8)

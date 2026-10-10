@@ -105,6 +105,8 @@ export interface Pillar {
   col: string
   dark: string
   delay: number
+  /** Dust kicked up as it rises (default: earth). */
+  dust?: string
 }
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a)
@@ -183,8 +185,8 @@ export class Vfx {
   beam(x1: number, y1: number, x2: number, y2: number, style: string, life: number, w: number) {
     this.beams.push({ x1, y1, x2, y2, style, t: 0, life, w })
   }
-  pillar(x: number, y: number, h: number, w: number, col: string, dark: string, life = 0.9, delay = 0) {
-    this.pillars.push({ x, y, h, w, t: -delay, life, col, dark, delay })
+  pillar(x: number, y: number, h: number, w: number, col: string, dark: string, life = 0.9, delay = 0, dust?: string) {
+    this.pillars.push({ x, y, h, w, t: -delay, life, col, dark, delay, dust })
   }
   /** Position hint for the screen effects that follow (used to sync effects in multiplayer). */
   mark(_x: number, _y: number) {}
@@ -586,7 +588,7 @@ function drawPillar(ctx: CanvasRenderingContext2D, p: Pillar, v: Vfx) {
   const sink = k > 0.75 ? (k - 0.75) / 0.25 : 0
   const h = p.h * rise * (1 - sink * 0.6)
   const px = p.x * TILE, py = p.y * TILE
-  if (rise < 1 && Math.random() < 0.5) v.burst(p.x, p.y, { n: 1, cols: ['#c8b890', '#a09070'], shape: 'smoke', s0: 3, s1: 7, life: 0.5, speed: 1, flat: 0.5 })
+  if (rise < 1 && Math.random() < 0.5) v.burst(p.x, p.y, { n: 1, cols: p.dust ? [p.dust, p.dust] : ['#c8b890', '#a09070'], shape: 'smoke', s0: 3, s1: 7, life: 0.5, speed: 1, flat: 0.5 })
   ctx.globalAlpha = 1 - sink
   ctx.fillStyle = 'rgba(0,0,0,0.25)'
   ctx.beginPath()

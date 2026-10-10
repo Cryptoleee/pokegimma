@@ -6,7 +6,7 @@ import type { Fx, Game, GameHooks, GameResult, ItemKind, Viewer } from '../game/
 import { preloadMon } from '../game/sprites'
 import type { Vfx } from '../game/vfx'
 import type { Command, NetEvent, RosterEntry } from './protocol'
-import type { Hazard } from '../game/boss'
+import { bossAttack, type Hazard } from '../game/boss'
 
 /**
  * Multiplayer state sync. The host runs the real simulation; ~20 times a second
@@ -159,7 +159,7 @@ export function snapshot(g: Game, v: RemoteViewer) {
     n: g.novas.filter((n) => near(n.x, n.y)).map((n) => [r2(n.x), r2(n.y), r2(n.t), n.total, n.move.name, n.r, r2(n.sx), r2(n.sy)]),
     z: [r2(z.x), r2(z.y), r2(z.r), r2(z.nx), r2(z.ny), z.nr, z.phase, r2(z.t), z.shrinking ? 1 : 0, r2(z.fromX), r2(z.fromY), r2(z.fromR)],
     ev: g.events.map((e) => [e.id, e.kind === 'drop' ? 0 : 1, r2(e.x), r2(e.y), r1(e.t), e.total, e.species ?? 0]),
-    hz: g.hazards.map((h) => [h.id, SHAPES.indexOf(h.shape), r2(h.x), r2(h.y), r2(h.ang), h.r, h.inner, h.width, r2(h.t), r2(h.total), h.type, h.both ? 1 : 0]),
+    hz: g.hazards.map((h) => [h.id, SHAPES.indexOf(h.shape), r2(h.x), r2(h.y), r2(h.ang), h.r, h.inner, h.width, r2(h.t), r2(h.total), h.type, h.both ? 1 : 0, h.atk]),
     rv: g.raidView ? [r1(g.raidView.timeLeft), g.raidView.phase, ...g.world.pillars.map((p) => p.hp)] : undefined,
     me: {
       p: me.party.map((m) => m.id), ac: me.active, mb: me.masterBalls, po: me.potions, re: me.revives,
@@ -319,7 +319,7 @@ type Snap = {
   z: number[]
   it?: [number, number, number][]
   ev?: [number, number, number, number, number, number, number][]
-  hz?: [number, number, number, number, number, number, number, number, number, number, string, number][]
+  hz?: [number, number, number, number, number, number, number, number, number, number, string, number, string][]
   rv?: number[]
   me: Record<string, number & number[]>
 }
@@ -400,10 +400,13 @@ export function applySnapshot(g: Game, raw: unknown) {
   ;[z.x, z.y, z.r, z.nx, z.ny, z.nr, z.phase, z.t] = s.z
   z.shrinking = !!s.z[8]
   ;[z.fromX, z.fromY, z.fromR] = [s.z[9], s.z[10], s.z[11]]
-  if (s.hz) g.hazards = s.hz.map(([id, sh, x, y, ang, r, inner, width, t, total, type, both]) => ({
-    id, shape: SHAPES[sh], x, y, ang, r, inner, width, t, total, type: type as Hazard['type'], both: !!both,
-    dmg: 0, fx: 'fireblast' as const, freeze: 0, cover: false,
-  }))
+  if (s.hz) g.hazards = s.hz.map(([id, sh, x, y, ang, r, inner, width, t, total, type, both, atk]) => {
+    const a = bossAttack(g, atk)
+    return {
+      id, shape: SHAPES[sh], x, y, ang, r, inner, width, t, total, type: type as Hazard['type'], both: !!both,
+      dmg: 0, fx: a?.fx ?? 'earthpower', freeze: 0, cover: !!a?.cover, atk,
+    }
+  })
   if (s.rv) {
     g.raidView = { timeLeft: s.rv[0], phase: s.rv[1] }
     s.rv.slice(2).forEach((hp, i) => { if (!hp) g.world.breakPillar(i) })
