@@ -99,7 +99,7 @@ function startGame() {
     },
   })
   hud = new Hud(hudRoot, game, confirmLeave)
-  if (desktop) setTimeout(() => hud?.toast('WASD of muis om te lopen · 1–4 aanvallen · Esc pauze'), INTRO_TIME * 1000 + 600)
+  if (desktop) setTimeout(() => hud?.toast('WASD lopen · klik = aanval · Q E R = krachten · Esc pauze'), INTRO_TIME * 1000 + 600)
   // Extra history entry so the phone's back button asks before leaving.
   history.pushState({ battlemon: 'game' }, '')
   guardActive = true
@@ -170,51 +170,70 @@ export const desktop = matchMedia('(pointer: fine)').matches
 if (desktop) document.body.classList.add('desk')
 
 const keys = new Set<string>()
-const MOVE_KEYS = ['1', '2', '3', '4']
+/**
+ * Desktop layout (left hand on WASD, right hand on the mouse):
+ * LMB = attack 1, Q/E/R = attacks 2/3/4 (R = ultimate), RMB hold = walk to cursor,
+ * Space = catch, F = switch Pokémon, 1/2/3 = Master Ball / Potion / Revive.
+ */
+const ATTACK_KEYS: Record<string, number> = { q: 1, e: 2, r: 3 }
 window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase()
   keys.add(k)
   if (e.key === 'Escape') return confirmLeave()
   if (!game || !hud || game.paused) return
-  if (k === ' ' || k.startsWith('arrow')) e.preventDefault()
+  if (k === ' ' || k === 'tab' || k.startsWith('arrow')) e.preventDefault()
   const g = game, p = g.player
-  const slot = MOVE_KEYS.indexOf(k)
-  if (slot >= 0) g.held[slot] = true
-  if (k === 'q' && !e.repeat) {
+  if (k in ATTACK_KEYS) {
+    const slot = ATTACK_KEYS[k]
+    // Fire on press (a quick tap must never be lost), keep firing while held
+    if (!e.repeat && p.alive && g.introT <= 0) g.useMove(p.mon, slot, undefined, g.cursorDir(p.mon))
+    g.held[slot] = true
+  }
+  if (e.repeat) return
+  if (k === 'f') {
     for (let i = 1; i <= p.party.length; i++) if (g.switchTo(p, (p.active + i) % p.party.length)) break
   }
-  if ((k === 'e' || k === ' ') && !e.repeat) {
+  if (k === ' ') {
     const w = g.catchable(p)
     if (w) g.throwBall(p, w, false)
   }
-  if (e.repeat) return
-  if (k === '5' || k === 'm') hud.useItem('master')
-  if (k === '6' || k === 'r') hud.useItem('potion')
-  if (k === '7' || k === 'f') hud.useItem('revive')
+  if (k === '1') hud.useItem('master')
+  if (k === '2') hud.useItem('potion')
+  if (k === '3') hud.useItem('revive')
 })
 window.addEventListener('keyup', (e) => {
   const k = e.key.toLowerCase()
   keys.delete(k)
-  if (!game) return
-  const slot = MOVE_KEYS.indexOf(k)
-  if (slot >= 0) game.held[slot] = false
+  if (game && k in ATTACK_KEYS) game.held[ATTACK_KEYS[k]] = false
 })
 window.addEventListener('blur', () => {
   keys.clear()
-  mouse.down = false
+  mouse.attack = mouse.walk = false
   if (game) game.held.fill(false)
 })
 
-// Hold the left mouse button to walk toward the cursor; attacks aim at the cursor.
-const mouse = { x: 0, y: 0, down: false, inside: false }
+// LMB fires attack 1 at the cursor (hold to keep firing); RMB held walks toward the cursor.
+const mouse = { x: 0, y: 0, attack: false, walk: false, inside: false }
 canvas.addEventListener('mousedown', (e) => {
-  if (e.button !== 0) return
-  mouse.down = true
   mouse.x = e.clientX
   mouse.y = e.clientY
+  mouse.inside = true
+  if (e.button === 0) {
+    mouse.attack = true
+    if (game && !game.paused && game.player.alive && game.introT <= 0) {
+      updateAim(game)
+      game.useMove(game.player.mon, 0, undefined, game.cursorDir(game.player.mon))
+      game.held[0] = true
+    }
+  }
+  if (e.button === 2) mouse.walk = true
 })
 window.addEventListener('mouseup', (e) => {
-  if (e.button === 0) mouse.down = false
+  if (e.button === 0) {
+    mouse.attack = false
+    if (game) game.held[0] = false
+  }
+  if (e.button === 2) mouse.walk = false
 })
 canvas.addEventListener('mousemove', (e) => {
   mouse.x = e.clientX
@@ -224,6 +243,15 @@ canvas.addEventListener('mousemove', (e) => {
 canvas.addEventListener('mouseleave', () => (mouse.inside = false))
 canvas.addEventListener('contextmenu', (e) => e.preventDefault())
 
+/** Map the mouse position to world tiles and store it as the aim point. */
+function updateAim(g: Game) {
+  const dpr = canvas.width / innerWidth
+  const wx = (mouse.x * dpr / view.Z + view.ox) / TILE
+  const wy = (mouse.y * dpr / view.Z + view.oy) / TILE
+  g.aimAt = desktop && (mouse.inside || mouse.attack || mouse.walk) ? { x: wx, y: wy } : null
+  return { wx, wy }
+}
+
 function desktopInput(g: Game) {
   let x = 0, y = 0
   if (keys.has('a') || keys.has('arrowleft')) x--
@@ -231,17 +259,14 @@ function desktopInput(g: Game) {
   if (keys.has('w') || keys.has('arrowup')) y--
   if (keys.has('s') || keys.has('arrowdown')) y++
 
-  const dpr = canvas.width / innerWidth
-  const wx = (mouse.x * dpr / view.Z + view.ox) / TILE
-  const wy = (mouse.y * dpr / view.Z + view.oy) / TILE
-  g.aimAt = desktop && (mouse.inside || mouse.down) ? { x: wx, y: wy } : null
+  const { wx, wy } = updateAim(g)
 
   if (x || y) {
     const l = Math.hypot(x, y)
     g.input.mx = x / l
     g.input.my = y / l
     steering = true
-  } else if (mouse.down && !g.paused) {
+  } else if (mouse.walk && !g.paused) {
     const p = g.player
     const dx = wx - p.x, dy = wy - (p.y - 0.4)
     const d = Math.hypot(dx, dy)

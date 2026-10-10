@@ -50,6 +50,7 @@ export class Hud {
   private vLow = h('div', 'vign low')
   private vStorm = h('div', 'vign storm', '<span>BUITEN DE ZONE!</span>')
   private countdown = h('div', 'countdown')
+  private hideBadge = h('div', 'hidebadge', '<i>🌿</i>Verborgen')
   private cdShown = ''
 
   constructor(private root: HTMLElement, private g: Game, onMenu: () => void) {
@@ -83,7 +84,7 @@ export class Hud {
     xp.append(this.xpFill)
     main.append(top, hp, bottom, xp)
     this.card.append(pf, main)
-    root.append(this.card, this.party)
+    root.append(this.card, this.party, this.hideBadge)
 
     // Top right: map, chips, feed
     const tr = h('div', 'topright')
@@ -111,7 +112,7 @@ export class Hud {
     // Items
     const items = h('div', 'items2')
     for (const [key, sprite, label] of [['master', 'master-ball', 'Master'], ['potion', 'potion', 'Potion'], ['revive', 'revive', 'Revive']] as const) {
-      const kb = { master: '5', potion: '6', revive: '7' }[key]
+      const kb = { master: '1', potion: '2', revive: '3' }[key]
       const b = h('div', `ib ${key}`, `<img class="px" src="${itemUrl(sprite)}" alt="${label}"><b>0</b><kbd>${kb}</kbd>`) as HTMLDivElement
       b.onpointerdown = (e) => {
         e.preventDefault()
@@ -400,7 +401,7 @@ export class Hud {
         const locked = !m.unlocked(s)
         b.classList.toggle('locked', locked)
         b.style.setProperty('--tc', TYPE_COLOR[mv.type])
-        b.innerHTML = `<div class="ring"></div><div class="cd"></div><div class="lbl">${locked ? `<span class="lock">🔒</span><small>Lv ${SLOT_UNLOCK[s]}</small>` : `<span>${mv.name}</span><small>${TYPE_NL[mv.type]}</small>`}</div><div class="secs"></div><div class="aimknob"></div><kbd>${s + 1}</kbd>`
+        b.innerHTML = `<div class="ring"></div><div class="cd"></div><div class="lbl">${locked ? `<span class="lock">🔒</span><small>Lv ${SLOT_UNLOCK[s]}</small>` : `<span>${mv.name}</span><small>${TYPE_NL[mv.type]}</small>`}</div><div class="secs"></div><div class="aimknob"></div><kbd>${['Klik', 'Q', 'E', 'R'][s]}</kbd>`
       })
     }
     m.moves.forEach((mv, s) => {
@@ -429,6 +430,8 @@ export class Hud {
     }
 
     this.catchBtn.classList.toggle('hidden', !p.alive || !g.catchable(p))
+
+    this.hideBadge.classList.toggle('on', p.alive && g.introT <= 0 && g.hidden(p))
 
     // Vignettes
     this.vLow.classList.toggle('on', p.alive && !m.fainted && k < 0.25)

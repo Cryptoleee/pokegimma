@@ -3272,3 +3272,116 @@ kbd {
 .mb.aiming .secs {
   opacity: 0.25;
 }
+
+/* ---------- Hidden in tall grass ---------- */
+
+.hidebadge {
+  position: absolute;
+  top: calc(126px + var(--safe-t));
+  left: calc(10px + var(--safe-l));
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px 3px 6px;
+  border-radius: 12px;
+  background: rgba(30, 90, 40, 0.9);
+  border: 2px solid #9cf0a0;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0;
+  transform: translateX(-12px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none !important;
+}
+.hidebadge.on {
+  opacity: 1;
+  transform: none;
+}
+.hidebadge i {
+  font-style: normal;
+}
+
+/* ---------- Results: calm, clean, glass ---------- */
+
+.res {
+  background: linear-gradient(180deg, rgba(10, 14, 30, 0.72), rgba(6, 8, 16, 0.9)) !important;
+  backdrop-filter: blur(10px) saturate(0.7);
+  -webkit-backdrop-filter: blur(10px) saturate(0.7);
+}
+.res.won {
+  background: linear-gradient(180deg, rgba(40, 28, 6, 0.72), rgba(10, 8, 4, 0.92)) !important;
+}
+.res-glow {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  width: 640px;
+  height: 640px;
+  max-width: 160vw;
+  max-height: 160vw;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(120, 150, 255, 0.28) 0%, rgba(120, 150, 255, 0.08) 35%, transparent 65%);
+  animation: breathe 5s ease-in-out infinite;
+  pointer-events: none;
+}
+.res.won .res-glow {
+  background: radial-gradient(circle, rgba(255, 210, 90, 0.35) 0%, rgba(255, 210, 90, 0.1) 35%, transparent 65%);
+}
+@keyframes breathe {
+  50% {
+    transform: translate(-50%, -50%) scale(1.06);
+    opacity: 0.85;
+  }
+}
+.res-card {
+  padding: 66px 22px 22px;
+  margin-top: 56px;
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(30, 38, 72, 0.72), rgba(14, 18, 36, 0.82));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.res.won .res-card {
+  border-color: rgba(255, 216, 74, 0.35);
+}
+.medal {
+  position: absolute;
+  top: -56px;
+  left: 50%;
+  margin-left: -56px;
+}
+.res-title {
+  margin-top: 0;
+}
+.res-stage {
+  height: 140px;
+}
+.res-plat {
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.22), transparent 70%) !important;
+}
+.res-stats div {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ---------- Evolution: soft light instead of rays ---------- */
+
+.evo-scene {
+  background: radial-gradient(circle at 50% 42%, #24305e 0%, #0c1022 55%, #06080f 100%) !important;
+}
+.evo-glow {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 90vmin;
+  height: 90vmin;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(150, 200, 255, 0.35) 0%, rgba(150, 200, 255, 0.08) 40%, transparent 68%);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+.evo-scene.done .evo-glow {
+  background: radial-gradient(circle, rgba(255, 220, 120, 0.4) 0%, rgba(255, 220, 120, 0.1) 40%, transparent 68%);
+}

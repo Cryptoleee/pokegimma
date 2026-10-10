@@ -43,7 +43,7 @@ const SLIDES: Slide[] = [
         <div class="btns"><span class="b1"></span><span class="b2"></span><span class="b3"></span><span class="b4"></span></div>
       </div>`,
     text: matchMedia('(pointer: fine)').matches
-      ? 'Loop met WASD, of houd de muisknop ingedrukt en je loopt naar je cursor. Aanvallen zitten op 1 t/m 4 en richten op de vijand bij je cursor!'
+      ? 'Loop met WASD. Klik om aan te vallen, en gebruik Q, E en R voor je krachten. Alles richt op je cursor. Rechtermuisknop vasthouden kan ook om te lopen.'
       : 'Beweeg met de joystick links op je scherm. Rechts zitten je aanvallen. Richten gaat vanzelf: tik en je Pokémon valt aan!',
   },
   {

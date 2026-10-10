@@ -149,6 +149,9 @@ export interface GameHooks {
 
 /** Length of the drop-in countdown before the match starts (s). */
 export const INTRO_TIME = 3.6
+/** How close you must be to spot someone hiding in tall grass (tiles). */
+export const BUSH_SIGHT = 2.8
+const REVEAL_TIME = 1.2
 
 export interface GameResult {
   won: boolean
@@ -323,6 +326,8 @@ export class Game {
 
   private updateTrainer(tr: Trainer, dt: number) {
     tr.swapCd = Math.max(0, tr.swapCd - dt)
+    tr.revealT = Math.max(0, tr.revealT - dt)
+    tr.mon.revealT = Math.max(0, tr.mon.revealT - dt)
     const len = Math.hypot(tr.vx, tr.vy)
     const speed = 4.4
     if (len > 0.08) {
@@ -434,7 +439,7 @@ export class Game {
       // Desktop: take the enemy closest to the cursor (if the cursor is near one)
       let pick: Mon | null = null, pd = 3.5
       for (const e of this.enemiesOf(m)) {
-        if (Math.hypot(e.x - m.x, e.y - m.y) > range) continue
+        if (Math.hypot(e.x - m.x, e.y - m.y) > range || !this.canSee(m, e)) continue
         const d = Math.hypot(e.x - this.aimAt.x, e.y - this.aimAt.y)
         if (d < pd) { pd = d; pick = e }
       }
@@ -443,6 +448,7 @@ export class Game {
     let best: Mon | null = null
     let bd = range
     for (const e of this.enemiesOf(m)) {
+      if (!this.canSee(m, e)) continue
       // Prefer trainers' Pokémon slightly over wild ones.
       const d = Math.hypot(e.x - m.x, e.y - m.y) - (e.owner ? 0.8 : 0)
       if (d < bd) { bd = d; best = e }
@@ -455,6 +461,7 @@ export class Game {
     if (!mv || !m.unlocked(slot) || m.cds[slot] > 0 || m.fainted || m.state === 'weak' || m.dash || m.catching || m.charging) return false
     const tgt = target ?? (dir ? this.dirTarget(m, mv.range + 1, dir) : this.autoTarget(m, mv.range + 1.5))
     m.aimDist = dir ? Math.max(1.2, mv.range * dir.k) : null
+    m.revealT = REVEAL_TIME
     if (m.owner?.isPlayer && tgt) {
       this.lastTarget = tgt
       this.lastTargetT = 1.6
@@ -472,6 +479,17 @@ export class Game {
     }
     this.fire(m, mv, tgt)
     return true
+  }
+
+  /** Trainers and their Pokémon standing in tall grass are hidden, unless revealed. */
+  hidden(e: { x: number; y: number; revealT: number }, owned = true): boolean {
+    return owned && e.revealT <= 0 && this.world.isTall(e.x, e.y)
+  }
+
+  /** Can `viewer` see `e`? Hidden things are only visible up close. */
+  canSee(viewer: { x: number; y: number }, e: Mon): boolean {
+    if (!e.owner || !this.hidden(e)) return true
+    return Math.hypot(viewer.x - e.x, viewer.y - e.y) < BUSH_SIGHT
   }
 
   /** Enemy closest to an aim line (within ~25°), for manual aiming. */
@@ -502,7 +520,7 @@ export class Game {
     const m = this.player.mon
     this.lastTargetT -= dt
     const lt = this.lastTarget
-    if (lt && this.lastTargetT > 0 && !lt.fainted && lt.state !== 'weak' && Math.hypot(lt.x - m.x, lt.y - m.y) < 10) this.playerTarget = lt
+    if (lt && this.lastTargetT > 0 && !lt.fainted && lt.state !== 'weak' && this.canSee(m, lt) && Math.hypot(lt.x - m.x, lt.y - m.y) < 10) this.playerTarget = lt
     else this.playerTarget = m.fainted ? null : this.autoTarget(m, m.moves[0].range + 1.5)
   }
 
@@ -734,6 +752,7 @@ export class Game {
     const dmg = Math.max(1, Math.round(raw * eff * mult * DMG_SCALE * this.rng.range(0.9, 1.05)))
     tgt.hp -= dmg
     tgt.flash = 0.12
+    tgt.revealT = REVEAL_TIME
     if (src.owner) tgt.lastHitBy = src.owner
 
     // knockback
@@ -1130,7 +1149,7 @@ export class Game {
         if (t.fainted || (t.owner && t.owner.mon !== t)) t = t.owner && t.owner.alive && !t.owner.mon.fainted ? t.owner.mon : t
         w.aggroT -= dt
         const d = Math.hypot(t.x - w.x, t.y - w.y)
-        if (t.fainted || !t.owner?.alive || d > 11 || Math.hypot(w.x - w.homeX, w.y - w.homeY) > 16 || w.aggroT <= 0) {
+        if (t.fainted || !t.owner?.alive || d > 11 || !this.canSee(w, t) || Math.hypot(w.x - w.homeX, w.y - w.homeY) > 16 || w.aggroT <= 0) {
           w.aggro = null
           w.state = 'roam'
         } else {
@@ -1155,7 +1174,7 @@ export class Game {
           w.goalX = w.homeX + this.rng.range(-4, 4)
           w.goalY = w.homeY + this.rng.range(-4, 4)
           if (w.aggressive) {
-            const near = this.trainers.find((tr) => tr.alive && !tr.mon.fainted && Math.hypot(tr.mon.x - w.x, tr.mon.y - w.y) < (w.legendary ? 5 : 3.5))
+            const near = this.trainers.find((tr) => tr.alive && !tr.mon.fainted && this.canSee(w, tr.mon) && Math.hypot(tr.mon.x - w.x, tr.mon.y - w.y) < (w.legendary ? 5 : 3.5))
             if (near) {
               w.aggro = near.mon
               w.aggroT = 8

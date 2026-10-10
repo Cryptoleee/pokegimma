@@ -11,7 +11,7 @@ export function showResults(r: GameResult, trainerSprite: string, onAgain: () =>
   el.innerHTML = `
     <div class="res ${r.won ? 'won' : ''}">
       <canvas class="confetti"></canvas>
-      <div class="res-rays"></div>
+      <div class="res-glow"></div>
       <div class="res-card">
         <div class="medal ${tier}"><small>${r.won ? 'WINNAAR' : 'PLAATS'}</small><b>#${r.place}</b></div>
         <div class="res-title">${r.won ? 'Kampioen van de arena!' : r.place <= 3 ? 'Bijna! Top 3' : 'Uitgeschakeld'}</div>

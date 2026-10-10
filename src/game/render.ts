@@ -1,6 +1,6 @@
 import { TYPE_COLOR } from '../data/types'
 import type { Game } from './game'
-import { INTRO_TIME, ITEM_SPRITE } from './game'
+import { BUSH_SIGHT, INTRO_TIME, ITEM_SPRITE } from './game'
 import type { Mon, Trainer } from './entities'
 import { getSprite, itemUrl, monSprite } from './sprites'
 import { trainerSpriteUrl } from '../data/trainers'
@@ -64,10 +64,12 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   type Ent = { y: number; draw: () => void }
   const ents: Ent[] = []
   for (const tr of g.trainers) {
-    if (tr.alive && inView(tr.x, tr.y)) ents.push({ y: tr.y, draw: () => drawTrainer(g, ctx, tr, time) })
+    const tv = vis(g, tr, tr.isPlayer)
+    if (tr.alive && inView(tr.x, tr.y) && tv > 0) ents.push({ y: tr.y, draw: () => drawTrainer(g, ctx, tr, time, tv) })
     const m = tr.mon
     if (tr.isPlayer && !g.partnerOut) continue
-    if (tr.alive && m && !m.fainted && inView(m.x, m.y)) ents.push({ y: m.y, draw: () => drawMon(g, ctx, m, time) })
+    const mvis = vis(g, m, tr.isPlayer)
+    if (tr.alive && m && !m.fainted && inView(m.x, m.y) && mvis > 0) ents.push({ y: m.y, draw: () => drawMon(g, ctx, m, time, mvis) })
   }
   for (const w of g.wilds) if (inView(w.x, w.y)) ents.push({ y: w.y, draw: () => drawMon(g, ctx, w, time) })
   ents.sort((a, b) => a.y - b.y)
@@ -118,7 +120,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
       ctx.stroke()
     }
     const m = tr.mon
-    if (m.fainted || (tr.isPlayer && !g.partnerOut)) continue
+    if (m.fainted || (tr.isPlayer && !g.partnerOut) || vis(g, m, tr.isPlayer) === 0) continue
     plate(ctx, m, tr.isPlayer ? 'me' : 'foe', tr.isPlayer ? m.name : tr.name.split(' ').pop()!)
   }
   const p = g.player
@@ -164,7 +166,7 @@ function trainerHeight(tr: Trainer) {
   return s.ready ? s.bh * TRAINER_SCALE : 28
 }
 
-function drawTrainer(g: Game, ctx: CanvasRenderingContext2D, tr: Trainer, _time: number) {
+function drawTrainer(g: Game, ctx: CanvasRenderingContext2D, tr: Trainer, _time: number, fade = 1) {
   const s = getSprite(trainerSpriteUrl(tr.def.sprite))
   const px = tr.x * TILE, py = tr.y * TILE
   shadow(ctx, px, py + 1, 13)
@@ -175,6 +177,7 @@ function drawTrainer(g: Game, ctx: CanvasRenderingContext2D, tr: Trainer, _time:
   const hop = tr.walkT > 0 ? -Math.abs(Math.sin(step)) * 1.8 : 0
   const sway = tr.walkT > 0 ? Math.sin(step) * 0.07 : 0
   ctx.save()
+  ctx.globalAlpha = fade
   ctx.translate(Math.round(px), Math.round(py + hop))
   ctx.rotate(sway)
   if (tr.faceRight) ctx.scale(-1, 1)
@@ -183,7 +186,7 @@ function drawTrainer(g: Game, ctx: CanvasRenderingContext2D, tr: Trainer, _time:
   grassOver(g, ctx, tr.x, tr.y)
 }
 
-function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number) {
+function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, fade = 1) {
   const back = m.dir === 'up'
   const s = monSprite(m.species.id, back, m.shiny)
   const px = m.x * TILE, py = m.y * TILE
@@ -217,6 +220,7 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number) {
   let alpha = 1
   if (m.state === 'weak' && m.weakT < 3) alpha = Math.sin(time * 20) > 0 ? 1 : 0.35
   if (m.catching) alpha = 0.5
+  alpha *= fade
   ctx.globalAlpha = alpha
   const flip = back ? m.dir === 'left' : m.dir === 'right'
   ctx.save()
@@ -287,6 +291,19 @@ function tinted(s: ReturnType<typeof monSprite>, col: string): HTMLCanvasElement
   return c
 }
 
+/**
+ * How visible a trainer or their Pokémon is to the player:
+ * 1 = normal, 0.5 = in tall grass but you can see it (yours, or close by), 0 = hidden.
+ */
+function vis(g: Game, e: { x: number; y: number; revealT: number }, mine: boolean): number {
+  if (!g.hidden(e)) return 1
+  if (mine) return 0.5
+  const p = g.player
+  if (!p.alive) return 0.5
+  const d = Math.min(Math.hypot(p.x - e.x, p.y - e.y), p.mon.fainted ? 99 : Math.hypot(p.mon.x - e.x, p.mon.y - e.y))
+  return d < BUSH_SIGHT ? 0.5 : 0
+}
+
 type Team = 'me' | 'foe' | 'wild'
 const TEAM_COL: Record<Team, { bar: string; dark: string; name: string; ring: string }> = {
   me: { bar: '#48e070', dark: '#1c7a38', name: '#7cf09c', ring: '#48e070' },
@@ -354,7 +371,7 @@ function drawRings(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, y
   }
   for (const tr of g.trainers) {
     const m = tr.mon
-    if (!tr.alive || m.fainted || !inView(m.x, m.y) || (tr.isPlayer && !g.partnerOut)) continue
+    if (!tr.alive || m.fainted || !inView(m.x, m.y) || (tr.isPlayer && !g.partnerOut) || vis(g, m, tr.isPlayer) === 0) continue
     ring(m, tr.isPlayer ? TEAM_COL.me.ring : TEAM_COL.foe.ring, 0.85)
   }
   const t = g.playerTarget

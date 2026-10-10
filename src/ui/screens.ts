@@ -33,11 +33,12 @@ export function showLeaveConfirm(onStay: () => void, onLeave: () => void) {
       <h2>Game verlaten?</h2>
       <p>Weet je zeker dat je wilt stoppen? Je voortgang in deze match gaat verloren.</p>
       ${document.body.classList.contains('desk') ? `<div class="keys">
-        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> of muis ingedrukt</span><em>Lopen</em>
-        <span><kbd>1</kbd>–<kbd>4</kbd></span><em>Aanvallen (richten op je cursor)</em>
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><em>Lopen (of rechtermuisknop vasthouden)</em>
+        <span><kbd>Linkermuis</kbd></span><em>Aanval 1 · vasthouden = blijven schieten</em>
+        <span><kbd>Q</kbd> <kbd>E</kbd> <kbd>R</kbd></span><em>Aanval 2 · 3 · ultimate (richt op je cursor)</em>
         <span><kbd>Spatie</kbd></span><em>Vangen</em>
-        <span><kbd>Q</kbd></span><em>Wissel Pokémon</em>
-        <span><kbd>5</kbd> <kbd>6</kbd> <kbd>7</kbd></span><em>Master Ball · Potion · Revive</em>
+        <span><kbd>F</kbd></span><em>Wissel Pokémon</em>
+        <span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></span><em>Master Ball · Potion · Revive</em>
         <span><kbd>Esc</kbd></span><em>Pauze</em>
       </div>` : ''}
       <div class="actions">

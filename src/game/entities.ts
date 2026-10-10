@@ -73,6 +73,8 @@ export class Mon {
   aimDist: number | null = null
   /** Trailing HP for the white 'damage taken' strip on nameplates. */
   hpLag = -1
+  /** >0 = briefly visible even inside tall grass (after attacking or being hit). */
+  revealT = 0
   lastHitBy: Trainer | null = null
 
   // Wild behaviour
@@ -157,6 +159,7 @@ export class Trainer {
   autoSwapT = 0
   /** Horizontal facing for the (mirrored) battle sprite. */
   faceRight = false
+  revealT = 0
   brain: BotBrain | null = null
   /** Throw animation (Poké Ball / Master Ball). */
   throwFx: { x: number; y: number; tx: number; ty: number; t: number; master: boolean } | null = null

@@ -12,7 +12,7 @@ export function showEvolution(from: number, to: number, shiny: boolean, done: ()
   const oldName = SPECIES[from].name
   const newName = SPECIES[to].name
   el.innerHTML = `
-    <div class="evo-rays"></div>
+    <div class="evo-glow"></div>
     <div class="evo-orbs">${Array.from({ length: 12 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>
     <div class="evo-fig">
       <img class="px a" src="${spriteUrl(from, { shiny })}" alt="">

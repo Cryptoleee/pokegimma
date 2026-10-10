@@ -121,7 +121,7 @@ function decide(g: Game, tr: Trainer) {
 function nearestEnemyTrainer(g: Game, tr: Trainer, range: number): Trainer | null {
   let best: Trainer | null = null, bd = range
   for (const o of g.trainers) {
-    if (o === tr || !o.alive || o.mon.fainted) continue
+    if (o === tr || !o.alive || o.mon.fainted || !g.canSee(tr.mon, o.mon)) continue
     const d = Math.hypot(o.mon.x - tr.x, o.mon.y - tr.y)
     if (d < bd) { bd = d; best = o }
   }
