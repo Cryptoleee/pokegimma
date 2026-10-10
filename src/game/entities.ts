@@ -1,7 +1,8 @@
 import { SPECIES, rarityOf, type Rarity, type Species } from '../data/pokemon'
 import { movesetFor, SLOT_UNLOCK, type Move } from '../data/moves'
 import type { TrainerDef } from '../data/trainers'
-import { buildTrainerSheet, type Dir } from './trainerSprite'
+
+export type Dir = 'down' | 'up' | 'left' | 'right'
 
 export const LEVEL_CAP = 60
 export const xpNeeded = (level: number) => 10 + level * 3 + level * level * 0.1
@@ -52,6 +53,8 @@ export class Mon {
   mvx = 0
   mvy = 0
   catching = false
+  castT = 0
+  charging: { move: Move; t: number; total: number; tgt: Mon | null } | null = null
   lastHitBy: Trainer | null = null
 
   // Wild behaviour
@@ -134,14 +137,13 @@ export class Trainer {
   diedAt = 0
   swapCd = 0
   autoSwapT = 0
-  sheet: HTMLCanvasElement
+  /** Horizontal facing for the (mirrored) battle sprite. */
+  faceRight = false
   brain: BotBrain | null = null
   /** Throw animation (Poké Ball / Master Ball). */
   throwFx: { x: number; y: number; tx: number; ty: number; t: number; master: boolean } | null = null
 
-  constructor(public def: TrainerDef, public name: string, public isPlayer: boolean) {
-    this.sheet = buildTrainerSheet(def.look)
-  }
+  constructor(public def: TrainerDef, public name: string, public isPlayer: boolean) {}
 
   get mon(): Mon {
     return this.party[this.active]

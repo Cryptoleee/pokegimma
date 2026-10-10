@@ -28,7 +28,9 @@ export function getSprite(url: string): Sprite {
   let s = cache.get(url)
   if (s) return s
   const img = new Image()
-  img.crossOrigin = 'anonymous'
+  // PokéAPI (GitHub) sends CORS headers so we can measure the sprite; Showdown does not,
+  // and asking for CORS there would block the image. Drawing works either way.
+  if (url.includes('githubusercontent.com')) img.crossOrigin = 'anonymous'
   s = { img, bx: 0, by: 0, bw: 96, bh: 96, ready: false }
   const sprite = s
   img.onload = () => {
@@ -56,6 +58,7 @@ function measure(s: Sprite) {
   c.height = img.naturalHeight
   const g = c.getContext('2d')!
   g.drawImage(img, 0, 0)
+  Object.assign(s, { bx: 0, by: 0, bw: c.width, bh: c.height })
   try {
     const d = g.getImageData(0, 0, c.width, c.height).data
     let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1

@@ -1,39 +1,44 @@
-export interface TrainerLook {
-  hat?: string
-  hatBand?: string
-  hair: string
-  longHair?: boolean
-  bigHair?: boolean
-  skin: string
-  shirt: string
-  shirtAccent: string
-  pants: string
-  shoes: string
-}
-
 export interface TrainerDef {
   key: string
   name: string
-  look: TrainerLook
+  /** Pokémon Showdown trainer sprite id (Black/White battle art). */
+  sprite: string
 }
 
-const SKIN = '#f8d0a8'
-
+/** Playable trainers (BW + BW2 protagonists and rivals). */
 export const TRAINERS: TrainerDef[] = [
-  { key: 'hilbert', name: 'Hilbert', look: { hat: '#e83030', hatBand: '#f8f8f8', hair: '#5a3418', skin: SKIN, shirt: '#3870c8', shirtAccent: '#f8f8f8', pants: '#303040', shoes: '#d83030' } },
-  { key: 'hilda', name: 'Hilda', look: { hat: '#f8f8f8', hatBand: '#f05880', hair: '#6a3a18', longHair: true, skin: SKIN, shirt: '#f8f8f8', shirtAccent: '#303040', pants: '#3878d8', shoes: '#f05880' } },
-  { key: 'cheren', name: 'Cheren', look: { hair: '#202028', skin: SKIN, shirt: '#3858b0', shirtAccent: '#d83030', pants: '#383848', shoes: '#202028' } },
-  { key: 'bianca', name: 'Bianca', look: { hat: '#58b048', hatBand: '#f8f8f8', hair: '#f0d050', skin: SKIN, shirt: '#f09830', shirtAccent: '#f8f8f8', pants: '#f8f8f8', shoes: '#58b048' } },
-  { key: 'n', name: 'N', look: { hat: '#202028', hatBand: '#f8f8f8', hair: '#78c890', longHair: true, skin: SKIN, shirt: '#f0f0f0', shirtAccent: '#202028', pants: '#c8b890', shoes: '#606070' } },
-  { key: 'iris', name: 'Iris', look: { hair: '#7848a8', bigHair: true, skin: '#c89068', shirt: '#f8f0d8', shirtAccent: '#f080a8', pants: '#f8f0d8', shoes: '#f0c040' } },
+  { key: 'hilbert', name: 'Hilbert', sprite: 'hilbert' },
+  { key: 'hilda', name: 'Hilda', sprite: 'hilda' },
+  { key: 'nate', name: 'Nate', sprite: 'nate' },
+  { key: 'rosa', name: 'Rosa', sprite: 'rosa' },
+  { key: 'cheren', name: 'Cheren', sprite: 'cheren' },
+  { key: 'bianca', name: 'Bianca', sprite: 'bianca' },
+  { key: 'n', name: 'N', sprite: 'n' },
+  { key: 'iris', name: 'Iris', sprite: 'iris' },
 ]
 
-export function trainerPortraitUrl(key: string): string {
-  return `https://play.pokemonshowdown.com/sprites/trainers/${key}.png`
+/** Rival trainer classes; the sprite matches the class in the name. */
+export const BOT_TRAINERS: TrainerDef[] = [
+  { key: 'acetrainer', name: 'Ace Trainer Kai', sprite: 'acetrainer' },
+  { key: 'acetrainerf', name: 'Ace Trainer Mila', sprite: 'acetrainerf' },
+  { key: 'youngster', name: 'Youngster Joey', sprite: 'youngster' },
+  { key: 'lass', name: 'Lass Noor', sprite: 'lass' },
+  { key: 'hiker', name: 'Hiker Bram', sprite: 'hiker' },
+  { key: 'veteran', name: 'Veteran Ruben', sprite: 'veteran' },
+  { key: 'backpacker', name: 'Backpacker Thijs', sprite: 'backpacker' },
+  { key: 'backpackerf', name: 'Backpacker Fenna', sprite: 'backpackerf' },
+  { key: 'psychic', name: 'Psychic Sem', sprite: 'psychic' },
+  { key: 'psychicf', name: 'Psychic Luna', sprite: 'psychicf' },
+  { key: 'blackbelt', name: 'Black Belt Daan', sprite: 'blackbelt' },
+  { key: 'swimmerf', name: 'Swimmer Tess', sprite: 'swimmerf' },
+  { key: 'pokemonranger', name: 'Ranger Stijn', sprite: 'pokemonranger' },
+  { key: 'pokemonrangerf', name: 'Ranger Fleur', sprite: 'pokemonrangerf' },
+  { key: 'pokemonbreeder', name: 'Breeder Lieke', sprite: 'pokemonbreederf' },
+  { key: 'scientist', name: 'Scientist Jules', sprite: 'scientist' },
+  { key: 'biker', name: 'Biker Rik', sprite: 'biker' },
+  { key: 'artist', name: 'Artist Vince', sprite: 'artist' },
+]
+
+export function trainerSpriteUrl(sprite: string): string {
+  return `https://play.pokemonshowdown.com/sprites/trainers/${sprite}.png`
 }
-
-export const BOT_NAMES = [
-  'Ace Trainer Kai', 'Youngster Joey', 'Lass Mila', 'Hiker Bram', 'Veteran Ruben', 'Backpacker Noor',
-  'Psychic Luna', 'Black Belt Sem', 'Swimmer Tess', 'Ranger Daan', 'Breeder Fleur', 'Scientist Jules',
-  'Biker Thijs', 'Artist Lieke', 'Pilot Stijn', 'Clerk Fenna',
-]

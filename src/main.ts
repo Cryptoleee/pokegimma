@@ -13,7 +13,7 @@ const hudRoot = document.getElementById('hud')!
 const store = {
   get<T>(k: string, d: T): T {
     try {
-      const v = localStorage.getItem(`pokegimma:${k}`)
+      const v = localStorage.getItem(`battlemon:${k}`)
       return v ? (JSON.parse(v) as T) : d
     } catch {
       return d
@@ -21,7 +21,7 @@ const store = {
   },
   set(k: string, v: unknown) {
     try {
-      localStorage.setItem(`pokegimma:${k}`, JSON.stringify(v))
+      localStorage.setItem(`battlemon:${k}`, JSON.stringify(v))
     } catch {
       /* private mode */
     }
@@ -153,6 +153,6 @@ function frame(now: number) {
 requestAnimationFrame(frame)
 
 // Handy for debugging from the console.
-;(window as unknown as { pokegimma: unknown }).pokegimma = { get game() { return game } }
+;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game } }
 
 toTitle()

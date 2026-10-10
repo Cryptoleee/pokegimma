@@ -1,6 +1,6 @@
 import { movesetFor, SLOT_UNLOCK } from '../data/moves'
 import { animatedUrl, ROSTER, SPECIES, spriteUrl, TEAM_SIZE, type Species } from '../data/pokemon'
-import { TRAINERS, trainerPortraitUrl, type TrainerDef } from '../data/trainers'
+import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
 import { TYPE_COLOR, TYPE_NL } from '../data/types'
 import { sfx, unlockAudio } from '../audio'
 import type { GameResult } from '../game/game'
@@ -25,8 +25,8 @@ export function showTitle(onStart: () => void) {
         <img src="${animatedUrl(644)}" alt="Zekrom">
         <img src="${animatedUrl(643)}" alt="Reshiram">
       </div>
-      <div class="logo">POKÉGIMMA</div>
-      <div class="subtitle">BATTLE ROYALE</div>
+      <div class="logo">BATTLEMON</div>
+      <div class="subtitle">ROYALE</div>
       <div class="press">Tik om te starten</div>
     </div>`
   el.querySelector('.title')!.addEventListener('click', () => {
@@ -46,7 +46,7 @@ export function showTrainerSelect(current: string | null, onPick: (t: TrainerDef
       <div class="grid trainers">
         ${TRAINERS.map((t) => `
           <div class="panel card" data-k="${t.key}">
-            <div class="art"><img class="px" src="${trainerPortraitUrl(t.key)}" alt=""></div>
+            <div class="art"><img class="px" src="${trainerSpriteUrl(t.sprite)}" alt=""></div>
             <div class="name">${t.name}</div>
           </div>`).join('')}
       </div>

@@ -1,4 +1,4 @@
-# Pokégimma
+# BattleMon Royale
 
 Een real-time Pokémon battle royale voor de browser, mobile first, in de stijl van Black/White.
 
@@ -27,7 +27,7 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 ## Hoe het werkt
 
 - **Levelen:** je hele team krijgt passief XP zolang je leeft. Schade doen en KO's leveren veel meer op. Op Lv 8, 16 en 25 komt er een nieuwe aanval vrij (de vierde is een ultimate). Starters evolueren op hun echte levels.
-- **Aanvallen:** elke Pokémon krijgt 4 aanvallen op basis van zijn types, elk met een eigen gedrag: melee, projectiel, spreidschot, dash, straal, AoE rond jezelf en een getelegrafeerde inslag. Daarbovenop geldt het complete Gen V-typeschema.
+- **Aanvallen:** elke Pokémon krijgt 4 echte aanvallen op basis van zijn types, elk met een eigen gedrag en effect. Thunder Shock is een bliksemflits die direct raakt, Thunderbolt springt door naar extra doelen, Thunder slaat in vanuit de lucht, Flamethrower is een vlammenstraal, Fire Blast een 大-explosie, Draco Meteor laat drie meteoren neerkomen, Aura Sphere en Swift zoeken hun doel zelf op, en Solar Beam en Hyper Beam moeten eerst opladen. Daarbovenop geldt het complete Gen V-typeschema.
 - **Wilde Pokémon:** die leven in het hoge gras en zijn er in gewoon, ongewoon en zeldzaam, met een kleine kans op shiny. Versla er een en hij is een paar seconden verzwakt: tik dan op VANG!. Rond 2:20 en 5:00 verschijnt er een legendarische Pokémon, zichtbaar op de minimap.
 - **Master Ball:** daarmee vang je elke wilde Pokémon direct, dus ook een legendarische, zonder te vechten.
 - **Zone:** de storm krimpt in 6 fases. Daarbuiten verliest je actieve Pokémon HP.
@@ -38,12 +38,12 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 ```
 src/
   data/       Pokémon, aanvallen, types, trainers
-  game/       wereldgeneratie, engine, bot-AI, renderer, pixel-trainer-sprites
+  game/       wereldgeneratie, engine, bot-AI, renderer, aanvalseffecten (vfx.ts)
   ui/         menu's en HUD (DOM boven de canvas)
 ```
 
 ## Assets en rechten
 
-Pokémon-sprites (Gen V Black/White), item-sprites en trainerportretten worden tijdens het spelen geladen van [PokéAPI/sprites](https://github.com/PokeAPI/sprites) en Pokémon Showdown. Ze staan dus niet in deze repo. Pokémon en alle bijbehorende namen en art zijn © Nintendo / Game Freak / The Pokémon Company. Dit is een niet-commercieel fanproject.
+Pokémon-sprites (Gen V Black/White), item-sprites en trainersprites (BW-battle-art, ook gebruikt in de wereld) worden tijdens het spelen geladen van [PokéAPI/sprites](https://github.com/PokeAPI/sprites) en Pokémon Showdown. Ze staan dus niet in deze repo. Pokémon en alle bijbehorende namen en art zijn © Nintendo / Game Freak / The Pokémon Company. Dit is een niet-commercieel fanproject.
 
-De overworld-trainers en de wereld zelf worden in code getekend.
+De wereld en alle aanvalseffecten worden in code getekend.

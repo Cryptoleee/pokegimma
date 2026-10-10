@@ -3,7 +3,8 @@ import type { Game } from './game'
 import { ITEM_SPRITE } from './game'
 import type { Mon, Trainer } from './entities'
 import { getSprite, itemUrl, monSprite } from './sprites'
-import { FH, FW, frameRect } from './trainerSprite'
+import { trainerSpriteUrl } from '../data/trainers'
+import { drawArea, drawBeam, drawCharge, drawDashAura, drawImpact, drawIncoming, drawMelee, drawProjectile, lightning } from './vfx'
 import { TILE } from './world'
 
 const FONT = '"Pixelify Sans", monospace'
@@ -17,6 +18,10 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   const vw = cw / Z, vh = ch / Z
   let ox = g.camX * TILE - vw / 2
   let oy = g.camY * TILE - vh / 2
+  if (g.vfx.shake > 0) {
+    ox += (Math.random() - 0.5) * g.vfx.shake
+    oy += (Math.random() - 0.5) * g.vfx.shake
+  }
   ox = Math.round(ox * Z) / Z
   oy = Math.round(oy * Z) / Z
   const time = g.time
@@ -36,7 +41,6 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   const inView = (x: number, y: number, m = 3) =>
     x * TILE > ox - m * TILE && x * TILE < ox + vw + m * TILE && y * TILE > oy - m * TILE && y * TILE < oy + vh + m * TILE
 
-  // Water shimmer
   drawItems(g, ctx, inView)
 
   // Entities, y-sorted
@@ -54,43 +58,15 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // Canopies and roofs
   ctx.drawImage(g.world.overlay, sx, sy, sw, sh, sx, sy, sw, sh)
 
-  // Telegraphs
-  for (const n of g.novas) {
-    const k = 1 - n.t / 0.6
-    const col = TYPE_COLOR[n.move.type]
-    ctx.globalAlpha = 0.25 + k * 0.35
-    ctx.fillStyle = col
-    circle(ctx, n.x * TILE, n.y * TILE, n.r * TILE * (0.3 + 0.7 * k))
-    ctx.fill()
-    ctx.globalAlpha = 0.9
-    ctx.strokeStyle = col
-    ctx.lineWidth = 1.5
-    circle(ctx, n.x * TILE, n.y * TILE, n.r * TILE)
-    ctx.stroke()
-    ctx.globalAlpha = 1
-  }
+  // Telegraphs (and meteors on their way down)
+  for (const n of g.novas)
+    drawIncoming(ctx, n.move.fx, n.x * TILE, n.y * TILE, n.r * TILE, 1 - n.t / n.total, TYPE_COLOR[n.move.type], time)
 
   // Projectiles
-  for (const p of g.projs) {
-    if (!inView(p.x, p.y)) continue
-    const col = TYPE_COLOR[p.move.type]
-    const px = p.x * TILE, py = p.y * TILE
-    ctx.globalAlpha = 0.45
-    ctx.fillStyle = col
-    circle(ctx, px - p.vx * 0.9, py - p.vy * 0.9, 2.4)
-    ctx.fill()
-    ctx.globalAlpha = 1
-    ctx.fillStyle = '#282830'
-    circle(ctx, px, py, 4)
-    ctx.fill()
-    ctx.fillStyle = col
-    circle(ctx, px, py, 3.2)
-    ctx.fill()
-    ctx.fillStyle = '#ffffff'
-    circle(ctx, px - 0.8, py - 0.8, 1.3)
-    ctx.fill()
-  }
+  for (const p of g.projs)
+    if (inView(p.x, p.y)) drawProjectile(ctx, p.move.fx, p.x * TILE, p.y * TILE, p.vx, p.vy, time, p.seed)
 
+  g.vfx.draw(ctx)
   drawFx(g, ctx)
   for (const tr of g.trainers) if (tr.throwFx) drawThrow(ctx, tr.throwFx)
 
@@ -117,16 +93,17 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // Overhead bars and labels on top of everything
   for (const tr of g.trainers) {
     if (!tr.alive || !inView(tr.x, tr.y)) continue
-    if (!tr.isPlayer) label(ctx, tr.name.split(' ').pop()!, tr.x * TILE, tr.y * TILE - 26, '#ffffff')
+    const top = tr.y * TILE - trainerHeight(tr) - 2
+    if (!tr.isPlayer) label(ctx, tr.name.split(' ').pop()!, tr.x * TILE, top, '#ffffff')
     else {
       const b = Math.sin(time * 6) * 1.5
       ctx.fillStyle = '#f84040'
       ctx.strokeStyle = '#282830'
       ctx.lineWidth = 1
       ctx.beginPath()
-      ctx.moveTo(tr.x * TILE - 3, tr.y * TILE - 30 + b)
-      ctx.lineTo(tr.x * TILE + 3, tr.y * TILE - 30 + b)
-      ctx.lineTo(tr.x * TILE, tr.y * TILE - 26 + b)
+      ctx.moveTo(tr.x * TILE - 3, top - 5 + b)
+      ctx.lineTo(tr.x * TILE + 3, top - 5 + b)
+      ctx.lineTo(tr.x * TILE, top - 1 + b)
       ctx.closePath()
       ctx.fill()
       ctx.stroke()
@@ -139,6 +116,10 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
     if (w.state === 'aggro' || w.hp < w.maxHp || w.rarity !== 'common') monBar(ctx, w)
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0)
+  if (g.vfx.flash > 0) {
+    ctx.fillStyle = `rgba(255,255,230,${g.vfx.flash * 0.45})`
+    ctx.fillRect(0, 0, cw, ch)
+  }
 }
 
 function circle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
@@ -160,16 +141,28 @@ function grassOver(g: Game, ctx: CanvasRenderingContext2D, x: number, y: number)
       ctx.drawImage(g.world.ground, (tx + dx) * TILE, ty * TILE + 8, TILE, 8, (tx + dx) * TILE, ty * TILE + 8, TILE, 8)
 }
 
+const TRAINER_SCALE = 0.42
+
+function trainerHeight(tr: Trainer) {
+  const s = getSprite(trainerSpriteUrl(tr.def.sprite))
+  return s.ready ? s.bh * TRAINER_SCALE : 28
+}
+
 function drawTrainer(g: Game, ctx: CanvasRenderingContext2D, tr: Trainer, _time: number) {
-  const moving = tr.walkT > 0
-  const frame = moving ? [1, 0, 2, 0][Math.floor(tr.walkT) % 4] : 0
-  const { sx, sy, flip } = frameRect(tr.dir, frame)
+  const s = getSprite(trainerSpriteUrl(tr.def.sprite))
   const px = tr.x * TILE, py = tr.y * TILE
-  shadow(ctx, px, py + 1, 11)
+  shadow(ctx, px, py + 1, 13)
+  if (!s.ready) return
+  const dw = s.bw * TRAINER_SCALE, dh = s.bh * TRAINER_SCALE
+  // Walk cycle: a little hop and sway, like BW overworld bobbing.
+  const step = tr.walkT > 0 ? tr.walkT * 0.9 : 0
+  const hop = tr.walkT > 0 ? -Math.abs(Math.sin(step)) * 1.8 : 0
+  const sway = tr.walkT > 0 ? Math.sin(step) * 0.07 : 0
   ctx.save()
-  ctx.translate(Math.round(px), Math.round(py))
-  if (flip) ctx.scale(-1, 1)
-  ctx.drawImage(tr.sheet, sx, sy, FW, FH, -9, -21, FW, FH)
+  ctx.translate(Math.round(px), Math.round(py + hop))
+  ctx.rotate(sway)
+  if (tr.faceRight) ctx.scale(-1, 1)
+  ctx.drawImage(s.img, s.bx, s.by, s.bw, s.bh, -dw / 2, -dh + 1, dw, dh)
   ctx.restore()
   grassOver(g, ctx, tr.x, tr.y)
 }
@@ -202,17 +195,26 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number) {
     return
   }
 
+  if (m.dash) drawDashAura(ctx, m.dash.move.fx, px, py - dh * 0.45, m.dash.vx, m.dash.vy, time)
+  if (m.charging) drawCharge(ctx, m.charging.move.fx, px, py - dh * 0.5, 1 - m.charging.t / m.charging.total, time)
+  const lunge = m.castT > 0 ? Math.sin((m.castT / 0.18) * Math.PI) * 3 : 0
   let alpha = 1
   if (m.state === 'weak' && m.weakT < 3) alpha = Math.sin(time * 20) > 0 ? 1 : 0.35
   if (m.catching) alpha = 0.5
   ctx.globalAlpha = alpha
   const flip = back ? m.dir === 'left' : m.dir === 'right'
   ctx.save()
-  ctx.translate(Math.round(px), Math.round(py + bob))
+  ctx.translate(Math.round(px + m.aimX * lunge), Math.round(py + bob + m.aimY * lunge))
   if (flip) ctx.scale(-1, 1)
   if (m.state === 'weak') ctx.rotate(0.25)
+  if (m.castT > 0) ctx.scale(1 + lunge * 0.02, 1 - lunge * 0.02)
   ctx.drawImage(s.img, s.bx, s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
-  const glow = Math.max(m.flash > 0 ? 0.85 : 0, m.evolveFx > 0 ? 0.5 + 0.5 * Math.sin(time * 18) : 0, m.catching ? 0.6 : 0)
+  const glow = Math.max(
+    m.flash > 0 ? 0.85 : 0,
+    m.evolveFx > 0 ? 0.5 + 0.5 * Math.sin(time * 18) : 0,
+    m.catching ? 0.6 : 0,
+    m.charging ? 0.25 + 0.25 * Math.sin(time * 30) : 0,
+  )
   if (glow > 0 && s.white) {
     ctx.globalAlpha = glow * alpha
     ctx.drawImage(s.white, s.bx, s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
@@ -301,31 +303,41 @@ function drawFx(g: Game, ctx: CanvasRenderingContext2D) {
         ctx.lineWidth = 1
         ctx.stroke()
         break
-      case 'beam': {
-        const w = (f.big ? 9 : 6) * (1 - k * 0.7)
-        ctx.lineCap = 'round'
-        ctx.strokeStyle = f.color
-        ctx.lineWidth = w
-        ctx.beginPath()
-        ctx.moveTo(px, py)
-        ctx.lineTo(f.x2! * TILE, f.y2! * TILE)
-        ctx.stroke()
-        ctx.strokeStyle = '#ffffff'
-        ctx.lineWidth = w * 0.35
-        ctx.stroke()
-        ctx.lineCap = 'butt'
+      case 'beam':
+        ctx.globalAlpha = 1
+        drawBeam(ctx, f.style!, px, py, f.x2! * TILE, f.y2! * TILE, k, g.time)
         break
-      }
-      case 'swipe': {
-        const a = Math.atan2(f.y2!, f.x2!)
-        ctx.strokeStyle = '#ffffff'
-        ctx.lineWidth = 3 * (1 - k)
+      case 'zap':
+        ctx.globalAlpha = k < 0.5 ? 1 : 1 - (k - 0.5) * 2
+        lightning(ctx, px, py, f.x2! * TILE, f.y2! * TILE, f.big ? 2.6 : 1.8, f.big ? 7 : 5, f.big ? 2 : 1)
+        break
+      case 'area':
+        drawArea(ctx, f.style!, px, py, (f.r ?? 1) * TILE, k, g.time)
+        break
+      case 'impact':
+        drawImpact(ctx, f.style!, px, py, (f.r ?? 1) * TILE, k, g.time)
+        break
+      case 'melee':
+        drawMelee(ctx, f.style!, px, py, f.x2!, f.y2!, k)
+        break
+      case 'callout': {
+        ctx.globalAlpha = k < 0.75 ? 1 : 1 - (k - 0.75) / 0.25
+        ctx.font = `700 6.5px ${FONT}`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'bottom'
+        const ty = py - Math.min(1, k * 6) * 4
+        const w = ctx.measureText(f.text!).width + 6
+        ctx.fillStyle = 'rgba(248,248,248,0.95)'
+        ctx.strokeStyle = '#282830'
+        ctx.lineWidth = 1
         ctx.beginPath()
-        ctx.arc(px - f.x2! * 8, py - f.y2! * 8, 14, a - 1 + k * 0.6, a + 1 + k * 0.6)
+        ctx.roundRect(px - w / 2, ty - 9, w, 10, 2)
+        ctx.fill()
         ctx.stroke()
-        ctx.strokeStyle = f.color
-        ctx.lineWidth = 1.5
-        ctx.stroke()
+        ctx.fillStyle = f.color
+        ctx.fillRect(px - w / 2 + 1, ty - 2, w - 2, 1.5)
+        ctx.fillStyle = '#282830'
+        ctx.fillText(f.text!, px, ty - 1.5)
         break
       }
       case 'text': {
