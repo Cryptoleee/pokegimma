@@ -5212,3 +5212,26 @@ button:disabled {
   margin-left: -20px;
   margin-top: 2px;
 }
+/* Title on landscape phones: smaller logo, higher up, clear of "Tik om te starten" */
+@media (orientation: landscape) and (max-height: 560px) {
+  .legend-l,
+  .legend-r {
+    width: min(42vw, 78vh);
+  }
+  .tlogo {
+    top: 22%;
+  }
+  .tball {
+    width: 40px;
+    height: 40px;
+  }
+  .word {
+    font-size: min(13.5vw, 17vh);
+  }
+  .ribbon span {
+    font-size: min(5vw, 6.2vh);
+  }
+  .tpress {
+    bottom: calc(9% + var(--safe-b));
+  }
+}
