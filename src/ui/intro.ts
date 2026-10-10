@@ -42,7 +42,9 @@ const SLIDES: Slide[] = [
         <div class="walker"><img class="px" src="${trainerSpriteUrl('hilbert')}" alt=""></div>
         <div class="btns"><span class="b1"></span><span class="b2"></span><span class="b3"></span><span class="b4"></span></div>
       </div>`,
-    text: 'Beweeg met de joystick links op je scherm. Rechts zitten je aanvallen. Richten gaat vanzelf: tik en je Pokémon valt aan!',
+    text: matchMedia('(pointer: fine)').matches
+      ? 'Loop met WASD, of houd de muisknop ingedrukt en je loopt naar je cursor. Aanvallen zitten op 1 t/m 4 en richten op de vijand bij je cursor!'
+      : 'Beweeg met de joystick links op je scherm. Rechts zitten je aanvallen. Richten gaat vanzelf: tik en je Pokémon valt aan!',
   },
   {
     stage: `

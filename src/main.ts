@@ -1,8 +1,9 @@
 import './style.css'
 import { ROSTER, TEAM_SIZE } from './data/pokemon'
 import { TRAINERS, type TrainerDef } from './data/trainers'
-import { Game } from './game/game'
-import { render } from './game/render'
+import { Game, INTRO_TIME } from './game/game'
+import { render, view } from './game/render'
+import { TILE } from './game/world'
 import { Hud } from './ui/hud'
 import { clearScreen, showLeaveConfirm, showPartyFull } from './ui/screens'
 import { showIntro } from './ui/intro'
@@ -98,6 +99,7 @@ function startGame() {
     },
   })
   hud = new Hud(hudRoot, game, confirmLeave)
+  if (desktop) setTimeout(() => hud?.toast('WASD of muis om te lopen · 1–4 aanvallen · Esc pauze'), INTRO_TIME * 1000 + 600)
   // Extra history entry so the phone's back button asks before leaving.
   history.pushState({ battlemon: 'game' }, '')
   guardActive = true
@@ -161,63 +163,106 @@ function stopGame() {
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 }
 
-// Keyboard for desktop play
+// ---------- Desktop: keyboard + mouse ----------
+
+/** Mouse/trackpad users get keyboard + mouse controls instead of the joystick. */
+export const desktop = matchMedia('(pointer: fine)').matches
+if (desktop) document.body.classList.add('desk')
+
 const keys = new Set<string>()
+const MOVE_KEYS = ['1', '2', '3', '4']
 window.addEventListener('keydown', (e) => {
-  keys.add(e.key.toLowerCase())
+  const k = e.key.toLowerCase()
+  keys.add(k)
   if (e.key === 'Escape') return confirmLeave()
   if (!game || !hud || game.paused) return
+  if (k === ' ' || k.startsWith('arrow')) e.preventDefault()
   const g = game, p = g.player
-  const k = e.key.toLowerCase()
-  const slot = ['j', 'k', 'l', ';'].indexOf(k) >= 0 ? ['j', 'k', 'l', ';'].indexOf(k) : ['1', '2', '3', '4'].indexOf(k)
+  const slot = MOVE_KEYS.indexOf(k)
   if (slot >= 0) g.held[slot] = true
-  if (k === 'q') {
+  if (k === 'q' && !e.repeat) {
     for (let i = 1; i <= p.party.length; i++) if (g.switchTo(p, (p.active + i) % p.party.length)) break
   }
-  if (k === 'e' || k === ' ') {
+  if ((k === 'e' || k === ' ') && !e.repeat) {
     const w = g.catchable(p)
     if (w) g.throwBall(p, w, false)
   }
-  if (k === 'm') hud.useItem('master')
-  if (k === 'r') hud.useItem('potion')
-  if (k === 'f') hud.useItem('revive')
+  if (e.repeat) return
+  if (k === '5' || k === 'm') hud.useItem('master')
+  if (k === '6' || k === 'r') hud.useItem('potion')
+  if (k === '7' || k === 'f') hud.useItem('revive')
 })
 window.addEventListener('keyup', (e) => {
   const k = e.key.toLowerCase()
   keys.delete(k)
   if (!game) return
-  const slot = ['j', 'k', 'l', ';'].indexOf(k) >= 0 ? ['j', 'k', 'l', ';'].indexOf(k) : ['1', '2', '3', '4'].indexOf(k)
+  const slot = MOVE_KEYS.indexOf(k)
   if (slot >= 0) game.held[slot] = false
 })
 window.addEventListener('blur', () => {
   keys.clear()
+  mouse.down = false
   if (game) game.held.fill(false)
 })
 
-function keyboardMove(g: Game) {
+// Hold the left mouse button to walk toward the cursor; attacks aim at the cursor.
+const mouse = { x: 0, y: 0, down: false, inside: false }
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return
+  mouse.down = true
+  mouse.x = e.clientX
+  mouse.y = e.clientY
+})
+window.addEventListener('mouseup', (e) => {
+  if (e.button === 0) mouse.down = false
+})
+canvas.addEventListener('mousemove', (e) => {
+  mouse.x = e.clientX
+  mouse.y = e.clientY
+  mouse.inside = true
+})
+canvas.addEventListener('mouseleave', () => (mouse.inside = false))
+canvas.addEventListener('contextmenu', (e) => e.preventDefault())
+
+function desktopInput(g: Game) {
   let x = 0, y = 0
   if (keys.has('a') || keys.has('arrowleft')) x--
   if (keys.has('d') || keys.has('arrowright')) x++
   if (keys.has('w') || keys.has('arrowup')) y--
   if (keys.has('s') || keys.has('arrowdown')) y++
+
+  const dpr = canvas.width / innerWidth
+  const wx = (mouse.x * dpr / view.Z + view.ox) / TILE
+  const wy = (mouse.y * dpr / view.Z + view.oy) / TILE
+  g.aimAt = desktop && (mouse.inside || mouse.down) ? { x: wx, y: wy } : null
+
   if (x || y) {
     const l = Math.hypot(x, y)
     g.input.mx = x / l
     g.input.my = y / l
-    usingKeys = true
-  } else if (usingKeys) {
+    steering = true
+  } else if (mouse.down && !g.paused) {
+    const p = g.player
+    const dx = wx - p.x, dy = wy - (p.y - 0.4)
+    const d = Math.hypot(dx, dy)
+    // Full speed when the cursor is a few tiles away, ease in close by
+    const k = d < 0.35 ? 0 : Math.min(1, d / 2.5) / d
+    g.input.mx = dx * k
+    g.input.my = dy * k
+    steering = true
+  } else if (steering) {
     g.input.mx = g.input.my = 0
-    usingKeys = false
+    steering = false
   }
 }
-let usingKeys = false
+let steering = false
 
 let last = performance.now()
 function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000)
   last = now
   if (game) {
-    keyboardMove(game)
+    desktopInput(game)
     game.update(dt)
     setTempo(game.zone.phase >= 4 ? 1.12 : 1)
     render(game, ctx, canvas.width, canvas.height)

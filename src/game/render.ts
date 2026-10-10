@@ -14,6 +14,9 @@ export function zoomFor(cw: number, ch: number) {
   return Math.max(2, Math.min(6, Math.min(cw, ch) / (TILE * 11.5)))
 }
 
+/** Last frame's camera, so input can map screen pixels to world tiles. */
+export const view = { ox: 0, oy: 0, Z: 1 }
+
 export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: number) {
   // Drop-in: start high above the arena and swoop down to the player
   const ik = Math.max(0, g.introT / INTRO_TIME)
@@ -27,6 +30,9 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   }
   ox = Math.round(ox * Z) / Z
   oy = Math.round(oy * Z) / Z
+  view.ox = ox
+  view.oy = oy
+  view.Z = Z
   const time = g.time
 
   ctx.setTransform(1, 0, 0, 1, 0, 0)

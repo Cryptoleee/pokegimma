@@ -3171,3 +3171,74 @@ img.px {
 #modal .panel {
   animation: cardIn 0.35s cubic-bezier(0.2, 1.3, 0.4, 1);
 }
+
+/* ---------- Desktop: keyboard hints, no joystick ---------- */
+
+kbd {
+  display: none;
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 10px;
+  line-height: 1;
+  color: #1a1420;
+  background: linear-gradient(#ffffff, #d8dce8);
+  border: 2px solid #1a1420;
+  border-bottom-width: 3px;
+  border-radius: 5px;
+  padding: 2px 4px;
+}
+.desk kbd,
+#modal kbd {
+  display: inline-block;
+}
+.desk .stick-zone {
+  display: none;
+}
+.desk #game {
+  cursor: crosshair;
+}
+.mb kbd {
+  position: absolute;
+  z-index: 4;
+  left: 2%;
+  top: 2%;
+}
+.ib kbd {
+  position: absolute;
+  left: -6px;
+  top: -6px;
+}
+.catch2 kbd {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+}
+#modal .keys {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  align-items: center;
+  text-align: left;
+  font-size: 13px;
+  margin: 8px 0 4px;
+}
+#modal .keys em {
+  font-style: normal;
+  color: var(--ink-soft);
+}
+
+/* Partner stage: sprite left, info panel right, so nothing overlaps on short screens */
+.mon-hero .hero-fig {
+  left: 28%;
+}
+.mon-hero .hero-plat {
+  left: 28%;
+  width: 46%;
+}
+@media (min-width: 640px) {
+  .mon-hero .hero-fig,
+  .mon-hero .hero-plat {
+    left: 36%;
+  }
+}

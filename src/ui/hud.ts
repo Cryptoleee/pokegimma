@@ -44,7 +44,7 @@ export class Hud {
   private moveKey = ''
   private readyState = [true, true, true, true]
   private itemBtns: Record<string, HTMLDivElement> = {}
-  private catchBtn = h('button', 'catch2 hidden', '<span>VANG!</span>')
+  private catchBtn = h('button', 'catch2 hidden', '<span>VANG!</span><kbd>Spatie</kbd>')
   private knob = h('div', 'stick-knob')
   private base = h('div', 'stick-base hidden')
   private vLow = h('div', 'vign low')
@@ -111,7 +111,8 @@ export class Hud {
     // Items
     const items = h('div', 'items2')
     for (const [key, sprite, label] of [['master', 'master-ball', 'Master'], ['potion', 'potion', 'Potion'], ['revive', 'revive', 'Revive']] as const) {
-      const b = h('div', `ib ${key}`, `<img class="px" src="${itemUrl(sprite)}" alt="${label}"><b>0</b>`) as HTMLDivElement
+      const kb = { master: '5', potion: '6', revive: '7' }[key]
+      const b = h('div', `ib ${key}`, `<img class="px" src="${itemUrl(sprite)}" alt="${label}"><b>0</b><kbd>${kb}</kbd>`) as HTMLDivElement
       b.onpointerdown = (e) => {
         e.preventDefault()
         this.useItem(key)
@@ -337,7 +338,7 @@ export class Hud {
         const locked = !m.unlocked(s)
         b.classList.toggle('locked', locked)
         b.style.setProperty('--tc', TYPE_COLOR[mv.type])
-        b.innerHTML = `<div class="ring"></div><div class="cd"></div><div class="lbl">${locked ? `<span class="lock">🔒</span><small>Lv ${SLOT_UNLOCK[s]}</small>` : `<span>${mv.name}</span><small>${TYPE_NL[mv.type]}</small>`}</div><div class="secs"></div>`
+        b.innerHTML = `<div class="ring"></div><div class="cd"></div><div class="lbl">${locked ? `<span class="lock">🔒</span><small>Lv ${SLOT_UNLOCK[s]}</small>` : `<span>${mv.name}</span><small>${TYPE_NL[mv.type]}</small>`}</div><div class="secs"></div><kbd>${s + 1}</kbd>`
       })
     }
     m.moves.forEach((mv, s) => {

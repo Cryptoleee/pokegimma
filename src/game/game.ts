@@ -189,6 +189,8 @@ export class Game {
   camY = 0
   spectate: Trainer | null = null
   input = { mx: 0, my: 0 }
+  /** World position of the mouse cursor (desktop); attacks aim near it. */
+  aimAt: { x: number; y: number } | null = null
   held = [false, false, false, false]
   private spawnT = 0
   private legendIdx = 0
@@ -418,6 +420,16 @@ export class Game {
 
   autoTarget(m: Mon, range: number): Mon | null {
     if (!m.owner) return m.aggro && !m.aggro.fainted ? m.aggro : null
+    if (m.owner.isPlayer && this.aimAt) {
+      // Desktop: take the enemy closest to the cursor (if the cursor is near one)
+      let pick: Mon | null = null, pd = 3.5
+      for (const e of this.enemiesOf(m)) {
+        if (Math.hypot(e.x - m.x, e.y - m.y) > range) continue
+        const d = Math.hypot(e.x - this.aimAt.x, e.y - this.aimAt.y)
+        if (d < pd) { pd = d; pick = e }
+      }
+      if (pick) return pick
+    }
     let best: Mon | null = null
     let bd = range
     for (const e of this.enemiesOf(m)) {
@@ -453,7 +465,10 @@ export class Game {
       ax = tgt.x - m.x
       ay = tgt.y - m.y
     } else {
-      ;[ax, ay] = m.owner ? dirVec(m.owner.dir) : dirVec(m.dir)
+      if (m.owner?.isPlayer && this.aimAt) {
+        ax = this.aimAt.x - m.x
+        ay = this.aimAt.y - m.y
+      } else [ax, ay] = m.owner ? dirVec(m.owner.dir) : dirVec(m.dir)
     }
     const l = Math.hypot(ax, ay) || 1
     m.aimX = ax / l

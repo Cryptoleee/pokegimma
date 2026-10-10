@@ -20,11 +20,11 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 
 | Actie | Mobiel | Toetsenbord |
 | --- | --- | --- |
-| Lopen | Joystick: tik ergens op de linkerhelft | WASD / pijltjes |
-| Aanvallen (richten gaat automatisch) | De 4 ronde knoppen (ingedrukt houden = blijven aanvallen) | J K L ; of 1–4 |
+| Lopen | Joystick: tik ergens op de linkerhelft | WASD / pijltjes, of houd de linkermuisknop ingedrukt (je loopt naar de cursor) |
+| Aanvallen | De 4 ronde knoppen (ingedrukt houden = blijven aanvallen); richten gaat automatisch | 1–4; je richt op de vijand bij je cursor |
 | Pokémon wisselen | Tik op een Pokémon in je team (linksboven) | Q |
-| Vangen (verzwakte wilde Pokémon) | VANG!-knop | E / spatie |
-| Master Ball / Potion / Revive | Itemknoppen | M / R / F |
+| Vangen (verzwakte wilde Pokémon) | VANG!-knop | Spatie / E |
+| Master Ball / Potion / Revive | Itemknoppen | 5 / 6 / 7 |
 | Pauze / game verlaten | ❚❚-knop of de terugknop van je telefoon (vraagt eerst om bevestiging) | Esc |
 
 ## Hoe het werkt
