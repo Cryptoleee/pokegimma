@@ -5,7 +5,7 @@ import type { TrainerDef } from '../data/trainers'
 export type Dir = 'down' | 'up' | 'left' | 'right'
 
 export const LEVEL_CAP = 60
-export const xpNeeded = (level: number) => 10 + level * 3 + level * level * 0.1
+export const xpNeeded = (level: number) => 8 + level * 2 + level * level * 0.05
 
 export function statHp(sp: Species, level: number) {
   return Math.floor(((2 * sp.hp * level) / 100 + level + 10) * 3)
@@ -75,6 +75,8 @@ export class Mon {
   hpLag = -1
   /** >0 = briefly visible even inside tall grass (after attacking or being hit). */
   revealT = 0
+  /** Seconds since this Pokémon last dealt or took damage (drives out-of-combat regen). */
+  combatT = 0
   lastHitBy: Trainer | null = null
 
   // Wild behaviour

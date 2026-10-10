@@ -3385,3 +3385,59 @@ kbd {
 .evo-scene.done .evo-glow {
   background: radial-gradient(circle, rgba(255, 220, 120, 0.4) 0%, rgba(255, 220, 120, 0.1) 40%, transparent 68%);
 }
+
+/* ---------- Stealth eye badge + regen glow ---------- */
+
+.hidebadge .eye {
+  position: relative;
+  width: 18px;
+  height: 10px;
+}
+.hidebadge .eye::before {
+  /* closed eye: a lid curve with lashes */
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 0;
+  height: 7px;
+  border-bottom: 2px solid #c8ffd0;
+  border-radius: 0 0 10px 10px;
+}
+.hidebadge .eye::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: -2px;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, #c8ffd0 0 2px, transparent 2px 5px);
+}
+.hidebadge.seen {
+  background: rgba(130, 24, 24, 0.92);
+  border-color: #ff8a80;
+  animation: seenShake 0.3s;
+}
+.hidebadge.seen .eye::before {
+  height: 10px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff3a3a 0 30%, #ffffff 32%);
+}
+.hidebadge.seen .eye::after {
+  display: none;
+}
+@keyframes seenShake {
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+.hcard.regen .hc-hp .fill {
+  background: linear-gradient(90deg, #40d860, #a8ffb8, #40d860) !important;
+  background-size: 200% 100% !important;
+  animation: regenShine 1s linear infinite;
+}
+@keyframes regenShine {
+  to {
+    background-position: -200% 0;
+  }
+}

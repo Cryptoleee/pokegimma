@@ -164,7 +164,10 @@ export interface GameResult {
 }
 
 const RARITY_XP: Record<Rarity, number> = { common: 1, uncommon: 1.4, rare: 2.5, legendary: 5 }
-const LEGEND_TIMES = [140, 300]
+/** Seconds out of combat before HP starts regenerating, and regen rates (fraction of max HP / s). */
+const REGEN_DELAY = 3
+const REGEN_ACTIVE = 0.12
+const REGEN_BENCH = 0.06
 const BOTS = 11
 const DMG_SCALE = 1.25
 
@@ -204,6 +207,9 @@ export class Game {
   held = [false, false, false, false]
   private spawnT = 0
   private legendIdx = 0
+  /** When the legendaries show up this match (randomised). */
+  private legendTimes: number[] = []
+  private regenFxT = 0
   private passiveT = 0
   total = BOTS + 1
 
@@ -247,7 +253,8 @@ export class Game {
     this.camY = this.player.y
 
     this.scatterItems()
-    for (let i = 0; i < 55; i++) this.spawnWild(true)
+    this.legendTimes = [this.rng.range(60, 100), this.rng.range(190, 250)]
+    for (let i = 0; i < 22; i++) this.spawnWild(true)
     team.forEach((id) => preloadMon(id))
   }
 
@@ -307,7 +314,7 @@ export class Game {
     if (this.passiveT >= 1) {
       this.passiveT -= 1
       for (const tr of this.alive)
-        tr.party.forEach((m, i) => !m.fainted && this.gainXp(m, i === tr.active ? 2 : 1))
+        tr.party.forEach((m, i) => !m.fainted && this.gainXp(m, i === tr.active ? 4 : 2))
     }
 
     this.updateWilds(dt)
@@ -371,8 +378,12 @@ export class Game {
     m.aimT -= dt
     m.dir = m.aimT > 0 ? dirOf(m.aimX, m.aimY) : len > 0.08 ? tr.dir : m.dir
 
+    // Out-of-combat regeneration (Brawl Stars style)
+    this.regen(tr, dt)
+
     // Storm
     if (this.zone.outside(tr.x, tr.y) && !m.fainted) {
+      m.combatT = 0
       m.hp -= m.maxHp * this.zone.dps * dt
       if (m.hp <= 0) {
         m.hp = 0
@@ -392,6 +403,27 @@ export class Game {
     this.vfx.burst(m.x, m.y - 0.5, { n: 18, speed: 6, cols: ['#ffffff', '#fff0a0', '#ffd040'], shape: 'star', add: true, s0: 3, s1: 0.6, life: 0.7, vr: 10 })
     this.vfx.shakeBy(4)
     this.hooks.banner({ kind: 'go', title: 'GO!' })
+  }
+
+  private regen(tr: Trainer, dt: number) {
+    tr.party.forEach((m, i) => {
+      m.combatT += dt
+      if (m.fainted || m.hp >= m.maxHp || m.combatT < REGEN_DELAY) return
+      m.hp = Math.min(m.maxHp, m.hp + m.maxHp * (i === tr.active ? REGEN_ACTIVE : REGEN_BENCH) * dt)
+    })
+    const m = tr.mon
+    if (tr.isPlayer && this.regenerating(m) && this.onScreen(m.x, m.y)) {
+      this.regenFxT -= dt
+      if (this.regenFxT <= 0) {
+        this.regenFxT = 0.45
+        this.fx.push({ kind: 'heal', x: m.x, y: m.y - 0.5, t: 0, life: 0.7, color: '#80f080' })
+      }
+    }
+  }
+
+  /** True while a Pokémon is healing from out-of-combat regen. */
+  regenerating(m: Mon) {
+    return !m.fainted && m.hp < m.maxHp && m.combatT >= REGEN_DELAY
   }
 
   /** Rustling grass and footstep dust. */
@@ -462,6 +494,7 @@ export class Game {
     const tgt = target ?? (dir ? this.dirTarget(m, mv.range + 1, dir) : this.autoTarget(m, mv.range + 1.5))
     m.aimDist = dir ? Math.max(1.2, mv.range * dir.k) : null
     m.revealT = REVEAL_TIME
+    m.combatT = 0
     if (m.owner?.isPlayer && tgt) {
       this.lastTarget = tgt
       this.lastTargetT = 1.6
@@ -753,6 +786,8 @@ export class Game {
     tgt.hp -= dmg
     tgt.flash = 0.12
     tgt.revealT = REVEAL_TIME
+    tgt.combatT = 0
+    src.combatT = 0
     if (src.owner) tgt.lastHitBy = src.owner
 
     // knockback
@@ -783,7 +818,7 @@ export class Game {
       tgt.aggroT = 8
       tgt.state = 'aggro'
     }
-    if (src.owner) this.gainXp(src, (Math.min(dmg, tgt.maxHp) / tgt.maxHp) * 6 * RARITY_XP[tgt.rarity])
+    if (src.owner) this.gainXp(src, (Math.min(dmg, tgt.maxHp) / tgt.maxHp) * 9 * RARITY_XP[tgt.rarity])
     if (tgt.hp <= 0) {
       tgt.hp = 0
       this.onFaint(tgt, src)
@@ -803,7 +838,7 @@ export class Game {
       }
     }
     m.dash = null
-    const koXp = (5 + m.level * 1.2) * RARITY_XP[m.rarity]
+    const koXp = (8 + m.level * 1.8) * RARITY_XP[m.rarity]
     if (!m.owner) {
       m.state = 'weak'
       m.weakT = m.legendary ? 15 : 9
@@ -1060,25 +1095,28 @@ export class Game {
   private spawnLoop(dt: number) {
     this.spawnT -= dt
     if (this.spawnT <= 0) {
-      this.spawnT = 1
+      this.spawnT = 1.5
       const frac = Math.min(1, (Math.PI * this.zone.r * this.zone.r) / (MAP * MAP))
-      const want = Math.round(16 + 44 * frac)
-      for (let i = 0; i < 2 && this.wilds.length < want; i++) this.spawnWild(false)
+      const want = Math.round(6 + 18 * frac)
+      if (this.wilds.length < want) this.spawnWild(false)
     }
-    if (this.legendIdx < LEGEND_TIMES.length && this.time >= LEGEND_TIMES[this.legendIdx]) {
+    if (this.legendIdx < this.legendTimes.length && this.time >= this.legendTimes[this.legendIdx]) {
       this.legendIdx++
       this.spawnLegendary()
     }
   }
 
   private wildLevel(r: Rarity) {
-    const base = 3 + this.time / 16 + this.rng.range(-2, 2)
+    const base = 3 + this.time / 11 + this.rng.range(-2, 2)
     return Math.max(2, Math.min(LEVEL_CAP, Math.round(base + (r === 'uncommon' ? 2 : r === 'rare' ? 6 : 0))))
   }
 
   private spawnWild(initial: boolean) {
     const roll = this.rng.next()
-    const rarity: Rarity = roll < 0.68 ? 'common' : roll < 0.93 ? 'uncommon' : 'rare'
+    // Rarer Pokémon show up more as the match goes on
+    const p = Math.min(1, this.time / 240)
+    const rare = 0.06 + 0.16 * p, uncommon = 0.24 + 0.12 * p
+    const rarity: Rarity = roll < rare ? 'rare' : roll < rare + uncommon ? 'uncommon' : 'common'
     const z = this.zone
     let pos: [number, number] | null = null
     for (let k = 0; k < 30 && !pos; k++) {
@@ -1104,7 +1142,7 @@ export class Game {
       (x, y) => Math.hypot(x - z.nx, y - z.ny) < Math.max(4, z.nr) && this.trainers.every((t) => Math.hypot(t.x - x, t.y - y) > 12),
     )
     const id = this.rng.pick(WILD.legendary)
-    const m = new Mon(id, Math.round(26 + this.time / 22), this.rng.chance(1 / 16))
+    const m = new Mon(id, Math.round(10 + this.time / 9), this.rng.chance(1 / 16))
     m.hp = m.maxHp
     m.x = m.homeX = m.goalX = x
     m.y = m.homeY = m.goalY = y

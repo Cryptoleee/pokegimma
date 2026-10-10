@@ -105,7 +105,12 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // Brawl-style nameplates on top of everything
   for (const tr of g.trainers) {
     if (!tr.alive || !inView(tr.x, tr.y)) continue
-    if (tr.isPlayer) {
+    const inGrass = tr.isPlayer && g.world.isTall(tr.x, tr.y)
+    if (inGrass) {
+      // Stealth eye: closed + green while hidden, open red "!" when you've just given yourself away
+      const top = tr.y * TILE - trainerHeight(tr) - 2
+      drawStealthEye(ctx, tr.x * TILE, top - 6 + Math.sin(time * 4) * 1.2, !g.hidden(tr), time)
+    } else if (tr.isPlayer) {
       const top = tr.y * TILE - trainerHeight(tr) - 2
       const b = Math.sin(time * 6) * 1.5
       ctx.fillStyle = '#48e070'
@@ -289,6 +294,61 @@ function tinted(s: ReturnType<typeof monSprite>, col: string): HTMLCanvasElement
     tintCache.set(key, c)
   }
   return c
+}
+
+/** Pixel-art stealth eye on a dark pill above the player. */
+function drawStealthEye(ctx: CanvasRenderingContext2D, x: number, y: number, revealed: boolean, time: number) {
+  const w = 16, h = 9
+  ctx.save()
+  ctx.translate(Math.round(x), Math.round(y))
+  // glow
+  ctx.globalAlpha = 0.5 + Math.sin(time * 5) * 0.2
+  ctx.fillStyle = revealed ? 'rgba(255,70,60,0.55)' : 'rgba(110,240,140,0.5)'
+  ctx.beginPath()
+  ctx.ellipse(0, 0, w * 0.8, h * 0.9, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.globalAlpha = 1
+  // pill
+  ctx.fillStyle = '#16121e'
+  ctx.beginPath()
+  ctx.roundRect(-w / 2 - 1, -h / 2 - 1, w + 2, h + 2, 5)
+  ctx.fill()
+  ctx.fillStyle = revealed ? '#5a1818' : '#1c4a2a'
+  ctx.beginPath()
+  ctx.roundRect(-w / 2, -h / 2, w, h, 4)
+  ctx.fill()
+  if (revealed) {
+    // open eye
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.ellipse(-1, 0, 5, 3, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#ff3a3a'
+    ctx.beginPath()
+    ctx.arc(-1, 0, 2, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#16121e'
+    ctx.fillRect(-1.6, -0.6, 1.2, 1.2)
+    ctx.fillStyle = '#ffd040'
+    ctx.fillRect(5, -3, 1.5, 4)
+    ctx.fillRect(5, 2, 1.5, 1.5)
+  } else {
+    // closed eye with lashes
+    ctx.strokeStyle = '#9cf0a8'
+    ctx.lineWidth = 1.4
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.arc(0, -1.5, 5, 0.2, Math.PI - 0.2)
+    ctx.stroke()
+    ctx.lineWidth = 1
+    for (const lx of [-3.5, 0, 3.5]) {
+      ctx.beginPath()
+      ctx.moveTo(lx, 2.6)
+      ctx.lineTo(lx * 1.25, 4)
+      ctx.stroke()
+    }
+  }
+  ctx.restore()
 }
 
 /**

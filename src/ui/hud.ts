@@ -50,7 +50,7 @@ export class Hud {
   private vLow = h('div', 'vign low')
   private vStorm = h('div', 'vign storm', '<span>BUITEN DE ZONE!</span>')
   private countdown = h('div', 'countdown')
-  private hideBadge = h('div', 'hidebadge', '<i>🌿</i>Verborgen')
+  private hideBadge = h('div', 'hidebadge', '<i class="eye"></i><span>Verborgen</span>')
   private cdShown = ''
 
   constructor(private root: HTMLElement, private g: Game, onMenu: () => void) {
@@ -431,7 +431,14 @@ export class Hud {
 
     this.catchBtn.classList.toggle('hidden', !p.alive || !g.catchable(p))
 
-    this.hideBadge.classList.toggle('on', p.alive && g.introT <= 0 && g.hidden(p))
+    const inGrass = p.alive && g.introT <= 0 && g.world.isTall(p.x, p.y)
+    const seen = inGrass && !g.hidden(p)
+    this.hideBadge.classList.toggle('on', inGrass)
+    this.hideBadge.classList.toggle('seen', seen)
+    const label = seen ? 'Gezien!' : 'Verborgen'
+    const span = this.hideBadge.querySelector('span')!
+    if (span.textContent !== label) span.textContent = label
+    this.card.classList.toggle('regen', g.regenerating(m))
 
     // Vignettes
     this.vLow.classList.toggle('on', p.alive && !m.fainted && k < 0.25)
