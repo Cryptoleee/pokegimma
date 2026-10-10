@@ -458,6 +458,17 @@ canvas.addEventListener('mousemove', (e) => {
 canvas.addEventListener('mouseleave', () => (mouse.inside = false))
 canvas.addEventListener('contextmenu', (e) => e.preventDefault())
 
+// Mobile: long-pressing during play must never select text or open the browser's
+// search/copy menu. Text fields (name, room code) keep working normally.
+const typing = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement
+document.addEventListener('selectstart', (e) => !typing(e.target) && e.preventDefault())
+document.addEventListener('contextmenu', (e) => !typing(e.target) && e.preventDefault())
+document.addEventListener('touchstart', (e) => {
+  if (typing(e.target)) return
+  const sel = window.getSelection()
+  if (sel && !sel.isCollapsed) sel.removeAllRanges()
+}, { passive: true })
+
 /** Map the mouse position to world tiles and store it as the aim point. */
 function updateAim(g: Game) {
   const dpr = canvas.width / innerWidth

@@ -22,6 +22,16 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  /* No text selection, magnifier or "search/copy" callout on long-press (iOS ignores the inherited value) */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 html,
