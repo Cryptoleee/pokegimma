@@ -570,12 +570,8 @@ export class Hud {
         this.bossKey = def.id
         this.bossBar.style.setProperty('--c', def.color)
         this.bossBar.innerHTML = `
-          <img class="px bb-face" src="${spriteUrl(def.species)}" alt="">
-          <div class="bb-main">
-            <div class="bb-top"><b>${def.name}</b><small>${def.title}</small><span class="bb-time"></span></div>
-            <div class="bb-bar"><i class="bb-lag"></i><i class="bb-fill"></i>${def.phases.map((f) => `<em style="left:${f * 100}%"></em>`).join('')}</div>
-            <div class="bb-team"></div>
-          </div>`
+          <div class="bb-top"><b>${def.name}</b><span class="bb-team"></span><span class="bb-time"></span></div>
+          <div class="bb-bar"><i class="bb-lag"></i><i class="bb-fill"></i>${def.phases.map((f) => `<em style="left:${f * 100}%"></em>`).join('')}</div>`
       }
       const k = Math.max(0, boss.hp / boss.maxHp)
       ;(this.bossBar.querySelector('.bb-fill') as HTMLElement).style.width = `${k * 100}%`
@@ -586,8 +582,12 @@ export class Hud {
       time.textContent = `⏱ ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
       time.classList.toggle('low', t <= 30)
       this.bossBar.classList.toggle('enraged', (rv?.phase ?? 0) >= 2)
+      // Lives: just your hearts solo; with friends a short name before each row of hearts
       const humans = g.trainers.filter((t) => t.human)
-      const team = humans.map((t) => `<span class="${t === p ? 'mine' : ''} ${t.alive ? '' : 'out'}">${esc(t.name)} ${'♥'.repeat(Math.max(0, t.lives))}${'♡'.repeat(Math.max(0, 3 - t.lives))}</span>`).join('')
+      const hearts = (t: typeof p) => '♥'.repeat(Math.max(0, t.lives)) + '♡'.repeat(Math.max(0, 3 - t.lives))
+      const team = humans.length < 2
+        ? `<span class="mine">${hearts(p)}</span>`
+        : humans.map((t) => `<span class="${t === p ? 'mine' : ''} ${t.alive ? '' : 'out'}">${esc(t.name.slice(0, 6))} ${hearts(t)}</span>`).join('')
       const tEl = this.bossBar.querySelector('.bb-team') as HTMLElement
       if (tEl.innerHTML !== team) tEl.innerHTML = team
     }

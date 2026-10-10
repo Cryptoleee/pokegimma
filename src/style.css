@@ -4914,23 +4914,36 @@ button:disabled {
 .raid-mode .topright .chips {
   display: none;
 }
+.raid-mode .hparty {
+  display: none;
+}
+/* Slim boss bar: name, lives and timer on one line, HP underneath */
 .bossbar {
   --c: #ff7a30;
   position: absolute;
   left: calc(10px + var(--safe-l));
   right: calc(10px + var(--safe-r));
-  top: calc(122px + var(--safe-t));
+  top: calc(78px + var(--safe-t));
   display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 6px 10px 6px 6px;
-  border-radius: 16px;
-  border: 2px solid #1a1420;
-  background: linear-gradient(180deg, rgba(30, 18, 24, 0.92), rgba(12, 10, 20, 0.92));
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5), 0 0 24px color-mix(in srgb, var(--c) 45%, transparent);
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 8px 5px;
+  border-radius: 10px;
+  background: rgba(10, 8, 18, 0.62);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--c) 35%, transparent);
   color: #fff;
   pointer-events: none;
   animation: legendPop 0.6s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+/* Landscape: between your card (left) and the pause button (right) */
+@media (orientation: landscape) and (min-width: 700px) {
+  .bossbar {
+    left: calc(292px + var(--safe-l));
+    right: calc(214px + var(--safe-r));
+    top: calc(12px + var(--safe-t));
+    max-width: 440px;
+    margin: 0 auto;
+  }
 }
 #hud > .bossbar,
 #hud > .respawn {
@@ -4943,44 +4956,25 @@ button:disabled {
   animation: bossRage 1s ease-in-out infinite;
 }
 @keyframes bossRage {
-  50% { box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5), 0 0 36px color-mix(in srgb, var(--c) 90%, transparent); }
-}
-.bb-face {
-  width: 44px;
-  height: 44px;
-  flex: none;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--c) 30%, #1a1420);
-  image-rendering: pixelated;
-}
-.bb-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  50% { box-shadow: 0 0 26px color-mix(in srgb, var(--c) 90%, transparent); }
 }
 .bb-top {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   white-space: nowrap;
-}
-.bb-top b {
-  font-size: 16px;
-  color: var(--c);
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
-}
-.bb-top small {
-  font-size: 10px;
-  color: #b8b0c8;
-  overflow: hidden;
-  text-overflow: ellipsis;
   min-width: 0;
 }
-.bb-time {
-  margin-left: auto;
+.bb-top b {
+  flex: none;
   font-size: 13px;
+  color: var(--c);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+.bb-time {
+  flex: none;
+  margin-left: auto;
+  font-size: 11px;
   font-weight: 700;
 }
 .bb-time.low {
@@ -4992,10 +4986,10 @@ button:disabled {
 }
 .bb-bar {
   position: relative;
-  height: 12px;
-  border-radius: 6px;
+  height: 7px;
+  border-radius: 4px;
   background: #2a2030;
-  border: 1.5px solid #000;
+  border: 1px solid #000;
   overflow: hidden;
 }
 .bb-bar i {
@@ -5021,9 +5015,10 @@ button:disabled {
 }
 .bb-team {
   display: flex;
-  flex-wrap: wrap;
-  gap: 2px 8px;
-  font-size: 11px;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10px;
   color: #ff8aa0;
 }
 .bb-team span {
@@ -5123,10 +5118,6 @@ button:disabled {
 .lb-choice .cp-modes small {
   display: none;
 }
-.bb-team {
-  flex-wrap: nowrap;
-  overflow: hidden;
-}
 @media (orientation: landscape) and (max-height: 560px) {
   .loading {
     flex-direction: row;
@@ -5150,4 +5141,74 @@ button:disabled {
   .ld-boss img {
     height: 96px;
   }
+}
+/* Raid picker: the boss is a surprise, shown as silhouettes */
+.cp-mystery {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 2px solid #ff7a30;
+  background: linear-gradient(110deg, rgba(255, 122, 48, 0.3), rgba(122, 200, 255, 0.18) 60%, rgba(16, 22, 44, 0.85));
+  box-shadow: 0 0 18px rgba(255, 122, 48, 0.35);
+  color: #fff;
+}
+.cp-sil {
+  position: relative;
+  flex: none;
+  display: flex;
+  width: 84px;
+  height: 60px;
+}
+.cp-sil img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: brightness(0) drop-shadow(0 0 6px rgba(255, 255, 255, 0.5));
+}
+.cp-sil img + img {
+  margin-left: -28px;
+  margin-top: 6px;
+}
+.cp-sil i {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-size: 30px;
+  font-weight: 700;
+  color: #ffd84a;
+  text-shadow: 0 2px 0 #000, 0 0 12px rgba(255, 216, 74, 0.8);
+  animation: bossFloat 2.4s ease-in-out infinite;
+}
+.cp-mystery span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+.cp-mystery b {
+  font-size: 17px;
+}
+.cp-mystery small {
+  font-size: 12px;
+  color: #c8d0f0;
+}
+.lb-choice .cp-mystery {
+  padding: 4px 10px;
+}
+.lb-choice .cp-sil {
+  width: 64px;
+  height: 44px;
+}
+.lb-choice .cp-sil img {
+  width: 42px;
+  height: 42px;
+}
+.lb-choice .cp-sil img + img {
+  margin-left: -20px;
+  margin-top: 2px;
 }

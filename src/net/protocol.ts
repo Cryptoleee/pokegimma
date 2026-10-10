@@ -1,7 +1,6 @@
 import type { AimDir, Dir } from '../game/entities'
 import type { MatchKind, MatchSetup } from '../game/game'
 import type { ThemeId } from '../data/themes'
-import type { BossId } from '../data/bosses'
 
 /** A player in the lobby. `pid` is a local profile id for now (an account id later). */
 export interface LobbyPlayer {
@@ -17,7 +16,6 @@ export interface LobbyPlayer {
 export interface MatchChoice {
   kind: MatchKind
   theme: ThemeId | 'random'
-  boss: BossId
 }
 
 /** A chat line (lobby and in-game). */

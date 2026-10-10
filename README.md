@@ -37,7 +37,7 @@ Zit je naast iemand? Dan heb je zo een potje:
 1. Speler 1 vult in het hoofdmenu een naam in, tikt **Multiplayer** en dan **Potje maken**. Er verschijnt een code van 4 tekens en een QR-code.
 2. Speler 2 tikt **Multiplayer** en typt de code bij **Meedoen**, of scant de QR-code met de camera. De link opent de game en doet meteen mee.
 3. In de lobby kiest iedereen een trainer en Pokémon met **Team kiezen** en tikt op **Klaar**. Je ziet bij iedereen of die klaar is, en je kunt chatten (ook met snelle knoppen).
-4. De host kiest bovenin de lobby de modus (Battle Royale of Raid) en de wereld of de baas. De anderen zien die keuze meteen.
+4. De host kiest bovenin de lobby de modus (Battle Royale of Raid) en bij een battle royale de wereld. De anderen zien die keuze meteen.
 5. Zodra iedereen klaar is, tikt de host **Start!** Iedereen ziet 8 seconden een laadscherm met tips en start dan tegelijk. De lege plekken (tot 12) worden bots.
 
 In het potje zelf kun je ook chatten via de 💬-knop (op desktop: Enter).
@@ -91,7 +91,7 @@ Elk potje heeft twee gebeurtenissen, tussen de legendarische Pokémon door. Beid
 
 ## Raid
 
-Een raid is PvE: jij (en tot 11 vrienden) tegen één legendarische baas, in een eigen arena. Er is geen storm en er zijn geen bots of wilde Pokémon.
+Een raid is PvE: jij (en tot 11 vrienden) tegen één legendarische baas, in een eigen arena. Er is geen storm en er zijn geen bots of wilde Pokémon. De baas is een verrassing: hij wordt willekeurig gekozen (nooit twee keer dezelfde na elkaar) en je ziet hem pas op het laadscherm.
 
 - **Jouw team:** je partner is in de raid volledig geëvolueerd en Lv 50 met alle vier de aanvallen (Pikachu wordt Raichu, Charmander Charizard, enzovoort). Je hebt 2 Potions en HP herstelt niet vanzelf. Er verschijnen wel geregeld Potions in de arena.
 - **Ontwijken:** elke grote aanval zie je eerst als rode vorm op de grond die langzaam volloopt: een cirkel, kegel, lijn of ring. Sta je erin als hij vol is, dan kost dat een groot deel van je HP. Elke waarschuwing is lang genoeg om eruit te lopen als je meteen reageert.

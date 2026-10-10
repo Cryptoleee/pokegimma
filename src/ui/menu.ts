@@ -41,10 +41,7 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
             const th = t === 'random' ? null : THEMES[t]
             return `<button data-theme="${t}" class="${c.theme === t ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${th ? th.grass[0] : '#5a6a9a'};--c2:${th ? th.tall[0] : '#3a4470'}"><i>${th ? th.icon : '🎲'}</i>${th ? th.name : 'Willekeurig'}</button>`
           }).join('')}</div>`
-        : `<div class="cp-bosses">${BOSS_LIST.map((b) => {
-            const d = BOSSES[b]
-            return `<button data-boss="${b}" class="${c.boss === b ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${d.color}">${gif(d.species, 'cp-boss')}<span><b>${d.name}</b><small>${d.title}</small><em>${d.blurb}</em></span></button>`
-          }).join('')}</div>`}`
+        : `<div class="cp-mystery"><div class="cp-sil">${BOSS_LIST.map((b) => `<img class="px" src="${spriteUrl(BOSSES[b].species)}" alt="">`).join('')}<i>?</i></div><span><b>Willekeurige baas</b><small>Je ziet pas bij het laden tegen wie je vecht</small></span></div>`}`
     el.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
       b.addEventListener('click', () => {
         if (!set) return
@@ -52,7 +49,6 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
         const c = { ...get() }
         if (b.dataset.kind) c.kind = b.dataset.kind as MatchChoice['kind']
         if (b.dataset.theme) c.theme = b.dataset.theme as MatchChoice['theme']
-        if (b.dataset.boss) c.boss = b.dataset.boss as MatchChoice['boss']
         set(c)
         paint()
       }),
@@ -290,7 +286,7 @@ export function showLobby(room: Room, on: LobbyActions) {
           ${p.team[0] ? gif(p.team[0], 'lb-mon') : ''}
           <span class="lb-state">${i === 0 ? 'HOST' : p.ready ? 'KLAAR ✓' : 'kiest…'}</span>
         </div>`
-    }).join('') + (raid ? `<div class="lb-bots">Raid: samen tegen ${BOSSES[room.choice.boss].name}</div>` : `<div class="lb-bots">+ ${bots} bot${bots === 1 ? '' : 's'} vullen de arena aan</div>`)
+    }).join('') + (raid ? '<div class="lb-bots">Raid: samen tegen een willekeurige baas</div>' : `<div class="lb-bots">+ ${bots} bot${bots === 1 ? '' : 's'} vullen de arena aan</div>`)
 
     const waiting = others().filter((p) => !p.ready)
     if (room.isHost) {
@@ -305,7 +301,7 @@ export function showLobby(room: Room, on: LobbyActions) {
         : waiting.length
           ? `Wachten… <small>${others().length - waiting.length}/${others().length} klaar</small>`
           : raid
-            ? `Start raid! ▶<small>${room.players.length} speler${room.players.length === 1 ? '' : 's'} tegen ${BOSSES[room.choice.boss].name}</small>`
+            ? `Start raid! ▶<small>${room.players.length} speler${room.players.length === 1 ? '' : 's'} tegen een eindbaas</small>`
             : `Start! ▶<small>${room.players.length} speler${room.players.length === 1 ? '' : 's'} + ${bots} bots</small>`
     } else {
       steps.innerHTML = me.ready

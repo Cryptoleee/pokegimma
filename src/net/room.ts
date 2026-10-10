@@ -45,7 +45,7 @@ export class Room {
   code = ''
   players: LobbyPlayer[] = []
   /** Mode and world/boss for the next match (host decides). */
-  choice: MatchChoice = { kind: 'royale', theme: 'random', boss: 'reshiram' }
+  choice: MatchChoice = { kind: 'royale', theme: 'random' }
   /** Recent chat, oldest first. */
   chatLog: ChatLine[] = []
   /** Host: a match is still being played. Guests get this through the lobby message. */

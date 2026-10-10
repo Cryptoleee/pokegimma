@@ -495,8 +495,19 @@ export class Game {
 
     const focus = p.alive ? p : this.spectate && this.spectate.alive ? this.spectate : (this.spectate = this.alive[0] ?? p)
     const k = Math.min(1, dt * 8)
-    this.camX += (focus.x - this.camX) * k
-    this.camY += (focus.y - this.camY) * k
+    const [fx, fy] = this.camTarget(focus)
+    this.camX += (fx - this.camX) * k
+    this.camY += (fy - this.camY) * k
+  }
+
+  /** Where the camera looks: at you, and in a raid a bit toward the boss so both are in view. */
+  private camTarget(focus: { x: number; y: number }): [number, number] {
+    const boss = this.kind === 'raid' ? this.wilds.find((w) => w.boss) : null
+    if (!boss) return [focus.x, focus.y]
+    // Aim at the boss's body, not its feet: the sprite is several tiles tall
+    const dx = boss.x - focus.x, dy = boss.y - 1.5 - focus.y, d = Math.hypot(dx, dy)
+    const lead = Math.min(d * 0.5, 7)
+    return d > 0.01 ? [focus.x + (dx / d) * lead, focus.y + (dy / d) * lead] : [focus.x, focus.y]
   }
 
   private updateTrainer(tr: Trainer, dt: number) {
@@ -639,8 +650,9 @@ export class Game {
 
     const focus = p.alive ? p : p.spectate && p.spectate.alive ? p.spectate : this.alive[0] ?? p
     const kc = Math.min(1, dt * 8)
-    this.camX += (focus.x - this.camX) * kc
-    this.camY += (focus.y - this.camY) * kc
+    const [fx, fy] = this.camTarget(focus)
+    this.camX += (fx - this.camX) * kc
+    this.camY += (fy - this.camY) * kc
   }
 
   /** Drop-in camera; in a raid it first shows off the boss, then swings to you. */
@@ -652,8 +664,9 @@ export class Game {
       this.camY = boss.y
     } else if (boss) {
       const k = Math.min(1, 0.12)
-      this.camX += (p.x - this.camX) * k
-      this.camY += (p.y - this.camY) * k
+      const [fx, fy] = this.camTarget(p)
+      this.camX += (fx - this.camX) * k
+      this.camY += (fy - this.camY) * k
     } else {
       this.camX = p.x
       this.camY = p.y

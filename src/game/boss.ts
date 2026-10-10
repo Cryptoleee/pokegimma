@@ -72,8 +72,8 @@ export function finalForm(id: number): number {
 
 /** Spots around the arena edge to (re)spawn at, one per player. */
 export function spawnPoint(i: number, n: number): [number, number] {
-  const a = Math.PI / 2 + (i - (n - 1) / 2) * 0.55
-  return [ARENA_C + Math.cos(a) * (ARENA_R - 3), ARENA_C + Math.sin(a) * (ARENA_R - 3)]
+  const a = Math.PI / 2 + (i - (n - 1) / 2) * 0.42
+  return [ARENA_C + Math.cos(a) * (ARENA_R - 4.5), ARENA_C + Math.sin(a) * (ARENA_R - 4.5)]
 }
 
 /** Host and solo: turn the match into a raid. */

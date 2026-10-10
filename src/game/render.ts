@@ -13,8 +13,9 @@ import { drawHazards } from './boss'
 
 const FONT = '"Pixelify Sans", monospace'
 
-export function zoomFor(cw: number, ch: number) {
-  return Math.max(2, Math.min(6, Math.min(cw, ch) / (TILE * 11.5)))
+/** Pixels per world pixel: ~11.5 tiles across the short side, ~16.5 in a raid to see the arena. */
+export function zoomFor(cw: number, ch: number, wide = false) {
+  return Math.max(2, Math.min(6, Math.min(cw, ch) / (TILE * (wide ? 16.5 : 11.5))))
 }
 
 /** Last frame's camera, so input can map screen pixels to world tiles. */
@@ -23,7 +24,7 @@ export const view = { ox: 0, oy: 0, Z: 1 }
 export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: number) {
   // Drop-in: start high above the arena and swoop down to the player
   const ik = Math.max(0, g.introT / INTRO_TIME)
-  const Z = zoomFor(cw, ch) * (1 - 0.62 * ik * ik * (3 - 2 * ik))
+  const Z = zoomFor(cw, ch, g.kind === 'raid') * (1 - 0.62 * ik * ik * (3 - 2 * ik))
   const vw = cw / Z, vh = ch / Z
   let ox = g.camX * TILE - vw / 2
   let oy = g.camY * TILE - vh / 2

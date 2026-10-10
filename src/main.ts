@@ -1,5 +1,6 @@
 import './style.css'
 import { ROSTER, TEAM_SIZE } from './data/pokemon'
+import { BOSS_LIST, type BossId } from './data/bosses'
 import { TRAINERS, type TrainerDef } from './data/trainers'
 import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
 import { render, view } from './game/render'
@@ -69,12 +70,21 @@ window.addEventListener('resize', resize)
 resize()
 
 /** Mode and world / boss: last solo pick, and the host's default for a new room. */
-let choice: MatchChoice = { kind: 'royale', theme: 'random', boss: 'reshiram', ...store.get<Partial<MatchChoice>>('choice', {}) }
+const saved = store.get<Partial<MatchChoice>>('choice', {})
+let choice: MatchChoice = { kind: saved.kind ?? 'royale', theme: saved.theme ?? 'random' }
 
-/** A concrete match setup from a choice (random world resolved from the seed). */
+/**
+ * A concrete match setup from a choice: a random world from the seed, and a
+ * random raid boss that is never the same as last time on this device.
+ */
 function setupFor(c: MatchChoice, humans: LobbyPlayer[]): MatchSetup {
   const seed = Date.now() % 1e9
-  return { seed, humans, kind: c.kind, theme: pickTheme(c.theme, seed), boss: c.boss }
+  if (c.kind !== 'raid') return { seed, humans, kind: c.kind, theme: pickTheme(c.theme, seed) }
+  const last = store.get<BossId | ''>('lastBoss', '')
+  const pool = BOSS_LIST.filter((b) => b !== last)
+  const boss = pool[Math.floor(Math.random() * pool.length)] ?? BOSS_LIST[0]
+  store.set('lastBoss', boss)
+  return { seed, humans, kind: c.kind, theme: pickTheme(c.theme, seed), boss }
 }
 
 /** Lobby: you picked a team and tapped "Klaar". */

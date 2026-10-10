@@ -189,9 +189,10 @@ export class World {
         this.vents.push({ x: vx, y: vy })
       }
     } else {
-      // Six ice pillars in a ring: cover from beams and blizzards
+      // Six ice pillars in a ring: cover from beams and blizzards (none right
+      // between the spawn at the bottom and the boss)
       for (let i = 0; i < 6; i++) {
-        const a = (i * Math.PI) / 3 + Math.PI / 6
+        const a = (i * Math.PI) / 3
         const px = Math.round(c + Math.cos(a) * 9 - 1), py = Math.round(c + Math.sin(a) * 9 - 1)
         for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) this.set(px + dx, py + dy, T.PILLAR)
         this.pillars.push({ x: px, y: py, hp: 1 })
