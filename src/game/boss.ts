@@ -568,6 +568,9 @@ function impactFx(g: Game, h: Hazard) {
 
 // ---------------------------------------------------------------- drawing
 
+/** Seconds before it fires that a sweep beam shows in full. */
+const SWEEP_SHOW = 0.9
+
 /** The outline of a hazard as a canvas path (world px). */
 function hazardPath(ctx: CanvasRenderingContext2D, h: Hazard) {
   const x = h.x * TILE, y = h.y * TILE, R = Math.min(h.r, ARENA_R + 2) * TILE
@@ -601,7 +604,21 @@ function hazardPath(ctx: CanvasRenderingContext2D, h: Hazard) {
 /** Telegraphs on the ground: the shape, a texture that moves, filling up until it hits. */
 export function drawHazards(g: Game, ctx: CanvasRenderingContext2D, time: number) {
   for (const h of g.hazards) {
-    const k = Math.max(0, Math.min(1, 1 - h.t / h.total))
+    // A sweep (Cross Flame) lays all its beams at once; only the next ones show in
+    // full, a short while before they fire. The rest is a faint outline that shows
+    // which way the sweep turns.
+    const win = h.shape === 'line' && h.both ? Math.min(h.total, SWEEP_SHOW) : h.total
+    if (h.t > win) {
+      ctx.save()
+      hazardPath(ctx, h)
+      ctx.setLineDash([4, 6])
+      ctx.lineWidth = 1.2
+      ctx.strokeStyle = `rgba(${palOf(h.type, h.atk).rgb},0.3)`
+      ctx.stroke()
+      ctx.restore()
+      continue
+    }
+    const k = Math.max(0, Math.min(1, 1 - h.t / win))
     const p = palOf(h.type, h.atk), col = p.rgb
     const pulse = 0.55 + 0.45 * Math.sin(time * 18)
     const x = h.x * TILE, y = h.y * TILE, R = Math.min(h.r, ARENA_R + 2) * TILE
@@ -651,7 +668,8 @@ export function drawHazards(g: Game, ctx: CanvasRenderingContext2D, time: number
       // Chevrons running along the beam, and a hot core line
       const ux = Math.cos(h.ang), uy = Math.sin(h.ang), px = -uy, py = ux
       const hw = (h.width / 2) * TILE * 0.7, gap = 20, back = (h.both ? h.r : 0.5) * TILE
-      for (let d = -back + ((time * 80) % gap); d < h.r * TILE; d += gap) {
+      // Sweeps stay calmer: no chevrons, just the fill and the core line
+      if (!h.both) for (let d = -back + ((time * 80) % gap); d < h.r * TILE; d += gap) {
         ctx.beginPath()
         ctx.moveTo(x + ux * (d - 7) + px * hw, y + uy * (d - 7) + py * hw)
         ctx.lineTo(x + ux * d, y + uy * d)
