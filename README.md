@@ -36,13 +36,20 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 - **Zone:** de storm krimpt in 6 fases. Daarbuiten verliest je actieve Pokémon HP.
 - **Bots:** 11 AI-trainers met verschillende skill. Ze farmen wilde Pokémon, vangen, rapen items op, vluchten de zone in en vallen aan of vluchten afhankelijk van hun HP en level.
 
+## Presentatie
+
+- **Soundtrack:** eigen chiptune-muziek die live gesequenced wordt met WebAudio: titel, menu, gevecht (versnelt in de finale), overwinning en nederlaag. Plus Pokémon-cries via PokéAPI.
+- **Cinematisch:** een titelscherm met Zekrom en Reshiram, Black/White-schermovergangen, keuzeschermen als podium, een drop-in met aftelling bij de start, een evolutie-cutscene, banners voor level-ups, nieuwe aanvallen, legendarische Pokémon en KO's, en een resultaatscherm met confetti.
+- **Wereld:** wolkschaduwen, golvend en glinsterend water, ritselend gras, stofwolkjes, zwevende pollen, een gloeiende stormmuur met bliksem en regen, en een vignet.
+
 ## Code
 
 ```
 src/
   data/       Pokémon, aanvallen, types, trainers
   game/       wereldgeneratie, engine, bot-AI, renderer, aanvalseffecten (vfx.ts)
-  ui/         menu's en HUD (DOM boven de canvas)
+  ui/         titel, uitleg, keuzeschermen, HUD, cutscenes, resultaten (DOM boven de canvas)
+  music.ts    chiptune-sequencer en soundtrack
 ```
 
 ## Assets en rechten

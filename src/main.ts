@@ -4,8 +4,14 @@ import { TRAINERS, type TrainerDef } from './data/trainers'
 import { Game } from './game/game'
 import { render } from './game/render'
 import { Hud } from './ui/hud'
-import { clearScreen, showLeaveConfirm, showPartyFull, showResults, showRoster, showTitle, showTrainerSelect } from './ui/screens'
+import { clearScreen, showLeaveConfirm, showPartyFull } from './ui/screens'
 import { showIntro } from './ui/intro'
+import { showTitle } from './ui/title'
+import { showRoster, showTrainerSelect } from './ui/select'
+import { showResults } from './ui/results'
+import { showEvolution } from './ui/cutscene'
+import { wipe } from './ui/transition'
+import { playMusic, setTempo } from './music'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
@@ -35,7 +41,7 @@ let game: Game | null = null
 let hud: Hud | null = null
 
 function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 3)
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
   canvas.width = Math.round(window.innerWidth * dpr)
   canvas.height = Math.round(window.innerHeight * dpr)
 }
@@ -44,41 +50,54 @@ resize()
 
 function toTitle() {
   stopGame()
-  showTitle(() => showIntro(toTrainer))
+  showTitle(() => showIntro(() => wipe(toTrainer)))
 }
 
 function toTrainer() {
-  showTrainerSelect(trainer.key, (t) => {
-    trainer = t
-    store.set('trainer', t.key)
-    toRoster()
-  })
+  playMusic('menu')
+  showTrainerSelect(
+    trainer.key,
+    () => wipe(toTitle),
+    (t) => {
+      trainer = t
+      store.set('trainer', t.key)
+      wipe(toRoster)
+    },
+  )
 }
 
 function toRoster() {
   stopGame()
-  showRoster(team, toTrainer, (picked) => {
-    team = picked
-    store.set('team', picked)
-    startGame()
-  })
+  playMusic('menu')
+  showRoster(
+    team,
+    () => wipe(toTrainer),
+    (picked) => {
+      team = picked
+      store.set('team', picked)
+      wipe(startGame, { flash: true })
+    },
+  )
 }
 
 function startGame() {
   clearScreen()
+  stopGame()
   if (team.length !== TEAM_SIZE) return toRoster()
+  playMusic('battle')
   game = new Game(trainer, team, {
     toast: (t, c) => hud?.toast(t, c),
-    feed: (t) => hud?.feed(t),
+    feed: (t, icon) => hud?.feed(t, icon),
+    banner: (b) => hud?.banner(b),
+    evolve: (from, to, shiny, done) => showEvolution(from, to, shiny, done),
     partyFull: (mon, choose) => showPartyFull(mon, game!.player.party, choose),
     end: (r) => {
       hud?.destroy()
       hud = null
-      showResults(r, startGame, toRoster)
+      showResults(r, trainer.sprite, () => wipe(startGame, { flash: true }), () => wipe(toRoster))
     },
   })
   hud = new Hud(hudRoot, game, confirmLeave)
-  hud.toast('Overleef! Versla wilde Pokémon om sneller te levelen', '#80c0ff')
   // Extra history entry so the phone's back button asks before leaving.
   history.pushState({ battlemon: 'game' }, '')
   guardActive = true
@@ -115,7 +134,7 @@ function leaveMatch() {
     guardActive = false
     history.back()
   }
-  toRoster()
+  wipe(toRoster)
 }
 
 window.addEventListener('popstate', () => {
@@ -200,6 +219,7 @@ function frame(now: number) {
   if (game) {
     keyboardMove(game)
     game.update(dt)
+    setTempo(game.zone.phase >= 4 ? 1.12 : 1)
     render(game, ctx, canvas.width, canvas.height)
     hud?.update()
   }

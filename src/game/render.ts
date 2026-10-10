@@ -1,12 +1,12 @@
 import { TYPE_COLOR } from '../data/types'
 import type { Game } from './game'
-import { ITEM_SPRITE } from './game'
+import { INTRO_TIME, ITEM_SPRITE } from './game'
 import type { Mon, Trainer } from './entities'
 import { getSprite, itemUrl, monSprite } from './sprites'
 import { trainerSpriteUrl } from '../data/trainers'
 import { drawCharge, drawDashAura, drawIncoming, drawMelee, drawProjectile } from './moveFx'
 import { drawGlow } from './vfx'
-import { TILE } from './world'
+import { T, TILE } from './world'
 
 const FONT = '"Pixelify Sans", monospace'
 
@@ -15,7 +15,9 @@ export function zoomFor(cw: number, ch: number) {
 }
 
 export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: number) {
-  const Z = zoomFor(cw, ch)
+  // Drop-in: start high above the arena and swoop down to the player
+  const ik = Math.max(0, g.introT / INTRO_TIME)
+  const Z = zoomFor(cw, ch) * (1 - 0.62 * ik * ik * (3 - 2 * ik))
   const vw = cw / Z, vh = ch / Z
   let ox = g.camX * TILE - vw / 2
   let oy = g.camY * TILE - vh / 2
@@ -43,6 +45,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
     x * TILE > ox - m * TILE && x * TILE < ox + vw + m * TILE && y * TILE > oy - m * TILE && y * TILE < oy + vh + m * TILE
 
   // Ground marks (scorch, frost, craters) under everything else
+  drawWater(g, ctx, ox, oy, vw, vh, time)
   g.vfx.drawDecals(ctx)
   g.vfx.drawUnder(ctx)
   drawItems(g, ctx, inView)
@@ -53,6 +56,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   for (const tr of g.trainers) {
     if (tr.alive && inView(tr.x, tr.y)) ents.push({ y: tr.y, draw: () => drawTrainer(g, ctx, tr, time) })
     const m = tr.mon
+    if (tr.isPlayer && !g.partnerOut) continue
     if (tr.alive && m && !m.fainted && inView(m.x, m.y)) ents.push({ y: m.y, draw: () => drawMon(g, ctx, m, time) })
   }
   for (const w of g.wilds) if (inView(w.x, w.y)) ents.push({ y: w.y, draw: () => drawMon(g, ctx, w, time) })
@@ -77,25 +81,14 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   drawFx(g, ctx)
   for (const tr of g.trainers) if (tr.throwFx) drawThrow(ctx, tr.throwFx)
 
-  // Storm
-  const z = g.zone
-  ctx.fillStyle = 'rgba(110, 50, 190, 0.34)'
-  ctx.beginPath()
-  ctx.rect(ox - 2, oy - 2, vw + 4, vh + 4)
-  ctx.arc(z.x * TILE, z.y * TILE, Math.max(0.01, z.r * TILE), 0, Math.PI * 2, true)
-  ctx.fill('evenodd')
-  ctx.strokeStyle = '#d8a0ff'
-  ctx.lineWidth = 2
-  circle(ctx, z.x * TILE, z.y * TILE, Math.max(0.01, z.r * TILE))
-  ctx.stroke()
-  if (z.phase < 6 && z.nr > 0) {
-    ctx.setLineDash([4, 4])
-    ctx.strokeStyle = 'rgba(255,255,255,0.75)'
-    ctx.lineWidth = 1
-    circle(ctx, z.nx * TILE, z.ny * TILE, z.nr * TILE)
-    ctx.stroke()
-    ctx.setLineDash([])
-  }
+  // Cloud shadows drift across the land
+  drawClouds(ctx, ox, oy, vw, vh, time)
+
+  // Storm: tinted, rain-swept outside, a crackling energy wall on the edge
+  drawStorm(g, ctx, ox, oy, vw, vh, time)
+
+  // Ambient pollen
+  drawMotes(ctx, ox, oy, vw, vh, time)
 
   // Overhead bars and labels on top of everything
   for (const tr of g.trainers) {
@@ -123,6 +116,8 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
     if (w.state === 'aggro' || w.hp < w.maxHp || w.rarity !== 'common') monBar(ctx, w)
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0)
+  // Cinematic vignette
+  ctx.drawImage(vignette(), 0, 0, cw, ch)
   if (g.vfx.screenFlash > 0) {
     ctx.fillStyle = `rgba(${g.vfx.screenFlashCol},${Math.min(0.75, g.vfx.screenFlash * 0.6)})`
     ctx.fillRect(0, 0, cw, ch)
@@ -428,4 +423,177 @@ function drawThrow(ctx: CanvasRenderingContext2D, t: NonNullable<Trainer['throwF
   circle(ctx, 0, 0, 1.2)
   ctx.fill()
   ctx.restore()
+}
+
+
+// ---------------- Ambience ----------------
+
+let vigCanvas: HTMLCanvasElement | null = null
+function vignette() {
+  if (vigCanvas) return vigCanvas
+  vigCanvas = document.createElement('canvas')
+  vigCanvas.width = vigCanvas.height = 256
+  const g = vigCanvas.getContext('2d')!
+  const grad = g.createRadialGradient(128, 128, 70, 128, 128, 182)
+  grad.addColorStop(0, 'rgba(0,0,0,0)')
+  grad.addColorStop(1, 'rgba(8,10,30,0.42)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 256, 256)
+  return vigCanvas
+}
+
+let cloudCanvas: HTMLCanvasElement | null = null
+function cloudSprite() {
+  if (cloudCanvas) return cloudCanvas
+  cloudCanvas = document.createElement('canvas')
+  cloudCanvas.width = cloudCanvas.height = 128
+  const g = cloudCanvas.getContext('2d')!
+  const blobs = [[64, 64, 44], [36, 70, 30], [92, 72, 32], [60, 44, 30], [84, 52, 26]]
+  for (const [x, y, r] of blobs) {
+    const grad = g.createRadialGradient(x, y, 0, x, y, r)
+    grad.addColorStop(0, 'rgba(20,30,60,0.55)')
+    grad.addColorStop(1, 'rgba(20,30,60,0)')
+    g.fillStyle = grad
+    g.fillRect(0, 0, 128, 128)
+  }
+  return cloudCanvas
+}
+
+function drawClouds(ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number) {
+  const span = 128 * TILE
+  const c = cloudSprite()
+  ctx.globalAlpha = 0.22
+  for (let i = 0; i < 14; i++) {
+    const size = (10 + (i % 4) * 4) * TILE
+    const x = (((i * 977) % 128) * TILE + time * (10 + (i % 3) * 4)) % span
+    const y = (((i * 613) % 128) * TILE + time * 4) % span
+    if (x + size < ox || x - size > ox + vw || y + size < oy || y - size > oy + vh) continue
+    ctx.drawImage(c, x - size, y - size * 0.7, size * 2, size * 1.4)
+  }
+  ctx.globalAlpha = 1
+}
+
+function drawWater(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number) {
+  const tx0 = Math.max(0, Math.floor(ox / TILE)), ty0 = Math.max(0, Math.floor(oy / TILE))
+  const tx1 = Math.min(127, Math.ceil((ox + vw) / TILE)), ty1 = Math.min(127, Math.ceil((oy + vh) / TILE))
+  if ((tx1 - tx0) * (ty1 - ty0) > 9000) return
+  for (let ty = ty0; ty <= ty1; ty++)
+    for (let tx = tx0; tx <= tx1; tx++) {
+      if (g.world.at(tx, ty) !== T.WATER) continue
+      const seed = (tx * 73856093) ^ (ty * 19349663)
+      const ph = (seed & 1023) / 163
+      const k = Math.sin(time * 1.6 + ph)
+      // Rolling wave line
+      const wy = ty * TILE + 4 + ((time * 6 + ph * 3) % 10)
+      ctx.fillStyle = 'rgba(200,228,255,0.45)'
+      ctx.fillRect(tx * TILE + 2 + Math.sin(time * 2 + ph) * 2, wy, 6, 1)
+      // Sparkle
+      if (k > 0.86) {
+        const sx = tx * TILE + (seed & 15), sy = ty * TILE + ((seed >> 4) & 15)
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(sx - 1, sy, 3, 1)
+        ctx.fillRect(sx, sy - 1, 1, 3)
+      }
+    }
+}
+
+const motes: { x: number; y: number; s: number; ph: number }[] = []
+function drawMotes(ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number) {
+  while (motes.length < 26) motes.push({ x: ox + Math.random() * vw, y: oy + Math.random() * vh, s: 0.6 + Math.random(), ph: Math.random() * 6 })
+  ctx.fillStyle = 'rgba(255,250,210,0.75)'
+  for (const m of motes) {
+    m.x += Math.sin(time * 0.7 + m.ph) * 0.15 + 0.12
+    m.y += Math.cos(time * 0.5 + m.ph) * 0.1 - 0.05
+    if (m.x < ox - 10 || m.x > ox + vw + 10 || m.y < oy - 10 || m.y > oy + vh + 10) {
+      m.x = ox + Math.random() * vw
+      m.y = oy + Math.random() * vh
+    }
+    const a = 0.4 + 0.4 * Math.sin(time * 2 + m.ph)
+    ctx.globalAlpha = a
+    ctx.fillRect(m.x, m.y, m.s, m.s)
+  }
+  ctx.globalAlpha = 1
+}
+
+let stormBolt = { t: 0, a: 0, seedT: 0 }
+function drawStorm(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number) {
+  const z = g.zone
+  const cx = z.x * TILE, cy = z.y * TILE, r = Math.max(0.01, z.r * TILE)
+  // Is any of the storm visible?
+  const camX = ox + vw / 2, camY = oy + vh / 2
+  const dCam = Math.hypot(camX - cx, camY - cy)
+  const stormVisible = dCam + Math.hypot(vw, vh) / 2 > r
+  if (stormVisible) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(ox - 2, oy - 2, vw + 4, vh + 4)
+    ctx.arc(cx, cy, r, 0, Math.PI * 2, true)
+    ctx.clip('evenodd')
+    ctx.fillStyle = 'rgba(80, 30, 150, 0.4)'
+    ctx.fillRect(ox - 2, oy - 2, vw + 4, vh + 4)
+    // Slanted rain
+    ctx.strokeStyle = 'rgba(220, 200, 255, 0.35)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    for (let i = 0; i < 70; i++) {
+      const x = ox + ((i * 53.7 + time * 220) % (vw + 40)) - 20
+      const y = oy + ((i * 91.3 + time * 380) % (vh + 40)) - 20
+      ctx.moveTo(x, y)
+      ctx.lineTo(x - 4, y + 12)
+    }
+    ctx.stroke()
+    ctx.restore()
+
+    // Energy wall
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+    ctx.strokeStyle = 'rgba(170, 90, 255, 0.35)'
+    ctx.lineWidth = 9
+    circle(ctx, cx, cy, r)
+    ctx.stroke()
+    ctx.strokeStyle = 'rgba(220, 170, 255, 0.8)'
+    ctx.lineWidth = 2.5
+    ctx.setLineDash([10, 8])
+    ctx.lineDashOffset = -time * 40
+    circle(ctx, cx, cy, r)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 1
+    circle(ctx, cx, cy, r)
+    ctx.stroke()
+    ctx.restore()
+
+    // Lightning crawling on the wall near the camera
+    stormBolt.t -= 1 / 60
+    if (stormBolt.t <= 0 && Math.random() < 0.04) {
+      stormBolt = { t: 0.18, a: Math.atan2(camY - cy, camX - cx) + (Math.random() - 0.5) * (vw / Math.max(r, 1)), seedT: time }
+    }
+    if (stormBolt.t > 0) {
+      const a = stormBolt.a
+      const x1 = cx + Math.cos(a) * r, y1 = cy + Math.sin(a) * r
+      const x2 = cx + Math.cos(a) * (r + 40), y2 = cy + Math.sin(a) * (r + 40) - 30
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.strokeStyle = '#e8d0ff'
+      ctx.lineWidth = 2
+      ctx.shadowColor = '#a060ff'
+      ctx.shadowBlur = 10
+      ctx.beginPath()
+      ctx.moveTo(x1, y1)
+      for (let i = 1; i <= 5; i++) ctx.lineTo(x1 + (x2 - x1) * (i / 5) + (Math.random() - 0.5) * 12, y1 + (y2 - y1) * (i / 5) + (Math.random() - 0.5) * 12)
+      ctx.stroke()
+      ctx.restore()
+    }
+  }
+  if (z.phase < 6 && z.nr > 0) {
+    // Next safe zone: soft white ring with marching dashes
+    ctx.setLineDash([6, 5])
+    ctx.lineDashOffset = time * 20
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'
+    ctx.lineWidth = 1.5
+    circle(ctx, z.nx * TILE, z.ny * TILE, z.nr * TILE)
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
 }

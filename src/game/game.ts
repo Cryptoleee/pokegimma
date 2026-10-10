@@ -4,7 +4,7 @@ import { Vfx } from './vfx'
 import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpact, onMelee, onZap, pal, projectileEnd, projectileTick } from './moveFx'
 import { BOT_TRAINERS, type TrainerDef } from '../data/trainers'
 import { effectiveness, TYPE_COLOR } from '../data/types'
-import { sfx } from '../audio'
+import { cry, sfx } from '../audio'
 import { LEVEL_CAP, Mon, Trainer, xpNeeded } from './entities'
 import { Rng } from './rng'
 import { preloadMon } from './sprites'
@@ -124,12 +124,30 @@ export class Zone {
   }
 }
 
+export type BannerKind = 'go' | 'levelup' | 'move' | 'legendary' | 'ko' | 'caught' | 'storm' | 'win' | 'fainted'
+
+export interface Banner {
+  kind: BannerKind
+  title: string
+  sub?: string
+  /** Pokémon or trainer sprite id to show */
+  mon?: number
+  shiny?: boolean
+  trainer?: string
+  color?: string
+}
+
 export interface GameHooks {
   toast(text: string, color?: string): void
-  feed(text: string): void
+  feed(text: string, icon?: { mon?: number; trainer?: string }): void
+  banner(b: Banner): void
+  evolve(from: number, to: number, shiny: boolean, done: () => void): void
   partyFull(mon: Mon, choose: (idx: number) => void): void
   end(result: GameResult): void
 }
+
+/** Length of the drop-in countdown before the match starts (s). */
+export const INTRO_TIME = 3.6
 
 export interface GameResult {
   won: boolean
@@ -158,6 +176,8 @@ export class Game {
   fx: Fx[] = []
   vfx = new Vfx()
   hitStop = 0
+  introT = INTRO_TIME
+  partnerOut = false
   catches: PendingCatch[] = []
   zone = new Zone()
   flow!: Int32Array
@@ -232,6 +252,15 @@ export class Game {
   // ---------------- Main loop ----------------
 
   update(dt: number) {
+    if (this.introT > 0) {
+      // Drop-in cinematic: the camera swoops down while everyone waits for GO.
+      this.introT -= dt
+      this.updateFx(dt)
+      this.camX = this.player.x
+      this.camY = this.player.y
+      if (this.introT <= 0) this.releasePartner()
+      return
+    }
     if (this.hitStop > 0) {
       // Freeze-frame on big hits; only the camera shake keeps going.
       this.hitStop -= dt
@@ -292,6 +321,7 @@ export class Game {
       tr.dir = dirOf(tr.vx, tr.vy)
       if (Math.abs(tr.vx) > 0.15) tr.faceRight = tr.vx > 0
       tr.walkT += dt * n * 7
+      if (this.onScreen(tr.x, tr.y)) this.stepFx(tr.x, tr.y, dt)
     } else tr.walkT = 0
 
     // Active Pokémon
@@ -332,6 +362,28 @@ export class Game {
         this.onFaint(m, null)
       }
     }
+  }
+
+  /** GO! The player's partner pops out of its Poké Ball. */
+  private releasePartner() {
+    this.partnerOut = true
+    const m = this.player.mon
+    sfx.release()
+    cry(m.species.id, 0.35)
+    this.vfx.ring(m.x, m.y - 0.2, 1.6, '#ffffff', 0.5, 6)
+    this.vfx.glow(m.x, m.y - 0.5, 40, '#ffffff', 0.4)
+    this.vfx.burst(m.x, m.y - 0.5, { n: 18, speed: 6, cols: ['#ffffff', '#fff0a0', '#ffd040'], shape: 'star', add: true, s0: 3, s1: 0.6, life: 0.7, vr: 10 })
+    this.vfx.shakeBy(4)
+    this.hooks.banner({ kind: 'go', title: 'GO!' })
+  }
+
+  /** Rustling grass and footstep dust. */
+  private stepFx(x: number, y: number, dt: number) {
+    const t = this.world.at(Math.floor(x), Math.floor(y))
+    if (t === T.TALL && Math.random() < dt * 9)
+      this.vfx.burst(x, y - 0.1, { n: 2, speed: 2, dir: -Math.PI / 2, spread: 1, cols: ['#88d858', '#48a838', '#2c7a30'], shape: 'leaf', s0: 1.8, s1: 1, life: 0.5, grav: 6 })
+    else if ((t === T.PATH || t === T.SAND) && Math.random() < dt * 6)
+      this.vfx.burst(x, y + 0.1, { n: 1, speed: 0.6, cols: ['#e8d8b0', '#d0c098'], shape: 'smoke', s0: 1.5, s1: 3.5, life: 0.45, flat: 0.4 })
   }
 
   sendOut(tr: Trainer, idx: number) {
@@ -624,7 +676,7 @@ export class Game {
     const tr = m.owner
     tr.autoSwapT = 0.9
     if (by?.owner) this.gainXp(by, koXp * 1.5)
-    if (tr.isPlayer) this.hooks.toast(`${m.name} is verslagen!`, '#ff8080')
+    if (tr.isPlayer) this.hooks.banner({ kind: 'fainted', title: `${m.name} is verslagen!`, sub: tr.healthyIndex() >= 0 ? 'Je volgende Pokémon komt eraan' : undefined, mon: m.species.id })
     if (tr.healthyIndex() < 0) this.eliminate(tr, by?.owner ?? m.lastHitBy)
   }
 
@@ -634,7 +686,11 @@ export class Game {
     tr.alive = false
     tr.diedAt = this.time
     if (by && by !== tr) by.kos++
-    this.hooks.feed(by && by !== tr ? `${by.isPlayer ? 'Jij' : by.name} schakelde ${tr.isPlayer ? 'jou' : tr.name} uit` : `${tr.isPlayer ? 'Jij' : tr.name} werd gesloopt door de storm`)
+    this.hooks.feed(
+      by && by !== tr ? `${by.isPlayer ? 'Jij' : by.name} schakelde ${tr.isPlayer ? 'jou' : tr.name} uit` : `${tr.isPlayer ? 'Jij' : tr.name} werd gesloopt door de storm`,
+      { trainer: tr.def.sprite },
+    )
+    if (by?.isPlayer && !tr.isPlayer) this.hooks.banner({ kind: 'ko', title: 'Trainer uitgeschakeld!', sub: `${tr.name} · nog ${this.alive.length} over`, trainer: tr.def.sprite })
     if (this.onScreen(tr.x, tr.y)) sfx.ko()
     // Drop loot
     const drops: ItemKind[] = [
@@ -651,7 +707,7 @@ export class Game {
     } else if (this.alive.length === 1 && this.alive[0].isPlayer) {
       this.player.place = 1
       this.endT = 1.5
-      this.hooks.toast('WINNAAR! Jij bent de laatste trainer!', '#ffd040')
+      this.hooks.banner({ kind: 'win', title: 'WINNAAR!', sub: 'Jij bent de laatste trainer', trainer: this.player.def.sprite })
     }
   }
 
@@ -682,9 +738,14 @@ export class Game {
     m.hp = Math.min(m.maxHp, m.hp + (m.maxHp - before))
     const mine = m.owner?.isPlayer
     if (mine) sfx.level()
+    let learned = false
     SLOT_UNLOCK.forEach((lv, i) => {
-      if (lv === m.level && mine) this.hooks.toast(`${m.name} leerde ${m.moves[i].name}!`, TYPE_COLOR[m.moves[i].type])
+      if (lv === m.level && mine) {
+        learned = true
+        this.hooks.banner({ kind: 'move', title: m.moves[i].name, sub: `${m.name} leerde een nieuwe aanval!`, color: TYPE_COLOR[m.moves[i].type], mon: m.species.id })
+      }
     })
+    if (mine && !learned && m.owner?.mon === m) this.hooks.banner({ kind: 'levelup', title: `Lv ${m.level}`, sub: m.name, mon: m.species.id, shiny: m.shiny })
     const sp = m.species
     if (sp.evo && sp.evoLevel && m.level >= sp.evoLevel) {
       const ratio = m.hp / m.maxHp
@@ -695,8 +756,12 @@ export class Game {
       m.evolveFx = 1.4
       preloadMon(m.species.id, m.shiny)
       if (mine) {
-        sfx.evolve()
-        this.hooks.toast(`Wat? ${old} evolueerde in ${m.species.name}!`, '#ffd040')
+        // Cutscene: pause the match while the evolution plays out
+        this.paused = true
+        this.hooks.evolve(sp.id, m.species.id, m.shiny, () => {
+          this.paused = false
+        })
+        this.hooks.feed(`${old} evolueerde in ${m.species.name}!`, { mon: m.species.id })
       }
     }
   }
@@ -745,11 +810,14 @@ export class Game {
     w.y = tr.y + 0.4
     tr.caught++
     preloadMon(w.species.id, w.shiny)
-    if (tr.isPlayer) sfx.catch()
+    if (tr.isPlayer) {
+      sfx.catch()
+      cry(w.species.id, 0.3)
+    }
     if (w.legendary || w.rarity === 'rare') this.hooks.feed(`${tr.isPlayer ? 'Jij' : tr.name} ving ${w.shiny ? '✦' : ''}${w.name}!`)
     if (tr.party.length < PARTY_MAX) {
       tr.party.push(w)
-      if (tr.isPlayer) this.hooks.toast(`Gevangen! ${w.name} (Lv ${w.level}) zit in je team`, '#80e080')
+      if (tr.isPlayer) this.hooks.banner({ kind: 'caught', title: 'Gevangen!', sub: `${w.name} · Lv ${w.level}`, mon: w.species.id, shiny: w.shiny })
       return
     }
     if (tr.isPlayer) {
@@ -905,8 +973,9 @@ export class Game {
     preloadMon(id, m.shiny)
     this.wilds.push(m)
     sfx.legendary()
-    this.hooks.toast(`Een legendarische ${m.name} is verschenen!`, '#ffd040')
-    this.hooks.feed(`★ ${m.name} (Lv ${m.level}) staat op de kaart`)
+    cry(id, 0.3)
+    this.hooks.banner({ kind: 'legendary', title: m.name, sub: `Legendarisch · Lv ${m.level} · zie de kaart`, mon: id, shiny: m.shiny, color: '#ffd040' })
+    this.hooks.feed(`★ ${m.name} (Lv ${m.level}) staat op de kaart`, { mon: id })
   }
 
   private updateWilds(dt: number) {
@@ -982,6 +1051,7 @@ export class Game {
       }
       w.mvx = mx
       w.mvy = my
+      if ((mx || my) && this.onScreen(w.x, w.y)) this.stepFx(w.x, w.y, dt * 0.6)
       if (mx || my) {
         if (!this.tryMove(w, mx * speed * dt, my * speed * dt, 0.3)) w.thinkT = 0
         if (w.aimT <= 0) w.dir = dirOf(mx, my)
@@ -1109,7 +1179,7 @@ export class Game {
         z.fromX = z.x
         z.fromY = z.y
         z.fromR = z.r
-        this.hooks.toast('De storm komt dichterbij!', '#d080ff')
+        this.hooks.banner({ kind: 'storm', title: 'De storm komt!', sub: `Fase ${z.phase + 1} van 6 · ga naar de witte cirkel`, color: '#c080ff' })
       }
     } else {
       const k = Math.min(1, z.t / ph.shrink)
