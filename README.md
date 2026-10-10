@@ -21,7 +21,7 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 | Actie | Mobiel | Toetsenbord |
 | --- | --- | --- |
 | Lopen | Joystick: tik ergens op de linkerhelft | WASD / pijltjes, of houd de linkermuisknop ingedrukt (je loopt naar de cursor) |
-| Aanvallen | De 4 ronde knoppen (ingedrukt houden = blijven aanvallen); richten gaat automatisch | 1–4; je richt op de vijand bij je cursor |
+| Aanvallen | Tik = automatisch richten, ingedrukt houden = blijven aanvallen, slepen vanaf de knop = zelf richten (met richtvoorbeeld), loslaten = vuren | 1–4, gericht op je cursor |
 | Pokémon wisselen | Tik op een Pokémon in je team (linksboven) | Q |
 | Vangen (verzwakte wilde Pokémon) | VANG!-knop | Spatie / E |
 | Master Ball / Potion / Revive | Itemknoppen | 5 / 6 / 7 |
@@ -31,6 +31,7 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 
 - **Levelen:** je hele team krijgt passief XP zolang je leeft. Schade doen en KO's leveren veel meer op. Op Lv 8, 16 en 25 komt er een nieuwe aanval vrij (de vierde is een ultimate). Starters evolueren op hun echte levels.
 - **Aanvallen:** elke Pokémon krijgt 4 echte aanvallen op basis van zijn types, elk met een eigen gedrag en effect. Thunder Shock is een bliksemflits die direct raakt, Thunderbolt springt door naar extra doelen, Thunder slaat in vanuit de lucht, Flamethrower is een vlammenstraal, Fire Blast een 大-explosie, Draco Meteor laat drie meteoren neerkomen, Aura Sphere en Swift zoeken hun doel zelf op, en Solar Beam en Hyper Beam moeten eerst opladen. Daarbovenop geldt het complete Gen V-typeschema.
+- **Duidelijk vechten:** boven elke Pokémon staat een naamplaat met een HP-balk in teamkleur (groen jij, rood rivalen, geel wild) en een nazakkende schadestrook. Je huidige doelwit krijgt rode haken. Treffers geven grote schadegetallen, "Super effectief!" en een tik-geluid; missers tonen "Mis". Melee-aanvallen laten je Pokémon naar het doel schieten.
 - **Wilde Pokémon:** die leven in het hoge gras en zijn er in gewoon, ongewoon en zeldzaam, met een kleine kans op shiny. Versla er een en hij is een paar seconden verzwakt: tik dan op VANG!. Rond 2:20 en 5:00 verschijnt er een legendarische Pokémon, zichtbaar op de minimap.
 - **Master Ball:** daarmee vang je elke wilde Pokémon direct, dus ook een legendarische, zonder te vechten.
 - **Zone:** de storm krimpt in 6 fases. Daarbuiten verliest je actieve Pokémon HP.

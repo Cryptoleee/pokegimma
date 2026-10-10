@@ -56,6 +56,10 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   g.vfx.drawUnder(ctx)
   drawItems(g, ctx, inView)
 
+  // Team rings on the ground + target reticle base + aim preview (under actors)
+  drawRings(g, ctx, inView, time)
+  drawAimPreview(g, ctx)
+
   // Entities, y-sorted
   type Ent = { y: number; draw: () => void }
   const ents: Ent[] = []
@@ -96,14 +100,13 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // Ambient pollen
   drawMotes(ctx, ox, oy, vw, vh, time)
 
-  // Overhead bars and labels on top of everything
+  // Brawl-style nameplates on top of everything
   for (const tr of g.trainers) {
     if (!tr.alive || !inView(tr.x, tr.y)) continue
-    const top = tr.y * TILE - trainerHeight(tr) - 2
-    if (!tr.isPlayer) label(ctx, tr.name.split(' ').pop()!, tr.x * TILE, top, '#ffffff')
-    else {
+    if (tr.isPlayer) {
+      const top = tr.y * TILE - trainerHeight(tr) - 2
       const b = Math.sin(time * 6) * 1.5
-      ctx.fillStyle = '#f84040'
+      ctx.fillStyle = '#48e070'
       ctx.strokeStyle = '#282830'
       ctx.lineWidth = 1
       ctx.beginPath()
@@ -115,12 +118,17 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
       ctx.stroke()
     }
     const m = tr.mon
-    if (!m.fainted && !tr.isPlayer) monBar(ctx, m)
+    if (m.fainted || (tr.isPlayer && !g.partnerOut)) continue
+    plate(ctx, m, tr.isPlayer ? 'me' : 'foe', tr.isPlayer ? m.name : tr.name.split(' ').pop()!)
   }
+  const p = g.player
   for (const w of g.wilds) {
-    if (!inView(w.x, w.y)) continue
-    if (w.state === 'aggro' || w.hp < w.maxHp || w.rarity !== 'common') monBar(ctx, w)
+    if (!inView(w.x, w.y) || w.state === 'weak' || w.catching) continue
+    const near = Math.hypot(w.x - p.x, w.y - p.y) < 7
+    if (w.state === 'aggro' || w.hp < w.maxHp || w.rarity !== 'common' || near || g.playerTarget === w)
+      plate(ctx, w, 'wild', `${w.shiny ? '✦' : ''}Lv${w.level}${w.legendary ? ' ★' : w.rarity === 'rare' ? ' ◆' : ''}`)
   }
+  if (g.playerTarget && p.alive && g.introT <= 0) drawReticle(ctx, g.playerTarget, time)
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   // Cinematic vignette
   ctx.drawImage(vignette(), 0, 0, cw, ch)
@@ -279,20 +287,207 @@ function tinted(s: ReturnType<typeof monSprite>, col: string): HTMLCanvasElement
   return c
 }
 
-function monBar(ctx: CanvasRenderingContext2D, m: Mon) {
+type Team = 'me' | 'foe' | 'wild'
+const TEAM_COL: Record<Team, { bar: string; dark: string; name: string; ring: string }> = {
+  me: { bar: '#48e070', dark: '#1c7a38', name: '#7cf09c', ring: '#48e070' },
+  foe: { bar: '#ff4a48', dark: '#8a1c1c', name: '#ff8a80', ring: '#ff4a48' },
+  wild: { bar: '#ffc830', dark: '#8a6410', name: '#ffffff', ring: '#ffc830' },
+}
+
+function spriteTop(m: Mon) {
   const s = monSprite(m.species.id, m.dir === 'up', m.shiny)
-  const dh = s.ready ? s.bh * m.scale : 16
-  const x = m.x * TILE, y = m.y * TILE - dh - 4
-  const w = m.legendary ? 26 : 18
+  return m.y * TILE - (s.ready ? s.bh * m.scale : 16)
+}
+
+/** Nameplate: name, HP number on a chunky team-coloured bar with a trailing damage strip. */
+function plate(ctx: CanvasRenderingContext2D, m: Mon, team: Team, name: string) {
+  const c = TEAM_COL[team]
+  const legend = m.legendary && !m.owner
+  const w = legend ? 40 : 30, h = 6
+  const x = m.x * TILE - w / 2
+  const y = spriteTop(m) - 9
   const k = Math.max(0, m.hp / m.maxHp)
-  ctx.fillStyle = '#282830'
-  ctx.fillRect(x - w / 2 - 1, y - 1, w + 2, 4)
-  ctx.fillStyle = '#505058'
-  ctx.fillRect(x - w / 2, y, w, 2)
-  ctx.fillStyle = k > 0.5 ? '#40d860' : k > 0.2 ? '#f8c020' : '#f84030'
-  ctx.fillRect(x - w / 2, y, w * k, 2)
-  const col = m.legendary ? '#ffd040' : m.rarity === 'rare' ? '#80c0ff' : m.rarity === 'uncommon' ? '#90f090' : '#ffffff'
-  label(ctx, `${m.shiny ? '✦' : ''}Lv${m.level}`, x, y - 2, col)
+  const lag = Math.max(k, Math.min(1, (m.hpLag < 0 ? m.hp : m.hpLag) / m.maxHp))
+  // frame
+  ctx.fillStyle = '#16121e'
+  ctx.beginPath()
+  ctx.roundRect(x - 1.5, y - 1.5, w + 3, h + 3, 2.5)
+  ctx.fill()
+  ctx.fillStyle = '#3a3448'
+  ctx.fillRect(x, y, w, h)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(x, y, w * lag, h)
+  ctx.fillStyle = legend ? '#ffd040' : c.dark
+  ctx.fillRect(x, y, w * k, h)
+  ctx.fillStyle = legend ? '#fff0a0' : c.bar
+  ctx.fillRect(x, y, w * k, h - 2)
+  // segment ticks
+  ctx.fillStyle = 'rgba(22,18,30,0.35)'
+  for (let i = 1; i < 4; i++) ctx.fillRect(x + (w * i) / 4, y, 0.6, h)
+  // HP number inside the bar
+  ctx.font = `700 5.5px ${FONT}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.lineWidth = 2
+  ctx.strokeStyle = '#16121e'
+  const hpText = `${Math.ceil(m.hp)}`
+  ctx.strokeText(hpText, x + w / 2, y + h / 2 + 0.5)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText(hpText, x + w / 2, y + h / 2 + 0.5)
+  // name above
+  label(ctx, name, m.x * TILE, y - 2, legend ? '#ffd040' : c.name)
+}
+
+function drawRings(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, y: number) => boolean, time: number) {
+  const ring = (m: Mon, col: string, a: number) => {
+    const r = m.legendary ? 15 : 10
+    ctx.globalAlpha = a * 0.25
+    ctx.fillStyle = col
+    ctx.beginPath()
+    ctx.ellipse(m.x * TILE, m.y * TILE + 1, r, r * 0.42, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalAlpha = a
+    ctx.strokeStyle = col
+    ctx.lineWidth = 1.4
+    ctx.stroke()
+    ctx.globalAlpha = 1
+  }
+  for (const tr of g.trainers) {
+    const m = tr.mon
+    if (!tr.alive || m.fainted || !inView(m.x, m.y) || (tr.isPlayer && !g.partnerOut)) continue
+    ring(m, tr.isPlayer ? TEAM_COL.me.ring : TEAM_COL.foe.ring, 0.85)
+  }
+  const t = g.playerTarget
+  if (t && g.player.alive && inView(t.x, t.y) && g.introT <= 0) {
+    // pulsing red ground marker under the current target
+    const r = (t.legendary ? 17 : 12) + Math.sin(time * 8) * 1.2
+    ctx.strokeStyle = '#ff3a3a'
+    ctx.lineWidth = 1.6
+    ctx.setLineDash([4, 3])
+    ctx.lineDashOffset = -time * 20
+    ctx.beginPath()
+    ctx.ellipse(t.x * TILE, t.y * TILE + 1, r, r * 0.42, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
+}
+
+/** Corner brackets around the Pokémon you're attacking. */
+function drawReticle(ctx: CanvasRenderingContext2D, m: Mon, time: number) {
+  const s = monSprite(m.species.id, m.dir === 'up', m.shiny)
+  const w = (s.ready ? s.bw * m.scale : 16) + 6
+  const h = (s.ready ? s.bh * m.scale : 16) + 6
+  const cx = m.x * TILE, cy = m.y * TILE - h / 2 + 3
+  const pulse = 1 + Math.sin(time * 9) * 0.06
+  const hw = (w / 2) * pulse, hh = (h / 2) * pulse
+  const L = 5
+  ctx.strokeStyle = '#16121e'
+  ctx.lineWidth = 3
+  const corners = () => {
+    ctx.beginPath()
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const x = cx + sx * hw, y = cy + sy * hh
+      ctx.moveTo(x, y - sy * -L)
+      ctx.lineTo(x, y)
+      ctx.lineTo(x - sx * L, y)
+    }
+  }
+  corners()
+  ctx.stroke()
+  ctx.strokeStyle = '#ff3a3a'
+  ctx.lineWidth = 1.5
+  corners()
+  ctx.stroke()
+}
+
+/** Brawl Stars-style aim preview while dragging an attack button (or aiming with the mouse). */
+function drawAimPreview(g: Game, ctx: CanvasRenderingContext2D) {
+  const p = g.player
+  if (!p.alive || !g.partnerOut) return
+  const m = p.mon
+  if (m.fainted) return
+  const prev = g.aimPreview
+  const desk = !prev && g.aimAt && document.body.classList.contains('desk')
+  if (!prev && !desk) return
+  const slot = prev ? prev.slot : 0
+  const mv = m.moves[slot]
+  let dx: number, dy: number, k: number
+  if (prev) {
+    dx = prev.x
+    dy = prev.y
+    k = prev.k
+  } else {
+    const d = g.cursorDir(m)
+    if (!d) return
+    dx = d.x
+    dy = d.y
+    k = d.k
+  }
+  const ox = m.x * TILE, oy = (m.y - 0.3) * TILE
+  const R = mv.range * TILE
+  const col = TYPE_COLOR[mv.type]
+  const ready = m.cds[slot] <= 0 && m.unlocked(slot)
+  ctx.save()
+  ctx.globalAlpha = desk ? 0.35 : ready ? 0.55 : 0.3
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'
+  ctx.strokeStyle = ready ? col : '#808090'
+  ctx.lineWidth = 1.5
+  const a = Math.atan2(dy, dx)
+  ctx.translate(ox, oy)
+  switch (mv.kind) {
+    case 'spread': {
+      ctx.beginPath()
+      ctx.moveTo(0, 0)
+      ctx.arc(0, 0, R, a - 0.32, a + 0.32)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+      break
+    }
+    case 'burst': {
+      const r = (mv.tier >= 3 ? 3.4 : mv.range) * TILE
+      ctx.beginPath()
+      ctx.ellipse(0, 4, r, r * 0.62, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+      break
+    }
+    case 'nova': {
+      const d = Math.max(1.2, mv.range * k) * TILE
+      const r = (mv.tier >= 3 ? 2.3 : 1.8) * TILE
+      ctx.setLineDash([3, 3])
+      ctx.beginPath()
+      ctx.moveTo(0, 0)
+      ctx.lineTo(Math.cos(a) * d, Math.sin(a) * d)
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.beginPath()
+      ctx.ellipse(Math.cos(a) * d, Math.sin(a) * d + 4, r, r * 0.62, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+      break
+    }
+    default: {
+      // bolt / zap / beam / dash / melee: a bar the length of the reach
+      const len = mv.kind === 'melee' ? R : R
+      const wid = mv.kind === 'beam' ? 10 : mv.kind === 'melee' || mv.kind === 'dash' ? 9 : 7
+      ctx.rotate(a)
+      ctx.beginPath()
+      ctx.roundRect(0, -wid / 2, len, wid, wid / 2)
+      ctx.fill()
+      ctx.stroke()
+      if (mv.kind === 'melee' || mv.kind === 'dash') {
+        ctx.beginPath()
+        ctx.moveTo(len + 4, 0)
+        ctx.lineTo(len - 4, -6)
+        ctx.lineTo(len - 4, 6)
+        ctx.closePath()
+        ctx.fillStyle = ready ? col : '#808090'
+        ctx.fill()
+      }
+    }
+  }
+  ctx.restore()
 }
 
 function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, col: string) {
@@ -361,8 +556,8 @@ function drawFx(g: Game, ctx: CanvasRenderingContext2D) {
       }
       case 'text': {
         ctx.globalAlpha = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3
-        const pop = 1 + Math.max(0, 0.6 - k * 4)
-        ctx.font = `700 ${(f.big ? 10 : 7.5) * pop}px ${FONT}`
+        const pop = 1 + Math.max(0, 0.7 - k * 4)
+        ctx.font = `700 ${(f.small ? 5.5 : f.big ? 11 : 7.5) * (f.small ? 1 : pop)}px ${FONT}`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         ctx.lineWidth = 2.5

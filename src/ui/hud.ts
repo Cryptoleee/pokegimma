@@ -126,22 +126,7 @@ export class Hud {
     const moves = h('div', 'moves3')
     for (let s = 0; s < 4; s++) {
       const b = h('div', `mb s${s}`) as HTMLDivElement
-      b.onpointerdown = (e) => {
-        e.preventDefault()
-        try {
-          b.setPointerCapture(e.pointerId)
-        } catch {
-          /* synthetic events */
-        }
-        this.g.held[s] = true
-        b.classList.add('pressed')
-      }
-      const up = () => {
-        this.g.held[s] = false
-        b.classList.remove('pressed')
-      }
-      b.onpointerup = up
-      b.onpointercancel = up
+      this.bindAimButton(b, s)
       this.moveBtns.push(b)
       moves.append(b)
     }
@@ -170,6 +155,83 @@ export class Hud {
       if (p.revives <= 0) return this.toast('Geen Revives')
       if (!g.useRevive(p)) this.toast('Niemand is verslagen')
     }
+  }
+
+  /**
+   * Brawl Stars-style attack button: tap = auto-aim, hold = keep auto-firing,
+   * drag = aim yourself (preview in the world), release to fire, drag back to cancel.
+   */
+  private bindAimButton(b: HTMLDivElement, slot: number) {
+    const DEAD = 18, MAXD = 64
+    let id = -1, cx = 0, cy = 0, dx = 0, dy = 0, aiming = false, autoFired = false
+    let holdTimer: number | undefined
+    const g = this.g
+    const knob = () => b.querySelector('.aimknob') as HTMLElement | null
+    const reset = () => {
+      clearTimeout(holdTimer)
+      id = -1
+      aiming = false
+      g.held[slot] = false
+      g.aimPreview = null
+      b.classList.remove('pressed', 'aiming')
+      const k = knob()
+      if (k) k.style.transform = ''
+    }
+    b.onpointerdown = (e) => {
+      e.preventDefault()
+      if (id !== -1) return
+      id = e.pointerId
+      try {
+        b.setPointerCapture(e.pointerId)
+      } catch {
+        /* synthetic events */
+      }
+      const r = b.getBoundingClientRect()
+      cx = r.left + r.width / 2
+      cy = r.top + r.height / 2
+      dx = dy = 0
+      aiming = false
+      autoFired = false
+      b.classList.add('pressed')
+      // Holding still = keep auto-firing (great for the basic attack)
+      holdTimer = window.setTimeout(() => {
+        if (!aiming && id !== -1) {
+          g.held[slot] = true
+          autoFired = true
+        }
+      }, 220)
+    }
+    b.onpointermove = (e) => {
+      if (e.pointerId !== id) return
+      dx = e.clientX - cx
+      dy = e.clientY - cy
+      let d = Math.hypot(dx, dy)
+      if (d > DEAD && !aiming) {
+        aiming = true
+        clearTimeout(holdTimer)
+        g.held[slot] = false
+        b.classList.add('aiming')
+      }
+      if (!aiming) return
+      if (d > MAXD) {
+        dx = (dx / d) * MAXD
+        dy = (dy / d) * MAXD
+        d = MAXD
+      }
+      const k = knob()
+      if (k) k.style.transform = `translate(${dx}px, ${dy}px)`
+      g.aimPreview = d > DEAD ? { slot, x: dx / d, y: dy / d, k: Math.min(1, d / MAXD) } : null
+    }
+    b.onpointerup = (e) => {
+      if (e.pointerId !== id) return
+      const d = Math.hypot(dx, dy)
+      const p = g.player
+      const ok = p.alive && !g.paused && g.introT <= 0
+      if (ok && aiming && d > DEAD) g.useMove(p.mon, slot, undefined, { x: dx / d, y: dy / d, k: Math.min(1, d / MAXD) })
+      else if (ok && !aiming && !autoFired) g.useMove(p.mon, slot)
+      reset()
+    }
+    b.onpointercancel = reset
   }
 
   private bindStick(zone: HTMLElement) {
@@ -338,7 +400,7 @@ export class Hud {
         const locked = !m.unlocked(s)
         b.classList.toggle('locked', locked)
         b.style.setProperty('--tc', TYPE_COLOR[mv.type])
-        b.innerHTML = `<div class="ring"></div><div class="cd"></div><div class="lbl">${locked ? `<span class="lock">🔒</span><small>Lv ${SLOT_UNLOCK[s]}</small>` : `<span>${mv.name}</span><small>${TYPE_NL[mv.type]}</small>`}</div><div class="secs"></div><kbd>${s + 1}</kbd>`
+        b.innerHTML = `<div class="ring"></div><div class="cd"></div><div class="lbl">${locked ? `<span class="lock">🔒</span><small>Lv ${SLOT_UNLOCK[s]}</small>` : `<span>${mv.name}</span><small>${TYPE_NL[mv.type]}</small>`}</div><div class="secs"></div><div class="aimknob"></div><kbd>${s + 1}</kbd>`
       })
     }
     m.moves.forEach((mv, s) => {

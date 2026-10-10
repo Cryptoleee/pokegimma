@@ -3242,3 +3242,33 @@ kbd {
     left: 36%;
   }
 }
+
+/* ---------- Drag-to-aim attack buttons ---------- */
+
+.mb .aimknob {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  margin: -17px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, color-mix(in srgb, var(--tc) 50%, white));
+  border: 3px solid #1a1420;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s;
+}
+.mb.aiming {
+  transform: none !important;
+  box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.18), 0 0 0 64px rgba(255, 255, 255, 0.07), 0 5px 0 rgba(0, 0, 0, 0.45);
+  z-index: 6;
+}
+.mb.aiming .aimknob {
+  opacity: 1;
+}
+.mb.aiming .lbl,
+.mb.aiming .secs {
+  opacity: 0.25;
+}

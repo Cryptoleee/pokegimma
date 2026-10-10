@@ -82,7 +82,12 @@ export const sfx = {
   select() {
     tone(990, 0.05, 'square', 0.035)
   },
-  whoosh() {
+  /** Crisp tick when your attack connects. */
+  hitConfirm() {
+    tone(1760, 0.04, 'square', 0.03)
+    tone(2640, 0.03, 'square', 0.015, 0, 0.02)
+  },
+    whoosh() {
     noise(0.22, 0.05)
     tone(220, 0.25, 'sawtooth', 0.025, 600)
   },

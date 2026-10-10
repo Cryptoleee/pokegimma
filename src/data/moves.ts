@@ -44,7 +44,7 @@ const TIER_POWER = [40, 62, 85, 120]
 const TIER_CD = [0.55, 2.4, 4.2, 9]
 
 const RANGE: Record<MoveKind, number> = {
-  melee: 1.7, dash: 4, bolt: 7, spread: 6, beam: 7, burst: 2.6, nova: 7, zap: 5.5,
+  melee: 3, dash: 4, bolt: 7, spread: 6, beam: 7, burst: 2.6, nova: 7, zap: 5.5,
 }
 
 type Def = [string, MoveKind, MoveFx]

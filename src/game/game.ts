@@ -5,7 +5,7 @@ import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpac
 import { BOT_TRAINERS, type TrainerDef } from '../data/trainers'
 import { effectiveness, TYPE_COLOR } from '../data/types'
 import { cry, sfx } from '../audio'
-import { LEVEL_CAP, Mon, Trainer, xpNeeded } from './entities'
+import { LEVEL_CAP, Mon, Trainer, xpNeeded, type AimDir } from './entities'
 import { Rng } from './rng'
 import { preloadMon } from './sprites'
 import { MAP, T, World } from './world'
@@ -74,6 +74,7 @@ export interface Fx {
   vx?: number
   vy?: number
   big?: boolean
+  small?: boolean
 }
 
 interface PendingCatch {
@@ -191,6 +192,12 @@ export class Game {
   input = { mx: 0, my: 0 }
   /** World position of the mouse cursor (desktop); attacks aim near it. */
   aimAt: { x: number; y: number } | null = null
+  /** Live aim preview while the player drags an attack button. */
+  aimPreview: { slot: number; x: number; y: number; k: number } | null = null
+  /** Who the player is currently fighting (for the target reticle). */
+  playerTarget: Mon | null = null
+  private lastTarget: Mon | null = null
+  private lastTargetT = 0
   held = [false, false, false, false]
   private spawnT = 0
   private legendIdx = 0
@@ -283,7 +290,9 @@ export class Game {
     if (p.alive) {
       p.vx = this.input.mx
       p.vy = this.input.my
-      for (let s = 0; s < 4; s++) if (this.held[s]) this.useMove(p.mon, s)
+      const dir = this.cursorDir(p.mon)
+      for (let s = 0; s < 4; s++) if (this.held[s]) this.useMove(p.mon, s, undefined, dir)
+      this.updatePlayerTarget(dt)
     }
 
     for (const tr of this.trainers) {
@@ -299,6 +308,7 @@ export class Game {
     }
 
     this.updateWilds(dt)
+    this.tickHpLag(dt)
     this.updateProjectiles(dt)
     this.updateNovas(dt)
     this.updateCatches(dt)
@@ -440,18 +450,23 @@ export class Game {
     return best
   }
 
-  useMove(m: Mon, slot: number, target?: Mon | null): boolean {
+  useMove(m: Mon, slot: number, target?: Mon | null, dir?: AimDir): boolean {
     const mv = m.moves[slot]
     if (!mv || !m.unlocked(slot) || m.cds[slot] > 0 || m.fainted || m.state === 'weak' || m.dash || m.catching || m.charging) return false
-    const tgt = target ?? this.autoTarget(m, mv.range + 1.5)
+    const tgt = target ?? (dir ? this.dirTarget(m, mv.range + 1, dir) : this.autoTarget(m, mv.range + 1.5))
+    m.aimDist = dir ? Math.max(1.2, mv.range * dir.k) : null
+    if (m.owner?.isPlayer && tgt) {
+      this.lastTarget = tgt
+      this.lastTargetT = 1.6
+    }
     m.cds[slot] = mv.cooldown
     const visible = this.onScreen(m.x, m.y)
     if (visible && m.owner?.isPlayer) sfx.cast(mv.tier)
     if (visible && mv.tier >= 1)
       this.fx.push({ kind: 'callout', x: m.x, y: m.y - 1.9, t: 0, life: 1, color: TYPE_COLOR[mv.type], text: mv.name, big: mv.tier >= 3 })
-    this.aim(m, tgt)
+    this.aim(m, tgt, dir)
     if (mv.charge > 0) {
-      m.charging = { move: mv, t: mv.charge, total: mv.charge, tgt }
+      m.charging = { move: mv, t: mv.charge, total: mv.charge, tgt, dir }
       fxCast(this.vfx, mv, m, this.nearCam(m.x, m.y))
       return true
     }
@@ -459,9 +474,44 @@ export class Game {
     return true
   }
 
-  private aim(m: Mon, tgt: Mon | null) {
+  /** Enemy closest to an aim line (within ~25°), for manual aiming. */
+  private dirTarget(m: Mon, range: number, dir: AimDir): Mon | null {
+    let best: Mon | null = null, bs = Infinity
+    for (const e of this.enemiesOf(m)) {
+      const dx = e.x - m.x, dy = e.y - m.y
+      const d = Math.hypot(dx, dy)
+      if (d > range || d < 0.01) continue
+      const cos = (dx * dir.x + dy * dir.y) / d
+      if (cos < 0.9) continue
+      const score = d * Math.sqrt(1 - cos * cos) + d * 0.05
+      if (score < bs) { bs = score; best = e }
+    }
+    return best
+  }
+
+  /** Desktop: direction from a Pokémon toward the mouse cursor. */
+  cursorDir(m: Mon): AimDir | undefined {
+    if (!this.aimAt) return undefined
+    const dx = this.aimAt.x - m.x, dy = this.aimAt.y - (m.y - 0.3)
+    const d = Math.hypot(dx, dy)
+    if (d < 0.3) return undefined
+    return { x: dx / d, y: dy / d, k: Math.min(1, d / 7) }
+  }
+
+  private updatePlayerTarget(dt: number) {
+    const m = this.player.mon
+    this.lastTargetT -= dt
+    const lt = this.lastTarget
+    if (lt && this.lastTargetT > 0 && !lt.fainted && lt.state !== 'weak' && Math.hypot(lt.x - m.x, lt.y - m.y) < 10) this.playerTarget = lt
+    else this.playerTarget = m.fainted ? null : this.autoTarget(m, m.moves[0].range + 1.5)
+  }
+
+  private aim(m: Mon, tgt: Mon | null, dir?: AimDir) {
     let ax: number, ay: number
-    if (tgt) {
+    if (dir) {
+      ax = dir.x
+      ay = dir.y
+    } else if (tgt) {
       ax = tgt.x - m.x
       ay = tgt.y - m.y
     } else {
@@ -488,8 +538,8 @@ export class Game {
     if (this.onScreen(m.x, m.y)) chargeTick(this.vfx, c.move, m.x, m.y - 0.5, 1 - c.t / c.total)
     if (c.t > 0) return
     m.charging = null
-    const tgt = c.tgt && !c.tgt.fainted && c.tgt.state !== 'weak' ? c.tgt : this.autoTarget(m, c.move.range + 1.5)
-    this.aim(m, tgt)
+    const tgt = c.tgt && !c.tgt.fainted && c.tgt.state !== 'weak' ? c.tgt : c.dir ? null : this.autoTarget(m, c.move.range + 1.5)
+    this.aim(m, tgt, c.dir)
     this.fire(m, c.move, tgt, true)
   }
 
@@ -505,19 +555,26 @@ export class Game {
 
     switch (mv.kind) {
       case 'melee': {
-        let hitAny: Mon | null = null
-        for (const e of this.enemiesOf(m)) {
-          const dx = e.x - m.x, dy = e.y - m.y
-          const d = Math.hypot(dx, dy)
-          if (d < mv.range + 0.4 && (d < 0.6 || (dx * ax + dy * ay) / d > 0.25)) {
-            this.hit(m, e, mv)
-            hitAny = hitAny ?? e
-          }
+        // Lunge: dart to the target (or the aimed spot) and strike on arrival
+        let tx: number, ty: number
+        if (tgt && Math.hypot(tgt.x - m.x, tgt.y - m.y) <= mv.range + 0.8) {
+          const dx = tgt.x - m.x, dy = tgt.y - m.y
+          const d = Math.hypot(dx, dy) || 1
+          tx = tgt.x - (dx / d) * 0.55
+          ty = tgt.y - (dy / d) * 0.55
+          m.aimX = dx / d
+          m.aimY = dy / d
+        } else {
+          const reach = m.aimDist !== null ? Math.min(mv.range, m.aimDist) : mv.range * 0.8
+          tx = m.x + ax * reach
+          ty = m.y + ay * reach
         }
-        const fx = hitAny ? hitAny.x : ox + ax * 1.1
-        const fy = hitAny ? hitAny.y - 0.45 : oy + ay * 1.1
-        this.fx.push({ kind: 'melee', style: mv.fx, x: fx, y: fy, x2: ax, y2: ay, t: 0, life: 0.32, color: TYPE_COLOR[mv.type] })
-        if (visible) onMelee(v, mv, fx, fy, ax, ay, !!hitAny)
+        const dist = Math.hypot(tx - m.x, ty - m.y)
+        if (dist < 0.25) this.strike(m, mv)
+        else {
+          const sp = 18
+          m.dash = { vx: ((tx - m.x) / dist) * sp, vy: ((ty - m.y) / dist) * sp, t: dist / sp, move: mv, hit: new Set(), strike: true }
+        }
         break
       }
       case 'bolt':
@@ -545,6 +602,7 @@ export class Game {
         const ey = main ? main.y - 0.45 : oy + ay * range * 0.7
         const big = mv.tier >= 2
         if (visible) onZap(v, mv, ox, oy, ex, ey, big)
+        if (!main) this.miss(m, ex, ey)
         if (main) {
           this.hit(m, main, mv)
           if (big) {
@@ -578,8 +636,8 @@ export class Game {
         break
       }
       case 'nova': {
-        const nx = tgt ? tgt.x : m.x + ax * 4
-        const ny = tgt ? tgt.y : m.y + ay * 4
+        const nx = m.aimDist !== null ? m.x + ax * m.aimDist : tgt ? tgt.x : m.x + ax * 4
+        const ny = m.aimDist !== null ? m.y + ay * m.aimDist : tgt ? tgt.y : m.y + ay * 4
         const r = mv.tier >= 3 ? 2.3 : 1.8
         if (mv.fx === 'dracometeor') {
           // A shower of three meteors
@@ -613,11 +671,21 @@ export class Game {
 
   private updateDash(m: Mon, dt: number) {
     const d = m.dash!
-    const nx = m.x + d.vx * dt, ny = m.y + d.vy * dt
+    const step = Math.min(dt, Math.max(0, d.t))
+    const nx = m.x + d.vx * step, ny = m.y + d.vy * step
     if (this.world.blocked(nx, ny)) d.t = 0
     else {
       m.x = nx
       m.y = ny
+    }
+    if (d.strike) {
+      if (this.onScreen(m.x, m.y)) dashTick(this.vfx, 'aerialace', m.x, m.y - 0.4, d.vx, d.vy)
+      d.t -= dt
+      if (d.t <= 0) {
+        m.dash = null
+        this.strike(m, d.move)
+      }
+      return
     }
     for (const e of this.enemiesOf(m))
       if (!d.hit.has(e) && Math.hypot(e.x - m.x, e.y - m.y) < 1) {
@@ -627,6 +695,35 @@ export class Game {
     if (this.onScreen(m.x, m.y)) dashTick(this.vfx, d.move.fx, m.x, m.y - 0.4, d.vx, d.vy)
     d.t -= dt
     if (d.t <= 0) m.dash = null
+  }
+
+  /** The melee blow at the end of a lunge. */
+  private strike(m: Mon, mv: Move) {
+    const ax = m.aimX, ay = m.aimY
+    let first: Mon | null = null
+    for (const e of this.enemiesOf(m)) {
+      const dx = e.x - m.x, dy = e.y - m.y
+      const d = Math.hypot(dx, dy)
+      if (d < 1.4 && (d < 0.8 || (dx * ax + dy * ay) / d > 0.2)) {
+        this.hit(m, e, mv)
+        first = first ?? e
+      }
+    }
+    m.castT = 0.18
+    const fx = first ? first.x : m.x + ax * 0.9
+    const fy = first ? first.y - 0.45 : m.y - 0.45 + ay * 0.9
+    this.fx.push({ kind: 'melee', style: mv.fx, x: fx, y: fy, x2: ax, y2: ay, t: 0, life: 0.32, color: TYPE_COLOR[mv.type] })
+    if (this.onScreen(m.x, m.y)) {
+      onMelee(this.vfx, mv, fx, fy, ax, ay, !!first)
+      if (first && this.nearCam(m.x, m.y)) this.vfx.shakeBy(2)
+    }
+    if (!first) this.miss(m, fx, fy)
+  }
+
+  /** Grey "Mis" so players can see an attack whiffed. */
+  private miss(src: Mon, x: number, y: number) {
+    if (!src.owner?.isPlayer || !this.onScreen(x, y)) return
+    this.fx.push({ kind: 'text', x, y: y - 0.3, t: 0, life: 0.6, color: '#b8b8c8', text: 'Mis', small: true })
   }
 
   hit(src: Mon, tgt: Mon, mv: Move, mult = 1) {
@@ -646,10 +743,18 @@ export class Game {
 
     const visible = this.onScreen(tgt.x, tgt.y)
     if (visible) {
+      const mine = !!src.owner?.isPlayer, hurt = !!tgt.owner?.isPlayer
       this.fx.push({
-        kind: 'text', x: tgt.x + this.rng.range(-0.3, 0.3), y: tgt.y - 1.4, t: 0, life: 0.8,
-        color: eff > 1 ? '#ffd040' : eff < 1 ? '#c8c8c8' : '#ffffff', text: `${dmg}${eff > 1 ? '!' : ''}`, big: eff > 1,
+        kind: 'text', x: tgt.x + this.rng.range(-0.35, 0.35), y: tgt.y - 1.5, t: 0, life: 0.85,
+        color: hurt ? '#ff5a50' : eff > 1 ? '#ffd040' : eff < 1 ? '#c8c8d0' : '#ffffff',
+        text: `${dmg}${eff > 1 ? '!' : ''}`, big: mine || hurt || eff > 1,
       })
+      if ((mine || hurt) && eff !== 1)
+        this.fx.push({
+          kind: 'text', x: tgt.x, y: tgt.y - 2.1, t: 0, life: 0.9, small: true,
+          color: eff > 1 ? '#ffd040' : '#b8b8c8', text: eff > 1 ? 'Super effectief!' : 'Weinig effect',
+        })
+      if (mine) sfx.hitConfirm()
       onHit(this.vfx, mv, tgt, eff, this.nearCam(tgt.x, tgt.y))
       if ((src.owner?.isPlayer || tgt.owner?.isPlayer) && (mv.tier >= 2 || eff > 1)) this.hitStop = Math.max(this.hitStop, 0.035 + mv.tier * 0.015)
       if (src.owner?.isPlayer || tgt.owner?.isPlayer) sfx.hit(eff > 1)
@@ -1085,6 +1190,15 @@ export class Game {
       }
   }
 
+  private tickHpLag(dt: number) {
+    const tick = (m: Mon) => {
+      if (m.hpLag < m.hp) m.hpLag = m.hp
+      else m.hpLag += (m.hp - m.hpLag) * Math.min(1, dt * 2.5)
+    }
+    for (const w of this.wilds) tick(w)
+    for (const tr of this.trainers) if (tr.alive) tick(tr.mon)
+  }
+
   /** Highest unlocked, ready move that reaches distance d (or -1). */
   bestSlot(m: Mon, d: number): number {
     for (let s = 3; s >= 0; s--) if (m.unlocked(s) && m.cds[s] <= 0 && m.moves[s].range + 0.3 >= d) return s
@@ -1128,6 +1242,7 @@ export class Game {
       if (dead) {
         this.projs.splice(this.projs.indexOf(p), 1)
         if (this.onScreen(p.x, p.y)) projectileEnd(this.vfx, p.move.fx, p.x, p.y, hit)
+        if (!hit && p.mult >= 0.5) this.miss(p.src, p.x, p.y)
       }
     }
   }
@@ -1137,7 +1252,13 @@ export class Game {
       n.t -= dt
       if (n.t > 0) continue
       this.novas.splice(this.novas.indexOf(n), 1)
-      for (const e of this.enemiesOf(n.src)) if (Math.hypot(e.x - n.x, e.y - n.y) < n.r) this.hit(n.src, e, n.move, n.mult)
+      let any = false
+      for (const e of this.enemiesOf(n.src))
+        if (Math.hypot(e.x - n.x, e.y - n.y) < n.r) {
+          this.hit(n.src, e, n.move, n.mult)
+          any = true
+        }
+      if (!any && n.mult >= 1) this.miss(n.src, n.x, n.y - 0.4)
       if (this.onScreen(n.x, n.y)) onImpact(this.vfx, n.move, n.x, n.y, n.r)
     }
   }

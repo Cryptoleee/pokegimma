@@ -24,6 +24,15 @@ export interface Dash {
   t: number
   move: Move
   hit: Set<Mon>
+  /** Melee lunge: travel to the spot, then strike once on arrival. */
+  strike?: boolean
+}
+
+/** Manual aim from dragging an attack button: unit direction plus drag strength 0..1. */
+export interface AimDir {
+  x: number
+  y: number
+  k: number
 }
 
 export class Mon {
@@ -59,7 +68,11 @@ export class Mon {
   tintT = 0
   joltT = 0
   liftT = 0
-  charging: { move: Move; t: number; total: number; tgt: Mon | null } | null = null
+  charging: { move: Move; t: number; total: number; tgt: Mon | null; dir?: AimDir } | null = null
+  /** Distance (tiles) a targeted move should land at when aimed manually. */
+  aimDist: number | null = null
+  /** Trailing HP for the white 'damage taken' strip on nameplates. */
+  hpLag = -1
   lastHitBy: Trainer | null = null
 
   // Wild behaviour
