@@ -424,7 +424,7 @@ window.addEventListener('keyup', (e) => {
 window.addEventListener('blur', () => {
   keys.clear()
   mouse.attack = mouse.walk = false
-  if (game) game.held.fill(false)
+  releaseInput()
 })
 
 // LMB fires attack 1 at the cursor (hold to keep firing); RMB held walks toward the cursor.
@@ -468,6 +468,33 @@ document.addEventListener('touchstart', (e) => {
   const sel = window.getSelection()
   if (sel && !sel.isCollapsed) sel.removeAllRanges()
 }, { passive: true })
+
+// During play, a long press must stay ours: cancelling touchstart stops iOS from starting
+// its own gesture (text selection, search menu, magnifier, double-tap zoom), which would
+// otherwise swallow the release and leave an attack or the joystick stuck. Pointer events
+// still fire; real buttons (pause, mute) are left alone so their clicks keep working.
+const ownTouch = (e: TouchEvent) => {
+  const t = e.target as Element | null
+  if (typing(t) || t?.closest?.('button')) return
+  e.preventDefault()
+}
+hudRoot.addEventListener('touchstart', ownTouch, { passive: false })
+canvas.addEventListener('touchstart', ownTouch, { passive: false })
+
+/** Let go of every attack and the joystick. */
+function releaseInput() {
+  hud?.releaseAll()
+  if (game) {
+    game.held.fill(false)
+    game.aimPreview = null
+    game.input.mx = game.input.my = 0
+  }
+}
+// Safety net: with no finger on the screen nothing can be held, whatever events got lost.
+const allUp = (e: TouchEvent) => e.touches.length === 0 && releaseInput()
+window.addEventListener('touchend', allUp, { passive: true })
+window.addEventListener('touchcancel', allUp, { passive: true })
+document.addEventListener('visibilitychange', () => document.hidden && releaseInput())
 
 /** Map the mouse position to world tiles and store it as the aim point. */
 function updateAim(g: Game) {

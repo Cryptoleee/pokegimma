@@ -52,6 +52,8 @@ export class Hud {
   private countdown = h('div', 'countdown')
   private hideBadge = h('div', 'hidebadge', '<i class="eye"></i><span>Verborgen</span>')
   private cdShown = ''
+  /** Resets for every touch control, so a lost touch can never leave one stuck. */
+  private releasers: (() => void)[] = []
 
   constructor(private root: HTMLElement, private g: Game, onMenu: () => void) {
     root.innerHTML = ''
@@ -232,7 +234,16 @@ export class Hud {
       else if (ok && !aiming && !autoFired) g.useMove(p.mon, slot)
       reset()
     }
+    // iOS can take over a long press (text selection, system menus) without ever
+    // sending pointerup: treat a cancelled or lost touch as letting go.
     b.onpointercancel = reset
+    b.onlostpointercapture = (e) => e.pointerId === id && reset()
+    this.releasers.push(reset)
+  }
+
+  /** Let go of every attack button and the joystick (e.g. when no finger is on the screen). */
+  releaseAll() {
+    for (const r of this.releasers) r()
   }
 
   private bindStick(zone: HTMLElement) {
@@ -265,15 +276,18 @@ export class Hud {
       this.g.input.mx = dx * k
       this.g.input.my = dy * k
     }
-    const end = (e: PointerEvent) => {
-      if (e.pointerId !== id) return
+    const release = () => {
       id = -1
       this.g.input.mx = 0
       this.g.input.my = 0
       this.base.classList.add('hidden')
+      this.knob.style.transform = ''
     }
+    const end = (e: PointerEvent) => e.pointerId === id && release()
     zone.onpointerup = end
     zone.onpointercancel = end
+    zone.onlostpointercapture = end
+    this.releasers.push(release)
   }
 
   toast(text: string, color?: string) {

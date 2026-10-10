@@ -19,7 +19,8 @@ export function showEvolution(from: number, to: number, shiny: boolean, done: ()
       <img class="px b" src="${spriteUrl(to, { shiny })}" alt="">
     </div>
     <div class="evo-flash"></div>
-    <div class="evo-box panel"><p></p></div>`
+    <div class="evo-box panel"><p></p></div>
+    <button class="ghost2 evo-skip">Overslaan ▶</button>`
   app.append(el)
   const a = el.querySelector('.a') as HTMLElement
   const b = el.querySelector('.b') as HTMLElement
@@ -58,6 +59,7 @@ export function showEvolution(from: number, to: number, shiny: boolean, done: ()
   }, 600)
 
   const reveal = () => {
+    if (finished) return
     finished = true
     el.classList.add('flash')
     sfx.evolve()
@@ -79,14 +81,27 @@ export function showEvolution(from: number, to: number, shiny: boolean, done: ()
   const close = () => {
     if (closed) return
     closed = true
+    finished = true
+    window.removeEventListener('keydown', onKey, true)
     el.classList.add('out')
     setTimeout(() => {
       el.remove()
       done()
     }, 350)
   }
-  el.addEventListener('click', () => {
-    if (el.classList.contains('done')) close()
+  // Skippable any time: tap anywhere, the button, or Enter / Space / Esc.
+  // The evolution itself already happened, so skipping just ends the show.
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Escape') return
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    close()
+  }
+  window.addEventListener('keydown', onKey, true)
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault()
+    sfx.select()
+    close()
   })
   setTimeout(close, 6200)
 }
