@@ -25,13 +25,13 @@ export function showPartyFull(mon: Mon, party: Mon[], choose: (idx: number) => v
   )
 }
 
-export function showLeaveConfirm(onStay: () => void, onLeave: () => void) {
+export function showLeaveConfirm(onStay: () => void, onLeave: () => void, text = 'Weet je zeker dat je wilt stoppen? Je voortgang in deze match gaat verloren.') {
   const modal = document.getElementById('modal')!
   modal.classList.remove('hidden')
   modal.innerHTML = `
     <div class="panel">
       <h2>Game verlaten?</h2>
-      <p>Weet je zeker dat je wilt stoppen? Je voortgang in deze match gaat verloren.</p>
+      <p>${text}</p>
       ${document.body.classList.contains('desk') ? `<div class="keys">
         <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><em>Lopen (of rechtermuisknop vasthouden)</em>
         <span><kbd>Linkermuis</kbd></span><em>Aanval 1 · vasthouden = blijven schieten</em>

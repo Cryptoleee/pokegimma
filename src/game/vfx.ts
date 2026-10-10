@@ -186,6 +186,8 @@ export class Vfx {
   pillar(x: number, y: number, h: number, w: number, col: string, dark: string, life = 0.9, delay = 0) {
     this.pillars.push({ x, y, h, w, t: -delay, life, col, dark, delay })
   }
+  /** Position hint for the screen effects that follow (used to sync effects in multiplayer). */
+  mark(_x: number, _y: number) {}
   shakeBy(a: number) {
     this.shake = Math.max(this.shake, a)
   }

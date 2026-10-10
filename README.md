@@ -4,7 +4,7 @@ Een real-time Pokémon battle royale voor de browser, mobile first, in de stijl 
 
 **Speel:** https://pokegimma.vercel.app
 
-Na een korte uitleg kies je een trainer en één partner-Pokémon uit een roster van 12; in de wereld vang je er nog twee bij (max. 3). Daarna word je gedropt op een grote kaart samen met 11 andere trainers. Je Pokémon loopt achter je aan en vecht in real time. Versla en vang wilde Pokémon, raap Master Balls en items op en blijf binnen de zone. Wie als laatste trainer overblijft, wint.
+Na een korte uitleg vul je je naam in en kies je: **solo** tegen bots, of **samen** met vrienden. Je kiest een trainer en één partner-Pokémon uit een roster van 12; in de wereld vang je er nog twee bij (max. 3). Daarna word je gedropt op een grote kaart met in totaal 12 trainers. Je Pokémon loopt achter je aan en vecht in real time. Versla en vang wilde Pokémon, raap Master Balls en items op en blijf binnen de zone. Wie als laatste trainer overblijft, wint.
 
 ## Spelen
 
@@ -27,6 +27,25 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 | Vangen (verzwakte wilde Pokémon) | VANG!-knop | Spatie |
 | Master Ball / Potion / Revive | Itemknoppen | 1 / 2 / 3 |
 | Pauze / game verlaten | ❚❚-knop of de terugknop van je telefoon (vraagt eerst om bevestiging) | Esc |
+
+## Samen spelen
+
+Zit je naast iemand? Dan heb je zo een potje:
+
+1. Speler 1 vult een naam in en tikt **Potje maken**. Er verschijnt een code van 4 tekens en een QR-code.
+2. Speler 2 tikt **Meedoen** en typt de code, of scant de QR-code met de camera (de link opent de game en doet meteen mee).
+3. Iedereen kan in de lobby nog zijn team wijzigen. De host tikt **Start!** De lege plekken (tot 12) worden bots.
+
+Na afloop ga je terug naar de lobby voor een rematch, of kijk je mee tot het potje klaar is. Valt iemand weg, dan neemt een bot die trainer over.
+
+**Hoe het technisch werkt:** de telefoons praten rechtstreeks met elkaar via WebRTC; PeerJS helpt ze alleen elkaar te vinden. Er is dus geen eigen gameserver nodig.
+- **De host** rekent het hele potje uit: bots, wilde Pokémon, schade en de storm. Hij stuurt 20× per seconde de stand naar de anderen, met de effecten, geluiden en banners die zij moeten zien.
+- **Je eigen trainer** beweegt lokaal, zodat lopen direct aanvoelt.
+- **De host moet de game open houden.** Gaat het scherm van de host op slot, dan staat het potje stil.
+
+Je naam en een willekeurige speler-id worden op je toestel bewaard (`src/profile.ts`). Een account/inlog kan dat later vervangen.
+
+Lokaal testen zonder internet: start een eigen PeerJS-server (`npx peer --port 9000`) en open de game met `?peer=127.0.0.1:9000`.
 
 ## Hoe het werkt
 
@@ -52,8 +71,10 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 src/
   data/       Pokémon, aanvallen, types, trainers
   game/       wereldgeneratie, engine, bot-AI, renderer, aanvalseffecten (vfx.ts)
-  ui/         titel, uitleg, keuzeschermen, HUD, cutscenes, resultaten (DOM boven de canvas)
+  net/        multiplayer: rooms (PeerJS), protocol, state-sync tussen host en spelers
+  ui/         titel, uitleg, menu, lobby, keuzeschermen, HUD, cutscenes, resultaten (DOM boven de canvas)
   music.ts    chiptune-sequencer en soundtrack
+  profile.ts  je naam en speler-id (later te vervangen door een login)
 ```
 
 ## Assets en rechten

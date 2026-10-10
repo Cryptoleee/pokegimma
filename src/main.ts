@@ -1,7 +1,7 @@
 import './style.css'
 import { ROSTER, TEAM_SIZE } from './data/pokemon'
 import { TRAINERS, type TrainerDef } from './data/trainers'
-import { Game, INTRO_TIME } from './game/game'
+import { Game, INTRO_TIME, type GameHooks, type GameResult, type MatchSetup } from './game/game'
 import { render, view } from './game/render'
 import { TILE } from './game/world'
 import { Hud } from './ui/hud'
@@ -11,8 +11,13 @@ import { showTitle } from './ui/title'
 import { showRoster, showTrainerSelect } from './ui/select'
 import { showResults } from './ui/results'
 import { showEvolution } from './ui/cutscene'
+import { showLobby, showMenu, type MenuState } from './ui/menu'
 import { wipe } from './ui/transition'
 import { playMusic, setTempo } from './music'
+import { profile } from './profile'
+import { cleanCode, Room } from './net/room'
+import type { HostMsg, LobbyPlayer } from './net/protocol'
+import { applyEvents, applySnapshot, initClient, recordVfx, remoteViewer, runCommand, snapshot, type RemoteViewer } from './net/sync'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
@@ -38,8 +43,20 @@ const store = {
 
 let trainer: TrainerDef = TRAINERS.find((t) => t.key === store.get('trainer', '')) ?? TRAINERS[0]
 let team: number[] = store.get<number[]>('team', []).filter((id) => ROSTER.includes(id))
+if (team.length !== TEAM_SIZE) team = [ROSTER[0]]
 let game: Game | null = null
 let hud: Hud | null = null
+/** The match is on screen (false while the host sits in the lobby and the match runs on). */
+let viewing = false
+
+/** Multiplayer room, if you're in one. */
+let room: Room | null = null
+let lobbyUi: { refresh(): void } | null = null
+/** Host: remote players in the running match, by player id. */
+const remotes = new Map<string, RemoteViewer>()
+let netT = 0
+/** Join code from a shared link (?join=ABCD). */
+let pendingJoin = cleanCode(new URLSearchParams(location.search).get('join') ?? '')
 
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -49,67 +66,250 @@ function resize() {
 window.addEventListener('resize', resize)
 resize()
 
+function me(): LobbyPlayer {
+  return { pid: profile().id, name: profile().name || trainer.name, trainer: trainer.key, team }
+}
+
+// ---------- Menus ----------
+
 function toTitle() {
   stopGame()
-  showTitle(() => showIntro(() => wipe(toTrainer)))
+  showTitle(() => (pendingJoin ? toMenu() : showIntro(() => wipe(() => toMenu()))))
 }
 
-function toTrainer() {
-  playMusic('menu')
-  showTrainerSelect(
-    trainer.key,
-    () => wipe(toTitle),
-    (t) => {
-      trainer = t
-      store.set('trainer', t.key)
-      wipe(toRoster)
-    },
-  )
-}
-
-function toRoster() {
+function toMenu(extra: Partial<MenuState> = {}) {
   stopGame()
+  lobbyUi = null
   playMusic('menu')
-  showRoster(
-    team,
-    () => wipe(toTrainer),
-    (picked) => {
-      team = picked
-      store.set('team', picked)
-      wipe(startGame, { flash: true })
-    },
-  )
+  const code = pendingJoin
+  showMenu({ trainer, team, code: code || undefined, ...extra }, {
+    solo: () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), 'Start de battle ▶')),
+    host: hostRoom,
+    join: joinRoom,
+    team: () => wipe(() => pickTeam(() => wipe(() => toMenu()), () => wipe(() => toMenu()), 'Klaar ▶')),
+  })
+  // Opened a shared link and we already know your name: straight in.
+  if (code && profile().name && !extra.error) {
+    pendingJoin = ''
+    showMenu({ trainer, team, code, busy: `Verbinden met ${code}…` }, { solo() {}, host() {}, join() {}, team() {} })
+    joinRoom(code)
+  }
 }
 
-function startGame() {
-  clearScreen()
-  stopGame()
-  if (team.length !== TEAM_SIZE) return toRoster()
-  playMusic('battle')
-  game = new Game(trainer, team, {
+/** Trainer, then partner. */
+function pickTeam(done: () => void, back: () => void, cta: string) {
+  playMusic('menu')
+  showTrainerSelect(trainer.key, back, (t) => {
+    trainer = t
+    store.set('trainer', t.key)
+    wipe(() =>
+      showRoster(team, () => wipe(() => pickTeam(done, back, cta)), (picked) => {
+        team = picked
+        store.set('team', picked)
+        done()
+      }, cta),
+    )
+  })
+}
+
+// ---------- Matches ----------
+
+function hooks(): GameHooks {
+  return {
     toast: (t, c) => hud?.toast(t, c),
     feed: (t, icon) => hud?.feed(t, icon),
     banner: (b) => hud?.banner(b),
     evolve: (from, to, shiny, done) => showEvolution(from, to, shiny, done),
     partyFull: (mon, choose) => showPartyFull(mon, game!.player.party, choose),
-    end: (r) => {
-      hud?.destroy()
-      hud = null
-      showResults(r, trainer.sprite, () => wipe(startGame, { flash: true }), () => wipe(toRoster))
-    },
-  })
-  hud = new Hud(hudRoot, game, confirmLeave)
-  if (desktop) setTimeout(() => hud?.toast('WASD lopen · klik = aanval · Q E R = krachten · Esc pauze'), INTRO_TIME * 1000 + 600)
+    end: (r) => onEnd(r),
+  }
+}
+
+function enterMatch(g: Game) {
+  clearScreen()
+  stopGame()
+  game = g
+  viewing = true
+  playMusic('battle')
+  if (g.mode !== 'client') hud = new Hud(hudRoot, g, confirmLeave)
+  if (desktop) setTimeout(() => game === g && hud?.toast('WASD lopen · klik = aanval · Q E R = krachten · Esc pauze'), INTRO_TIME * 1000 + 600)
   // Extra history entry so the phone's back button asks before leaving.
   history.pushState({ battlemon: 'game' }, '')
   guardActive = true
+}
+
+function startSolo() {
+  if (team.length !== TEAM_SIZE) return toMenu()
+  const setup: MatchSetup = { seed: Date.now() % 1e9, humans: [me()] }
+  enterMatch(new Game(setup, 0, hooks(), 'solo'))
+}
+
+function onEnd(r: GameResult) {
+  hud?.destroy()
+  hud = null
+  if (!room) {
+    showResults(r, trainer.sprite, () => wipe(startSolo, { flash: true }), () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), 'Start de battle ▶')))
+    return
+  }
+  showResults(r, trainer.sprite, () => wipe(toLobby), () => spectate(), { again: 'Naar de lobby ▶', other: 'Kijk mee' })
+}
+
+/** Watch the rest of the match after you're out. */
+function spectate() {
+  clearScreen()
+  viewing = true
+  hudRoot.innerHTML = '<button class="spec-pill">Toeschouwer · naar de lobby ▶</button>'
+  hudRoot.querySelector('.spec-pill')!.addEventListener('click', () => wipe(toLobby))
+}
+
+// ---------- Multiplayer ----------
+
+function roomEvents() {
+  return {
+    lobby: () => lobbyUi?.refresh(),
+    closed: (reason: string) => {
+      room = null
+      remotes.clear()
+      wipe(() => toMenu({ error: reason }))
+    },
+    host: (msg: HostMsg) => onHostMsg(msg),
+    command: (pid: string, c: Parameters<typeof runCommand>[2]) => {
+      const v = remotes.get(pid)
+      if (v && game?.mode === 'host') runCommand(game, v, c)
+    },
+    left: (p: LobbyPlayer) => {
+      const v = remotes.get(p.pid)
+      remotes.delete(p.pid)
+      if (!v || game?.mode !== 'host') return
+      // A bot takes over their trainer
+      game.removeViewer(v.tr)
+      v.tr.remote = false
+      if (v.tr.alive) game.giveBrain(v.tr)
+      hud?.toast(`${p.name} heeft het potje verlaten`)
+    },
+  }
+}
+
+function hostRoom() {
+  Room.create(me(), roomEvents())
+    .then((r) => {
+      room = r
+      wipe(toLobby)
+    })
+    .catch((e: Error) => toMenu({ error: e.message }))
+}
+
+function joinRoom(code: string) {
+  Room.join(code, me(), roomEvents())
+    .then((r) => {
+      room = r
+      pendingJoin = ''
+      if (location.search.includes('join=')) history.replaceState(null, '', location.pathname + location.search.replace(/[?&]join=[^&]*/, '').replace(/^&/, '?'))
+      wipe(toLobby)
+    })
+    .catch((e: Error) => {
+      pendingJoin = ''
+      toMenu({ error: e.message, code })
+    })
+}
+
+function toLobby() {
+  if (!room) return toMenu()
+  // Guests drop the match they were watching; the host keeps simulating until it's over.
+  if (game?.mode !== 'host') stopGame()
+  else {
+    viewing = false
+    hud?.destroy()
+    hud = null
+    hudRoot.innerHTML = ''
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+  }
+  guardActive = false
+  playMusic('menu')
+  lobbyUi = showLobby(room, {
+    start: hostStart,
+    team: () => {
+      lobbyUi = null
+      wipe(() => pickTeam(() => {
+        room?.updateMe(me())
+        wipe(toLobby)
+      }, () => wipe(toLobby), 'Klaar ▶'))
+    },
+    leave: () => {
+      room?.leave()
+      room = null
+      remotes.clear()
+      stopGame()
+      wipe(() => toMenu())
+    },
+  })
+}
+
+function hostStart() {
+  const r = room
+  if (!r?.isHost || r.running) return
+  r.updateMe(me())
+  // The previous match (still kept for the lobby) is done for good
+  stopGame()
+  const setup: MatchSetup = { seed: Date.now() % 1e9, humans: r.players }
+  const g = new Game(setup, 0, hooks(), 'host')
+  recordVfx(g)
+  remotes.clear()
+  for (const tr of g.trainers) {
+    if (!tr.human || tr.isPlayer) continue
+    tr.remote = true
+    const v = remoteViewer(tr)
+    g.addViewer(v)
+    remotes.set(tr.pid, v)
+  }
+  const roster = g.trainers.map((t) => ({ i: t.id, key: t.def.key, sprite: t.def.sprite, name: t.name, human: t.human, pid: t.pid }))
+  for (const v of remotes.values()) r.sendTo(v.tr.pid, { t: 'start', setup, roster, you: v.tr.id })
+  r.setRunning(true)
+  lobbyUi = null
+  wipe(() => enterMatch(g), { flash: true })
+}
+
+/** Guest: the host started a match, or sent a state update. */
+function onHostMsg(msg: HostMsg) {
+  if (msg.t === 'start') {
+    const idx = msg.setup.humans.findIndex((h) => h.pid === profile().id)
+    const g = new Game(msg.setup, idx, hooks(), 'client')
+    initClient(g, msg.roster, msg.you)
+    g.send = (c) => room?.command(c)
+    lobbyUi = null
+    pendingMatch = g
+    // Close any open picker or modal, then drop in
+    document.getElementById('modal')!.classList.add('hidden')
+    wipe(() => enterMatch(g), { flash: true })
+  } else if (msg.t === 's') {
+    const g = game?.mode === 'client' ? game : pendingMatch
+    if (!g) return
+    applySnapshot(g, msg.s)
+    applyEvents(g, msg.e, g.hooks, (c) => room?.command(c))
+    if (g === game && viewing && !hud && !g.over) hud = new Hud(hudRoot, g, confirmLeave)
+  }
+}
+/** Guest: match that started while the wipe transition is still running. */
+let pendingMatch: Game | null = null
+
+/** Host: send each remote player their view of the match, 20× a second. */
+function hostNet(g: Game, dt: number) {
+  if (!room) return
+  netT -= dt
+  if (netT > 0) return
+  netT = 0.05
+  for (const v of remotes.values()) {
+    room.sendTo(v.tr.pid, { t: 's', s: snapshot(g, v), e: v.out.splice(0) })
+  }
+  if (g.allDone && room.running) room.setRunning(false)
 }
 
 // ---------- Leaving a running match ----------
 
 let guardActive = false
 let confirming = false
-const inMatch = () => !!game && !game.over
+const inMatch = () => !!game && viewing && !game.over
 
 function confirmLeave() {
   if (!inMatch() || confirming) return
@@ -119,6 +319,9 @@ function confirmLeave() {
   g.held.fill(false)
   g.input.mx = g.input.my = 0
   confirming = true
+  const text = !room ? undefined : room.isHost
+    ? 'Jij bent de host: als je stopt, stopt het potje voor iedereen.'
+    : 'Je verlaat het potje en de lobby.'
   showLeaveConfirm(
     () => {
       confirming = false
@@ -128,6 +331,7 @@ function confirmLeave() {
       confirming = false
       leaveMatch()
     },
+    text,
   )
 }
 
@@ -136,7 +340,15 @@ function leaveMatch() {
     guardActive = false
     history.back()
   }
-  wipe(toRoster)
+  if (room) {
+    room.leave()
+    room = null
+    remotes.clear()
+    stopGame()
+    wipe(() => toMenu())
+    return
+  }
+  wipe(() => toMenu())
 }
 
 window.addEventListener('popstate', () => {
@@ -149,7 +361,7 @@ window.addEventListener('popstate', () => {
 })
 
 window.addEventListener('beforeunload', (e) => {
-  if (inMatch()) {
+  if (inMatch() || room) {
     e.preventDefault()
     e.returnValue = ''
   }
@@ -159,6 +371,9 @@ function stopGame() {
   hud?.destroy()
   hud = null
   game = null
+  pendingMatch = null
+  viewing = false
+  hudRoot.innerHTML = ''
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 }
@@ -287,17 +502,21 @@ function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000)
   last = now
   if (game) {
-    desktopInput(game)
-    game.update(dt)
-    setTempo(game.zone.phase >= 4 ? 1.12 : 1)
-    render(game, ctx, canvas.width, canvas.height)
-    hud?.update()
+    const g = game
+    if (viewing) desktopInput(g)
+    g.update(dt)
+    if (g.mode === 'host') hostNet(g, dt)
+    if (viewing && (g.mode !== 'client' || g.net?.placed)) {
+      setTempo(g.zone.phase >= 4 ? 1.12 : 1)
+      render(g, ctx, canvas.width, canvas.height)
+      hud?.update()
+    }
   }
   requestAnimationFrame(frame)
 }
 requestAnimationFrame(frame)
 
 // Handy for debugging from the console.
-;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game } }
+;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game }, get room() { return room }, remotes, snapshot }
 
 toTitle()

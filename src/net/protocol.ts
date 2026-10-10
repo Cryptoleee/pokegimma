@@ -1,0 +1,49 @@
+import type { AimDir, Dir } from '../game/entities'
+import type { MatchSetup } from '../game/game'
+
+/** A player in the lobby. `pid` is a local profile id for now (an account id later). */
+export interface LobbyPlayer {
+  pid: string
+  name: string
+  trainer: string
+  team: number[]
+}
+
+/** Client → host while a match is running. */
+export type Command =
+  /** Your own position (players move themselves, so walking feels instant) plus where your camera is. */
+  | { t: 'in'; x: number; y: number; d: Dir; f: 0 | 1; w: number; m: number; cx: number; cy: number }
+  | { t: 'move'; s: number; tg?: number; d?: AimDir }
+  | { t: 'switch'; i: number }
+  | { t: 'ball'; w: number; m: boolean }
+  | { t: 'item'; k: 'potion' | 'revive' }
+  /** Answer to "your team is full": which slot to replace (-1 = let it go). */
+  | { t: 'pick'; i: number }
+
+/** One trainer as clients need to know it (bots included). */
+export interface RosterEntry {
+  i: number
+  key: string
+  sprite: string
+  name: string
+  human: boolean
+  pid: string
+}
+
+/** Something that happened on the host that a client should see or hear. */
+export type NetEvent =
+  | ['v', string, number, number, ...unknown[]]
+  | ['fx', unknown]
+  | ['sfx', string, ...unknown[]]
+  | ['cry', number, number]
+  | ['hook', 'banner' | 'toast' | 'feed' | 'end', ...unknown[]]
+  | ['full', number, number, boolean]
+
+export type HostMsg =
+  | { t: 'lobby'; players: LobbyPlayer[]; running: boolean }
+  | { t: 'start'; setup: MatchSetup; roster: RosterEntry[]; you: number }
+  | { t: 's'; s: unknown; e: NetEvent[] }
+  | { t: 'bye'; reason: string }
+  | { t: 'ping' }
+
+export type GuestMsg = { t: 'hello'; p: LobbyPlayer } | { t: 'cmd'; c: Command } | { t: 'ping' }

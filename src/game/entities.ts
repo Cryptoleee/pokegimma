@@ -163,6 +163,17 @@ export class Trainer {
   faceRight = false
   revealT = 0
   brain: BotBrain | null = null
+  /** Played by a person (local or over the network) rather than a bot. */
+  human = false
+  /** Player id of the human behind this trainer. */
+  pid = ''
+  /** Host side: moved by a remote player; position arrives over the network. */
+  remote = false
+  /** Remote player's last input strength (drives the follow behaviour of their Pokémon). */
+  netMoving = 0
+  regenFxT = 0
+  /** Who this player is watching after being knocked out. */
+  spectate: Trainer | null = null
   /** Throw animation (Poké Ball / Master Ball). */
   throwFx: { x: number; y: number; tx: number; ty: number; t: number; master: boolean } | null = null
 

@@ -5,7 +5,10 @@ import { playMusic } from '../music'
 import type { GameResult } from '../game/game'
 
 /** End-of-match screen: placement badge, your trainer and best Pokémon, counted stats. */
-export function showResults(r: GameResult, trainerSprite: string, onAgain: () => void, onMenu: () => void) {
+export function showResults(
+  r: GameResult, trainerSprite: string, onAgain: () => void, onMenu: () => void,
+  labels = { again: 'Nog een keer ▶', other: 'Ander team kiezen' },
+) {
   const el = document.getElementById('screen')!
   const tier = r.won ? 'gold' : r.place <= 3 ? 'silver' : 'bronze'
   el.innerHTML = `
@@ -28,8 +31,8 @@ export function showResults(r: GameResult, trainerSprite: string, onAgain: () =>
           <div><b data-n="${r.caught}">0</b><span>Gevangen</span></div>
         </div>
         <div class="res-actions">
-          <button class="cta" id="again">Nog een keer ▶</button>
-          <button class="ghost2" id="menu">Ander team kiezen</button>
+          <button class="cta" id="again">${labels.again}</button>
+          <button class="ghost2" id="menu">${labels.other}</button>
         </div>
       </div>
     </div>`

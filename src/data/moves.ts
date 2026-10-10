@@ -82,3 +82,14 @@ export function movesetFor(types: PType[]): Move[] {
   const [a, b] = types
   return [make(a, 0), make(a, 1), make(b ?? a, 2), make(a, 3)]
 }
+
+const BY_NAME = new Map<string, Move>()
+for (const type of Object.keys(TABLE) as PType[]) for (let i = 0; i < 4; i++) {
+  const m = make(type, i)
+  if (!BY_NAME.has(m.name)) BY_NAME.set(m.name, m)
+}
+
+/** Looks a move up by name (used to send moves over the network). */
+export function moveByName(name: string): Move {
+  return BY_NAME.get(name) ?? make('normal', 0)
+}

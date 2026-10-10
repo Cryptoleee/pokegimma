@@ -96,7 +96,7 @@ export function showTrainerSelect(current: string | null, onBack: () => void, on
 
 // ---------------- Partner Pokémon ----------------
 
-export function showRoster(initial: number[], onBack: () => void, onGo: (team: number[]) => void) {
+export function showRoster(initial: number[], onBack: () => void, onGo: (team: number[]) => void, cta = 'Start de battle ▶') {
   const el = screen()
   let pick = initial.find((id) => ROSTER.includes(id)) ?? ROSTER[0]
   el.innerHTML = shell('STAP 2 / 2', 'Kies je partner', `
@@ -115,7 +115,7 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
     <div class="mon-grid">
       ${ROSTER.map((id) => `<button class="tile" data-id="${id}" style="--tc:${TYPE_COLOR[SPECIES[id].types[0]]}"><img class="px" src="${spriteUrl(id)}" alt=""><span>${SPECIES[id].name}</span></button>`).join('')}
     </div>
-    <div class="sel-note">Je start met 1 partner. In de wereld vang je er nog ${PARTY_MAX - TEAM_SIZE} bij.</div>`, 'Start de battle ▶')
+    <div class="sel-note">Je start met 1 partner. In de wereld vang je er nog ${PARTY_MAX - TEAM_SIZE} bij.</div>`, cta)
 
   const hero = el.querySelector('.hero') as HTMLElement
   const paint = (animate: boolean) => {

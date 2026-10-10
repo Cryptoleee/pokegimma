@@ -2,7 +2,7 @@ import { PARTY_MAX, ROSTER, SPECIES, TEAM_SIZE, WILD, type Rarity } from '../dat
 import { movesetFor, SLOT_UNLOCK, type Move, type MoveFx } from '../data/moves'
 import { Vfx } from './vfx'
 import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpact, onMelee, onZap, pal, projectileEnd, projectileTick } from './moveFx'
-import { BOT_TRAINERS, type TrainerDef } from '../data/trainers'
+import { BOT_TRAINERS, TRAINERS } from '../data/trainers'
 import { effectiveness, TYPE_COLOR } from '../data/types'
 import { cry, sfx } from '../audio'
 import { LEVEL_CAP, Mon, Trainer, xpNeeded, type AimDir } from './entities'
@@ -11,6 +11,8 @@ import { preloadMon } from './sprites'
 import { MAP, T, World } from './world'
 import { botThink } from './ai'
 import type { Dir } from './entities'
+import type { Command } from '../net/protocol'
+import type { ClientState } from '../net/sync'
 
 export type ItemKind = 'master' | 'potion' | 'candy' | 'revive'
 export const ITEM_SPRITE: Record<ItemKind, string> = {
@@ -160,7 +162,44 @@ export interface GameResult {
   time: number
   kos: number
   caught: number
-  best: Mon
+  best: Pick<Mon, 'name' | 'level' | 'shiny'> & { species: { id: number } }
+}
+
+/** One human in a match (solo = just you). */
+export interface HumanSetup {
+  /** Stable player id (local profile id, later an account id). */
+  pid: string
+  name: string
+  trainer: string
+  team: number[]
+}
+
+export interface MatchSetup {
+  seed: number
+  humans: HumanSetup[]
+}
+
+/** solo = everything local; host = simulates for remote players too; client = renders the host's state. */
+export type GameMode = 'solo' | 'host' | 'client'
+
+export type SfxName = keyof typeof sfx
+
+/**
+ * Someone watching the match. The local player plays sounds and shows banners
+ * directly; remote players (on the host) get them sent over the network.
+ */
+export interface Viewer {
+  tr: Trainer
+  local: boolean
+  camX: number
+  camY: number
+  hooks: GameHooks
+  sfx(name: SfxName, ...args: unknown[]): void
+  cry(id: number, vol: number): void
+  fx(f: Fx): void
+  /** Countdown to the results screen once this player is out (or won). */
+  endT: number
+  done: boolean
 }
 
 const RARITY_XP: Record<Rarity, number> = { common: 1, uncommon: 1.4, rare: 2.5, legendary: 5 }
@@ -168,14 +207,15 @@ const RARITY_XP: Record<Rarity, number> = { common: 1, uncommon: 1.4, rare: 2.5,
 const REGEN_DELAY = 3
 const REGEN_ACTIVE = 0.12
 const REGEN_BENCH = 0.06
-const BOTS = 11
+/** Trainers per match; empty seats are filled with bots. */
+export const SEATS = 12
 const DMG_SCALE = 1.25
 
 export class Game {
   rng: Rng
   world: World
   trainers: Trainer[] = []
-  player: Trainer
+  player!: Trainer
   wilds: Mon[] = []
   items: GroundItem[] = []
   projs: Projectile[] = []
@@ -191,7 +231,6 @@ export class Game {
   time = 0
   paused = false
   over = false
-  endT = -1
   camX = 0
   camY = 0
   spectate: Trainer | null = null
@@ -209,29 +248,49 @@ export class Game {
   private legendIdx = 0
   /** When the legendaries show up this match (randomised). */
   private legendTimes: number[] = []
-  private regenFxT = 0
   private passiveT = 0
-  total = BOTS + 1
+  total = SEATS
+  /** Everyone watching this match: just you in solo, every human on the host. */
+  viewers: Viewer[] = []
+  private viewerOf = new Map<Trainer, Viewer>()
+  /** Host: every human is out or the match has a winner. */
+  allDone = false
+  /** Client: sends a command to the host. */
+  send: ((c: Command) => void) | null = null
+  /** Client: objects by host id and their network positions. */
+  net: ClientState | null = null
+  /** >0 while spawning effects that clients draw themselves (not sent over the network). */
+  vfxMute = 0
+  private netT = 0
 
-  constructor(playerDef: TrainerDef, team: number[], public hooks: GameHooks, seed = Date.now() % 1e9) {
-    this.rng = new Rng(seed)
+  constructor(setup: MatchSetup, me: number, public hooks: GameHooks, public mode: GameMode = 'solo') {
+    this.rng = new Rng(setup.seed)
     this.world = new World(this.rng)
+    // The client only needs the world: everything else comes from the host.
+    if (mode === 'client') return
     this.pickNextZone()
 
-    this.player = new Trainer(playerDef, playerDef.name, true)
-    this.player.party = team.map((id) => this.ownMon(new Mon(id, 5), this.player))
-    this.trainers.push(this.player)
+    setup.humans.forEach((h, i) => {
+      const def = TRAINERS.find((t) => t.key === h.trainer) ?? TRAINERS[0]
+      const tr = new Trainer(def, h.name || def.name, i === me)
+      tr.human = true
+      tr.pid = h.pid
+      tr.party = h.team.slice(0, TEAM_SIZE).map((id) => this.ownMon(new Mon(id, 5), tr))
+      this.trainers.push(tr)
+      if (i === me) {
+        this.player = tr
+        this.addViewer(this.localViewer(tr))
+      }
+    })
+    if (!this.player) this.player = this.trainers[0]
 
     const bots = [...BOT_TRAINERS].sort(() => this.rng.next() - 0.5)
-    for (let i = 0; i < BOTS; i++) {
+    for (let i = 0; this.trainers.length < SEATS; i++) {
       const def = bots[i % bots.length]
       const bot = new Trainer(def, def.name, false)
       const pool = [...ROSTER].sort(() => this.rng.next() - 0.5)
       bot.party = pool.slice(0, TEAM_SIZE).map((id) => this.ownMon(new Mon(id, 5), bot))
-      bot.brain = {
-        skill: this.rng.range(0.45, 0.95), thinkT: 0, goalX: 0, goalY: 0, target: null,
-        lastX: 0, lastY: 0, stuckT: 0, mode: 'wander', strafe: this.rng.chance(0.5) ? 1 : -1,
-      }
+      this.giveBrain(bot)
       this.trainers.push(bot)
     }
 
@@ -255,7 +314,67 @@ export class Game {
     this.scatterItems()
     this.legendTimes = [this.rng.range(60, 100), this.rng.range(190, 250)]
     for (let i = 0; i < 22; i++) this.spawnWild(true)
-    team.forEach((id) => preloadMon(id))
+    for (const tr of this.trainers) if (tr.human) tr.party.forEach((m) => preloadMon(m.species.id))
+  }
+
+  /** AI takes over a trainer (bots, or a player who disconnected). */
+  giveBrain(tr: Trainer) {
+    tr.brain = {
+      skill: this.rng.range(0.45, 0.95), thinkT: 0, goalX: 0, goalY: 0, target: null,
+      lastX: 0, lastY: 0, stuckT: 0, mode: 'wander', strafe: this.rng.chance(0.5) ? 1 : -1,
+    }
+  }
+
+  // ---------------- Viewers ----------------
+
+  private localViewer(tr: Trainer): Viewer {
+    const g = this
+    return {
+      tr, local: true, endT: -1, done: false,
+      get camX() { return g.camX },
+      get camY() { return g.camY },
+      hooks: this.hooks,
+      sfx: (name, ...args) => (sfx[name] as (...a: unknown[]) => void)(...args),
+      cry: (id, vol) => cry(id, vol),
+      fx: (f) => this.fx.push(f),
+    }
+  }
+
+  addViewer(v: Viewer) {
+    this.viewers.push(v)
+    this.viewerOf.set(v.tr, v)
+  }
+
+  removeViewer(tr: Trainer) {
+    const v = this.viewerOf.get(tr)
+    if (!v) return
+    this.viewers.splice(this.viewers.indexOf(v), 1)
+    this.viewerOf.delete(tr)
+    if (this.viewers.every((o) => o.done)) this.allDone = true
+  }
+
+  /** The viewer playing as this trainer, if it's a human. */
+  vOf(tr: Trainer | null | undefined): Viewer | null {
+    return (tr && this.viewerOf.get(tr)) || null
+  }
+
+  private seenBy(v: Viewer, x: number, y: number) {
+    return Math.abs(x - v.camX) < 14 && Math.abs(y - v.camY) < 12
+  }
+
+  /** Play a sound for everyone who can see (x, y). */
+  private sfxAt(x: number, y: number, name: SfxName, ...args: unknown[]) {
+    for (const v of this.viewers) if (this.seenBy(v, x, y)) v.sfx(name, ...args)
+  }
+
+  /** A floating label for everyone who can see it. */
+  private addFx(f: Fx) {
+    for (const v of this.viewers) if (this.seenBy(v, f.x, f.y)) v.fx(f)
+  }
+
+  /** Per-frame visuals (trails, footsteps): clients draw their own, so only the local screen counts. */
+  private localSeen(x: number, y: number) {
+    return Math.abs(x - this.camX) < 14 && Math.abs(y - this.camY) < 12
   }
 
   private ownMon(m: Mon, tr: Trainer) {
@@ -271,6 +390,7 @@ export class Game {
   // ---------------- Main loop ----------------
 
   update(dt: number) {
+    if (this.mode === 'client') return this.clientUpdate(dt)
     if (this.introT > 0) {
       // Drop-in cinematic: the camera swoops down while everyone waits for GO.
       this.introT -= dt
@@ -287,10 +407,13 @@ export class Game {
       return
     }
     this.updateFx(dt)
-    if (this.paused) return
-    if (this.endT >= 0) {
-      this.endT -= dt
-      if (this.endT < 0 && !this.over) this.finish()
+    // Only a solo match can pause: in multiplayer the world keeps going.
+    if (this.paused && this.mode === 'solo') return
+    if (this.allDone) return
+    for (const v of this.viewers) {
+      if (v.endT < 0 || v.done) continue
+      v.endT -= dt
+      if (v.endT < 0) this.finish(v)
     }
     this.time += dt
     this.updateZone(dt)
@@ -335,18 +458,8 @@ export class Game {
     tr.swapCd = Math.max(0, tr.swapCd - dt)
     tr.revealT = Math.max(0, tr.revealT - dt)
     tr.mon.revealT = Math.max(0, tr.mon.revealT - dt)
-    const len = Math.hypot(tr.vx, tr.vy)
-    const speed = 4.4
-    if (len > 0.08) {
-      const n = Math.min(1, len)
-      const dx = (tr.vx / len) * n * speed * dt
-      const dy = (tr.vy / len) * n * speed * dt
-      this.tryMove(tr, dx, dy, 0.3)
-      tr.dir = dirOf(tr.vx, tr.vy)
-      if (Math.abs(tr.vx) > 0.15) tr.faceRight = tr.vx > 0
-      tr.walkT += dt * n * 7
-      if (this.onScreen(tr.x, tr.y)) this.stepFx(tr.x, tr.y, dt)
-    } else tr.walkT = 0
+    // Remote players move themselves; their position arrives over the network.
+    const len = tr.remote ? tr.netMoving : this.walk(tr, dt)
 
     // Active Pokémon
     const m = tr.mon
@@ -392,17 +505,125 @@ export class Game {
     }
   }
 
-  /** GO! The player's partner pops out of its Poké Ball. */
+  /** Client: glides toward the host's state and runs the visuals that aren't sent over the network. */
+  private clientUpdate(dt: number) {
+    this.updateFx(dt)
+    const p = this.player
+    const cs = this.net
+    if (!p || !cs?.placed) return
+    if (this.introT > 0) {
+      this.introT -= dt
+      this.camX = p.x
+      this.camY = p.y
+      if (this.introT <= 0) this.partnerOut = true
+      return
+    }
+    this.time += dt
+
+    // Your own trainer moves locally so walking feels instant
+    if (p.alive) {
+      p.vx = this.input.mx
+      p.vy = this.input.my
+      const moving = this.walk(p, dt)
+      p.swapCd = Math.max(0, p.swapCd - dt)
+      for (const m of p.party) for (let i = 0; i < 4; i++) m.cds[i] = Math.max(0, m.cds[i] - dt)
+      const dir = this.cursorDir(p.mon)
+      for (let s = 0; s < 4; s++) if (this.held[s]) this.useMove(p.mon, s, undefined, dir)
+      this.updatePlayerTarget(dt)
+      this.netT -= dt
+      if (this.netT <= 0) {
+        this.netT = 0.05
+        this.send?.({ t: 'in', x: p.x, y: p.y, d: p.dir, f: p.faceRight ? 1 : 0, w: p.walkT, m: Math.min(1, moving), cx: this.camX, cy: this.camY })
+      }
+    } else {
+      this.playerTarget = null
+      this.netT -= dt
+      if (this.netT <= 0) {
+        this.netT = 0.25
+        this.send?.({ t: 'in', x: p.x, y: p.y, d: p.dir, f: 0, w: 0, m: 0, cx: this.camX, cy: this.camY })
+      }
+    }
+
+    // Everything else glides toward where the host says it is
+    const k = 1 - Math.exp(-dt * 16)
+    for (const [o, [gx, gy]] of cs.goal) {
+      const dx = gx - o.x, dy = gy - o.y
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+        o.x = gx
+        o.y = gy
+      } else {
+        o.x += dx * k
+        o.y += dy * k
+      }
+      if (o instanceof Mon) {
+        o.mvx = dx * k
+        o.mvy = dy * k
+        if (!o.owner && (Math.abs(dx) > 0.02 || Math.abs(dy) > 0.02) && this.localSeen(o.x, o.y)) this.stepFx(o.x, o.y, dt * 0.6)
+      } else if (Math.hypot(dx, dy) > 0.05 && this.localSeen(o.x, o.y)) this.stepFx(o.x, o.y, dt)
+    }
+
+    // Local-only visuals: charge-ups, dash trails, projectile trails
+    const mons = [...this.wilds, ...this.trainers.filter((t) => t.alive).map((t) => t.mon)]
+    for (const m of mons) {
+      if (!this.localSeen(m.x, m.y)) continue
+      if (m.charging) {
+        m.charging.t = Math.max(0, m.charging.t - dt)
+        chargeTick(this.vfx, m.charging.move, m.x, m.y - 0.5, 1 - m.charging.t / m.charging.total)
+      }
+      if (m.dash) dashTick(this.vfx, m.dash.strike ? 'aerialace' : m.dash.move.fx, m.x, m.y - 0.4, m.dash.vx, m.dash.vy)
+      m.flash = Math.max(0, m.flash - dt)
+      m.castT = Math.max(0, m.castT - dt)
+      m.tintT = Math.max(0, m.tintT - dt)
+      m.joltT = Math.max(0, m.joltT - dt)
+      m.liftT = Math.max(0, m.liftT - dt)
+      m.evolveFx = Math.max(0, m.evolveFx - dt)
+    }
+    for (const pr of this.projs) {
+      if (this.localSeen(pr.x, pr.y)) projectileTick(this.vfx, pr.move.fx, pr.x, pr.y, pr.vx, pr.vy)
+      pr.x += pr.vx * dt
+      pr.y += pr.vy * dt
+    }
+    for (const n of this.novas) n.t = Math.max(0.001, n.t - dt)
+    for (const tr of this.trainers) if (tr.throwFx) tr.throwFx.t += dt
+    this.tickHpLag(dt)
+
+    const focus = p.alive ? p : p.spectate && p.spectate.alive ? p.spectate : this.alive[0] ?? p
+    const kc = Math.min(1, dt * 8)
+    this.camX += (focus.x - this.camX) * kc
+    this.camY += (focus.y - this.camY) * kc
+  }
+
+  /** Walks a trainer along its input vector. Returns the input strength. */
+  walk(tr: Trainer, dt: number) {
+    const len = Math.hypot(tr.vx, tr.vy)
+    const speed = 4.4
+    if (len > 0.08) {
+      const n = Math.min(1, len)
+      const dx = (tr.vx / len) * n * speed * dt
+      const dy = (tr.vy / len) * n * speed * dt
+      this.tryMove(tr, dx, dy, 0.3)
+      tr.dir = dirOf(tr.vx, tr.vy)
+      if (Math.abs(tr.vx) > 0.15) tr.faceRight = tr.vx > 0
+      tr.walkT += dt * n * 7
+      if (this.localSeen(tr.x, tr.y)) this.quiet(() => this.stepFx(tr.x, tr.y, dt))
+    } else tr.walkT = 0
+    return len
+  }
+
+  /** GO! Every player's partner pops out of its Poké Ball. */
   private releasePartner() {
     this.partnerOut = true
-    const m = this.player.mon
-    sfx.release()
-    cry(m.species.id, 0.35)
-    this.vfx.ring(m.x, m.y - 0.2, 1.6, '#ffffff', 0.5, 6)
-    this.vfx.glow(m.x, m.y - 0.5, 40, '#ffffff', 0.4)
-    this.vfx.burst(m.x, m.y - 0.5, { n: 18, speed: 6, cols: ['#ffffff', '#fff0a0', '#ffd040'], shape: 'star', add: true, s0: 3, s1: 0.6, life: 0.7, vr: 10 })
-    this.vfx.shakeBy(4)
-    this.hooks.banner({ kind: 'go', title: 'GO!' })
+    for (const v of this.viewers) {
+      const m = v.tr.mon
+      v.sfx('release')
+      v.cry(m.species.id, 0.35)
+      this.vfx.mark(m.x, m.y)
+      this.vfx.ring(m.x, m.y - 0.2, 1.6, '#ffffff', 0.5, 6)
+      this.vfx.glow(m.x, m.y - 0.5, 40, '#ffffff', 0.4)
+      this.vfx.burst(m.x, m.y - 0.5, { n: 18, speed: 6, cols: ['#ffffff', '#fff0a0', '#ffd040'], shape: 'star', add: true, s0: 3, s1: 0.6, life: 0.7, vr: 10 })
+      this.vfx.shakeBy(4)
+      v.hooks.banner({ kind: 'go', title: 'GO!' })
+    }
   }
 
   private regen(tr: Trainer, dt: number) {
@@ -411,12 +632,12 @@ export class Game {
       if (m.fainted || m.hp >= m.maxHp || m.combatT < REGEN_DELAY) return
       m.hp = Math.min(m.maxHp, m.hp + m.maxHp * (i === tr.active ? REGEN_ACTIVE : REGEN_BENCH) * dt)
     })
-    const m = tr.mon
-    if (tr.isPlayer && this.regenerating(m) && this.onScreen(m.x, m.y)) {
-      this.regenFxT -= dt
-      if (this.regenFxT <= 0) {
-        this.regenFxT = 0.45
-        this.fx.push({ kind: 'heal', x: m.x, y: m.y - 0.5, t: 0, life: 0.7, color: '#80f080' })
+    const m = tr.mon, v = this.vOf(tr)
+    if (v && this.regenerating(m)) {
+      tr.regenFxT -= dt
+      if (tr.regenFxT <= 0) {
+        tr.regenFxT = 0.45
+        v.fx({ kind: 'heal', x: m.x, y: m.y - 0.5, t: 0, life: 0.7, color: '#80f080' })
       }
     }
   }
@@ -441,10 +662,17 @@ export class Game {
     m.x = tr.x
     m.y = tr.y + 0.4
     m.dash = null
-    this.fx.push({ kind: 'poof', x: m.x, y: m.y - 0.4, t: 0, life: 0.4, color: '#ffffff' })
+    this.addFx({ kind: 'poof', x: m.x, y: m.y - 0.4, t: 0, life: 0.4, color: '#ffffff' })
   }
 
   switchTo(tr: Trainer, idx: number): boolean {
+    if (this.send) {
+      if (!tr.alive || idx === tr.active || !tr.party[idx] || tr.party[idx].fainted || tr.swapCd > 0) return false
+      tr.swapCd = 1.2
+      this.send({ t: 'switch', i: idx })
+      sfx.select()
+      return true
+    }
     if (!tr.alive || idx === tr.active || !tr.party[idx] || tr.party[idx].fainted || tr.swapCd > 0) return false
     tr.swapCd = 1.2
     this.sendOut(tr, idx)
@@ -500,10 +728,16 @@ export class Game {
       this.lastTargetT = 1.6
     }
     m.cds[slot] = mv.cooldown
-    const visible = this.onScreen(m.x, m.y)
-    if (visible && m.owner?.isPlayer) sfx.cast(mv.tier)
-    if (visible && mv.tier >= 1)
-      this.fx.push({ kind: 'callout', x: m.x, y: m.y - 1.9, t: 0, life: 1, color: TYPE_COLOR[mv.type], text: mv.name, big: mv.tier >= 3 })
+    if (this.send) {
+      // Client: the host runs the move; we only predict the cooldown and facing.
+      this.aim(m, tgt, dir)
+      sfx.cast(mv.tier)
+      this.send({ t: 'move', s: slot, tg: tgt?.id, d: dir })
+      return true
+    }
+    if (m.owner?.isPlayer) sfx.cast(mv.tier)
+    if (mv.tier >= 1)
+      this.addFx({ kind: 'callout', x: m.x, y: m.y - 1.9, t: 0, life: 1, color: TYPE_COLOR[mv.type], text: mv.name, big: mv.tier >= 3 })
     this.aim(m, tgt, dir)
     if (mv.charge > 0) {
       m.charging = { move: mv, t: mv.charge, total: mv.charge, tgt, dir }
@@ -586,7 +820,7 @@ export class Game {
       return
     }
     c.t -= dt
-    if (this.onScreen(m.x, m.y)) chargeTick(this.vfx, c.move, m.x, m.y - 0.5, 1 - c.t / c.total)
+    if (this.localSeen(m.x, m.y)) this.quiet(() => chargeTick(this.vfx, c.move, m.x, m.y - 0.5, 1 - c.t / c.total))
     if (c.t > 0) return
     m.charging = null
     const tgt = c.tgt && !c.tgt.fainted && c.tgt.state !== 'weak' ? c.tgt : c.dir ? null : this.autoTarget(m, c.move.range + 1.5)
@@ -713,11 +947,21 @@ export class Game {
   }
 
   shakeAt(x: number, y: number, amount: number) {
-    if (this.nearCam(x, y)) this.vfx.shakeBy(amount)
+    if (!this.nearCam(x, y)) return
+    this.vfx.mark(x, y)
+    this.vfx.shakeBy(amount)
   }
 
+  /** Close enough to someone's camera for the full effect (and screen shake). */
   nearCam(x: number, y: number) {
-    return Math.hypot(x - this.camX, y - this.camY) < 11
+    return this.viewers.some((v) => Math.hypot(x - v.camX, y - v.camY) < 11)
+  }
+
+  /** Runs per-frame visuals without sending them to clients (they draw their own). */
+  private quiet(fn: () => void) {
+    this.vfxMute++
+    fn()
+    this.vfxMute--
   }
 
   private updateDash(m: Mon, dt: number) {
@@ -730,7 +974,7 @@ export class Game {
       m.y = ny
     }
     if (d.strike) {
-      if (this.onScreen(m.x, m.y)) dashTick(this.vfx, 'aerialace', m.x, m.y - 0.4, d.vx, d.vy)
+      if (this.localSeen(m.x, m.y)) this.quiet(() => dashTick(this.vfx, 'aerialace', m.x, m.y - 0.4, d.vx, d.vy))
       d.t -= dt
       if (d.t <= 0) {
         m.dash = null
@@ -743,7 +987,7 @@ export class Game {
         d.hit.add(e)
         this.hit(m, e, d.move)
       }
-    if (this.onScreen(m.x, m.y)) dashTick(this.vfx, d.move.fx, m.x, m.y - 0.4, d.vx, d.vy)
+    if (this.localSeen(m.x, m.y)) this.quiet(() => dashTick(this.vfx, d.move.fx, m.x, m.y - 0.4, d.vx, d.vy))
     d.t -= dt
     if (d.t <= 0) m.dash = null
   }
@@ -763,18 +1007,19 @@ export class Game {
     m.castT = 0.18
     const fx = first ? first.x : m.x + ax * 0.9
     const fy = first ? first.y - 0.45 : m.y - 0.45 + ay * 0.9
-    this.fx.push({ kind: 'melee', style: mv.fx, x: fx, y: fy, x2: ax, y2: ay, t: 0, life: 0.32, color: TYPE_COLOR[mv.type] })
+    this.addFx({ kind: 'melee', style: mv.fx, x: fx, y: fy, x2: ax, y2: ay, t: 0, life: 0.32, color: TYPE_COLOR[mv.type] })
     if (this.onScreen(m.x, m.y)) {
       onMelee(this.vfx, mv, fx, fy, ax, ay, !!first)
-      if (first && this.nearCam(m.x, m.y)) this.vfx.shakeBy(2)
+      if (first) this.shakeAt(m.x, m.y, 2)
     }
     if (!first) this.miss(m, fx, fy)
   }
 
   /** Grey "Mis" so players can see an attack whiffed. */
   private miss(src: Mon, x: number, y: number) {
-    if (!src.owner?.isPlayer || !this.onScreen(x, y)) return
-    this.fx.push({ kind: 'text', x, y: y - 0.3, t: 0, life: 0.6, color: '#b8b8c8', text: 'Mis', small: true })
+    const v = this.vOf(src.owner)
+    if (!v || !this.seenBy(v, x, y)) return
+    v.fx({ kind: 'text', x, y: y - 0.3, t: 0, life: 0.6, color: '#b8b8c8', text: 'Mis', small: true })
   }
 
   hit(src: Mon, tgt: Mon, mv: Move, mult = 1) {
@@ -797,21 +1042,26 @@ export class Game {
 
     const visible = this.onScreen(tgt.x, tgt.y)
     if (visible) {
-      const mine = !!src.owner?.isPlayer, hurt = !!tgt.owner?.isPlayer
-      this.fx.push({
-        kind: 'text', x: tgt.x + this.rng.range(-0.35, 0.35), y: tgt.y - 1.5, t: 0, life: 0.85,
-        color: hurt ? '#ff5a50' : eff > 1 ? '#ffd040' : eff < 1 ? '#c8c8d0' : '#ffffff',
-        text: `${dmg}${eff > 1 ? '!' : ''}`, big: mine || hurt || eff > 1,
-      })
-      if ((mine || hurt) && eff !== 1)
-        this.fx.push({
-          kind: 'text', x: tgt.x, y: tgt.y - 2.1, t: 0, life: 0.9, small: true,
-          color: eff > 1 ? '#ffd040' : '#b8b8c8', text: eff > 1 ? 'Super effectief!' : 'Weinig effect',
+      const jx = this.rng.range(-0.35, 0.35)
+      // Damage numbers are coloured per viewer: red when it's your Pokémon getting hit.
+      for (const v of this.viewers) {
+        if (!this.seenBy(v, tgt.x, tgt.y)) continue
+        const mine = src.owner === v.tr, hurt = tgt.owner === v.tr
+        v.fx({
+          kind: 'text', x: tgt.x + jx, y: tgt.y - 1.5, t: 0, life: 0.85,
+          color: hurt ? '#ff5a50' : eff > 1 ? '#ffd040' : eff < 1 ? '#c8c8d0' : '#ffffff',
+          text: `${dmg}${eff > 1 ? '!' : ''}`, big: mine || hurt || eff > 1,
         })
-      if (mine) sfx.hitConfirm()
+        if ((mine || hurt) && eff !== 1)
+          v.fx({
+            kind: 'text', x: tgt.x, y: tgt.y - 2.1, t: 0, life: 0.9, small: true,
+            color: eff > 1 ? '#ffd040' : '#b8b8c8', text: eff > 1 ? 'Super effectief!' : 'Weinig effect',
+          })
+        if (mine) v.sfx('hitConfirm')
+        if (mine || hurt) v.sfx('hit', eff > 1)
+      }
       onHit(this.vfx, mv, tgt, eff, this.nearCam(tgt.x, tgt.y))
-      if ((src.owner?.isPlayer || tgt.owner?.isPlayer) && (mv.tier >= 2 || eff > 1)) this.hitStop = Math.max(this.hitStop, 0.035 + mv.tier * 0.015)
-      if (src.owner?.isPlayer || tgt.owner?.isPlayer) sfx.hit(eff > 1)
+      if (this.mode === 'solo' && (src.owner?.isPlayer || tgt.owner?.isPlayer) && (mv.tier >= 2 || eff > 1)) this.hitStop = Math.max(this.hitStop, 0.035 + mv.tier * 0.015)
     }
     if (!tgt.owner) {
       tgt.aggro = src
@@ -826,14 +1076,14 @@ export class Game {
   }
 
   private onFaint(m: Mon, by: Mon | null) {
-    if (this.onScreen(m.x, m.y)) sfx.faint()
+    this.sfxAt(m.x, m.y, 'faint')
     if (this.nearCam(m.x, m.y)) {
       // KO punctuation: freeze, flash ring and a burst of stars
       this.vfx.ring(m.x, m.y - 0.2, 1.8, '#ffffff', 0.5, 5)
       this.vfx.glow(m.x, m.y - 0.5, 30, '#ffffff', 0.3)
       this.vfx.burst(m.x, m.y - 0.5, { n: 14, speed: 6, cols: ['#ffffff', '#fff0a0', '#ffd040'], shape: 'star', add: true, s0: 3, s1: 0.8, life: 0.6, vr: 12 })
-      if (by?.owner?.isPlayer || m.owner?.isPlayer) {
-        this.hitStop = Math.max(this.hitStop, 0.12)
+      if (this.vOf(by?.owner) || this.vOf(m.owner)) {
+        if (this.mode === 'solo') this.hitStop = Math.max(this.hitStop, 0.12)
         this.vfx.shakeBy(6)
       }
     }
@@ -844,13 +1094,13 @@ export class Game {
       m.weakT = m.legendary ? 15 : 9
       m.aggro = null
       if (by?.owner) this.gainXp(by, koXp)
-      if (m.legendary) this.hooks.feed(`${m.name} is verzwakt! Vang hem snel!`)
+      if (m.legendary) for (const v of this.viewers) v.hooks.feed(`${m.name} is verzwakt! Vang hem snel!`)
       return
     }
     const tr = m.owner
     tr.autoSwapT = 0.9
     if (by?.owner) this.gainXp(by, koXp * 1.5)
-    if (tr.isPlayer) this.hooks.banner({ kind: 'fainted', title: `${m.name} is verslagen!`, sub: tr.healthyIndex() >= 0 ? 'Je volgende Pokémon komt eraan' : undefined, mon: m.species.id })
+    this.vOf(tr)?.hooks.banner({ kind: 'fainted', title: `${m.name} is verslagen!`, sub: tr.healthyIndex() >= 0 ? 'Je volgende Pokémon komt eraan' : undefined, mon: m.species.id })
     if (tr.healthyIndex() < 0) this.eliminate(tr, by?.owner ?? m.lastHitBy)
   }
 
@@ -860,12 +1110,15 @@ export class Game {
     tr.alive = false
     tr.diedAt = this.time
     if (by && by !== tr) by.kos++
-    this.hooks.feed(
-      by && by !== tr ? `${by.isPlayer ? 'Jij' : by.name} schakelde ${tr.isPlayer ? 'jou' : tr.name} uit` : `${tr.isPlayer ? 'Jij' : tr.name} werd gesloopt door de storm`,
-      { trainer: tr.def.sprite },
-    )
-    if (by?.isPlayer && !tr.isPlayer) this.hooks.banner({ kind: 'ko', title: 'Trainer uitgeschakeld!', sub: `${tr.name} · nog ${this.alive.length} over`, trainer: tr.def.sprite })
-    if (this.onScreen(tr.x, tr.y)) sfx.ko()
+    for (const v of this.viewers) {
+      const who = (t: Trainer, me: string) => (t === v.tr ? me : t.name)
+      v.hooks.feed(
+        by && by !== tr ? `${who(by, 'Jij')} schakelde ${who(tr, 'jou')} uit` : `${who(tr, 'Jij')} werd gesloopt door de storm`,
+        { trainer: tr.def.sprite },
+      )
+    }
+    if (by && by !== tr) this.vOf(by)?.hooks.banner({ kind: 'ko', title: 'Trainer uitgeschakeld!', sub: `${tr.name} · nog ${this.alive.length} over`, trainer: tr.def.sprite })
+    this.sfxAt(tr.x, tr.y, 'ko')
     // Drop loot
     const drops: ItemKind[] = [
       ...Array(tr.masterBalls).fill('master'), ...Array(tr.potions).fill('potion'), ...Array(tr.revives).fill('revive'),
@@ -875,24 +1128,34 @@ export class Game {
       this.items.push({ x: tr.x + Math.cos(a) * 0.9, y: tr.y + Math.sin(a) * 0.9, kind, bob: Math.random() * 6 })
     })
     tr.masterBalls = tr.potions = tr.revives = 0
-    if (tr.isPlayer) {
-      this.spectate = by && by.alive ? by : null
-      this.endT = 2.2
-    } else if (this.alive.length === 1 && this.alive[0].isPlayer) {
-      this.player.place = 1
-      this.endT = 1.5
-      this.hooks.banner({ kind: 'win', title: 'WINNAAR!', sub: 'Jij bent de laatste trainer', trainer: this.player.def.sprite })
+    const v = this.vOf(tr)
+    if (v) {
+      if (tr.isPlayer) this.spectate = by && by.alive ? by : null
+      tr.spectate = by && by.alive ? by : null
+      v.endT = 2.2
+    }
+    if (this.alive.length === 1) {
+      const last = this.alive[0], lv = this.vOf(last)
+      last.place = 1
+      if (lv) {
+        lv.endT = 1.5
+        lv.hooks.banner({ kind: 'win', title: 'WINNAAR!', sub: 'Jij bent de laatste trainer', trainer: last.def.sprite })
+      }
     }
   }
 
-  private finish() {
-    this.over = true
-    const p = this.player
-    const best = [...p.party].sort((a, b) => b.level - a.level)[0]
-    this.hooks.end({
+  /** Results for one player. The match ends once every human has theirs. */
+  private finish(v: Viewer) {
+    v.done = true
+    const p = v.tr
+    const b = [...p.party].sort((a, b) => b.level - a.level)[0]
+    v.hooks.end({
       won: p.alive, place: p.alive ? 1 : p.place, total: this.total,
-      time: p.alive ? this.time : p.diedAt, kos: p.kos, caught: p.caught, best,
+      time: p.alive ? this.time : p.diedAt, kos: p.kos, caught: p.caught,
+      best: { name: b.name, level: b.level, shiny: b.shiny, species: { id: b.species.id } },
     })
+    if (v.local) this.over = true
+    if (this.viewers.every((o) => o.done)) this.allDone = true
   }
 
   // ---------------- Leveling ----------------
@@ -910,16 +1173,16 @@ export class Game {
     const before = m.maxHp
     m.level++
     m.hp = Math.min(m.maxHp, m.hp + (m.maxHp - before))
-    const mine = m.owner?.isPlayer
-    if (mine) sfx.level()
+    const mine = this.vOf(m.owner)
+    mine?.sfx('level')
     let learned = false
     SLOT_UNLOCK.forEach((lv, i) => {
       if (lv === m.level && mine) {
         learned = true
-        this.hooks.banner({ kind: 'move', title: m.moves[i].name, sub: `${m.name} leerde een nieuwe aanval!`, color: TYPE_COLOR[m.moves[i].type], mon: m.species.id })
+        mine.hooks.banner({ kind: 'move', title: m.moves[i].name, sub: `${m.name} leerde een nieuwe aanval!`, color: TYPE_COLOR[m.moves[i].type], mon: m.species.id })
       }
     })
-    if (mine && !learned && m.owner?.mon === m) this.hooks.banner({ kind: 'levelup', title: `Lv ${m.level}`, sub: m.name, mon: m.species.id, shiny: m.shiny })
+    if (mine && !learned && m.owner?.mon === m) mine.hooks.banner({ kind: 'levelup', title: `Lv ${m.level}`, sub: m.name, mon: m.species.id, shiny: m.shiny })
     const sp = m.species
     if (sp.evo && sp.evoLevel && m.level >= sp.evoLevel) {
       const ratio = m.hp / m.maxHp
@@ -929,13 +1192,18 @@ export class Game {
       m.hp = Math.max(1, Math.round(ratio * m.maxHp))
       m.evolveFx = 1.4
       preloadMon(m.species.id, m.shiny)
-      if (mine) {
+      if (mine && this.mode === 'solo') {
         // Cutscene: pause the match while the evolution plays out
         this.paused = true
-        this.hooks.evolve(sp.id, m.species.id, m.shiny, () => {
+        mine.hooks.evolve(sp.id, m.species.id, m.shiny, () => {
           this.paused = false
         })
-        this.hooks.feed(`${old} evolueerde in ${m.species.name}!`, { mon: m.species.id })
+        mine.hooks.feed(`${old} evolueerde in ${m.species.name}!`, { mon: m.species.id })
+      } else if (mine) {
+        // Multiplayer can't pause for a cutscene: a banner instead
+        mine.sfx('evolve')
+        mine.hooks.banner({ kind: 'levelup', title: `${m.species.name}!`, sub: `${old} evolueerde`, mon: m.species.id, shiny: m.shiny, color: '#80e0ff' })
+        mine.hooks.feed(`${old} evolueerde in ${m.species.name}!`, { mon: m.species.id })
       }
     }
   }
@@ -944,6 +1212,11 @@ export class Game {
 
   /** Try to throw a ball. Normal balls only work on weakened wild Pokémon. */
   throwBall(tr: Trainer, w: Mon, master: boolean): boolean {
+    if (this.send) {
+      if (!tr.alive || w.catching || (!master && w.state !== 'weak') || (master && tr.masterBalls <= 0) || tr.throwFx) return false
+      this.send({ t: 'ball', w: w.id, m: master })
+      return true
+    }
     if (!tr.alive || w.owner || w.catching || this.catches.some((c) => c.tr === tr)) return false
     if (!master && w.state !== 'weak') return false
     if (master) {
@@ -984,23 +1257,25 @@ export class Game {
     w.y = tr.y + 0.4
     tr.caught++
     preloadMon(w.species.id, w.shiny)
-    if (tr.isPlayer) {
-      sfx.catch()
-      cry(w.species.id, 0.3)
+    const v = this.vOf(tr)
+    if (v) {
+      v.sfx('catch')
+      v.cry(w.species.id, 0.3)
     }
-    if (w.legendary || w.rarity === 'rare') this.hooks.feed(`${tr.isPlayer ? 'Jij' : tr.name} ving ${w.shiny ? '✦' : ''}${w.name}!`)
+    if (w.legendary || w.rarity === 'rare')
+      for (const o of this.viewers) o.hooks.feed(`${tr === o.tr ? 'Jij' : tr.name} ving ${w.shiny ? '✦' : ''}${w.name}!`)
     if (tr.party.length < PARTY_MAX) {
       tr.party.push(w)
-      if (tr.isPlayer) this.hooks.banner({ kind: 'caught', title: 'Gevangen!', sub: `${w.name} · Lv ${w.level}`, mon: w.species.id, shiny: w.shiny })
+      v?.hooks.banner({ kind: 'caught', title: 'Gevangen!', sub: `${w.name} · Lv ${w.level}`, mon: w.species.id, shiny: w.shiny })
       return
     }
-    if (tr.isPlayer) {
-      this.paused = true
-      this.hooks.partyFull(w, (idx) => {
-        if (idx >= 0) {
+    if (v) {
+      if (this.mode === 'solo') this.paused = true
+      v.hooks.partyFull(w, (idx) => {
+        if (idx >= 0 && tr.alive && !tr.party.includes(w)) {
           tr.party[idx] = w
           if (idx === tr.active) this.sendOut(tr, idx)
-          this.hooks.toast(`${w.name} zit nu in je team`, '#80e080')
+          v.hooks.toast(`${w.name} zit nu in je team`, '#80e080')
         }
         this.paused = false
       })
@@ -1016,23 +1291,30 @@ export class Game {
   usePotion(tr: Trainer): boolean {
     const m = tr.mon
     if (tr.potions <= 0 || m.fainted || m.hp >= m.maxHp) return false
+    if (this.send) {
+      this.send({ t: 'item', k: 'potion' })
+      return true
+    }
     tr.potions--
     m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.5)
-    this.fx.push({ kind: 'heal', x: m.x, y: m.y - 0.5, t: 0, life: 0.7, color: '#80f080' })
-    if (tr.isPlayer) sfx.heal()
+    this.addFx({ kind: 'heal', x: m.x, y: m.y - 0.5, t: 0, life: 0.7, color: '#80f080' })
+    this.vOf(tr)?.sfx('heal')
     return true
   }
 
   useRevive(tr: Trainer): boolean {
     const idx = tr.party.findIndex((m) => m.fainted)
     if (tr.revives <= 0 || idx < 0) return false
+    if (this.send) {
+      this.send({ t: 'item', k: 'revive' })
+      return true
+    }
     tr.revives--
     const m = tr.party[idx]
     m.hp = Math.round(m.maxHp * 0.5)
-    if (tr.isPlayer) {
-      sfx.heal()
-      this.hooks.toast(`${m.name} is weer fit!`, '#80f080')
-    }
+    const v = this.vOf(tr)
+    v?.sfx('heal')
+    v?.hooks.toast(`${m.name} is weer fit!`, '#80f080')
     return true
   }
 
@@ -1066,25 +1348,26 @@ export class Game {
   }
 
   private applyItem(tr: Trainer, kind: ItemKind) {
-    if (tr.isPlayer) sfx.pickup()
+    const v = this.vOf(tr)
+    v?.sfx('pickup')
     switch (kind) {
       case 'master':
         tr.masterBalls++
-        if (tr.isPlayer) this.hooks.toast('Master Ball gevonden! Vang elke wilde Pokémon direct', '#c080ff')
+        v?.hooks.toast('Master Ball gevonden! Vang elke wilde Pokémon direct', '#c080ff')
         break
       case 'potion':
         tr.potions++
-        if (tr.isPlayer) this.hooks.toast('Potion gevonden')
+        v?.hooks.toast('Potion gevonden')
         break
       case 'revive':
         tr.revives++
-        if (tr.isPlayer) this.hooks.toast('Revive gevonden')
+        v?.hooks.toast('Revive gevonden')
         break
       case 'candy': {
         const m = tr.mon.fainted ? tr.party.find((x) => !x.fainted) : tr.mon
         if (!m) return
         this.gainXp(m, xpNeeded(m.level) - m.xp + 0.01)
-        if (tr.isPlayer) this.hooks.toast(`Rare Candy! ${m.name} is nu Lv ${m.level}`, '#80c0ff')
+        v?.hooks.toast(`Rare Candy! ${m.name} is nu Lv ${m.level}`, '#80c0ff')
         break
       }
     }
@@ -1149,10 +1432,12 @@ export class Game {
     m.aggressive = true
     preloadMon(id, m.shiny)
     this.wilds.push(m)
-    sfx.legendary()
-    cry(id, 0.3)
-    this.hooks.banner({ kind: 'legendary', title: m.name, sub: `Legendarisch · Lv ${m.level} · zie de kaart`, mon: id, shiny: m.shiny, color: '#ffd040' })
-    this.hooks.feed(`★ ${m.name} (Lv ${m.level}) staat op de kaart`, { mon: id })
+    for (const v of this.viewers) {
+      v.sfx('legendary')
+      v.cry(id, 0.3)
+      v.hooks.banner({ kind: 'legendary', title: m.name, sub: `Legendarisch · Lv ${m.level} · zie de kaart`, mon: id, shiny: m.shiny, color: '#ffd040' })
+      v.hooks.feed(`★ ${m.name} (Lv ${m.level}) staat op de kaart`, { mon: id })
+    }
   }
 
   private updateWilds(dt: number) {
@@ -1228,7 +1513,7 @@ export class Game {
       }
       w.mvx = mx
       w.mvy = my
-      if ((mx || my) && this.onScreen(w.x, w.y)) this.stepFx(w.x, w.y, dt * 0.6)
+      if ((mx || my) && this.localSeen(w.x, w.y)) this.quiet(() => this.stepFx(w.x, w.y, dt * 0.6))
       if (mx || my) {
         if (!this.tryMove(w, mx * speed * dt, my * speed * dt, 0.3)) w.thinkT = 0
         if (w.aimT <= 0) w.dir = dirOf(mx, my)
@@ -1265,7 +1550,7 @@ export class Game {
   private removeWild(w: Mon) {
     const i = this.wilds.indexOf(w)
     if (i >= 0) this.wilds.splice(i, 1)
-    if (this.onScreen(w.x, w.y)) this.fx.push({ kind: 'poof', x: w.x, y: w.y - 0.4, t: 0, life: 0.4, color: '#ffffff' })
+    this.addFx({ kind: 'poof', x: w.x, y: w.y - 0.4, t: 0, life: 0.4, color: '#ffffff' })
   }
 
   // ---------------- Projectiles & effects ----------------
@@ -1281,7 +1566,7 @@ export class Game {
         p.vx += ((dx / d) * sp - p.vx) * k
         p.vy += ((dy / d) * sp - p.vy) * k
       }
-      if (this.onScreen(p.x, p.y)) projectileTick(this.vfx, p.move.fx, p.x, p.y, p.vx, p.vy)
+      if (this.localSeen(p.x, p.y)) this.quiet(() => projectileTick(this.vfx, p.move.fx, p.x, p.y, p.vx, p.vy))
       p.x += p.vx * dt
       p.y += p.vy * dt
       p.life -= dt
@@ -1372,7 +1657,7 @@ export class Game {
         z.fromX = z.x
         z.fromY = z.y
         z.fromR = z.r
-        this.hooks.banner({ kind: 'storm', title: 'De storm komt!', sub: `Fase ${z.phase + 1} van 6 · ga naar de witte cirkel`, color: '#c080ff' })
+        for (const v of this.viewers) v.hooks.banner({ kind: 'storm', title: 'De storm komt!', sub: `Fase ${z.phase + 1} van 6 · ga naar de witte cirkel`, color: '#c080ff' })
       }
     } else {
       const k = Math.min(1, z.t / ph.shrink)
@@ -1408,8 +1693,9 @@ export class Game {
     return w.blocked(x - r, y - r * 0.6) || w.blocked(x + r, y - r * 0.6) || w.blocked(x - r, y + r * 0.6) || w.blocked(x + r, y + r * 0.6)
   }
 
+  /** Visible on anyone's screen (worth spawning effects for). */
   onScreen(x: number, y: number) {
-    return Math.abs(x - this.camX) < 14 && Math.abs(y - this.camY) < 12
+    return this.viewers.some((v) => this.seenBy(v, x, y))
   }
 
   /** Weakened wild Pokémon the trainer can catch with a normal ball. */
