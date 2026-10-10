@@ -1,5 +1,5 @@
 import { Peer, type DataConnection, type PeerOptions } from 'peerjs'
-import type { Command, GuestMsg, HostMsg, LobbyPlayer } from './protocol'
+import type { ChatLine, Command, GuestMsg, HostMsg, LobbyPlayer } from './protocol'
 
 /**
  * A multiplayer room: one phone hosts, the others join with a 4-letter code.
@@ -33,12 +33,19 @@ export interface RoomEvents {
   command?(pid: string, c: Command): void
   /** Host only: a player disconnected. */
   left?(p: LobbyPlayer): void
+  /** Someone said something in the chat (including you). */
+  chat?(m: ChatLine): void
 }
+
+export const CHAT_MAX = 80
+const cleanChat = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX)
 
 export class Room {
   peer: Peer | null = null
   code = ''
   players: LobbyPlayer[] = []
+  /** Recent chat, oldest first. */
+  chatLog: ChatLine[] = []
   /** Host: a match is still being played. Guests get this through the lobby message. */
   running = false
   private conns = new Map<string, DataConnection>()
@@ -153,6 +160,11 @@ export class Room {
       const msg = d as GuestMsg
       this.seen.set(c, performance.now())
       if (msg.t === 'ping') return
+      if (msg.t === 'chat') {
+        const p = this.players.find((x) => x.pid === pid)
+        if (p) this.addChat({ pid, name: p.name, text: msg.text })
+        return
+      }
       if (msg.t === 'hello') {
         if (this.players.length >= MAX_PLAYERS && !this.players.some((p) => p.pid === msg.p.pid)) {
           c.send({ t: 'bye', reason: 'Dit potje zit vol.' } satisfies HostMsg)
@@ -160,7 +172,10 @@ export class Room {
           return
         }
         pid = msg.p.pid
-        this.conns.get(pid)?.close()
+        // Same player reconnecting on a new connection: drop the old one (not this one;
+        // a hello on the same connection is just a lobby update like a new team or "Klaar")
+        const old = this.conns.get(pid)
+        if (old && old !== c) old.close()
         this.conns.set(pid, c)
         const i = this.players.findIndex((p) => p.pid === pid)
         if (i >= 0) this.players[i] = msg.p
@@ -209,9 +224,33 @@ export class Room {
     this.on.lobby()
   }
 
+  /** Host: record a chat line and pass it on to everyone. */
+  private addChat(m: ChatLine) {
+    const text = cleanChat(m.text)
+    if (!text) return
+    const line = { ...m, text }
+    this.pushChat(line)
+    for (const c of this.conns.values()) if (c.open) c.send({ t: 'chat', m: line } satisfies HostMsg)
+  }
+
+  private pushChat(m: ChatLine) {
+    this.chatLog.push(m)
+    if (this.chatLog.length > 40) this.chatLog.shift()
+    this.on.chat?.(m)
+  }
+
+  /** Say something in the room chat. */
+  say(text: string) {
+    text = cleanChat(text)
+    if (!text) return
+    if (this.isHost) this.addChat({ pid: this.me.pid, name: this.me.name, text })
+    else if (this.host?.open) this.host.send({ t: 'chat', text } satisfies GuestMsg)
+  }
+
   // ---------------- guest ----------------
 
   private fromHost(msg: HostMsg) {
+    if (msg.t === 'chat') return this.pushChat(msg.m)
     if (msg.t === 'lobby') {
       this.players = msg.players
       this.running = msg.running

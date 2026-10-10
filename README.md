@@ -32,9 +32,12 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 
 Zit je naast iemand? Dan heb je zo een potje:
 
-1. Speler 1 vult een naam in en tikt **Potje maken**. Er verschijnt een code van 4 tekens en een QR-code.
-2. Speler 2 tikt **Meedoen** en typt de code, of scant de QR-code met de camera (de link opent de game en doet meteen mee).
-3. Iedereen kan in de lobby nog zijn team wijzigen. De host tikt **Start!** De lege plekken (tot 12) worden bots.
+1. Speler 1 vult in het hoofdmenu een naam in, tikt **Multiplayer** en dan **Potje maken**. Er verschijnt een code van 4 tekens en een QR-code.
+2. Speler 2 tikt **Multiplayer** en typt de code bij **Meedoen**, of scant de QR-code met de camera. De link opent de game en doet meteen mee.
+3. In de lobby kiest iedereen een trainer en Pokémon met **Team kiezen** en tikt op **Klaar**. Je ziet bij iedereen of die klaar is, en je kunt chatten (ook met snelle knoppen).
+4. Zodra iedereen klaar is, tikt de host **Start!** Iedereen ziet 8 seconden een laadscherm met tips en start dan tegelijk. De lege plekken (tot 12) worden bots.
+
+In het potje zelf kun je ook chatten via de 💬-knop (op desktop: Enter).
 
 Na afloop ga je terug naar de lobby voor een rematch, of kijk je mee tot het potje klaar is. Valt iemand weg, dan neemt een bot die trainer over.
 
@@ -57,6 +60,7 @@ Lokaal testen zonder internet: start een eigen PeerJS-server (`npx peer --port 9
 - **Herstellen:** ben je 3 seconden niet in gevecht geweest (geen schade gedaan of gekregen, niet in de storm), dan herstelt je actieve Pokémon 12% HP per seconde en je reserve-Pokémon 6%. Bewusteloze Pokémon hebben nog steeds een Revive nodig.
 - **Wilde Pokémon:** die leven in het hoge gras en zijn er in gewoon, ongewoon en zeldzaam, met een kleine kans op shiny. Er zijn er niet veel (~24 bij de start, minder naarmate de zone krimpt), maar hoe langer de match duurt, hoe vaker er zeldzame tussen zitten. Versla er een en hij is een paar seconden verzwakt: tik dan op VANG!. Twee keer per match verschijnt er op een willekeurig moment een legendarische Pokémon (ergens tussen 1:00–1:40 en 3:10–4:10), zichtbaar op de minimap.
 - **Master Ball:** daarmee vang je elke wilde Pokémon direct, dus ook een legendarische, zonder te vechten.
+- **Legendarisch alarm:** als er een legendarische Pokémon verschijnt, flitst het scherm goud. Een gouden balk bovenin toont de naam, de afstand, een pijl in de juiste richting en hoe je hem vangt.
 - **Eerlijk vangen:** wie een wilde Pokémon verslaat, mag hem eerst vangen: 3 seconden, bij een legendarische 8. Daarna mag iedereen een poging doen.
 - **Zone:** de storm krimpt in 6 fases. Daarbuiten verliest je actieve Pokémon HP.
 - **Bots:** AI-trainers met verschillende skill. Ze farmen wilde Pokémon, vangen, rapen items op, vluchten de zone in en vallen aan of vluchten afhankelijk van hun HP en level.

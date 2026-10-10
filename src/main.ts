@@ -1,7 +1,7 @@
 import './style.css'
 import { ROSTER, TEAM_SIZE } from './data/pokemon'
 import { TRAINERS, type TrainerDef } from './data/trainers'
-import { Game, INTRO_TIME, type GameHooks, type GameResult, type MatchSetup } from './game/game'
+import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
 import { render, view } from './game/render'
 import { TILE } from './game/world'
 import { Hud } from './ui/hud'
@@ -12,11 +12,12 @@ import { showRoster, showTrainerSelect } from './ui/select'
 import { showResults } from './ui/results'
 import { showEvolution } from './ui/cutscene'
 import { showLobby, showMenu, type MenuState } from './ui/menu'
+import { showLoading } from './ui/loading'
 import { wipe } from './ui/transition'
 import { playMusic, setTempo } from './music'
 import { profile } from './profile'
 import { cleanCode, Room } from './net/room'
-import type { HostMsg, LobbyPlayer } from './net/protocol'
+import type { ChatLine, HostMsg, LobbyPlayer } from './net/protocol'
 import { applyEvents, applySnapshot, initClient, recordVfx, remoteViewer, runCommand, snapshot, type RemoteViewer } from './net/sync'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
@@ -51,7 +52,7 @@ let viewing = false
 
 /** Multiplayer room, if you're in one. */
 let room: Room | null = null
-let lobbyUi: { refresh(): void } | null = null
+let lobbyUi: ReturnType<typeof showLobby> | null = null
 /** Host: remote players in the running match, by player id. */
 const remotes = new Map<string, RemoteViewer>()
 let netT = 0
@@ -66,8 +67,11 @@ function resize() {
 window.addEventListener('resize', resize)
 resize()
 
+/** Lobby: you picked a team and tapped "Klaar". */
+let ready = false
+
 function me(): LobbyPlayer {
-  return { pid: profile().id, name: profile().name || trainer.name, trainer: trainer.key, team }
+  return { pid: profile().id, name: profile().name || trainer.name, trainer: trainer.key, team, ready }
 }
 
 // ---------- Menus ----------
@@ -83,15 +87,17 @@ function toMenu(extra: Partial<MenuState> = {}) {
   playMusic('menu')
   const code = pendingJoin
   showMenu({ trainer, team, code: code || undefined, ...extra }, {
-    solo: () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), 'Start de battle ▶')),
+    solo: () => wipe(startSolo, { flash: true }),
     host: hostRoom,
     join: joinRoom,
     team: () => wipe(() => pickTeam(() => wipe(() => toMenu()), () => wipe(() => toMenu()), 'Klaar ▶')),
+    back: () => wipe(toTitle),
   })
   // Opened a shared link and we already know your name: straight in.
   if (code && profile().name && !extra.error) {
     pendingJoin = ''
-    showMenu({ trainer, team, code, busy: `Verbinden met ${code}…` }, { solo() {}, host() {}, join() {}, team() {} })
+    const none = () => {}
+    showMenu({ trainer, team, code, busy: `Verbinden met ${code}…` }, { solo: none, host: none, join: none, team: none, back: none })
     joinRoom(code)
   }
 }
@@ -131,17 +137,37 @@ function enterMatch(g: Game) {
   game = g
   viewing = true
   playMusic('battle')
-  if (g.mode !== 'client') hud = new Hud(hudRoot, g, confirmLeave)
+  if (g.mode !== 'client') hud = makeHud(g)
   if (desktop) setTimeout(() => game === g && hud?.toast('WASD lopen · klik = aanval · Q E R = krachten · Esc pauze'), INTRO_TIME * 1000 + 600)
   // Extra history entry so the phone's back button asks before leaving.
   history.pushState({ battlemon: 'game' }, '')
   guardActive = true
 }
 
+function makeHud(g: Game) {
+  return new Hud(hudRoot, g, confirmLeave, room ? { chat: (t) => room?.say(t) } : {})
+}
+
+/** Seconds of the pre-match splash with tips (everyone in a multiplayer match waits together). */
+const LOADING_TIME = 8
+
+/** Tips splash before a match; `start` drops you in afterwards. */
+function loadingThen(setup: MatchSetup, skippable: boolean, start: () => void) {
+  clearScreen()
+  playMusic('menu')
+  const players = setup.humans.map((h) => ({
+    name: h.name,
+    sprite: (TRAINERS.find((t) => t.key === h.trainer) ?? TRAINERS[0]).sprite,
+    mon: h.team[0],
+  }))
+  showLoading({ seconds: LOADING_TIME, players, skippable, bots: Math.max(0, SEATS - players.length) }, start)
+}
+
 function startSolo() {
   if (team.length !== TEAM_SIZE) return toMenu()
   const setup: MatchSetup = { seed: Date.now() % 1e9, humans: [me()] }
-  enterMatch(new Game(setup, 0, hooks(), 'solo'))
+  const g = new Game(setup, 0, hooks(), 'solo')
+  loadingThen(setup, true, () => enterMatch(g))
 }
 
 function onEnd(r: GameResult) {
@@ -173,6 +199,10 @@ function spectate() {
 function roomEvents() {
   return {
     lobby: () => lobbyUi?.refresh(),
+    chat: (m: ChatLine) => {
+      lobbyUi?.chat(m)
+      if (viewing) hud?.chatLine(m, m.pid === profile().id)
+    },
     closed: (reason: string) => {
       room = null
       remotes.clear()
@@ -237,10 +267,18 @@ function toLobby() {
     start: hostStart,
     team: () => {
       lobbyUi = null
+      // Picking a new team: not ready until you're done
+      ready = false
+      room?.updateMe(me())
       wipe(() => pickTeam(() => {
+        ready = true
         room?.updateMe(me())
         wipe(toLobby)
       }, () => wipe(toLobby), 'Klaar ▶'))
+    },
+    ready: (on) => {
+      ready = on
+      room?.updateMe(me())
     },
     leave: leaveRoom,
   })
@@ -248,6 +286,7 @@ function toLobby() {
 
 /** Leave the multiplayer room (as host this closes it for everyone) and go to the main menu. */
 function leaveRoom() {
+  ready = false
   room?.leave()
   room = null
   remotes.clear()
@@ -274,9 +313,11 @@ function hostStart() {
   }
   const roster = g.trainers.map((t) => ({ i: t.id, key: t.def.key, sprite: t.def.sprite, name: t.name, human: t.human, pid: t.pid }))
   for (const v of remotes.values()) r.sendTo(v.tr.pid, { t: 'start', setup, roster, you: v.tr.id })
+  // Everyone confirms again for the next match
+  r.players.forEach((p) => (p.ready = false))
   r.setRunning(true)
   lobbyUi = null
-  wipe(() => enterMatch(g), { flash: true })
+  loadingThen(setup, false, () => enterMatch(g))
 }
 
 /** Guest: the host started a match, or sent a state update. */
@@ -288,15 +329,17 @@ function onHostMsg(msg: HostMsg) {
     g.send = (c) => room?.command(c)
     lobbyUi = null
     pendingMatch = g
-    // Close any open picker or modal, then drop in
+    ready = false
+    if (room) room.me = me()
+    // Close any open picker or modal, then the tips splash, then drop in
     document.getElementById('modal')!.classList.add('hidden')
-    wipe(() => enterMatch(g), { flash: true })
+    loadingThen(msg.setup, false, () => enterMatch(g))
   } else if (msg.t === 's') {
     const g = game?.mode === 'client' ? game : pendingMatch
     if (!g) return
     applySnapshot(g, msg.s)
     applyEvents(g, msg.e, g.hooks, (c) => room?.command(c))
-    if (g === game && viewing && !hud && !g.over) hud = new Hud(hudRoot, g, confirmLeave)
+    if (g === game && viewing && !hud && !g.over) hud = makeHud(g)
   }
 }
 /** Guest: match that started while the wipe transition is still running. */
@@ -404,6 +447,7 @@ window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase()
   keys.add(k)
   if (e.key === 'Escape') return confirmLeave()
+  if (e.key === 'Enter' && viewing && hud?.openChat()) return e.preventDefault()
   if (!game || !hud || game.paused) return
   if (k === ' ' || k === 'tab' || k.startsWith('arrow')) e.preventDefault()
   const g = game, p = g.player

@@ -7,6 +7,9 @@ import { xpNeeded } from '../game/entities'
 import { INTRO_TIME, type Banner, type Game } from '../game/game'
 import { itemUrl } from '../game/sprites'
 import { MAP } from '../game/world'
+import type { Mon } from '../game/entities'
+import type { ChatLine } from '../net/protocol'
+import { esc, QUICK_CHAT } from './menu'
 
 const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = '') => {
   const el = document.createElement(tag)
@@ -16,7 +19,7 @@ const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = '') =
 }
 
 const BANNER_LIFE: Record<Banner['kind'], number> = {
-  go: 1100, levelup: 1600, move: 2600, legendary: 3200, ko: 2200, caught: 2200, storm: 2600, win: 3000, fainted: 2000,
+  go: 1100, levelup: 1600, move: 2600, legendary: 4200, ko: 2200, caught: 2200, storm: 2600, win: 3000, fainted: 2000,
 }
 
 export class Hud {
@@ -52,10 +55,15 @@ export class Hud {
   private countdown = h('div', 'countdown')
   private hideBadge = h('div', 'hidebadge', '<i class="eye"></i><span>Verborgen</span>')
   private cdShown = ''
+  /** Legendary alert: where it is and how to get it. */
+  private legend = h('div', 'legend hidden')
+  private legendId = -1
+  private chatBar: HTMLElement | null = null
+  private chatBtn: HTMLButtonElement | null = null
   /** Resets for every touch control, so a lost touch can never leave one stuck. */
   private releasers: (() => void)[] = []
 
-  constructor(private root: HTMLElement, private g: Game, onMenu: () => void) {
+  constructor(private root: HTMLElement, private g: Game, onMenu: () => void, opts: { chat?: (text: string) => void } = {}) {
     root.innerHTML = ''
     root.classList.remove('hidden')
     root.classList.add('intro-mode')
@@ -109,7 +117,46 @@ export class Hud {
     menu.setAttribute('aria-label', 'Pauze')
     menu.onclick = onMenu
     sys.append(menu, mute)
-    root.append(sys, this.toastEl, this.bannerEl)
+    root.append(sys, this.toastEl, this.bannerEl, this.legend)
+
+    // Multiplayer chat: a button opens quick phrases and a text field
+    if (opts.chat) {
+      const say = opts.chat
+      const btn = h('button', 'sysbtn chatbtn', '💬') as HTMLButtonElement
+      btn.setAttribute('aria-label', 'Chat')
+      const bar = h('form', 'chatbar hidden', `
+        <div class="cb-quick">${QUICK_CHAT.map((q) => `<button type="button">${q}</button>`).join('')}</div>
+        <div class="cb-row"><input maxlength="80" placeholder="Bericht…" autocomplete="off" enterkeyhint="send"><button type="submit">➤</button></div>`)
+      const input = bar.querySelector('input') as HTMLInputElement
+      const close = () => {
+        bar.classList.add('hidden')
+        input.blur()
+      }
+      btn.onclick = () => {
+        btn.classList.remove('unread')
+        if (bar.classList.toggle('hidden')) input.blur()
+      }
+      bar.addEventListener('submit', (e) => {
+        e.preventDefault()
+        say(input.value)
+        input.value = ''
+        close()
+      })
+      input.addEventListener('keydown', (e) => {
+        e.stopPropagation()
+        if (e.key === 'Escape') close()
+      })
+      bar.querySelectorAll<HTMLButtonElement>('.cb-quick button').forEach((b) =>
+        b.addEventListener('click', () => {
+          say(b.textContent!)
+          close()
+        }),
+      )
+      sys.append(btn)
+      root.append(bar)
+      this.chatBar = bar
+      this.chatBtn = btn
+    }
 
     // Items
     const items = h('div', 'items2')
@@ -241,6 +288,27 @@ export class Hud {
     this.releasers.push(reset)
   }
 
+  /** Desktop: Enter opens the chat. Returns false when there's no chat. */
+  openChat() {
+    if (!this.chatBar) return false
+    this.chatBar.classList.remove('hidden')
+    this.chatBtn?.classList.remove('unread')
+    ;(this.chatBar.querySelector('input') as HTMLInputElement).focus()
+    return true
+  }
+
+  /** A chat line in the feed (top right). */
+  chatLine(m: ChatLine, mine: boolean) {
+    const d = h('div', 'chatline', `<b>${esc(m.name)}</b> ${esc(m.text)}`)
+    this.feedEl.append(d)
+    while (this.feedEl.children.length > 5) this.feedEl.firstChild!.remove()
+    setTimeout(() => d.remove(), 8000)
+    if (!mine) {
+      sfx.blip()
+      if (this.chatBar?.classList.contains('hidden')) this.chatBtn?.classList.add('unread')
+    }
+  }
+
   /** Let go of every attack button and the joystick (e.g. when no finger is on the screen). */
   releaseAll() {
     for (const r of this.releasers) r()
@@ -330,6 +398,12 @@ export class Hud {
     el.innerHTML = `${art}<div class="txt"><small>${kicker[b.kind] ?? ''}</small><b>${b.title}</b>${b.sub ? `<span>${b.sub}</span>` : ''}</div>`
     // Only one big banner at a time; small ones stack
     const big = b.kind === 'legendary' || b.kind === 'win' || b.kind === 'storm'
+    if (b.kind === 'legendary') {
+      // Hard to miss: a golden pulse over the whole screen
+      const flash = h('div', 'legend-flash')
+      this.root.append(flash)
+      setTimeout(() => flash.remove(), 1800)
+    }
     if (big) this.bannerEl.querySelectorAll('.bn').forEach((x) => x.remove())
     this.bannerEl.append(el)
     while (this.bannerEl.children.length > 2) this.bannerEl.firstChild!.remove()
@@ -460,6 +534,7 @@ export class Hud {
 
     // Chips
     this.aliveChip.innerHTML = `<i>👤</i>${g.alive.length}`
+    this.updateLegend()
     const z = g.zone
     const t = Math.max(0, Math.ceil(z.timeLeft))
     const mm = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
@@ -467,6 +542,33 @@ export class Hud {
     this.stormChip.classList.toggle('closing', z.shrinking)
 
     this.drawMini()
+  }
+
+  /** Gold alert while a legendary roams: name, distance, an arrow toward it and how to catch it. */
+  private updateLegend() {
+    const g = this.g, p = g.player
+    const w: Mon | undefined = g.wilds.find((x) => x.legendary && !x.catching)
+    const show = !!w && p.alive && g.introT <= 0
+    this.legend.classList.toggle('hidden', !show)
+    if (!show || !w) {
+      this.legendId = -1
+      return
+    }
+    if (this.legendId !== w.id) {
+      this.legendId = w.id
+      this.legend.innerHTML = `<img class="px" src="${spriteUrl(w.species.id, { shiny: w.shiny })}" alt=""><div class="lg-txt"><b>★ ${w.name} <small>Lv ${w.level}</small></b><span></span></div><i class="lg-arrow">➤</i>`
+      this.legend.classList.remove('pop')
+      void this.legend.offsetWidth
+      this.legend.classList.add('pop')
+    }
+    const dx = w.x - p.x, dy = w.y - p.y
+    const d = Math.hypot(dx, dy)
+    ;(this.legend.querySelector('.lg-arrow') as HTMLElement).style.transform = `rotate(${Math.atan2(dy, dx)}rad)`
+    const how = w.state === 'weak'
+      ? (g.claimedByOther(w, p) ? 'Verzwakt, iemand anders mag eerst' : 'Verzwakt! Snel vangen!')
+      : p.masterBalls > 0 ? 'Gooi je Master Ball!' : 'Versla hem, of vang hem met een Master Ball'
+    ;(this.legend.querySelector('span') as HTMLElement).textContent = `${Math.round(d)} m · ${how}`
+    this.legend.classList.toggle('near', d < 6)
   }
 
   private drawMini() {

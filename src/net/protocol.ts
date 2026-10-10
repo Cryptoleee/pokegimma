@@ -7,6 +7,15 @@ export interface LobbyPlayer {
   name: string
   trainer: string
   team: number[]
+  /** Picked a team and tapped "Klaar". */
+  ready?: boolean
+}
+
+/** A chat line (lobby and in-game). */
+export interface ChatLine {
+  pid: string
+  name: string
+  text: string
 }
 
 /** Client → host while a match is running. */
@@ -45,5 +54,6 @@ export type HostMsg =
   | { t: 's'; s: unknown; e: NetEvent[] }
   | { t: 'bye'; reason: string }
   | { t: 'ping' }
+  | { t: 'chat'; m: ChatLine }
 
-export type GuestMsg = { t: 'hello'; p: LobbyPlayer } | { t: 'cmd'; c: Command } | { t: 'ping' }
+export type GuestMsg = { t: 'hello'; p: LobbyPlayer } | { t: 'cmd'; c: Command } | { t: 'ping' } | { t: 'chat'; text: string }

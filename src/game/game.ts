@@ -1462,8 +1462,8 @@ export class Game {
     for (const v of this.viewers) {
       v.sfx('legendary')
       v.cry(id, 0.3)
-      v.hooks.banner({ kind: 'legendary', title: m.name, sub: `Legendarisch · Lv ${m.level} · zie de kaart`, mon: id, shiny: m.shiny, color: '#ffd040' })
-      v.hooks.feed(`★ ${m.name} (Lv ${m.level}) staat op de kaart`, { mon: id })
+      v.hooks.banner({ kind: 'legendary', title: `${m.name} verschijnt!`, sub: `Lv ${m.level} · volg de gouden pijl · Master Ball = direct vangen`, mon: id, shiny: m.shiny, color: '#ffd040' })
+      v.hooks.feed(`★ ${m.name} (Lv ${m.level}) is verschenen! Vang hem met een Master Ball`, { mon: id })
     }
   }
 
