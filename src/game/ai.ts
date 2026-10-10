@@ -7,7 +7,8 @@ export function botThink(g: Game, tr: Trainer, dt: number) {
   const b = tr.brain!
   b.thinkT -= dt
   if (b.thinkT <= 0) {
-    b.thinkT = 0.18 + (1 - b.skill) * 0.35 + Math.random() * 0.1
+    // Bots need a moment to react, like people do (the weaker ones a bit longer)
+    b.thinkT = 0.26 + (1 - b.skill) * 0.45 + Math.random() * 0.15
     decide(g, tr)
   }
   steer(g, tr, dt)
@@ -28,12 +29,12 @@ function decide(g: Game, tr: Trainer) {
     if (best >= 0) g.switchTo(tr, best)
   }
 
-  // Free catches
+  // Free catches. Bots never spend a Master Ball on a legendary: they have to earn those.
   const weak = g.catchable(tr)
   if (weak) g.throwBall(tr, weak, false)
   if (tr.masterBalls > 0) {
     const mt = g.masterTarget(tr, 5)
-    if (mt && (mt.rarity === 'legendary' || mt.rarity === 'rare' || (mt.rarity === 'uncommon' && tr.masterBalls > 1))) g.throwBall(tr, mt, true)
+    if (mt && !mt.legendary && (mt.rarity === 'rare' || (mt.rarity === 'uncommon' && tr.masterBalls > 1))) g.throwBall(tr, mt, true)
   }
 
   // Storm first
@@ -43,9 +44,11 @@ function decide(g: Game, tr: Trainer) {
   // Threats and prey
   let foe = nearestEnemyTrainer(g, tr, 9)
   // Early game: leave other trainers alone unless they started it.
-  if (foe && g.time < 45 && m.lastHitBy !== foe) foe = null
+  if (foe && g.time < 60 && m.lastHitBy !== foe) foe = null
   let target: Mon | null = null
   b.mode = 'wander'
+  // Don't pile on: leave someone alone who's already fighting another trainer, unless they hit us
+  if (foe && m.lastHitBy !== foe && foe.mon.combatT < 3 && foe.mon.lastHitBy && foe.mon.lastHitBy !== tr && foe.mon.lastHitBy.alive) foe = null
   if (foe && !m.fainted) {
     const e = foe.mon
     const er = e.hp / e.maxHp
@@ -65,7 +68,8 @@ function decide(g: Game, tr: Trainer) {
       if (w.state === 'weak' || w.catching) continue
       const d = Math.hypot(w.x - tr.x, w.y - tr.y)
       const angry = w.aggro === m
-      const doable = ratio > 0.45 && m.level + 4 >= w.level && (!w.legendary || m.level >= w.level - 6 || tr.party.length >= 4)
+      // Legendaries are only worth it when clearly strong enough
+      const doable = ratio > 0.45 && m.level + 4 >= w.level && (!w.legendary || (ratio > 0.8 && m.level >= w.level + 2))
       if ((angry || doable) && d < bd) { bd = d; best = w }
     }
     if (best) {
@@ -99,9 +103,18 @@ function decide(g: Game, tr: Trainer) {
   // Attack whatever is in reach, even while running
   if (!m.fainted) {
     const t = target && b.mode !== 'flee' ? target : g.autoTarget(m, 6)
-    if (t && Math.random() < 0.55 + b.skill * 0.45) {
-      const slot = g.bestSlot(m, Math.hypot(t.x - m.x, t.y - m.y))
-      if (slot >= 0) g.useMove(m, slot, t)
+    if (t && Math.random() < 0.4 + b.skill * 0.45) {
+      const d = Math.hypot(t.x - m.x, t.y - m.y)
+      let slot = g.bestSlot(m, d)
+      // Weaker bots don't always pick their best move
+      if (slot > 0 && Math.random() > b.skill + 0.15 && m.cds[0] <= 0 && m.moves[0].range + 0.3 >= d) slot = 0
+      if (slot >= 0) {
+        // ...and their aim isn't perfect: sometimes they fire a bit off to the side
+        if (Math.random() < (1 - b.skill) * 0.7) {
+          const a = Math.atan2(t.y - m.y, t.x - m.x) + (Math.random() < 0.5 ? -1 : 1) * (0.45 + Math.random() * 0.4)
+          g.useMove(m, slot, null, { x: Math.cos(a), y: Math.sin(a), k: Math.min(1, d / Math.max(1, m.moves[slot].range)) })
+        } else g.useMove(m, slot, t)
+      }
     }
   }
 

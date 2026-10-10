@@ -105,6 +105,7 @@ function monState(m: Mon, own: boolean) {
   if (m.joltT > 0) o.jt = r2(m.joltT)
   if (m.liftT > 0) o.lt = r2(m.liftT)
   if (m.state === 'weak') o.wk = r1(m.weakT)
+  if (m.claimT > 0 && m.claim) o.cl = [m.claim.id, r1(m.claimT)]
   if (m.catching) o.ca = 1
   if (m.dash) o.ds = [r2(m.dash.vx), r2(m.dash.vy), r2(m.dash.t), m.dash.move.name, m.dash.strike ? 1 : 0]
   if (m.charging) o.ch = [m.charging.move.name, r2(m.charging.t), m.charging.total]
@@ -274,6 +275,9 @@ function getMon(cs: ClientState, o: Record<string, number & string & unknown[]>,
   m.joltT = o.jt ?? 0
   m.liftT = o.lt ?? 0
   m.weakT = o.wk ?? 0
+  const cl = o.cl as unknown as [number, number] | undefined
+  m.claim = cl ? cs.trainers.get(cl[0]) ?? null : null
+  m.claimT = cl ? cl[1] : 0
   m.catching = !!o.ca
   const ds = o.ds as unknown as [number, number, number, string, number] | undefined
   m.dash = ds ? { vx: ds[0], vy: ds[1], t: ds[2], move: moveByName(ds[3]), hit: new Set(), strike: !!ds[4] } : null

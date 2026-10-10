@@ -91,6 +91,9 @@ export class Mon {
   thinkT = 0
   aggressive = false
   legendary = false
+  /** Weakened wild: reserved for this trainer (who knocked it out) for claimT seconds. */
+  claim: Trainer | null = null
+  claimT = 0
 
   constructor(id: number, level: number, shiny = false) {
     this.species = SPECIES[id]
@@ -172,6 +175,8 @@ export class Trainer {
   /** Remote player's last input strength (drives the follow behaviour of their Pokémon). */
   netMoving = 0
   regenFxT = 0
+  /** Bots: wait before throwing another ball after a legendary broke free. */
+  catchCd = 0
   /** Who this player is watching after being knocked out. */
   spectate: Trainer | null = null
   /** Throw animation (Poké Ball / Master Ball). */

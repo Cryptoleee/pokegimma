@@ -210,6 +210,13 @@ const REGEN_BENCH = 0.06
 /** Trainers per match; empty seats are filled with bots. */
 export const SEATS = 12
 const DMG_SCALE = 1.25
+const BOT_XP = 0.8
+/** Seconds a weakened wild Pokémon is reserved for whoever knocked it out (legendaries longer). */
+const CLAIM_TIME = 3
+const CLAIM_TIME_LEGEND = 8
+/** Chance a bot's normal ball holds a legendary; on a miss it has to wait before trying again. */
+const BOT_LEGEND_CATCH = 0.35
+const BOT_RETRY = 5
 
 export class Game {
   rng: Rng
@@ -320,7 +327,7 @@ export class Game {
   /** AI takes over a trainer (bots, or a player who disconnected). */
   giveBrain(tr: Trainer) {
     tr.brain = {
-      skill: this.rng.range(0.45, 0.95), thinkT: 0, goalX: 0, goalY: 0, target: null,
+      skill: this.rng.range(0.3, 0.85), thinkT: 0, goalX: 0, goalY: 0, target: null,
       lastX: 0, lastY: 0, stuckT: 0, mode: 'wander', strafe: this.rng.chance(0.5) ? 1 : -1,
     }
   }
@@ -1093,6 +1100,9 @@ export class Game {
       m.state = 'weak'
       m.weakT = m.legendary ? 15 : 9
       m.aggro = null
+      // Whoever knocked it out gets first dibs: no stealing someone else's catch
+      m.claim = by?.owner ?? null
+      m.claimT = m.legendary ? CLAIM_TIME_LEGEND : CLAIM_TIME
       if (by?.owner) this.gainXp(by, koXp)
       if (m.legendary) for (const v of this.viewers) v.hooks.feed(`${m.name} is verzwakt! Vang hem snel!`)
       return
@@ -1162,7 +1172,8 @@ export class Game {
 
   gainXp(m: Mon, amount: number) {
     if (m.level >= LEVEL_CAP || !m.owner) return
-    m.xp += amount
+    // Bots fight nonstop; a lower XP rate keeps them from out-levelling people
+    m.xp += m.owner.brain ? amount * BOT_XP : amount
     while (m.xp >= xpNeeded(m.level) && m.level < LEVEL_CAP) {
       m.xp -= xpNeeded(m.level)
       this.levelUp(m)
@@ -1218,7 +1229,8 @@ export class Game {
       return true
     }
     if (!tr.alive || w.owner || w.catching || this.catches.some((c) => c.tr === tr)) return false
-    if (!master && w.state !== 'weak') return false
+    if (!master && (w.state !== 'weak' || this.claimedByOther(w, tr))) return false
+    if (tr.catchCd > 0) return false
     if (master) {
       if (tr.masterBalls <= 0) return false
       tr.masterBalls--
@@ -1230,7 +1242,13 @@ export class Game {
     return true
   }
 
+  /** A weakened wild Pokémon still reserved for the trainer who knocked it out. */
+  claimedByOther(w: Mon, tr: Trainer) {
+    return w.claimT > 0 && !!w.claim && w.claim !== tr && w.claim.alive
+  }
+
   private updateCatches(dt: number) {
+    for (const tr of this.trainers) tr.catchCd = Math.max(0, tr.catchCd - dt)
     for (const c of [...this.catches]) {
       c.t -= dt
       if (c.tr.throwFx) c.tr.throwFx.t += dt
@@ -1239,6 +1257,15 @@ export class Game {
       c.tr.throwFx = null
       if (!c.tr.alive) {
         c.mon.catching = false
+        continue
+      }
+      // Legendaries often break out of a bot's normal ball
+      if (c.tr.brain && c.mon.legendary && !c.master && !this.rng.chance(BOT_LEGEND_CATCH)) {
+        c.mon.catching = false
+        c.tr.catchCd = BOT_RETRY
+        this.sfxAt(c.mon.x, c.mon.y, 'faint')
+        this.addFx({ kind: 'poof', x: c.mon.x, y: c.mon.y - 0.4, t: 0, life: 0.4, color: '#ffffff' })
+        this.addFx({ kind: 'text', x: c.mon.x, y: c.mon.y - 1.6, t: 0, life: 0.9, color: '#ffd040', text: 'Uitgebroken!', small: true })
         continue
       }
       this.completeCatch(c.tr, c.mon)
@@ -1452,6 +1479,7 @@ export class Game {
       w.liftT = Math.max(0, w.liftT - dt)
       if (w.catching) continue
       if (w.state === 'weak') {
+        w.claimT = Math.max(0, w.claimT - dt)
         w.weakT -= dt
         if (w.weakT <= 0) this.removeWild(w)
         continue
@@ -1702,7 +1730,7 @@ export class Game {
   catchable(tr: Trainer): Mon | null {
     let best: Mon | null = null, bd = 2.8
     for (const w of this.wilds) {
-      if (w.state !== 'weak' || w.catching) continue
+      if (w.state !== 'weak' || w.catching || this.claimedByOther(w, tr)) continue
       const d = Math.min(Math.hypot(w.x - tr.x, w.y - tr.y), Math.hypot(w.x - tr.mon.x, w.y - tr.mon.y))
       if (d < bd) { bd = d; best = w }
     }
