@@ -74,6 +74,10 @@ export const sfx = {
   select() {
     tone(990, 0.05, 'square', 0.035)
   },
+  /** Text scroll blip, like BW dialogue boxes. */
+  blip() {
+    tone(1320, 0.025, 'square', 0.018)
+  },
   legendary() {
     ;[220, 277, 330, 440].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.04, 0, i * 0.18))
   },

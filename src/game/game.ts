@@ -1,4 +1,4 @@
-import { PARTY_MAX, ROSTER, SPECIES, WILD, type Rarity } from '../data/pokemon'
+import { PARTY_MAX, ROSTER, SPECIES, TEAM_SIZE, WILD, type Rarity } from '../data/pokemon'
 import { movesetFor, SLOT_UNLOCK, type Move, type MoveFx } from '../data/moves'
 import { Vfx } from './vfx'
 import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpact, onMelee, onZap, pal, projectileEnd, projectileTick } from './moveFx'
@@ -189,7 +189,7 @@ export class Game {
       const def = bots[i % bots.length]
       const bot = new Trainer(def, def.name, false)
       const pool = [...ROSTER].sort(() => this.rng.next() - 0.5)
-      bot.party = pool.slice(0, 3).map((id) => this.ownMon(new Mon(id, 5), bot))
+      bot.party = pool.slice(0, TEAM_SIZE).map((id) => this.ownMon(new Mon(id, 5), bot))
       bot.brain = {
         skill: this.rng.range(0.45, 0.95), thinkT: 0, goalX: 0, goalY: 0, target: null,
         lastX: 0, lastY: 0, stuckT: 0, mode: 'wander', strafe: this.rng.chance(0.5) ? 1 : -1,

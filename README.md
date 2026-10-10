@@ -4,7 +4,7 @@ Een real-time Pokémon battle royale voor de browser, mobile first, in de stijl 
 
 **Speel:** https://pokegimma.vercel.app
 
-Je kiest een trainer en drie Pokémon uit een roster van 12. Daarna word je gedropt op een grote kaart samen met 11 andere trainers. Je Pokémon loopt achter je aan en vecht in real time. Versla en vang wilde Pokémon, raap Master Balls en items op en blijf binnen de zone. Wie als laatste trainer overblijft, wint.
+Na een korte uitleg kies je een trainer en één partner-Pokémon uit een roster van 12; in de wereld vang je er nog twee bij (max. 3). Daarna word je gedropt op een grote kaart samen met 11 andere trainers. Je Pokémon loopt achter je aan en vecht in real time. Versla en vang wilde Pokémon, raap Master Balls en items op en blijf binnen de zone. Wie als laatste trainer overblijft, wint.
 
 ## Spelen
 
@@ -25,6 +25,7 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 | Pokémon wisselen | Tik op een Pokémon in je team (linksboven) | Q |
 | Vangen (verzwakte wilde Pokémon) | VANG!-knop | E / spatie |
 | Master Ball / Potion / Revive | Itemknoppen | M / R / F |
+| Pauze / game verlaten | ❚❚-knop of de terugknop van je telefoon (vraagt eerst om bevestiging) | Esc |
 
 ## Hoe het werkt
 

@@ -1,5 +1,5 @@
 import { movesetFor, SLOT_UNLOCK } from '../data/moves'
-import { animatedUrl, ROSTER, SPECIES, spriteUrl, TEAM_SIZE, type Species } from '../data/pokemon'
+import { animatedUrl, PARTY_MAX, ROSTER, SPECIES, spriteUrl, TEAM_SIZE, type Species } from '../data/pokemon'
 import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
 import { TYPE_COLOR, TYPE_NL } from '../data/types'
 import { sfx, unlockAudio } from '../audio'
@@ -79,8 +79,8 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
   let focus = team[0] ?? ROSTER[0]
   el.innerHTML = `
     <div class="menu">
-      <h1>Kies ${TEAM_SIZE} Pokémon</h1>
-      <div class="hint">Ze levelen en evolueren hoe langer je overleeft. In de wereld kun je er meer vangen.</div>
+      <h1>Kies je partner</h1>
+      <div class="hint">Je partner levelt en evolueert hoe langer je overleeft. In de wereld vang je er nog ${PARTY_MAX - TEAM_SIZE} bij.</div>
       <div class="grid roster">
         ${ROSTER.map((id) => {
           const sp = SPECIES[id]
@@ -106,7 +106,7 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
       const i = team.indexOf(id)
       c.classList.toggle('sel', i >= 0)
       c.querySelector('.badge')?.remove()
-      if (i >= 0) c.insertAdjacentHTML('beforeend', `<div class="badge">${i + 1}</div>`)
+      if (i >= 0) c.insertAdjacentHTML('beforeend', `<div class="badge">${TEAM_SIZE === 1 ? '✓' : i + 1}</div>`)
     })
     el.querySelector('#team')!.innerHTML = Array.from({ length: TEAM_SIZE }, (_, i) =>
       team[i] ? `<div class="slot on"><img src="${spriteUrl(team[i])}" alt=""></div>` : `<div class="slot"></div>`,
@@ -138,7 +138,8 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
       const id = Number(c.dataset.id)
       focus = id
       const i = team.indexOf(id)
-      if (i >= 0) team.splice(i, 1)
+      if (i >= 0 && TEAM_SIZE > 1) team.splice(i, 1)
+      else if (i >= 0) return paint()
       else if (team.length < TEAM_SIZE) team.push(id)
       else team[TEAM_SIZE - 1] = id
       sfx.select()
@@ -196,6 +197,35 @@ export function showResults(r: GameResult, onAgain: () => void, onMenu: () => vo
     </div>`
   el.querySelector('#again')!.addEventListener('click', onAgain)
   el.querySelector('#menu')!.addEventListener('click', onMenu)
+}
+
+/** Pause-style confirmation before leaving a running match. */
+export function showLeaveConfirm(onStay: () => void, onLeave: () => void) {
+  const modal = document.getElementById('modal')!
+  modal.classList.remove('hidden')
+  modal.innerHTML = `
+    <div class="panel">
+      <h2>Game verlaten?</h2>
+      <p>Weet je zeker dat je wilt stoppen? Je voortgang in deze match gaat verloren.</p>
+      <div class="actions">
+        <button class="btn" id="stay">Verder spelen</button>
+        <button class="btn red" id="leave">Verlaten</button>
+      </div>
+    </div>`
+  const close = () => {
+    modal.classList.add('hidden')
+    modal.innerHTML = ''
+  }
+  modal.querySelector('#stay')!.addEventListener('click', () => {
+    sfx.select()
+    close()
+    onStay()
+  })
+  modal.querySelector('#leave')!.addEventListener('click', () => {
+    sfx.select()
+    close()
+    onLeave()
+  })
 }
 
 export function clearScreen() {

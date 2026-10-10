@@ -34,7 +34,7 @@ export class Hud {
   private knob = h('div', 'stick-knob')
   private base = h('div', 'stick-base hidden')
 
-  constructor(private root: HTMLElement, private g: Game) {
+  constructor(private root: HTMLElement, private g: Game, onMenu: () => void) {
     root.innerHTML = ''
     root.classList.remove('hidden')
 
@@ -72,7 +72,10 @@ export class Hud {
       setMuted(!isMuted())
       mute.innerHTML = isMuted() ? '🔇' : '🔊'
     }
-    root.append(mute, this.toastEl)
+    const menu = h('button', 'menu-btn', '❚❚')
+    menu.setAttribute('aria-label', 'Menu')
+    menu.onclick = onMenu
+    root.append(mute, menu, this.toastEl)
 
     // Items
     const items = h('div', 'items')

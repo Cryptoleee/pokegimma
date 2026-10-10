@@ -4,7 +4,8 @@ import { TRAINERS, type TrainerDef } from './data/trainers'
 import { Game } from './game/game'
 import { render } from './game/render'
 import { Hud } from './ui/hud'
-import { clearScreen, showPartyFull, showResults, showRoster, showTitle, showTrainerSelect } from './ui/screens'
+import { clearScreen, showLeaveConfirm, showPartyFull, showResults, showRoster, showTitle, showTrainerSelect } from './ui/screens'
+import { showIntro } from './ui/intro'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
@@ -43,7 +44,7 @@ resize()
 
 function toTitle() {
   stopGame()
-  showTitle(toTrainer)
+  showTitle(() => showIntro(toTrainer))
 }
 
 function toTrainer() {
@@ -76,9 +77,62 @@ function startGame() {
       showResults(r, startGame, toRoster)
     },
   })
-  hud = new Hud(hudRoot, game)
+  hud = new Hud(hudRoot, game, confirmLeave)
   hud.toast('Overleef! Versla wilde Pokémon om sneller te levelen', '#80c0ff')
+  // Extra history entry so the phone's back button asks before leaving.
+  history.pushState({ battlemon: 'game' }, '')
+  guardActive = true
 }
+
+// ---------- Leaving a running match ----------
+
+let guardActive = false
+let confirming = false
+const inMatch = () => !!game && !game.over
+
+function confirmLeave() {
+  if (!inMatch() || confirming) return
+  const g = game!
+  const wasPaused = g.paused
+  g.paused = true
+  g.held.fill(false)
+  g.input.mx = g.input.my = 0
+  confirming = true
+  showLeaveConfirm(
+    () => {
+      confirming = false
+      if (game === g) g.paused = wasPaused
+    },
+    () => {
+      confirming = false
+      leaveMatch()
+    },
+  )
+}
+
+function leaveMatch() {
+  if (guardActive) {
+    guardActive = false
+    history.back()
+  }
+  toRoster()
+}
+
+window.addEventListener('popstate', () => {
+  if (!guardActive) return
+  if (inMatch()) {
+    // Swallow the back press and ask first.
+    history.pushState({ battlemon: 'game' }, '')
+    confirmLeave()
+  } else guardActive = false
+})
+
+window.addEventListener('beforeunload', (e) => {
+  if (inMatch()) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+})
 
 function stopGame() {
   hud?.destroy()
@@ -92,7 +146,8 @@ function stopGame() {
 const keys = new Set<string>()
 window.addEventListener('keydown', (e) => {
   keys.add(e.key.toLowerCase())
-  if (!game || !hud) return
+  if (e.key === 'Escape') return confirmLeave()
+  if (!game || !hud || game.paused) return
   const g = game, p = g.player
   const k = e.key.toLowerCase()
   const slot = ['j', 'k', 'l', ';'].indexOf(k) >= 0 ? ['j', 'k', 'l', ';'].indexOf(k) : ['1', '2', '3', '4'].indexOf(k)

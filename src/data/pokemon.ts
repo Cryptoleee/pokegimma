@@ -139,8 +139,9 @@ for (const [id, name, types, hp, atk, def, spe, evo, evoLevel] of ROWS) {
 
 /** The 12 Pokémon you pick your starting team from. */
 export const ROSTER = [25, 4, 7, 1, 133, 495, 498, 501, 447, 443, 570, 610]
-export const TEAM_SIZE = 3
-export const PARTY_MAX = 6
+/** You start with one partner and can catch more in the world, up to PARTY_MAX. */
+export const TEAM_SIZE = 1
+export const PARTY_MAX = 3
 
 export const WILD: Record<Rarity, number[]> = {
   common: [504, 506, 509, 519, 540, 543, 524, 527, 535, 522, 16, 19, 41, 74, 129, 10],
