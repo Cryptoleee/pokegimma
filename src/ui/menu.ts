@@ -168,8 +168,10 @@ export function showLobby(room: Room, on: LobbyActions) {
 
   const list = el.querySelector('.lb-list') as HTMLElement
   const start = el.querySelector('.lb-start') as HTMLButtonElement
+  const head = el.querySelector('.sel-title small') as HTMLElement
   const refresh = () => {
     const bots = Math.max(0, SEATS - room.players.length)
+    head.textContent = `${room.isHost ? 'JOUW POTJE' : 'LOBBY'} · ${room.players.length}/${MAX_PLAYERS} SPELERS`
     list.innerHTML = room.players.map((p, i) => {
       const tr = TRAINERS.find((t) => t.key === p.trainer) ?? TRAINERS[0]
       const me = p.pid === room.me.pid

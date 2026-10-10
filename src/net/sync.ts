@@ -87,6 +87,11 @@ export function recordVfx(g: Game) {
   }) as Vfx
 }
 
+/** Bare minimum for things far off-screen: who it is and roughly where. */
+function farMon(m: Mon) {
+  return { i: m.id, s: m.species.id, l: m.level, hp: r1(m.hp), x: r1(m.x), y: r1(m.y), ...(m.shiny ? { sh: 1 } : {}) }
+}
+
 function monState(m: Mon, own: boolean) {
   const o: Record<string, unknown> = {
     i: m.id, s: m.species.id, l: m.level, hp: r1(m.hp), x: r2(m.x), y: r2(m.y), d: DIRS.indexOf(m.dir),
@@ -114,10 +119,15 @@ function monState(m: Mon, own: boolean) {
 /** Everything one remote player needs to draw the match right now. */
 export function snapshot(g: Game, v: RemoteViewer) {
   const me = v.tr
+  // Full detail only for what's around this player's camera; far away things get the bare minimum.
+  // Keeps each update small, so a host can serve a full lobby.
+  const near = (x: number, y: number) => Math.abs(x - v.camX) < 20 && Math.abs(y - v.camY) < 15
   const mons: Record<string, unknown>[] = []
   const trs = g.trainers.map((tr) => {
     const m = tr.mon
-    if (tr !== me) mons.push(monState(m, false))
+    const close = near(tr.x, tr.y) || near(m.x, m.y)
+    if (tr !== me) mons.push(close ? monState(m, false) : farMon(m))
+    if (!close) return { i: tr.id, x: r1(tr.x), y: r1(tr.y), a: tr.alive ? 1 : 0, m: m.id, pl: tr.place }
     const o: Record<string, unknown> = {
       i: tr.id, x: r2(tr.x), y: r2(tr.y), d: DIRS.indexOf(tr.dir), f: tr.faceRight ? 1 : 0, w: r1(tr.walkT),
       a: tr.alive ? 1 : 0, rv: r2(tr.revealT), m: m.id, pl: tr.place,
@@ -129,12 +139,14 @@ export function snapshot(g: Game, v: RemoteViewer) {
     return o
   })
   for (const m of me.party) mons.push(monState(m, true))
-  for (const w of g.wilds) mons.push(monState(w, false))
+  // Wild Pokémon: nearby ones, plus legendaries (they're on everyone's minimap)
+  const wilds = g.wilds.filter((w) => w.legendary || near(w.x, w.y))
+  for (const w of wilds) mons.push(near(w.x, w.y) ? monState(w, false) : farMon(w))
   const z = g.zone
   const snap: Record<string, unknown> = {
-    t: r2(g.time), tr: trs, m: mons, w: g.wilds.map((w) => w.id),
-    p: g.projs.map((p) => [r2(p.x), r2(p.y), r2(p.vx), r2(p.vy), r2(p.life), p.move.name, r2(p.seed)]),
-    n: g.novas.map((n) => [r2(n.x), r2(n.y), r2(n.t), n.total, n.move.name, n.r, r2(n.sx), r2(n.sy)]),
+    t: r2(g.time), tr: trs, m: mons, w: wilds.map((w) => w.id),
+    p: g.projs.filter((p) => near(p.x, p.y)).map((p) => [r2(p.x), r2(p.y), r2(p.vx), r2(p.vy), r2(p.life), p.move.name, r2(p.seed)]),
+    n: g.novas.filter((n) => near(n.x, n.y)).map((n) => [r2(n.x), r2(n.y), r2(n.t), n.total, n.move.name, n.r, r2(n.sx), r2(n.sy)]),
     z: [r2(z.x), r2(z.y), r2(z.r), r2(z.nx), r2(z.ny), z.nr, z.phase, r2(z.t), z.shrinking ? 1 : 0, r2(z.fromX), r2(z.fromY), r2(z.fromR)],
     me: {
       p: me.party.map((m) => m.id), ac: me.active, mb: me.masterBalls, po: me.potions, re: me.revives,
@@ -248,12 +260,12 @@ function getMon(cs: ClientState, o: Record<string, number & string & unknown[]>,
   m.owner = owner
   m.level = o.l
   m.hp = o.hp
-  m.dir = DIRS[o.d]
-  m.aimX = o.ax
-  m.aimY = o.ay
-  m.aimT = o.at
-  m.revealT = o.rv
-  m.state = STATES[o.st]
+  m.dir = DIRS[o.d] ?? m.dir
+  m.aimX = o.ax ?? m.aimX
+  m.aimY = o.ay ?? m.aimY
+  m.aimT = o.at ?? 0
+  m.revealT = o.rv ?? 0
+  m.state = STATES[o.st] ?? 'roam'
   m.castT = o.ct ?? 0
   m.flash = o.fl ?? 0
   m.evolveFx = o.ev ?? 0
@@ -305,15 +317,17 @@ export function applySnapshot(g: Game, raw: unknown) {
     const tr = cs.trainers.get(t.i)
     if (!tr) continue
     tr.alive = !!t.a
-    tr.revealT = t.rv
+    tr.revealT = t.rv ?? 0
     tr.place = t.pl
     const th = t.th as unknown as number[] | undefined
     tr.throwFx = th ? { x: th[0], y: th[1], tx: th[2], ty: th[3], t: th[4], master: !!th[5] } : null
     // You move yourself; only snap back if the host disagrees a lot (blocked or lagged out)
     if (tr === me && cs.placed && tr.alive && Math.hypot(t.x - tr.x, t.y - tr.y) < 3) continue
-    tr.dir = DIRS[t.d]
-    tr.faceRight = !!t.f
-    tr.walkT = t.w
+    if (t.d !== undefined) {
+      tr.dir = DIRS[t.d]
+      tr.faceRight = !!t.f
+      tr.walkT = t.w
+    }
     if (tr === me) {
       tr.x = t.x
       tr.y = t.y

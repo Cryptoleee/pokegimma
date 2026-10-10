@@ -41,6 +41,7 @@ Na afloop ga je terug naar de lobby voor een rematch, of kijk je mee tot het pot
 **Hoe het technisch werkt:** de telefoons praten rechtstreeks met elkaar via WebRTC; PeerJS helpt ze alleen elkaar te vinden. Er is dus geen eigen gameserver nodig.
 - **De host** rekent het hele potje uit: bots, wilde Pokémon, schade en de storm. Hij stuurt 20× per seconde de stand naar de anderen, met de effecten, geluiden en banners die zij moeten zien.
 - **Je eigen trainer** beweegt lokaal, zodat lopen direct aanvoelt.
+- **Elke speler krijgt alleen details van wat in de buurt is,** plus het minimum van de rest (positie, of iemand nog leeft, legendarische Pokémon voor de minimap). Dat is ~30 KB/s per medespeler. Getest met 8 spelers tegelijk; een potje kan er 12 hebben.
 - **De host moet de game open houden.** Gaat het scherm van de host op slot, dan staat het potje stil.
 
 Je naam en een willekeurige speler-id worden op je toestel bewaard (`src/profile.ts`). Een account/inlog kan dat later vervangen.
