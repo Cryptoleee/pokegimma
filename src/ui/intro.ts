@@ -53,7 +53,7 @@ const SLIDES: Slide[] = [
         <div class="t-mode raid"><b>Raid</b><small>samen tegen een eindbaas</small></div>
       </div>
       <div class="t-spark"><i></i><i></i><i></i><i></i><i></i></div>`,
-    text: 'Welkom bij BattleMon Royale! Ik ben Professor Juniper. Je kunt op twee manieren spelen: een Battle Royale, waarin je als laatste trainer overblijft, of een Raid, waarin je samen een eindbaas verslaat.',
+    text: 'Welkom bij Stormbreak Royale! Ik ben Professor Juniper. Je kunt op twee manieren spelen: een Battle Royale, waarin je als laatste trainer overblijft, of een Raid, waarin je samen een eindbaas verslaat.',
   },
   {
     title: 'Je partner',

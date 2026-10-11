@@ -1,4 +1,4 @@
-# BattleMon Royale
+# Stormbreak Royale
 
 Een real-time Pokémon battle royale voor de browser, mobile first, in de stijl van Black/White.
 

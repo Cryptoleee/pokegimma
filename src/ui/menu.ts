@@ -85,7 +85,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
     <div class="home">
       <div class="home-top">
         <button class="sel-back" aria-label="Terug naar het titelscherm">◀</button>
-        <div class="home-logo"><b>BATTLEMON</b><span>ROYALE</span></div>
+        <div class="home-logo"><b>STORM<i>BREAK</i></b><span>ROYALE</span></div>
       </div>
       <div class="home-stage">
         <div class="hs-bg"></div>
@@ -349,7 +349,7 @@ export function showLobby(room: Room, on: LobbyActions) {
   const share = el.querySelector('.lb-share') as HTMLButtonElement
   share.addEventListener('click', async () => {
     sfx.select()
-    const data = { title: 'BattleMon Royale', text: `Doe mee met mijn potje! Code ${room.code}`, url: room.link }
+    const data = { title: 'Stormbreak Royale', text: `Doe mee met mijn potje! Code ${room.code}`, url: room.link }
     try {
       if (navigator.share) await navigator.share(data)
       else {
