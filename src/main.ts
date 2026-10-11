@@ -1,4 +1,5 @@
 import { moveByName } from './data/moves'
+import { preloadVoice, voiceLog } from './voice'
 import './style.css'
 import { ROSTER, TEAM_SIZE } from './data/pokemon'
 import { BOSS_LIST, type BossId } from './data/bosses'
@@ -30,6 +31,9 @@ import { applyEvents, applySnapshot, initClient, recordVfx, remoteViewer, runCom
 const canvas = document.getElementById('game') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
 const hudRoot = document.getElementById('hud')!
+
+// Fetch the announcer's lines in the background
+preloadVoice()
 
 const store = {
   get<T>(k: string, d: T): T {
@@ -741,6 +745,6 @@ function frame(now: number) {
 requestAnimationFrame(frame)
 
 // Handy for debugging from the console.
-;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game }, get room() { return room }, get music() { return currentMusic() }, remotes, snapshot, sound: { move: moveByName, namePitch, cast: playMoveCast, hit: playMoveHit, charge: playMoveCharge, item: playItem, reset: resetSfx } }
+;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game }, get room() { return room }, get music() { return currentMusic() }, remotes, snapshot, voiceLog, sound: { move: moveByName, namePitch, cast: playMoveCast, hit: playMoveHit, charge: playMoveCharge, item: playItem, reset: resetSfx } }
 
 toTitle()

@@ -127,6 +127,9 @@ Nieuwe bazen zijn vooral data: een rij in `src/data/bosses.ts` met hun aanvallen
 ## Presentatie
 
 - **Soundtrack:** "Castelia Nights", eigen muziek in Black/White-stijl die live in de browser wordt gespeeld door een kleine DS-achtige synth (`src/synth.ts`): pulse-lead, marimba, synthbas, strijkers, drums en galm. Er zijn nummers voor het titelscherm, het menu, de battle royale (versnelt in de finale), de raid-baas (versnelt in de laatste fase), overwinning en nederlaag. Twee alternatieve sets staan in `src/data/soundtracks.ts`. Plus Pokémon-cries via PokéAPI.
+- **Geluidseffecten:** elke aanval heeft een eigen gesynthetiseerd geluid (`src/moveSfx.ts`): de klank van het type, de vorm van de aanval en zwaarder naarmate de aanval sterker is. Geluiden van anderen komen uit de goede richting en worden zachter op afstand. Items (potion, revive, ballen, oppakken) hebben ook hun eigen geluid.
+- **Omroeper:** een stem met een Japans accent (ElevenLabs, `src/assets/voice/`, afgespeeld door `src/voice.ts`) roept het titelscherm, het aftellen, de storm, legendarische Pokémon, K.O.'s, raid-fases en winst of verlies om. De muziek gaat even zachter terwijl hij praat.
+- **Opties:** via ⚙️ in het menu zet je muziek, stemmen en geluidseffecten los aan of uit; de keuze wordt onthouden.
 - **Cinematisch:** een titelscherm met Zekrom en Reshiram, Black/White-schermovergangen, keuzeschermen als podium, een drop-in met aftelling bij de start, een evolutie-cutscene, banners voor level-ups, nieuwe aanvallen, legendarische Pokémon en KO's, en een resultaatscherm met confetti.
 - **Wereld:** weer per wereld (sneeuw, zand, as, gloeiende vonken, vuurvliegjes), wolkschaduwen, golvend en glinsterend water, ritselend gras, stofwolkjes, zwevende pollen, een gloeiende stormmuur met bliksem en regen, en een vignet.
 

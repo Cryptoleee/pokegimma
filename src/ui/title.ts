@@ -1,5 +1,6 @@
 import { animatedUrl } from '../data/pokemon'
 import { sfx, unlockAudio } from '../audio'
+import { say } from '../voice'
 import { playMusic } from '../music'
 import logoUrl from '../assets/stormbreak-logo.webp'
 
@@ -179,6 +180,7 @@ export function showTitle(onStart: () => void): () => void {
   el.querySelector('.title2')!.addEventListener('click', () => {
     unlockAudio()
     playMusic('title')
+    say('title')
     sfx.select()
     cleanup()
     onStart()

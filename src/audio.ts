@@ -10,21 +10,47 @@ export function unlockAudio() {
   if (ctx.state === 'suspended') void ctx.resume()
 }
 
-const muteListeners: ((m: boolean) => void)[] = []
+/** Sound channels the player can switch on and off in the options. */
+export type Channel = 'music' | 'voice' | 'sfx'
+const PREFS_KEY = 'battlemon:audio'
+const prefs: Record<Channel, boolean> = { music: true, voice: true, sfx: true }
+try {
+  Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}'))
+} catch {
+  /* private mode */
+}
 
+const listeners: (() => void)[] = []
+const notify = () => listeners.forEach((f) => f())
+
+/** The in-game speaker button: silences everything at once. */
 export function setMuted(m: boolean) {
   muted = m
-  muteListeners.forEach((f) => f(m))
+  notify()
 }
-export function onMuteChange(f: (m: boolean) => void) {
-  muteListeners.push(f)
+export function setChannel(c: Channel, on: boolean) {
+  prefs[c] = on
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
+  } catch {
+    /* private mode */
+  }
+  notify()
+}
+/** Whether a channel's switch is on (ignores the speaker button). */
+export const channelPref = (c: Channel) => prefs[c]
+/** Whether a channel is audible right now. */
+export const channelOn = (c: Channel) => !muted && prefs[c]
+export function onAudioChange(f: () => void) {
+  listeners.push(f)
 }
 /** Shared AudioContext (null until the first user gesture). */
 export const audioCtx = () => ctx
 export const isMuted = () => muted
+const sfxOff = () => !channelOn('sfx')
 
 function tone(freq: number, dur: number, type: OscillatorType = 'square', vol = 0.06, slide = 0, delay = 0) {
-  if (!ctx || muted) return
+  if (!ctx || sfxOff()) return
   const t = ctx.currentTime + delay
   const o = ctx.createOscillator()
   const g = ctx.createGain()
@@ -39,7 +65,7 @@ function tone(freq: number, dur: number, type: OscillatorType = 'square', vol = 
 }
 
 function noise(dur: number, vol = 0.05) {
-  if (!ctx || muted) return
+  if (!ctx || sfxOff()) return
   const len = Math.floor(ctx.sampleRate * dur)
   const buf = ctx.createBuffer(1, len, ctx.sampleRate)
   const d = buf.getChannelData(0)
@@ -116,19 +142,19 @@ export const sfx = {
   /** A move going off, by move name (its own sound per move, heavier for stronger moves); pan -1..1, gain 0..1. */
   moveCast(name: string, pan = 0, gain = 1) {
     const mv = moveByName(name)
-    playMoveCast(ctx, muted, mv.fx, mv.tier, pan, gain, mv.kind, namePitch(name))
+    playMoveCast(ctx, sfxOff(), mv.fx, mv.tier, pan, gain, mv.kind, namePitch(name))
   },
   /** A move landing on something. */
   moveHit(fx: MoveFx, tier: number, pan = 0, gain = 1) {
-    playMoveHit(ctx, muted, fx, tier, pan, gain)
+    playMoveHit(ctx, sfxOff(), fx, tier, pan, gain)
   },
   /** A big move charging up before it fires. */
   moveCharge(fx: MoveFx, tier: number, dur: number, pan = 0, gain = 1) {
-    playMoveCharge(ctx, muted, fx, tier, dur, pan, gain)
+    playMoveCharge(ctx, sfxOff(), fx, tier, dur, pan, gain)
   },
   /** Items: potion, revive, ball throws and wobbles, pickups. */
   item(name: ItemSound, pan = 0, gain = 1) {
-    playItem(ctx, muted, name, pan, gain)
+    playItem(ctx, sfxOff(), name, pan, gain)
   },
   /** Raid: a boss attack is coming (two quick alarm beeps). */
   warn() {
@@ -143,7 +169,7 @@ const cryCache = new Map<number, Promise<AudioBuffer | null>>()
 
 /** Plays a Pokémon's cry. Fails silently where the browser can't decode Ogg. */
 export function cry(id: number, vol = 0.35) {
-  if (!ctx || muted) return
+  if (!ctx || sfxOff()) return
   const c = ctx
   let p = cryCache.get(id)
   if (!p) {
@@ -154,7 +180,7 @@ export function cry(id: number, vol = 0.35) {
     cryCache.set(id, p)
   }
   void p.then((buf) => {
-    if (!buf || muted) return
+    if (!buf || sfxOff()) return
     const s = c.createBufferSource()
     const g = c.createGain()
     g.gain.value = vol

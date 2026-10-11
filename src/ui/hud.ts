@@ -4,6 +4,7 @@ import { animatedUrl, spriteUrl } from '../data/pokemon'
 import { trainerSpriteUrl } from '../data/trainers'
 import { TYPE_COLOR, TYPE_NL } from '../data/types'
 import { isMuted, setMuted, sfx } from '../audio'
+import { say, type VoiceLine } from '../voice'
 import { xpNeeded } from '../game/entities'
 import { INTRO_TIME, type Banner, type Game } from '../game/game'
 import { itemUrl } from '../game/sprites'
@@ -392,6 +393,7 @@ export class Hud {
       this.countdown.className = 'countdown go'
       this.countdown.innerHTML = '<b>GO!</b>'
       sfx.countdown(true)
+      say('go')
       setTimeout(() => (this.countdown.className = 'countdown hidden'), 900)
       return
     }
@@ -416,6 +418,7 @@ export class Hud {
     this.bannerEl.append(el)
     while (this.bannerEl.children.length > 2) this.bannerEl.firstChild!.remove()
     if (b.kind !== 'fainted') sfx.banner()
+    if (b.voice) say(b.voice)
     setTimeout(() => el.classList.add('out'), BANNER_LIFE[b.kind] - 350)
     setTimeout(() => el.remove(), BANNER_LIFE[b.kind])
   }
@@ -427,7 +430,8 @@ export class Hud {
     // Countdown
     if (g.introT > 0) {
       const t = g.introT
-      const label = t > INTRO_TIME - 1.6 ? 'title' : String(Math.ceil(t / ((INTRO_TIME - 1.6) / 3)))
+      // A title card while the announcer speaks, then 3-2-1 (2 s)
+      const label = t > INTRO_TIME - 2 ? 'title' : String(Math.ceil(t / (2 / 3)))
       if (label !== this.cdShown) {
         this.cdShown = label
         if (label === 'title') {
@@ -435,10 +439,12 @@ export class Hud {
           this.countdown.innerHTML = boss
             ? `<div class="cd-title raid"><small>RAID · ${boss.title.toUpperCase()}</small><b>${boss.name.toUpperCase()}</b></div>`
             : `<div class="cd-title"><small>${g.total} TRAINERS · 1 WINNAAR</small><b>BATTLE ROYALE</b></div>`
+          say(boss ? (`raid_${boss.id}` as VoiceLine) : 'br_intro')
         }
         else {
           this.countdown.innerHTML = `<b class="num">${label}</b>`
           sfx.countdown(false)
+          say(`count${label}` as VoiceLine)
         }
         this.countdown.className = `countdown ${label === 'title' ? 'tt' : 'n'}`
       }

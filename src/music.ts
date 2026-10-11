@@ -1,4 +1,4 @@
-import { audioCtx, isMuted, onMuteChange } from './audio'
+import { audioCtx, channelOn, onAudioChange } from './audio'
 import { PACKS, type Slot } from './data/soundtracks'
 import { Player } from './synth'
 
@@ -11,15 +11,26 @@ const PACK = PACKS.find((p) => p.id === 'castelia')!
 
 let player: Player | null = null
 let current: Slot | null = null
+let musicBus: GainNode | null = null
+let ducked = false
+const level = () => (channelOn('music') ? (ducked ? 0.3 : 0.85) : 0)
+
+/** Turn the music down while the announcer speaks. */
+export function duckMusic(on: boolean) {
+  ducked = on
+  const ctx = audioCtx()
+  if (musicBus && ctx) musicBus.gain.setTargetAtTime(level(), ctx.currentTime, on ? 0.06 : 0.35)
+}
 
 function ensure(): Player | null {
   if (player) return player
   const ctx = audioCtx()
   if (!ctx) return null
   const bus = ctx.createGain()
-  bus.gain.value = isMuted() ? 0 : 0.85
+  musicBus = bus
+  bus.gain.value = level()
   bus.connect(ctx.destination)
-  onMuteChange((m) => bus.gain.setTargetAtTime(m ? 0 : 0.85, ctx.currentTime, 0.05))
+  onAudioChange(() => bus.gain.setTargetAtTime(level(), ctx.currentTime, 0.05))
   player = new Player(ctx, bus)
   return player
 }

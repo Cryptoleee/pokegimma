@@ -1,3 +1,4 @@
+import { showOptions } from './screens'
 import qrcode from 'qrcode-generator'
 import logoSmall from '../assets/stormbreak-logo-small.webp'
 import { animatedUrl, SPECIES, spriteUrl } from '../data/pokemon'
@@ -87,6 +88,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
       <div class="home-top">
         <button class="sel-back" aria-label="Terug naar het titelscherm">◀</button>
         <div class="home-logo"><img src="${logoSmall}" alt="Stormbreak Royale"></div>
+        <button class="sel-back home-opts" aria-label="Opties">⚙️</button>
       </div>
       <div class="home-stage">
         <div class="hs-bg"></div>
@@ -177,7 +179,8 @@ export function showMenu(st: MenuState, on: MenuActions) {
       fn()
     })
 
-  click('.sel-back', on.back)
+  click('.sel-back:not(.home-opts)', on.back)
+  click('.home-opts', showOptions)
   click('.hs-edit', () => {
     setName(name.value)
     on.team()

@@ -20,6 +20,7 @@ import { botThink } from './ai'
 import type { Dir } from './entities'
 import type { Command } from '../net/protocol'
 import type { ClientState } from '../net/sync'
+import type { VoiceLine } from '../voice'
 
 export type ItemKind = 'master' | 'potion' | 'candy' | 'revive'
 const PICKUP_SOUND: Record<ItemKind, ItemSound> = { master: 'pickupMaster', potion: 'pickupPotion', candy: 'pickupCandy', revive: 'pickupRevive' }
@@ -139,6 +140,8 @@ export type BannerKind = 'go' | 'levelup' | 'move' | 'legendary' | 'ko' | 'caugh
 
 export interface Banner {
   kind: BannerKind
+  /** Announcer line to go with it */
+  voice?: VoiceLine
   title: string
   sub?: string
   /** Pokémon or trainer sprite id to show */
@@ -158,7 +161,8 @@ export interface GameHooks {
 }
 
 /** Length of the drop-in countdown before the match starts (s). */
-export const INTRO_TIME = 3.6
+/** Title card (with the announcer) and then 3-2-1. */
+export const INTRO_TIME = 5.3
 /** How close you must be to spot someone hiding in tall grass (tiles). */
 export const BUSH_SIGHT = 2.8
 const REVEAL_TIME = 1.2
@@ -1281,7 +1285,7 @@ export class Game {
     const tr = m.owner
     tr.autoSwapT = 0.9
     if (by?.owner) this.gainXp(by, koXp * 1.5)
-    this.vOf(tr)?.hooks.banner({ kind: 'fainted', title: `${m.name} is verslagen!`, sub: tr.healthyIndex() >= 0 ? 'Je volgende Pokémon komt eraan' : undefined, mon: m.species.id })
+    this.vOf(tr)?.hooks.banner({ kind: 'fainted', title: `${m.name} is verslagen!`, sub: tr.healthyIndex() >= 0 ? 'Je volgende Pokémon komt eraan' : undefined, mon: m.species.id, voice: tr.healthyIndex() >= 0 ? undefined : 'lose' })
     if (tr.healthyIndex() < 0) this.eliminate(tr, by?.owner ?? m.lastHitBy)
   }
 
@@ -1293,7 +1297,7 @@ export class Game {
     for (const v of this.viewers) v.hooks.feed(`${tr === v.tr ? 'Jij bent' : `${tr.name} is`} door je levens heen`, { trainer: tr.def.sprite })
     const v = this.vOf(tr)
     if (v) {
-      v.hooks.banner({ kind: 'fainted', title: 'Geen levens meer', sub: 'Je kijkt mee tot de raid voorbij is', mon: tr.mon.species.id })
+      v.hooks.banner({ kind: 'fainted', title: 'Geen levens meer', sub: 'Je kijkt mee tot de raid voorbij is', mon: tr.mon.species.id, voice: 'lose' })
       const mate = this.trainers.find((t) => t.alive)
       tr.spectate = mate ?? null
       if (tr.isPlayer) this.spectate = mate ?? null
@@ -1345,7 +1349,7 @@ export class Game {
         { trainer: tr.def.sprite },
       )
     }
-    if (by && by !== tr) this.vOf(by)?.hooks.banner({ kind: 'ko', title: 'Trainer uitgeschakeld!', sub: `${tr.name} · nog ${this.alive.length} over`, trainer: tr.def.sprite })
+    if (by && by !== tr) this.vOf(by)?.hooks.banner({ kind: 'ko', title: 'Trainer uitgeschakeld!', sub: `${tr.name} · nog ${this.alive.length} over`, trainer: tr.def.sprite, voice: 'ko' })
     this.sfxAt(tr.x, tr.y, 'ko')
     // Drop loot
     const drops: ItemKind[] = [
@@ -1367,7 +1371,7 @@ export class Game {
       last.place = 1
       if (lv) {
         lv.endT = 1.5
-        lv.hooks.banner({ kind: 'win', title: 'WINNAAR!', sub: 'Jij bent de laatste trainer', trainer: last.def.sprite })
+        lv.hooks.banner({ kind: 'win', title: 'WINNAAR!', sub: 'Jij bent de laatste trainer', trainer: last.def.sprite, voice: 'win' })
       }
     }
   }
@@ -1411,10 +1415,10 @@ export class Game {
     SLOT_UNLOCK.forEach((lv, i) => {
       if (lv === m.level && mine) {
         learned = true
-        mine.hooks.banner({ kind: 'move', title: m.moves[i].name, sub: `${m.name} leerde een nieuwe aanval!`, color: TYPE_COLOR[m.moves[i].type], mon: m.species.id })
+        mine.hooks.banner({ kind: 'move', title: m.moves[i].name, sub: `${m.name} leerde een nieuwe aanval!`, color: TYPE_COLOR[m.moves[i].type], mon: m.species.id, voice: 'new_move' })
       }
     })
-    if (mine && !learned && m.owner?.mon === m) mine.hooks.banner({ kind: 'levelup', title: `Lv ${m.level}`, sub: m.name, mon: m.species.id, shiny: m.shiny })
+    if (mine && !learned && m.owner?.mon === m) mine.hooks.banner({ kind: 'levelup', title: `Lv ${m.level}`, sub: m.name, mon: m.species.id, shiny: m.shiny, voice: 'levelup' })
     const sp = m.species
     if (sp.evo && sp.evoLevel && m.level >= sp.evoLevel) {
       const ratio = m.hp / m.maxHp
@@ -1434,7 +1438,7 @@ export class Game {
       } else if (mine) {
         // Multiplayer can't pause for a cutscene: a banner instead
         mine.sfx('evolve')
-        mine.hooks.banner({ kind: 'levelup', title: `${m.species.name}!`, sub: `${old} evolueerde`, mon: m.species.id, shiny: m.shiny, color: '#80e0ff' })
+        mine.hooks.banner({ kind: 'levelup', title: `${m.species.name}!`, sub: `${old} evolueerde`, mon: m.species.id, shiny: m.shiny, color: '#80e0ff', voice: 'evolve' })
         mine.hooks.feed(`${old} evolueerde in ${m.species.name}!`, { mon: m.species.id })
       }
     }
@@ -1518,7 +1522,7 @@ export class Game {
       for (const o of this.viewers) o.hooks.feed(`${tr === o.tr ? 'Jij' : tr.name} ving ${w.shiny ? '✦' : ''}${w.name}!`)
     if (tr.party.length < PARTY_MAX) {
       tr.party.push(w)
-      v?.hooks.banner({ kind: 'caught', title: 'Gevangen!', sub: `${w.name} · Lv ${w.level}`, mon: w.species.id, shiny: w.shiny })
+      v?.hooks.banner({ kind: 'caught', title: 'Gevangen!', sub: `${w.name} · Lv ${w.level}`, mon: w.species.id, shiny: w.shiny, voice: 'caught' })
       return
     }
     if (v) {
@@ -1696,7 +1700,7 @@ export class Game {
     for (const v of this.viewers) {
       v.sfx('legendary')
       v.cry(id, 0.3)
-      v.hooks.banner({ kind: 'legendary', title: `${m.name} verschijnt!`, sub: `Lv ${m.level} · volg de gouden pijl · Master Ball = direct vangen`, mon: id, shiny: m.shiny, color: '#ffd040' })
+      v.hooks.banner({ kind: 'legendary', title: `${m.name} verschijnt!`, sub: `Lv ${m.level} · volg de gouden pijl · Master Ball = direct vangen`, mon: id, shiny: m.shiny, color: '#ffd040', voice: 'legendary' })
       v.hooks.feed(`★ ${m.name} (Lv ${m.level}) is verschenen! Vang hem met een Master Ball`, { mon: id })
     }
   }
@@ -1921,7 +1925,7 @@ export class Game {
         z.fromX = z.x
         z.fromY = z.y
         z.fromR = z.r
-        for (const v of this.viewers) v.hooks.banner({ kind: 'storm', title: 'De storm komt!', sub: `Fase ${z.phase + 1} van 6 · ga naar de witte cirkel`, color: '#c080ff' })
+        for (const v of this.viewers) v.hooks.banner({ kind: 'storm', title: 'De storm komt!', sub: `Fase ${z.phase + 1} van 6 · ga naar de witte cirkel`, color: '#c080ff', voice: z.phase + 1 >= 6 ? 'final_circle' : 'storm' })
       }
     } else {
       const k = Math.min(1, z.t / ph.shrink)

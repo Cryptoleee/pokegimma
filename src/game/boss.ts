@@ -671,7 +671,7 @@ function enrage(g: Game, r: RaidState) {
   boss.charging = null
   for (const v of g.viewers) {
     v.cry(boss.species.id, 0.5)
-    v.hooks.banner({ kind: 'legendary', title: `${r.def.name} wordt woedend!`, sub: r.phase === 1 ? 'Fase 2 · nieuwe aanvallen' : 'Laatste fase · alles of niets!', mon: boss.species.id, color: r.def.color })
+    v.hooks.banner({ kind: 'legendary', title: `${r.def.name} wordt woedend!`, sub: r.phase === 1 ? 'Fase 2 · nieuwe aanvallen' : 'Laatste fase · alles of niets!', mon: boss.species.id, color: r.def.color, voice: r.phase === 1 ? 'enraged' : 'final_phase' })
   }
   g.vfx.mark(boss.x, boss.y)
   g.vfx.ring(boss.x, boss.y, 4, r.def.color, 0.8, 8)
@@ -759,8 +759,8 @@ function endRaid(g: Game, r: RaidState) {
   for (const v of g.viewers) {
     if (v.done) continue
     v.hooks.banner(won
-      ? { kind: 'win', title: 'RAID GESLAAGD!', sub: `${r.def.name} is verslagen`, mon: r.boss.species.id, color: '#ffd040' }
-      : { kind: 'fainted', title: 'Raid mislukt', sub: r.timeLeft <= 0 ? 'De tijd is op' : 'Iedereen is verslagen', mon: r.boss.species.id })
+      ? { kind: 'win', title: 'RAID GESLAAGD!', sub: `${r.def.name} is verslagen`, mon: r.boss.species.id, color: '#ffd040', voice: 'raid_win' }
+      : { kind: 'fainted', title: 'Raid mislukt', sub: r.timeLeft <= 0 ? 'De tijd is op' : 'Iedereen is verslagen', mon: r.boss.species.id, voice: 'raid_fail' })
     v.endT = 2.6
   }
 }

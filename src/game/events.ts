@@ -41,7 +41,7 @@ export function startEvent(g: Game, kind: WorldEvent['kind']) {
     g.events.push({ id: nextId++, kind, x, y, t: DROP_TIME, total: DROP_TIME })
     for (const v of g.viewers) {
       v.sfx('banner')
-      v.hooks.banner({ kind: 'storm', title: 'Bevoorrading!', sub: 'Een kist valt uit de lucht · volg de pijl', color: '#58d0ff' })
+      v.hooks.banner({ kind: 'storm', title: 'Bevoorrading!', sub: 'Een kist valt uit de lucht · volg de pijl', color: '#58d0ff', voice: 'supply' })
       v.hooks.feed('📦 Bevoorrading onderweg: Master Ball, Potions en Rare Candy')
     }
     return
@@ -66,7 +66,7 @@ export function startEvent(g: Game, kind: WorldEvent['kind']) {
   g.events.push({ id: nextId++, kind, x: cx, y: cy, t: SWARM_TIME, total: SWARM_TIME, species })
   for (const v of g.viewers) {
     v.sfx('banner')
-    v.hooks.banner({ kind: 'storm', title: 'Een zwerm!', sub: 'Zes wilde Pokémon in het gras · volg de pijl', mon: species, color: '#7ce07c' })
+    v.hooks.banner({ kind: 'storm', title: 'Een zwerm!', sub: 'Zes wilde Pokémon in het gras · volg de pijl', mon: species, color: '#7ce07c', voice: 'swarm' })
     v.hooks.feed('🐾 Er is een zwerm wilde Pokémon gespot', { mon: species })
   }
 }
