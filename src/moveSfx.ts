@@ -381,32 +381,48 @@ export function resetSfx() {
   lastPlay.clear()
 }
 
-function play(ctx: AudioContext | null, muted: boolean, key: string, gap: number, pan: number, vol: number, rev: number, life: number, draw: (o: AudioNode, t: number) => void) {
-  if (!ctx || muted || vol < 0.03) return
+function play(ctx: AudioContext | null, muted: boolean, key: string, gap: number, pan: number, vol: number, rev: number, life: number, draw: (o: AudioNode, t: number) => void, own = true) {
+  if (!ctx || muted || vol < 0.01) return
   const now = performance.now()
   if (now - (lastPlay.get(key) ?? 0) < gap) return
-  // Too much going on: drop the quieter sounds
-  if (voices > 22 || (voices > 12 && vol < 0.4)) return
+  // Too much going on: drop other trainers' sounds first, never your own
+  if (voices > (own ? 40 : 16)) return
   lastPlay.set(key, now)
   const { out, t } = voice(ctx, pan, vol, rev, life)
   draw(out, t)
 }
 
-/** A move going off: the launch (bolt, beam, swing, ...) in its type's timbre. */
-export function playMoveCast(ctx: AudioContext | null, muted: boolean, fx: MoveFx, tier: number, pan = 0, gain = 1) {
+/** Airy timbres sound thinner at the same gain; lift them a bit. */
+const LOUDER: Partial<Record<Fam, number>> = { wind: 1.7, poison: 1.4, water: 1.35, bug: 1.2 }
+
+/** A small pitch offset per move name, so moves sharing an effect still sound apart. */
+export function namePitch(name: string) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0
+  return 0.93 + ((h >>> 0) % 1000) / 1000 * 0.14
+}
+
+/**
+ * A move going off: the launch (bolt, beam, swing, ...) in its type's timbre.
+ * `kind` is the move's real shape (some moves share an effect but not a shape).
+ */
+export function playMoveCast(ctx: AudioContext | null, muted: boolean, fx: MoveFx, tier: number, pan = 0, gain = 1, kind?: Shape, pitchMul = 1) {
   const m = MOVES[fx]
   if (!m) return
-  const [fam, shape, pitch] = m
+  const [fam, base, pitch] = m
+  const shape = kind ?? base
   const k = tier / 3
-  const p = pitch * r(0.96, 1.04)
-  const len = { melee: 0.12, bolt: 0.14, spread: 0.1, dash: 0.24, beam: 0.35, burst: 0.3, nova: 0.18, zap: 0.12 }[shape] * (1 + k * 0.9)
-  const vol = (0.07 + k * 0.06) * gain
-  play(ctx, muted, 'c' + fx, 45, pan, vol, 0.05 + k * 0.25, len, (o, t) => {
+  const p = pitch * pitchMul * r(0.96, 1.04)
+  const len = { melee: 0.14, bolt: 0.16, spread: 0.1, dash: 0.24, beam: 0.35, burst: 0.3, nova: 0.18, zap: 0.13 }[shape] * (1 + k * 0.9)
+  const vol = (0.12 + k * 0.06) * gain * (LOUDER[fam] ?? 1)
+  play(ctx, muted, 'c' + fx + shape, 45, pan, vol, 0.05 + k * 0.25, len, (o, t) => {
     const x: Ctx = { ctx: ctx!, o, t, p, k, len }
     const T = TIMBRE[fam]
     switch (shape) {
       case 'melee':
-        swish(x, 0.1 + k * 0.05)
+        // Swing plus a quick taste of the type (a lick slurps, a bite snaps, ...)
+        swish(x, 0.13 + k * 0.06)
+        T.cast({ ...x, t: t + 0.05, len: 0.07 + k * 0.04 })
         break
       case 'dash':
         swish(x, len)
@@ -429,7 +445,7 @@ export function playMoveCast(ctx: AudioContext | null, muted: boolean, fx: MoveF
       default:
         T.cast(x)
     }
-  })
+  }, gain >= 1)
 }
 
 /** A move landing on a target: its type's impact, heavier for stronger moves. */
@@ -439,12 +455,12 @@ export function playMoveHit(ctx: AudioContext | null, muted: boolean, fx: MoveFx
   const [fam, shape, pitch] = m
   const k = tier / 3
   const p = pitch * r(0.95, 1.05)
-  const vol = (0.08 + k * 0.08) * gain * (shape === 'nova' ? 1.25 : 1)
+  const vol = (0.1 + k * 0.08) * gain * (shape === 'nova' ? 1.25 : 1)
   play(ctx, muted, 'h' + fx, 55, pan, vol, 0.08 + k * 0.3, 0.6 + k, (o, t) => {
     const x: Ctx = { ctx: ctx!, o, t, p, k, len: 0.2 }
     TIMBRE[fam].hit(x)
     if (shape === 'nova' || k >= 0.99) sub(x, 0.7 + k * 0.3)
-  })
+  }, gain >= 1)
 }
 
 /** A big move charging up (Solar Beam, Hyper Beam, ...): a rising swell. */
@@ -456,7 +472,7 @@ export function playMoveCharge(ctx: AudioContext | null, muted: boolean, fx: Mov
     osc(ctx!, o, t, { type: 'sine', f: 200 * pitch, f2: 1200 * pitch, dur: dur + 0.05, vol: 0.5, attack: dur * 0.8, lin: true, vib: [14, 20] })
     osc(ctx!, o, t, { type: 'triangle', f: 400 * pitch, f2: 2400 * pitch, dur: dur + 0.05, vol: 0.2, attack: dur * 0.8, lin: true })
     noise(ctx!, o, t, { dur: dur + 0.05, vol: 0.25, attack: dur * 0.9, filter: 'bandpass', f: 600, f2: 4000, q: 3 })
-  })
+  }, gain >= 1)
 }
 
 // ---------------------------------------------------------------- items
@@ -464,7 +480,7 @@ export function playMoveCharge(ctx: AudioContext | null, muted: boolean, fx: Mov
 export type ItemSound = 'potion' | 'revive' | 'throw' | 'throwMaster' | 'shake' | 'breakOut' | 'pickupBall' | 'pickupPotion' | 'pickupCandy' | 'pickupRevive' | 'pickupMaster'
 
 export function playItem(ctx: AudioContext | null, muted: boolean, name: ItemSound, pan = 0, gain = 1) {
-  play(ctx, muted, 'i' + name, 40, pan, 0.11 * gain, 0.15, 1.2, (o, t) => {
+  play(ctx, muted, 'i' + name, 40, pan, 0.2 * gain, 0.15, 1.2, (o, t) => {
     const x = ctx!
     switch (name) {
       case 'potion':
@@ -512,5 +528,5 @@ export function playItem(ctx: AudioContext | null, muted: boolean, name: ItemSou
         noise(x, o, t, { dur: 0.5, vol: 0.2, attack: 0.15, filter: 'highpass', f: 6500 })
         break
     }
-  })
+  }, gain >= 1)
 }

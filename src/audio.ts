@@ -1,6 +1,7 @@
 /** Tiny chiptune-ish sound effects with WebAudio; no audio files needed. */
 import type { MoveFx } from './data/moves'
-import { playItem, playMoveCast, playMoveCharge, playMoveHit, type ItemSound } from './moveSfx'
+import { moveByName } from './data/moves'
+import { namePitch, playItem, playMoveCast, playMoveCharge, playMoveHit, type ItemSound } from './moveSfx'
 let ctx: AudioContext | null = null
 let muted = false
 
@@ -112,9 +113,10 @@ export const sfx = {
     noise(0.25, 0.08)
     tone(140, 0.3, 'sawtooth', 0.05, -80)
   },
-  /** A move going off (its own sound per move, heavier for stronger moves); pan -1..1, gain 0..1. */
-  moveCast(fx: MoveFx, tier: number, pan = 0, gain = 1) {
-    playMoveCast(ctx, muted, fx, tier, pan, gain)
+  /** A move going off, by move name (its own sound per move, heavier for stronger moves); pan -1..1, gain 0..1. */
+  moveCast(name: string, pan = 0, gain = 1) {
+    const mv = moveByName(name)
+    playMoveCast(ctx, muted, mv.fx, mv.tier, pan, gain, mv.kind, namePitch(name))
   },
   /** A move landing on something. */
   moveHit(fx: MoveFx, tier: number, pan = 0, gain = 1) {

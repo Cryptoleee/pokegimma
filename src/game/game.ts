@@ -890,7 +890,7 @@ export class Game {
       this.aim(m, tgt, dir)
       // Play our own move right away; the host skips sending it back to us
       if (mv.charge > 0) sfx.moveCharge(mv.fx, mv.tier, mv.charge)
-      else sfx.moveCast(mv.fx, mv.tier)
+      else sfx.moveCast(mv.name)
       this.send({ t: 'move', s: slot, tg: tgt?.id, d: dir })
       return true
     }
@@ -994,7 +994,7 @@ export class Game {
     const near = this.nearCam(m.x, m.y)
     const v = this.vfx
     m.castT = 0.18
-    this.soundAt(m.x, m.y, 'moveCast', [mv.fx, mv.tier], { owners: [m.owner], skipRemote: charged ? null : m.owner })
+    this.soundAt(m.x, m.y, 'moveCast', [mv.name], { owners: [m.owner], skipRemote: charged ? null : m.owner })
     if (!charged) fxCast(v, mv, m, near)
     else if (near) v.shakeBy(3)
 
