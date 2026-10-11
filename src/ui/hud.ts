@@ -1,4 +1,5 @@
 import { SLOT_UNLOCK } from '../data/moves'
+import { LiveBoard } from './scoreboard'
 import { animatedUrl, spriteUrl } from '../data/pokemon'
 import { trainerSpriteUrl } from '../data/trainers'
 import { TYPE_COLOR, TYPE_NL } from '../data/types'
@@ -64,6 +65,8 @@ export class Hud {
   /** Resets for every touch control, so a lost touch can never leave one stuck. */
   private releasers: (() => void)[] = []
 
+  /** Live scoreboard (🏆 button or Tab). */
+  board: LiveBoard
   constructor(private root: HTMLElement, private g: Game, onMenu: () => void, opts: { chat?: (text: string) => void } = {}) {
     root.innerHTML = ''
     root.classList.remove('hidden')
@@ -114,8 +117,13 @@ export class Hud {
     const menu = h('button', 'sysbtn', '❚❚')
     menu.setAttribute('aria-label', 'Pauze')
     menu.onclick = onMenu
-    sys.append(menu, mute)
+    const score = h('button', 'sysbtn', '🏆')
+    score.setAttribute('aria-label', 'Scorebord')
+    score.title = 'Scorebord (Tab)'
+    score.onclick = () => this.board.toggle()
+    sys.append(menu, mute, score)
     root.append(sys, this.toastEl, this.bannerEl, this.legend, this.bossBar, this.respawnEl)
+    this.board = new LiveBoard(root, g, () => g.player.id)
     if (g.kind === 'raid') root.classList.add('raid-mode')
     else root.classList.remove('raid-mode')
 
@@ -708,6 +716,7 @@ export class Hud {
   }
 
   destroy() {
+    this.board.destroy()
     this.root.innerHTML = ''
     this.root.classList.add('hidden')
     this.root.classList.remove('intro-mode')

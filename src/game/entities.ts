@@ -192,6 +192,8 @@ export class Trainer {
   respawnT = 0
   /** Raid: total damage dealt to the boss (results screen). */
   bossDmg = 0
+  /** Damage dealt to other trainers' Pokémon (scoreboard). */
+  dmg = 0
   /** Bots: wait before throwing another ball after a legendary broke free. */
   catchCd = 0
   /** Who this player is watching after being knocked out. */

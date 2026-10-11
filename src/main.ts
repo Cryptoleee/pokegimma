@@ -11,11 +11,14 @@ import { showIntro } from './ui/intro'
 import { showTitle } from './ui/title'
 import { showRoster, showTrainerSelect } from './ui/select'
 import { showResults } from './ui/results'
+import { LiveBoard, showFinalBoard } from './ui/scoreboard'
+import { decided, scoreRows } from './game/score'
 import { showEvolution } from './ui/cutscene'
 import { showLobby, showMenu, type MenuState } from './ui/menu'
 import { showLoading } from './ui/loading'
 import { wipe } from './ui/transition'
 import { currentMusic, playMusic, setTempo } from './music'
+import { sfx } from './audio'
 import { profile } from './profile'
 import { cleanCode, Room } from './net/room'
 import type { ChatLine, HostMsg, LobbyPlayer, MatchChoice } from './net/protocol'
@@ -196,28 +199,117 @@ function startSolo() {
   loadingThen(setup, true, () => enterMatch(g))
 }
 
+const soloAgain = () => wipe(startSolo, { flash: true })
+const soloOtherTeam = () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), 'Start de battle ▶'))
+
 function onEnd(r: GameResult) {
   hud?.destroy()
   hud = null
+  // The match goes on without you (bots or other players still in it): you can watch
+  const watch = r.final ? [] : [{ label: 'Kijk verder 👁', run: () => spectate() }]
   if (!room) {
-    showResults(r, trainer.sprite, { label: 'Nog een keer ▶', run: () => wipe(startSolo, { flash: true }) }, [
-      { label: 'Ander team', run: () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), 'Start de battle ▶')) },
+    showResults(r, trainer.sprite, { label: 'Nog een keer ▶', run: soloAgain }, [
+      ...watch,
+      { label: 'Ander team', run: soloOtherTeam },
       { label: 'Hoofdmenu', run: () => wipe(() => toMenu()) },
     ])
     return
   }
   showResults(r, trainer.sprite, { label: 'Naar de lobby ▶', run: () => wipe(toLobby) }, [
-    { label: 'Kijk mee', run: () => spectate() },
+    ...watch,
     { label: 'Hoofdmenu', run: () => leaveRoom() },
   ])
 }
 
+// ---------- Watching after you're out ----------
+
+/** Spectating: the bar at the top, the live scoreboard, and the playback speed (solo). */
+let spec: { g: Game; board: LiveBoard; speed: number; name: string; endT: number } | null = null
+
 /** Watch the rest of the match after you're out. */
 function spectate() {
+  const g = game
+  if (!g) return
   clearScreen()
   viewing = true
-  hudRoot.innerHTML = '<button class="spec-pill">Toeschouwer · naar de lobby ▶</button>'
-  hudRoot.querySelector('.spec-pill')!.addEventListener('click', () => wipe(toLobby))
+  // Solo, or the host: keep simulating after every human is done
+  if (g.mode !== 'client') g.watch = true
+  playMusic(g.kind === 'raid' ? 'boss' : 'battle')
+  hudRoot.classList.remove('hidden', 'intro-mode')
+  hudRoot.innerHTML = `
+    <div class="spec-bar">
+      <span class="spec-tag">👁 Toeschouwer</span>
+      <div class="spec-follow"><button class="spec-prev" aria-label="Vorige trainer">◀</button><span class="spec-name"></span><button class="spec-next" aria-label="Volgende trainer">▶</button></div>
+      <div class="spec-btns">
+        ${room ? '' : '<button class="spec-speed" title="Snelheid">1×</button>'}
+        <button class="spec-board" title="Scorebord (Tab)">🏆</button>
+        <button class="spec-leave">${room ? 'Naar de lobby ▶' : 'Stoppen'}</button>
+      </div>
+    </div>`
+  const board = new LiveBoard(hudRoot, g, () => g.player.id)
+  spec = { g, board, speed: 1, name: '', endT: -1 }
+  const cycle = (d: number) => {
+    const alive = g.trainers.filter((t) => t.alive)
+    if (!alive.length) return
+    const cur = followed(g)
+    const i = cur ? alive.indexOf(cur) : -1
+    g.follow = alive[(i + d + alive.length) % alive.length]
+    sfx.select()
+  }
+  hudRoot.querySelector('.spec-prev')!.addEventListener('click', () => cycle(-1))
+  hudRoot.querySelector('.spec-next')!.addEventListener('click', () => cycle(1))
+  hudRoot.querySelector('.spec-board')!.addEventListener('click', () => board.toggle())
+  hudRoot.querySelector('.spec-speed')?.addEventListener('click', (e) => {
+    if (!spec) return
+    spec.speed = spec.speed === 1 ? 2 : spec.speed === 2 ? 4 : 1
+    ;(e.currentTarget as HTMLElement).textContent = `${spec.speed}×`
+    sfx.select()
+  })
+  hudRoot.querySelector('.spec-leave')!.addEventListener('click', () => {
+    sfx.select()
+    if (room) wipe(toLobby)
+    else wipe(() => toMenu())
+  })
+}
+
+/** Who the camera follows while you watch. */
+function followed(g: Game) {
+  const p = g.player
+  if (g.follow?.alive) return g.follow
+  const s = g.mode === 'client' ? p.spectate : g.spectate
+  return s?.alive ? s : g.trainers.find((t) => t.alive) ?? null
+}
+
+/** Each frame while watching: name of who you follow, and the final standings once it's decided. */
+function spectateTick(dt: number) {
+  const s = spec
+  if (!s || s.g !== game) return
+  const f = followed(s.g)
+  const name = f ? `Volgt: ${f.name}` : ''
+  if (name !== s.name) {
+    s.name = name
+    const el = hudRoot.querySelector('.spec-name')
+    if (el) el.textContent = name
+  }
+  if (s.endT < 0 && decided(s.g)) s.endT = 2
+  if (s.endT > 0) {
+    s.endT -= dt
+    if (s.endT <= 0) {
+      const g = s.g
+      const rows = scoreRows(g)
+      s.board.destroy()
+      spec = null
+      hudRoot.innerHTML = ''
+      viewing = false
+      sfx.select()
+      if (room) showFinalBoard(rows, g.kind === 'raid', g.player.id, { label: 'Naar de lobby ▶', run: () => wipe(toLobby) }, [{ label: 'Hoofdmenu', run: () => leaveRoom() }])
+      else showFinalBoard(rows, g.kind === 'raid', g.player.id, { label: 'Nog een keer ▶', run: soloAgain }, [
+        { label: 'Ander team', run: soloOtherTeam },
+        { label: 'Hoofdmenu', run: () => wipe(() => toMenu()) },
+      ])
+      playMusic('victory')
+    }
+  }
 }
 
 // ---------- Multiplayer ----------
@@ -448,6 +540,8 @@ window.addEventListener('beforeunload', (e) => {
 })
 
 function stopGame() {
+  spec?.board.destroy()
+  spec = null
   hud?.destroy()
   hud = null
   game = null
@@ -476,6 +570,11 @@ window.addEventListener('keydown', (e) => {
   keys.add(k)
   if (e.key === 'Escape') return confirmLeave()
   if (e.key === 'Enter' && viewing && hud?.openChat()) return e.preventDefault()
+  if (e.key === 'Tab' && viewing && (hud || spec)) {
+    e.preventDefault()
+    if (!e.repeat) (spec?.board ?? hud?.board)?.toggle()
+    return
+  }
   if (!game || !hud || game.paused) return
   if (k === ' ' || k === 'tab' || k.startsWith('arrow')) e.preventDefault()
   const g = game, p = g.player
@@ -623,7 +722,9 @@ function frame(now: number) {
   if (game) {
     const g = game
     if (viewing) desktopInput(g)
-    g.update(dt)
+    const steps = spec && spec.g === g && g.mode === 'solo' ? spec.speed : 1
+    for (let i = 0; i < steps; i++) g.update(dt)
+    if (spec) spectateTick(dt)
     if (g.mode === 'host') hostNet(g, dt)
     if (viewing && (g.mode !== 'client' || g.net?.placed)) {
       setTempo(g.kind === 'raid' ? ((g.raidView?.phase ?? 0) >= 2 ? 1.08 : 1) : g.zone.phase >= 4 ? 1.08 : 1)

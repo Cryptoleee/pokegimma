@@ -173,6 +173,8 @@ export function snapshot(g: Game, v: RemoteViewer) {
     v.itemsSent = g.items.length
     snap.it = g.items.map((it) => [r2(it.x), r2(it.y), ITEMS.indexOf(it.kind)])
   }
+  // Scoreboard numbers for every trainer, twice a second
+  if (v.ticks % 10 === 1) snap.sb = g.trainers.map((tr) => [tr.id, tr.kos, tr.caught, Math.round(tr.dmg), Math.round(tr.bossDmg), tr.lives, tr.place, Math.round(tr.diedAt)])
   return snap
 }
 
@@ -322,6 +324,8 @@ type Snap = {
   ev?: [number, number, number, number, number, number, number][]
   hz?: [number, number, number, number, number, number, number, number, number, number, string, number, string, number, number, number][]
   rv?: RaidViewState
+  /** Scoreboard: [id, kos, caught, dmg, bossDmg, lives, place, diedAt] per trainer. */
+  sb?: number[][]
   me: Record<string, number & number[]>
 }
 
@@ -424,6 +428,13 @@ export function applySnapshot(g: Game, raw: unknown) {
     })
   }
   if (s.ev) g.events = s.ev.map(([id, k, x, y, t, total, species]) => ({ id, kind: k ? 'swarm' : 'drop', x, y, t, total, species: species || undefined }))
+  if (s.sb)
+    for (const [id, kos, caught, dmg, bossDmg, lives, place, diedAt] of s.sb) {
+      const tr = cs.trainers.get(id)
+      if (!tr) continue
+      Object.assign(tr, { kos, caught, dmg, bossDmg, lives, diedAt })
+      if (place) tr.place = place
+    }
   if (s.it) g.items = s.it.map(([x, y, k], i) => ({ x, y, kind: ITEMS[k], bob: g.items[i]?.bob ?? Math.random() * 6 }))
 }
 

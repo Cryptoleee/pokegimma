@@ -1,6 +1,7 @@
 import { PARTY_MAX, rarityOf, ROSTER, SPECIES, TEAM_SIZE, WILD, type Rarity } from '../data/pokemon'
 import { eventTimes, startEvent, updateEvents, type WorldEvent } from './events'
 import { roleInfo } from '../data/roles'
+import { decided, scoreRows, type ScoreRow } from './score'
 import { raidDown, setupRaid, updateRaid, type Hazard, type RaidState, type RaidView } from './boss'
 import { movesetFor, SLOT_UNLOCK, type Move, type MoveFx } from '../data/moves'
 import { Vfx } from './vfx'
@@ -170,6 +171,12 @@ export interface GameResult {
   best: Pick<Mon, 'name' | 'level' | 'shiny'> & { species: { id: number } }
   /** Raid results: your damage to the boss and lives left. */
   raid?: { boss: BossId; dmg: number; share: number; lives: number }
+  /** Every trainer's stats when your match ended. */
+  board: ScoreRow[]
+  /** The match was over for everyone (otherwise it's the standing so far). */
+  final: boolean
+  /** Your trainer id (to highlight your row). */
+  me: number
 }
 
 /** One human in a match (solo = just you). */
@@ -286,6 +293,10 @@ export class Game {
   net: ClientState | null = null
   /** Raid: the boss fight state (host and solo). */
   raid: RaidState | null = null
+  /** Someone keeps watching after their own match ended: the world plays on. */
+  watch = false
+  /** Spectating: the trainer the camera follows (picked by the viewer). */
+  follow: Trainer | null = null
   /** Raid HUD info, on the host and on clients: time left, boss phase, pillars standing. */
   raidView: RaidView | null = null
   /** Raid: Mewtwo's mirror images (drawn see-through, can't be hit). */
@@ -452,7 +463,8 @@ export class Game {
     this.updateFx(dt)
     // Only a solo match can pause: in multiplayer the world keeps going.
     if (this.paused && this.mode === 'solo') return
-    if (this.allDone) return
+    // Done for every human; when someone stays to watch, play on until it's decided
+    if (this.allDone && !(this.watch && !decided(this))) return
     for (const v of this.viewers) {
       if (v.endT < 0 || v.done) continue
       v.endT -= dt
@@ -496,7 +508,7 @@ export class Game {
       updateEvents(this, dt)
     }
 
-    const focus = p.alive ? p : this.spectate && this.spectate.alive ? this.spectate : (this.spectate = this.alive[0] ?? p)
+    const focus = p.alive ? p : this.follow?.alive ? this.follow : this.spectate && this.spectate.alive ? this.spectate : (this.spectate = this.alive[0] ?? p)
     const k = Math.min(1, dt * 8)
     const [fx, fy] = this.camTarget(focus)
     this.camX += (fx - this.camX) * k
@@ -661,7 +673,7 @@ export class Game {
     for (const tr of this.trainers) if (tr.throwFx) tr.throwFx.t += dt
     this.tickHpLag(dt)
 
-    const focus = p.alive ? p : p.spectate && p.spectate.alive ? p.spectate : this.alive[0] ?? p
+    const focus = p.alive ? p : this.follow?.alive ? this.follow : p.spectate && p.spectate.alive ? p.spectate : this.alive[0] ?? p
     const kc = Math.min(1, dt * 8)
     const [fx, fy] = this.camTarget(focus)
     this.camX += (fx - this.camX) * kc
@@ -807,11 +819,13 @@ export class Game {
 
   enemiesOf(m: Mon): Mon[] {
     const out: Mon[] = []
-    for (const tr of this.trainers) {
-      if (!tr.alive || tr === m.owner) continue
-      const a = tr.mon
-      if (a && !a.fainted) out.push(a)
-    }
+    // A raid is everyone against the boss: players never hit each other
+    if (!(this.kind === 'raid' && m.owner))
+      for (const tr of this.trainers) {
+        if (!tr.alive || tr === m.owner) continue
+        const a = tr.mon
+        if (a && !a.fainted) out.push(a)
+      }
     if (m.owner) for (const w of this.wilds) if (w.state !== 'weak') out.push(w)
     return out
   }
@@ -1163,6 +1177,7 @@ export class Game {
       : Math.max(1, Math.round(raw * eff * mult * roleInfo(src.species.id).dmg * DMG_SCALE * this.rng.range(0.9, 1.05)))
     tgt.hp -= dmg
     if (tgt.boss && src.owner) src.owner.bossDmg += Math.min(dmg, tgt.hp + dmg)
+    if (src.owner && tgt.owner && tgt.owner !== src.owner) src.owner.dmg += Math.min(dmg, tgt.hp + dmg)
     tgt.flash = 0.12
     tgt.revealT = REVEAL_TIME
     tgt.combatT = 0
@@ -1344,6 +1359,7 @@ export class Game {
       time: r ? this.time : p.alive ? this.time : p.diedAt, kos: p.kos, caught: p.caught,
       best: { name: b.name, level: b.level, shiny: b.shiny, species: { id: b.species.id } },
       raid: r ? { boss: r.def.id, dmg: Math.round(p.bossDmg), share: Math.round((p.bossDmg / r.boss.maxHp) * 100), lives: p.lives } : undefined,
+      board: scoreRows(this), final: decided(this), me: p.id,
     })
     if (v.local) this.over = true
     if (this.viewers.every((o) => o.done)) this.allDone = true

@@ -4,6 +4,7 @@ import { cry, sfx } from '../audio'
 import { playMusic } from '../music'
 import type { GameResult } from '../game/game'
 import { BOSSES } from '../data/bosses'
+import { boardHtml } from './scoreboard'
 
 /** End-of-match screen: placement badge, your trainer and best Pokémon, counted stats. */
 export interface ResultAction {
@@ -21,6 +22,12 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
       <canvas class="confetti"></canvas>
       <div class="res-glow"></div>
       <div class="res-card">
+        <div class="res-tabs"><button class="on" data-tab="mine">Jouw potje</button><button data-tab="board">Scorebord</button></div>
+        <div class="res-board hidden">
+          <div class="res-sub">${r.final ? 'Eindstand' : 'Tussenstand: het potje loopt nog'}</div>
+          <div class="sb-scroll">${boardHtml(r.board, !!r.raid, r.me)}</div>
+        </div>
+        <div class="res-mine">
         ${boss
           ? `<div class="medal raid ${r.won ? 'gold' : 'bronze'}" style="--c:${boss.color}"><img class="px" src="${spriteUrl(boss.species)}" alt=""></div>
         <div class="res-title">${r.won ? 'Raid geslaagd!' : 'Raid mislukt'}</div>
@@ -41,6 +48,7 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
           : `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>Overleefd</span></div>
           <div><b data-n="${r.kos}">0</b><span>Trainers K.O.</span></div>
           <div><b data-n="${r.caught}">0</b><span>Gevangen</span></div>`}
+        </div>
         </div>
         <div class="res-actions">
           <button class="cta" data-a="0">${main.label}</button>
@@ -102,6 +110,18 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
     }
     requestAnimationFrame(loop)
   }
+
+  // Tabs: your match / the scoreboard
+  el.querySelectorAll<HTMLElement>('.res-tabs button').forEach((b) =>
+    b.addEventListener('click', () => {
+      sfx.select()
+      const board = b.dataset.tab === 'board'
+      el.querySelectorAll('.res-tabs button').forEach((o) => o.classList.toggle('on', o === b))
+      el.querySelector('.res-board')!.classList.toggle('hidden', !board)
+      el.querySelector('.res-mine')!.classList.toggle('hidden', board)
+      el.querySelector('.res-card')!.classList.toggle('wide', board)
+    }),
+  )
 
   const actions = [main, ...more]
   el.querySelectorAll<HTMLElement>('.res-actions [data-a]').forEach((b) =>
