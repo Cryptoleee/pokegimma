@@ -6487,7 +6487,7 @@ button:disabled {
   clip-path: polygon(-20% -30%, 100% -30%, 97% 20%, 101% 38%, 95% 58%, 100% 76%, 97% 130%, -20% 130%);
 }
 .b-break {
-  transform: rotate(4deg) translate(2%, 7%);
+  transform: rotate(4deg) translateY(7%);
   clip-path: polygon(3% -30%, 120% -30%, 120% 130%, 2% 130%, -1% 76%, 4% 58%, -2% 38%, 2% 20%);
 }
 .crack {
@@ -6519,6 +6519,14 @@ button:disabled {
 }
 .ribbon.dark span {
   color: #ffd84a;
+}
+/* Desktop and tablets on their side: the logo block sits in the middle of the screen */
+@media (orientation: landscape) and (min-height: 561px) {
+  .tlogo.v-break {
+    top: 0;
+    bottom: 16%;
+    justify-content: center;
+  }
 }
 @media (orientation: landscape) and (max-height: 560px) {
   .wbox { font-size: min(13vw, 18vh); }
