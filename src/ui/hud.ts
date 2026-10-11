@@ -79,9 +79,10 @@ export class Hud {
     this.bindStick(zone)
     root.append(zone)
 
-    // Team dock: round portrait with the HP as a ring around it, then the name,
-    // XP and the rest of the team (tap to switch). HP numbers live on the
-    // nameplate above the Pokémon itself, types on the attack buttons.
+    // Team capsule: one pill with the active Pokémon (HP as a ring around the
+    // portrait, level underneath), its name and XP, then the rest of the team
+    // (tap to switch). HP numbers live on the nameplate above the Pokémon
+    // itself, types on the attack buttons.
     const pf = h('div', 'hc-portrait')
     const face = h('div', 'hc-face')
     face.append(this.portrait)
@@ -89,8 +90,8 @@ export class Hud {
     const main = h('div', 'hc-main')
     const xp = h('div', 'hc-xp')
     xp.append(this.xpFill)
-    main.append(this.monName, xp, this.party)
-    this.card.append(pf, main)
+    main.append(this.monName, xp)
+    this.card.append(pf, main, h('div', 'hc-div'), this.party)
     root.append(this.card, this.hideBadge)
 
     // Top right: map, chips, feed
@@ -444,7 +445,7 @@ export class Hud {
       this.card.classList.add('swap')
     }
     this.monName.textContent = `${m.shiny ? '✦' : ''}${m.name}`
-    this.monLv.textContent = `${m.level}`
+    this.monLv.textContent = `Lv${m.level}`
     const k = Math.max(0, m.hp / m.maxHp)
     // The ring flashes red for a moment on every hit
     const now = performance.now()
