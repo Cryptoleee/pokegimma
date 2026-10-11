@@ -1,5 +1,6 @@
 import { PARTY_MAX, rarityOf, ROSTER, SPECIES, TEAM_SIZE, WILD, type Rarity } from '../data/pokemon'
 import { eventTimes, startEvent, updateEvents, type WorldEvent } from './events'
+import { roleInfo } from '../data/roles'
 import { raidDown, setupRaid, updateRaid, type Hazard, type RaidState } from './boss'
 import { movesetFor, SLOT_UNLOCK, type Move, type MoveFx } from '../data/moves'
 import { Vfx } from './vfx'
@@ -676,7 +677,8 @@ export class Game {
   /** Walks a trainer along its input vector. Returns the input strength. */
   walk(tr: Trainer, dt: number) {
     let len = Math.hypot(tr.vx, tr.vy)
-    const speed = 4.4
+    // Speedsters make their trainer quicker on their feet
+    const speed = 4.4 * (tr.mon && !tr.mon.fainted ? roleInfo(tr.mon.species.id).speed : 1)
     // Frozen solid by an ice attack: can't move for a moment
     if (tr.mon && tr.mon.frozenT > 0 && !tr.mon.fainted) len = 0
     // Ice floor: you keep sliding and turn slowly
@@ -829,7 +831,7 @@ export class Game {
       this.lastTarget = tgt
       this.lastTargetT = 1.6
     }
-    m.cds[slot] = mv.cooldown
+    m.cds[slot] = mv.cooldown * (mv.kind === 'dash' ? roleInfo(m.species.id).dashCd : 1)
     if (this.send) {
       // Client: the host runs the move; we only predict the cooldown and facing.
       this.aim(m, tgt, dir)
@@ -1139,7 +1141,7 @@ export class Game {
     // The boss's ordinary moves are chip damage (a share of your HP); its telegraphed attacks are the real threat
     const dmg = src.boss
       ? Math.max(1, Math.round(tgt.maxHp * (0.02 + mv.tier * 0.012) * mult * (eff > 1 ? 1.3 : eff < 1 ? 0.75 : 1)))
-      : Math.max(1, Math.round(raw * eff * mult * DMG_SCALE * this.rng.range(0.9, 1.05)))
+      : Math.max(1, Math.round(raw * eff * mult * roleInfo(src.species.id).dmg * DMG_SCALE * this.rng.range(0.9, 1.05)))
     tgt.hp -= dmg
     if (tgt.boss && src.owner) src.owner.bossDmg += Math.min(dmg, tgt.hp + dmg)
     tgt.flash = 0.12
@@ -1151,7 +1153,8 @@ export class Game {
     // knockback
     const dx = tgt.x - src.x, dy = tgt.y - src.y
     const d = Math.hypot(dx, dy) || 1
-    if (!tgt.legendary) this.tryMove(tgt, (dx / d) * 0.12, (dy / d) * 0.12, 0.2)
+    const kb = 0.12 * roleInfo(tgt.species.id).knock
+    if (!tgt.legendary) this.tryMove(tgt, (dx / d) * kb, (dy / d) * kb, 0.2)
 
     const visible = this.onScreen(tgt.x, tgt.y)
     if (visible) {

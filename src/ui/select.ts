@@ -3,6 +3,7 @@ import { animatedUrl, PARTY_MAX, ROSTER, SPECIES, spriteUrl, TEAM_SIZE, type Spe
 import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
 import { TYPE_COLOR, TYPE_NL } from '../data/types'
 import { cry, sfx } from '../audio'
+import { ROLES, roleOf, STYLES, styleOf, type Role, type Style } from '../data/roles'
 
 /**
  * Selection screens built like a character-select in a fighting game: a big
@@ -105,15 +106,31 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
       <div class="hero-rays"></div>
       <div class="hero-plat"></div>
       <div class="hero-fig"></div>
-      <div class="plate"><b></b><span class="chips"></span></div>
+      <div class="plate"><b></b><span class="chips"></span><span class="role-line"></span></div>
       <div class="info">
         <div class="stats"></div>
         <div class="moves2"></div>
         <div class="evo"></div>
       </div>
     </div>
+    <div class="mon-filter">
+      <div class="mf-row" role="group" aria-label="Rol">
+        <button class="mf on" data-role="all">Alle</button>
+        ${(Object.keys(ROLES) as Role[]).map((r) => `<button class="mf" data-role="${r}" style="--rc:${ROLES[r].color}"><i>${ROLES[r].icon}</i>${ROLES[r].name}</button>`).join('')}
+      </div>
+      <div class="mf-row" role="group" aria-label="Aanvalsstijl">
+        <button class="mf on" data-style="all">Alle stijlen</button>
+        <button class="mf" data-style="melee">Melee</button>
+        <button class="mf" data-style="ranged">Ranged</button>
+        <span class="mf-count"></span>
+      </div>
+    </div>
     <div class="mon-grid">
-      ${ROSTER.map((id) => `<button class="tile" data-id="${id}" style="--tc:${TYPE_COLOR[SPECIES[id].types[0]]}"><img class="px" src="${spriteUrl(id)}" alt=""><span>${SPECIES[id].name}</span></button>`).join('')}
+      ${ROSTER.map((id) => {
+        const r = ROLES[roleOf(id)]
+        return `<button class="tile" data-id="${id}" data-role="${roleOf(id)}" data-style="${styleOf(id)}" style="--tc:${TYPE_COLOR[SPECIES[id].types[0]]};--rc:${r.color}"><i class="rl" title="${r.name}">${r.icon}</i><img class="px" src="${spriteUrl(id)}" alt=""><span>${SPECIES[id].name}</span></button>`
+      }).join('')}
+      <div class="mf-empty hidden">Geen partners met deze filters</div>
     </div>
     <div class="sel-note">Je start met 1 partner. In de wereld vang je er nog ${PARTY_MAX - TEAM_SIZE} bij.</div>`, cta)
 
@@ -127,6 +144,9 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
     el.querySelector('.hero-fig')!.innerHTML = gif(pick)
     el.querySelector('.plate b')!.textContent = sp.name
     el.querySelector('.plate .chips')!.innerHTML = typeChips(sp)
+    const role = ROLES[roleOf(pick)]
+    el.querySelector('.plate .role-line')!.innerHTML =
+      `<em class="rb" style="--rc:${role.color}"><i>${role.icon}</i>${role.name}</em><em class="sb">${STYLES[styleOf(pick)]}</em><small>${role.bonus}</small>`
     const stat = (label: string, v: number) =>
       `<div class="st"><span>${label}</span><i><em style="--w:${Math.min(100, (v / 120) * 100)}%"></em></i><b>${v}</b></div>`
     el.querySelector('.stats')!.innerHTML = stat('HP', sp.hp) + stat('ATK', sp.atk) + stat('DEF', sp.def) + stat('SPE', sp.spe)
@@ -150,6 +170,29 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
       hero.classList.add('swap')
     }
   }
+  // Filters: role and attack style
+  let fRole: Role | 'all' = 'all', fStyle: Style | 'all' = 'all'
+  const applyFilter = () => {
+    let n = 0
+    el.querySelectorAll<HTMLElement>('.tile').forEach((t) => {
+      const ok = (fRole === 'all' || t.dataset.role === fRole) && (fStyle === 'all' || t.dataset.style === fStyle)
+      t.classList.toggle('hidden', !ok)
+      if (ok) n++
+    })
+    el.querySelector('.mf-count')!.textContent = `${n} van ${ROSTER.length}`
+    el.querySelector('.mf-empty')!.classList.toggle('hidden', n > 0)
+    el.querySelectorAll<HTMLElement>('[data-role].mf').forEach((b) => b.classList.toggle('on', b.dataset.role === fRole))
+    el.querySelectorAll<HTMLElement>('[data-style].mf').forEach((b) => b.classList.toggle('on', b.dataset.style === fStyle))
+  }
+  el.querySelectorAll<HTMLElement>('.mf').forEach((b) =>
+    b.addEventListener('click', () => {
+      sfx.select()
+      if (b.dataset.role) fRole = b.dataset.role as Role | 'all'
+      if (b.dataset.style) fStyle = b.dataset.style as Style | 'all'
+      applyFilter()
+    }),
+  )
+  applyFilter()
   el.querySelectorAll<HTMLElement>('.tile').forEach((b) =>
     b.addEventListener('click', () => {
       const id = Number(b.dataset.id)

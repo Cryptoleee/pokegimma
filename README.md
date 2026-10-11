@@ -6,7 +6,7 @@ Een real-time Pokémon battle royale voor de browser, mobile first, in de stijl 
 
 Er zijn twee modi: **Battle Royale** (12 trainers, laatste die overblijft wint) en **Raid** (alleen of samen tegen één enorme eindbaas). Beide kun je solo of met vrienden spelen.
 
-Na een korte uitleg vul je je naam in en kies je: **solo** tegen bots, of **samen** met vrienden. Je kiest een trainer en één partner-Pokémon uit een roster van 12; in de wereld vang je er nog twee bij (max. 3). Daarna word je gedropt op een grote kaart met in totaal 12 trainers. Je Pokémon loopt achter je aan en vecht in real time. Versla en vang wilde Pokémon, raap Master Balls en items op en blijf binnen de zone. Wie als laatste trainer overblijft, wint.
+Na een korte uitleg vul je je naam in en kies je: **solo** tegen bots, of **samen** met vrienden. Je kiest een trainer en één partner-Pokémon uit een roster van 24 (te filteren op rol en op melee/ranged); in de wereld vang je er nog twee bij (max. 3). Daarna word je gedropt op een grote kaart met in totaal 12 trainers. Je Pokémon loopt achter je aan en vecht in real time. Versla en vang wilde Pokémon, raap Master Balls en items op en blijf binnen de zone. Wie als laatste trainer overblijft, wint.
 
 ## Spelen
 
@@ -72,6 +72,19 @@ Lokaal testen zonder internet: start een eigen PeerJS-server (`npx peer --port 9
   - Ze bemoeien zich niet met een gevecht dat al bezig is, tenzij ze zelf geraakt worden.
   - Ze laten andere trainers de eerste minuut met rust.
   - Een legendarische Pokémon pakken ze alleen aan als ze duidelijk sterk genoeg zijn. Ze gebruiken er nooit een Master Ball voor, en hij breekt vaak uit hun bal.
+
+## Rollen
+
+Net als in Pokémon Unite heeft elke partner een rol en een aanvalsstijl. Je ziet ze bij de stats op het keuzescherm en kunt erop filteren. De rol geeft een klein voordeel; evoluties houden de rol van hun lijn, en wilde Pokémon krijgen een rol op basis van hun stats.
+
+| Rol | Bonus | Partners |
+| --- | --- | --- |
+| **Aanvaller** | +10% schade | Pikachu, Charmander, Bulbasaur, Gastly, Abra, Shinx, Deino |
+| **Allrounder** | +5% schade, +7% HP | Eevee, Tepig, Oshawott, Gible, Axew, Machop, Dratini, Beldum |
+| **Verdediger** | +15% HP, halve knockback | Squirtle, Larvitar, Munchlax, Mudkip |
+| **Snelheid** | +12% loopsnelheid, 20% kortere cooldown op dash-aanvallen | Snivy, Riolu, Zorua, Scyther, Torchic |
+
+**Melee** of **Ranged** volgt uit de basisaanval (de aanval die je het vaakst gebruikt).
 
 ## Werelden en gebeurtenissen
 

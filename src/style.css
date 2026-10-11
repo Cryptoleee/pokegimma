@@ -5212,3 +5212,151 @@ button:disabled {
     bottom: calc(9% + var(--safe-b));
   }
 }
+
+/* ---------- Roster: role filter, role icons, scrolling grid ---------- */
+.mon-filter {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 12px 0;
+}
+.mf-row {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mf-row::-webkit-scrollbar {
+  display: none;
+}
+.mf {
+  --rc: #c8d0f0;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  color: #dfe4ff;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.mf i {
+  font-style: normal;
+  color: var(--rc);
+}
+.mf.on {
+  border-color: var(--rc);
+  background: color-mix(in srgb, var(--rc) 28%, transparent);
+  color: #fff;
+}
+.mf[data-role='all'].on,
+.mf[data-style].on {
+  --rc: var(--hi);
+}
+.mf-count {
+  margin-left: auto;
+  flex: none;
+  font-size: 11px;
+  color: #a8b0d0;
+  padding-left: 6px;
+}
+.mon-grid {
+  flex: none;
+  grid-auto-rows: max-content;
+  align-content: start;
+  max-height: 172px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+}
+.mon-grid .tile.hidden {
+  display: none;
+}
+.mf-empty {
+  grid-column: 1 / -1;
+  padding: 18px 0;
+  text-align: center;
+  color: #a8b0d0;
+  font-size: 13px;
+}
+.mf-empty.hidden {
+  display: none;
+}
+.tile .rl {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 1;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--rc);
+  color: #fff;
+  font-style: normal;
+  font-size: 9px;
+  line-height: 1;
+  border: 1.5px solid rgba(0, 0, 0, 0.45);
+  text-shadow: none;
+}
+.plate .role-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 2px;
+}
+.plate .role-line em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 6px;
+  color: #fff;
+}
+.plate .role-line .rb {
+  background: var(--rc);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+}
+.plate .role-line .rb i {
+  font-style: normal;
+  margin-right: 3px;
+}
+.plate .role-line .sb {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.plate .role-line small {
+  font-size: 11px;
+  color: #c8d0f0;
+}
+@media (max-height: 560px) {
+  .mon-grid {
+    max-height: 92px;
+  }
+  .mon-filter {
+    flex-direction: row;
+    gap: 8px;
+    padding-top: 6px;
+  }
+}
+.mf-row:first-child {
+  -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, #000 88%, transparent);
+  padding-right: 24px;
+}
+@media (max-height: 560px) {
+  .mon-filter + .mon-grid + .sel-note {
+    display: none;
+  }
+}

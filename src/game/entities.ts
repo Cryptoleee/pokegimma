@@ -1,6 +1,7 @@
 import { SPECIES, rarityOf, type Rarity, type Species } from '../data/pokemon'
 import { movesetFor, SLOT_UNLOCK, type Move } from '../data/moves'
 import type { TrainerDef } from '../data/trainers'
+import { roleInfo } from '../data/roles'
 
 export type Dir = 'down' | 'up' | 'left' | 'right'
 
@@ -112,7 +113,9 @@ export class Mon {
 
   get maxHp() {
     if (this.boss) return statHp(this.species, this.level) * this.bossMul
-    return statHp(this.species, this.level) * (this.legendary && !this.owner ? 2.2 : 1)
+    if (this.legendary && !this.owner) return statHp(this.species, this.level) * 2.2
+    // Defenders and all-rounders get a little extra HP
+    return Math.round(statHp(this.species, this.level) * roleInfo(this.species.id).hp)
   }
   get atk() {
     return stat(this.species.atk, this.level)

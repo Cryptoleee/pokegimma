@@ -56,6 +56,26 @@ const ROWS: Row[] = [
   [610, 'Axew', 'dragon', 46, 58, 50, 57, 611, 26],
   [611, 'Fraxure', 'dragon', 66, 79, 60, 67, 612, 38],
   [612, 'Haxorus', 'dragon', 76, 104, 80, 97],
+  [68, 'Machamp', 'fighting', 90, 99, 75, 55],
+  [148, 'Dragonair', 'dragon', 61, 74, 63, 70, 149, 38],
+  [246, 'Larvitar', 'rock/ground', 50, 55, 50, 41, 247, 30],
+  [247, 'Pupitar', 'rock/ground', 70, 65, 70, 51, 248, 36],
+  [446, 'Munchlax', 'normal', 135, 62, 68, 5, 143, 20],
+  [374, 'Beldum', 'steel/psychic', 40, 45, 70, 30, 375, 20],
+  [375, 'Metang', 'steel/psychic', 60, 65, 80, 50, 376, 36],
+  [123, 'Scyther', 'bug/flying', 70, 82, 60, 105, 212, 30],
+  [212, 'Scizor', 'bug/steel', 70, 93, 90, 65],
+  [258, 'Mudkip', 'water', 50, 60, 50, 40, 259, 16],
+  [259, 'Marshtomp', 'water/ground', 70, 75, 70, 50, 260, 36],
+  [260, 'Swampert', 'water/ground', 100, 102, 90, 60],
+  [255, 'Torchic', 'fire', 45, 65, 50, 45, 256, 16],
+  [256, 'Combusken', 'fire/fighting', 60, 85, 60, 55, 257, 36],
+  [257, 'Blaziken', 'fire/fighting', 80, 115, 70, 80],
+  [403, 'Shinx', 'electric', 45, 52, 34, 45, 404, 15],
+  [404, 'Luxio', 'electric', 60, 72, 49, 60, 405, 30],
+  [405, 'Luxray', 'electric', 80, 108, 69, 70],
+  [633, 'Deino', 'dark/dragon', 52, 55, 50, 38, 634, 26],
+  [634, 'Zweilous', 'dark/dragon', 72, 75, 70, 58, 635, 38],
 
   // Wild: common
   [504, 'Patrat', 'normal', 45, 45, 39, 42],
@@ -80,7 +100,7 @@ const ROWS: Row[] = [
   [63, 'Abra', 'psychic', 25, 63, 35, 90, 64, 16],
   [64, 'Kadabra', 'psychic', 40, 78, 50, 105, 65, 36],
   [66, 'Machop', 'fighting', 70, 58, 43, 35, 67, 28],
-  [67, 'Machoke', 'fighting', 80, 75, 65, 45],
+  [67, 'Machoke', 'fighting', 80, 75, 65, 45, 68, 38],
   [92, 'Gastly', 'ghost/poison', 30, 68, 33, 80, 93, 25],
   [93, 'Haunter', 'ghost/poison', 45, 83, 50, 95, 94, 38],
   [529, 'Drilbur', 'ground', 60, 58, 43, 68, 530, 31],
@@ -93,7 +113,7 @@ const ROWS: Row[] = [
   [585, 'Deerling', 'normal/grass', 60, 50, 50, 75],
   [587, 'Emolga', 'electric/flying', 55, 75, 60, 103],
   [559, 'Scraggy', 'dark/fighting', 50, 55, 70, 48],
-  [147, 'Dratini', 'dragon', 41, 57, 48, 50],
+  [147, 'Dratini', 'dragon', 41, 57, 48, 50, 148, 30],
   [636, 'Larvesta', 'bug/fire', 55, 68, 55, 60, 637, 40],
 
   // Wild: rare
@@ -137,8 +157,8 @@ for (const [id, name, types, hp, atk, def, spe, evo, evoLevel] of ROWS) {
   }
 }
 
-/** The 12 Pokémon you pick your starting team from. */
-export const ROSTER = [25, 4, 7, 1, 133, 495, 498, 501, 447, 443, 570, 610]
+/** The 24 Pokémon you pick your starting partner from. */
+export const ROSTER = [25, 4, 7, 1, 133, 495, 498, 501, 447, 443, 570, 610, 92, 66, 63, 147, 246, 446, 374, 123, 258, 255, 403, 633]
 /** You start with one partner and can catch more in the world, up to PARTY_MAX. */
 export const TEAM_SIZE = 1
 export const PARTY_MAX = 3
