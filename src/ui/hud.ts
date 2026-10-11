@@ -574,7 +574,8 @@ export class Hud {
       time.classList.toggle('low', t <= 30)
       this.bossBar.classList.toggle('enraged', (rv?.phase ?? 0) >= 2)
       // Lives: just your hearts solo; with friends a short name before each row of hearts
-      const humans = g.trainers.filter((t) => t.human)
+      // Your own hearts first, then the others
+      const humans = g.trainers.filter((t) => t.human).sort((a, b) => (b === p ? 1 : 0) - (a === p ? 1 : 0))
       const hearts = (t: typeof p) => '♥'.repeat(Math.max(0, t.lives)) + '♡'.repeat(Math.max(0, 3 - t.lives))
       const team = humans.length < 2
         ? `<span class="mine">${hearts(p)}</span>`

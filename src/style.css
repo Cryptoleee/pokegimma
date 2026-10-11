@@ -4902,8 +4902,8 @@ button:disabled {
 .bossbar {
   --c: #ff7a30;
   position: absolute;
-  left: calc(10px + var(--safe-l));
-  right: calc(10px + var(--safe-r));
+  left: calc(8px + var(--safe-l));
+  width: min(230px, calc(100vw - 168px - var(--safe-l)));
   top: calc(74px + var(--safe-t));
   display: flex;
   flex-direction: column;
@@ -4916,14 +4916,10 @@ button:disabled {
   pointer-events: none;
   animation: legendPop 0.6s cubic-bezier(0.2, 1.5, 0.4, 1);
 }
-/* Landscape: between your card (left) and the pause button (right) */
+/* Landscape has room: a bit wider, still right under the team capsule */
 @media (orientation: landscape) and (min-width: 700px) {
   .bossbar {
-    left: calc(292px + var(--safe-l));
-    right: calc(214px + var(--safe-r));
-    top: calc(12px + var(--safe-t));
-    max-width: 440px;
-    margin: 0 auto;
+    width: 320px;
   }
 }
 #hud > .bossbar,
