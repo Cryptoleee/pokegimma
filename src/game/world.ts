@@ -373,18 +373,18 @@ export class World {
         const fancy = !this.arena
         if (t === T.ICE || t === T.PILLAR) drawIce(g, x, y, th, tx, ty)
         else if (this.arena === 'lab' && t !== T.TREE) drawLabFloor(g, x, y, th, tx, ty)
-        else if (this.arena === 'sky' && t !== T.TREE) drawCloud(g, x, y, th, tx, ty)
+        else if (this.arena === 'sky' && t !== T.TREE) drawSkyStone(g, x, y, th, tx, ty, t === T.SAND)
         else if (fancy) paintGrass(g, x, y, tx, ty, th)
         else drawGrass(g, x, y, r, th)
         switch (t) {
           // Tall grass and flowers are drawn (animated) every frame on top of this
           case T.TALL: fancy ? tallBed(g, x, y, th) : drawTall(g, x, y, th); break
           case T.PATH: fancy ? paintPath(g, x, y, this, tx, ty, th) : drawPath(g, x, y, r, this, tx, ty, th); break
-          case T.SAND: fancy ? paintSand(g, x, y, tx, ty, th, this) : drawSand(g, x, y, r, th); break
+          case T.SAND: if (this.arena !== 'sky') fancy ? paintSand(g, x, y, tx, ty, th, this) : drawSand(g, x, y, r, th); break
           case T.WATER: fancy && th.liquid === 'water' ? paintWater(g, x, y, this, tx, ty, th) : fancy && th.liquid === 'lava' ? paintLava(g, x, y, this, tx, ty, th) : drawWater(g, x, y, this, tx, ty, th); break
           case T.BRIDGE: drawBridge(g, x, y, th); break
           case T.FLOWER: if (!fancy) drawFlower(g, x, y, r, th); break
-          case T.ROCK: fancy ? paintRock(g, x, y, tx, ty, th) : drawRock(g, x, y, th); break
+          case T.ROCK: fancy ? paintRock(g, x, y, tx, ty, th) : this.arena === 'sky' ? drawPillarStub(g, o, x, y, th) : drawRock(g, x, y, th); break
           case T.TREE: fancy && isTree(th) ? treeBase(g, x, y, th) : drawTrunk(g, o, x, y, th, this, tx, ty); break
           case T.LAVA: drawLava(g, x, y, this, tx, ty); break
         }
@@ -591,22 +591,40 @@ function drawRock(g: CanvasRenderingContext2D, x: number, y: number, th: WorldTh
 function drawTrunk(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, x: number, y: number, th: WorldTheme, w: World, tx: number, ty: number) {
   const [shadow, trunk, trunkDark] = th.trunk
   if (th.decor === 'sky') {
-    // Open sky around the cloud floor: gradient blue with drifting cloud puffs
-    let h = ((tx * 73856093) ^ (ty * 19349663)) >>> 0
-    g.fillStyle = (tx + ty) % 2 ? th.canopy[1] : th.canopy[2]
+    // Open sky around the tower top: deeper blue further out, drifting cloud
+    // banks, and the pillar's stone wall dropping away under the floor's edge
+    const h = ((tx * 73856093) ^ (ty * 19349663)) >>> 0
+    const far = Math.hypot(tx + 0.5 - ARENA_C, ty + 0.5 - ARENA_C) - ARENA_R
+    g.fillStyle = far > 9 ? th.canopy[0] : far > 4 ? th.canopy[1] : th.canopy[2]
     g.fillRect(x, y, TILE, TILE)
-    if (h % 7 === 0) {
-      g.fillStyle = 'rgba(255,255,255,0.55)'
-      g.fillRect(x + (h % 6), y + ((h >> 3) % 8), 9, 3)
-      g.fillRect(x + (h % 6) + 2, y + ((h >> 3) % 8) - 2, 5, 2)
+    if (h % 5 === 0) {
+      g.fillStyle = 'rgba(255,255,255,0.75)'
+      g.fillRect(x + (h % 4), y + 6 + ((h >> 3) % 5), 12, 4)
+      g.fillRect(x + (h % 4) + 3, y + 3 + ((h >> 3) % 5), 6, 3)
+      g.fillStyle = 'rgba(190,215,245,0.8)'
+      g.fillRect(x + (h % 4), y + 9 + ((h >> 3) % 5), 12, 1)
     }
-    // Fluffy cloud lip where the floor ends
-    const floorUp = ty > 0 && !w.blockedTile(tx, ty - 1)
-    if (floorUp) {
-      g.fillStyle = '#ffffff'
-      for (let i = 0; i < 4; i++) g.fillRect(x + i * 4, y, 4, 4 + ((tx * 3 + i) % 3) * 2)
-      g.fillStyle = '#c8d8ee'
-      g.fillRect(x, y + 7, TILE, 2)
+    // Stone wall of the tower below the floor's edge
+    let up = 0
+    while (up < 3 && ty - up - 1 >= 0 && w.blockedTile(tx, ty - up - 1) && w.at(tx, ty - up - 1) === T.TREE) up++
+    const floorAbove = ty - up - 1 >= 0 && !(w.at(tx, ty - up - 1) === T.TREE)
+    if (floorAbove && up < 2) {
+      const [outline, base, hi] = th.rock
+      g.fillStyle = up === 0 ? base : outline
+      g.fillRect(x, y, TILE, TILE)
+      g.fillStyle = outline
+      g.fillRect(x, y + (up === 0 ? 7 : 3), TILE, 1)
+      g.fillRect(x + (ty % 2 ? 4 : 11) , y, 1, TILE)
+      if (up === 0) {
+        g.fillStyle = hi
+        g.fillRect(x, y, TILE, 2)
+      } else {
+        // Fade into the sky
+        g.fillStyle = th.canopy[2]
+        g.globalAlpha = 0.6
+        g.fillRect(x, y + 8, TILE, 8)
+        g.globalAlpha = 1
+      }
     }
     return
   }
@@ -762,15 +780,86 @@ function drawLabFloor(g: CanvasRenderingContext2D, x: number, y: number, th: Wor
 }
 
 /** Cloud floor of the Sky Pillar: soft white with blue shading. */
-function drawCloud(g: CanvasRenderingContext2D, x: number, y: number, th: WorldTheme, tx: number, ty: number) {
-  const [base, dark, light] = th.grass
-  g.fillStyle = base
-  g.fillRect(x, y, TILE, TILE)
+/**
+ * Sky Pillar roof: weathered green-grey flagstones with moss and cracks, and
+ * two carved rings around the centre (Rayquaza's resting place).
+ */
+function drawSkyStone(g: CanvasRenderingContext2D, x: number, y: number, th: WorldTheme, tx: number, ty: number, moss: boolean) {
+  const [base, grout, light] = th.grass
   const h = ((tx * 92837111) ^ (ty * 689287499)) >>> 0
-  g.fillStyle = dark
-  g.fillRect(x + (h % 10), y + ((h >> 4) % 12), 6, 2)
-  g.fillStyle = light
-  g.fillRect(x + ((h >> 8) % 10), y + ((h >> 12) % 10), 5, 3)
+  // Two flagstones per tile, offset every other row like old masonry
+  g.fillStyle = grout
+  g.fillRect(x, y, TILE, TILE)
+  const off = ty % 2 ? 8 : 0
+  for (const [sx, sw] of [[-off, 8], [8 - off, 8], [16 - off, 8]] as const) {
+    const a = Math.max(0, sx), b = Math.min(TILE, sx + sw)
+    if (b - a <= 0) continue
+    g.fillStyle = base
+    g.fillRect(x + a + (a === sx ? 1 : 0), y + 1, b - a - (a === sx ? 1 : 0), TILE - 2)
+    g.fillStyle = light
+    g.fillRect(x + a + (a === sx ? 1 : 0), y + 1, b - a - (a === sx ? 1 : 0), 1)
+  }
+  // Wear: a few darker pits and a crack now and then
+  g.fillStyle = grout
+  g.fillRect(x + (h % 13) + 1, y + ((h >> 4) % 11) + 3, 2, 1)
+  if (h % 5 === 0) {
+    const cx = x + 3 + ((h >> 7) % 9), cy = y + 3 + ((h >> 11) % 8)
+    g.fillRect(cx, cy, 1, 2)
+    g.fillRect(cx + 1, cy + 2, 1, 2)
+    g.fillRect(cx + 2, cy + 3, 2, 1)
+  }
+  // Carved rings with a faint gold inlay
+  for (const R of [4.5, 11]) {
+    for (let py = 0; py < TILE; py++)
+      for (let px = 0; px < TILE; px++) {
+        const d = Math.hypot(tx + (px + 0.5) / TILE - ARENA_C, ty + (py + 0.5) / TILE - ARENA_C)
+        const e = Math.abs(d - R) * TILE
+        if (e < 1.2) {
+          g.fillStyle = e < 0.5 ? '#c8a860' : grout
+          g.fillRect(x + px, y + py, 1, 1)
+        }
+      }
+  }
+  if (moss) {
+    // Moss creeping over the stones
+    const [m1, m2] = th.sand
+    for (let i = 0; i < 7; i++) {
+      const k = (h >> (i * 3)) & 0xff
+      g.fillStyle = i % 3 ? m1 : m2
+      g.fillRect(x + (k % 13), y + ((k >> 3) % 13) + (i & 1), 3 + (i % 3), 2 + (i % 2))
+    }
+  }
+}
+
+/** A broken pillar of the old roof (blocks movement). */
+function drawPillarStub(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, x: number, y: number, th: WorldTheme) {
+  const [outline, base, hi] = th.rock
+  g.fillStyle = 'rgba(0,0,0,0.3)'
+  g.fillRect(x, y + 12, TILE, 4)
+  g.fillStyle = outline
+  g.fillRect(x + 1, y + 2, 14, 13)
+  g.fillStyle = base
+  g.fillRect(x + 2, y + 3, 12, 11)
+  g.fillStyle = hi
+  g.fillRect(x + 3, y + 3, 2, 11)
+  g.fillStyle = outline
+  g.fillRect(x + 6, y + 3, 1, 11)
+  g.fillRect(x + 10, y + 3, 1, 11)
+  // Jagged broken top on the overlay so trainers walk "behind" it
+  o.fillStyle = outline
+  o.fillRect(x + 1, y - 7, 14, 10)
+  o.fillStyle = base
+  o.fillRect(x + 2, y - 6, 12, 9)
+  o.fillStyle = hi
+  o.fillRect(x + 3, y - 6, 2, 9)
+  o.fillStyle = outline
+  o.fillRect(x + 6, y - 6, 1, 9)
+  o.fillRect(x + 10, y - 6, 1, 9)
+  o.fillStyle = th.grass[1]
+  o.fillRect(x + 1, y - 8, 4, 2)
+  o.fillRect(x + 8, y - 10, 5, 4)
+  o.fillStyle = th.sand[0]
+  o.fillRect(x + 2, y - 8, 3, 1)
 }
 
 /** Lightning rod: a metal mast with a glowing coil (the top sits on the overlay). */
