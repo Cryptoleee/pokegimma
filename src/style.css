@@ -2138,37 +2138,47 @@ img.px {
   transition: opacity 0.5s;
 }
 
-/* Battle card */
+/* Team dock: portrait with an HP ring, name, XP and the bench */
 .hcard {
+  --hp: 360deg;
+  --hc: #40d860;
   position: absolute;
   top: calc(8px + var(--safe-t));
   left: calc(8px + var(--safe-l));
   display: flex;
-  align-items: stretch;
-  width: min(268px, calc(100vw - 182px));
+  align-items: center;
+  max-width: calc(100vw - 190px);
   pointer-events: none !important;
-  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.35));
 }
 .hc-portrait {
   position: relative;
   z-index: 2;
-  width: 58px;
-  height: 58px;
-  margin-right: -14px;
+  flex: none;
+  width: 54px;
+  height: 54px;
+  padding: 4px;
   border-radius: 50%;
-  border: 3px solid #1a1420;
+  background: conic-gradient(var(--hc) var(--hp), rgba(16, 16, 28, 0.75) 0);
+  transition: box-shadow 0.15s;
+}
+.hc-face {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid #1a1420;
   background: radial-gradient(circle at 40% 35%, #ffffff, #c8d8f0 60%, #8098c8);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.hc-portrait img {
-  width: 92px;
-  margin-top: 10px;
+.hc-face img {
+  width: 76px;
+  margin-top: 8px;
   image-rendering: pixelated;
 }
-.hcard.swap .hc-portrait img {
+.hcard.swap .hc-face img {
   animation: figIn2 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 @keyframes figIn2 {
@@ -2177,89 +2187,59 @@ img.px {
     filter: brightness(5);
   }
 }
-.hc-main {
-  flex: 1;
-  padding: 5px 10px 5px 20px;
-  background: linear-gradient(180deg, #fafafa 0 55%, #e4e8f0 55%);
-  border: 3px solid #1a1420;
-  border-radius: 6px 16px 16px 6px;
-  clip-path: polygon(0 0, 100% 0, 100% 70%, 94% 100%, 0 100%);
-}
-.hc-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: 15px;
-}
-.hc-top .lv {
-  font-weight: 700;
-  font-size: 13px;
-  color: #3858a8;
-}
-.hc-hp {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 2px;
-  padding: 2px 3px;
-  background: #1a1420;
-  border-radius: 4px;
-}
-.hc-hp span {
-  color: var(--hi);
-  font-size: 9px;
-  font-weight: 700;
-}
-.hc-hp .bar {
-  position: relative;
-  flex: 1;
-  height: 7px;
-  border-radius: 2px;
-  background: #484858;
-  overflow: hidden;
-}
-.hc-hp .bar i {
+.hc-portrait .lv {
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  transition: width 0.12s;
-}
-.hc-hp .lag {
-  background: #f8f8f8;
-  transition: none !important;
-}
-.hcard.hurt .hc-hp .lag {
-  background: #ff6050;
-}
-.hc-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 2px;
-}
-.hc-bottom .types {
-  display: flex;
-  gap: 2px;
-}
-.hc-bottom .types em {
-  font-style: normal;
-  font-size: 8.5px;
-  font-weight: 700;
+  right: -4px;
+  bottom: -3px;
+  min-width: 20px;
+  padding: 1px 4px;
+  border-radius: 8px;
+  background: #1a1420;
+  border: 1.5px solid var(--hi);
   color: #fff;
-  padding: 0 4px;
-  border-radius: 3px;
-  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4);
-}
-.hc-bottom .nums {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+.hcard.hurt .hc-portrait {
+  box-shadow: 0 0 0 2px #ff5040, 0 0 14px rgba(255, 64, 48, 0.8);
+}
+.hcard.low .hc-portrait {
+  animation: lowPulse 0.8s ease-in-out infinite;
+}
+@keyframes lowPulse {
+  50% { box-shadow: 0 0 0 2px rgba(255, 64, 48, 0.9), 0 0 16px rgba(255, 64, 48, 0.7); }
+}
+.hcard.regen .hc-portrait {
+  box-shadow: 0 0 0 2px rgba(120, 255, 150, 0.8), 0 0 14px rgba(80, 240, 120, 0.7);
+}
+.hc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  margin-left: -10px;
+  padding: 4px 10px 5px 16px;
+  border-radius: 0 14px 14px 0;
+  background: rgba(14, 16, 32, 0.72);
+  border: 2px solid #1a1420;
+  border-left: none;
+}
+.hc-main > b {
+  font-size: 14px;
+  line-height: 1.1;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 0 #000;
 }
 .hc-xp {
-  height: 4px;
-  margin-top: 2px;
+  width: 96px;
+  height: 3px;
   border-radius: 2px;
-  background: #b8c0d0;
+  background: rgba(255, 255, 255, 0.18);
   overflow: hidden;
 }
 .hc-xp i {
@@ -2269,23 +2249,24 @@ img.px {
   transition: width 0.3s;
 }
 
-/* Party badges */
+/* The rest of the team, small, inside the dock (tap to switch) */
 .hparty {
-  position: absolute;
-  top: calc(74px + var(--safe-t));
-  left: calc(10px + var(--safe-l));
   display: flex;
-  gap: 6px;
+  gap: 5px;
+  pointer-events: auto;
+}
+.hparty:empty {
+  display: none;
 }
 .pb {
   --hp: 360deg;
   --hc: #40d860;
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: conic-gradient(var(--hc) var(--hp), rgba(20, 20, 30, 0.6) 0);
-  padding: 3px;
+  padding: 2px;
   cursor: pointer;
 }
 .pb img {
@@ -2293,39 +2274,40 @@ img.px {
   height: 100%;
   border-radius: 50%;
   background: radial-gradient(circle at 40% 35%, #fff, #c8d4ec);
-  border: 2px solid #1a1420;
+  border: 1.5px solid #1a1420;
   object-fit: cover;
   object-position: center 30%;
   image-rendering: pixelated;
 }
 .pb .lv {
   position: absolute;
-  right: -4px;
-  bottom: -2px;
+  right: -5px;
+  bottom: -3px;
   background: #1a1420;
   color: #fff;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
-  border-radius: 6px;
-  padding: 0 3px;
+  border-radius: 5px;
+  padding: 0 2px;
 }
 .pb.active {
-  box-shadow: 0 0 0 3px var(--hi), 0 0 14px rgba(255, 216, 74, 0.7);
+  display: none;
 }
 .pb.faint {
   filter: grayscale(1) brightness(0.7);
 }
 .pb.empty {
-  background: rgba(20, 20, 30, 0.35);
-  border: 2px dashed rgba(255, 255, 255, 0.5);
+  background: transparent;
+  border: 1.5px dashed rgba(255, 255, 255, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: default;
 }
 .pb .plus {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.55);
   font-weight: 700;
-  font-size: 18px;
+  font-size: 13px;
 }
 
 /* Map + chips */
@@ -3287,7 +3269,7 @@ kbd {
 
 .hidebadge {
   position: absolute;
-  top: calc(126px + var(--safe-t));
+  top: calc(70px + var(--safe-t));
   left: calc(10px + var(--safe-l));
   display: flex;
   align-items: center;
@@ -3441,11 +3423,7 @@ kbd {
   25% { transform: translateX(-3px); }
   75% { transform: translateX(3px); }
 }
-.hcard.regen .hc-hp .fill {
-  background: linear-gradient(90deg, #40d860, #a8ffb8, #40d860) !important;
-  background-size: 200% 100% !important;
-  animation: regenShine 1s linear infinite;
-}
+
 @keyframes regenShine {
   to {
     background-position: -200% 0;
@@ -4923,7 +4901,7 @@ button:disabled {
   position: absolute;
   left: calc(10px + var(--safe-l));
   right: calc(10px + var(--safe-r));
-  top: calc(78px + var(--safe-t));
+  top: calc(70px + var(--safe-t));
   display: flex;
   flex-direction: column;
   gap: 3px;

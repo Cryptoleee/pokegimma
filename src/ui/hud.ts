@@ -29,13 +29,9 @@ export class Hud {
   private portraitId = -1
   private monName = h('b')
   private monLv = h('span', 'lv')
-  private types = h('span', 'types')
-  private hpFill = h('i', 'fill')
-  private hpLag = h('i', 'lag')
-  private hpNums = h('span', 'nums')
   private xpFill = h('i')
-  private lagK = 1
   private lastK = 1
+  private hurtUntil = 0
   private party = h('div', 'hparty')
   private partyKey = ''
   private mini = h('canvas', 'minimap') as HTMLCanvasElement
@@ -83,23 +79,19 @@ export class Hud {
     this.bindStick(zone)
     root.append(zone)
 
-    // Battle card (BW battle box, upgraded)
+    // Team dock: round portrait with the HP as a ring around it, then the name,
+    // XP and the rest of the team (tap to switch). HP numbers live on the
+    // nameplate above the Pokémon itself, types on the attack buttons.
     const pf = h('div', 'hc-portrait')
-    pf.append(this.portrait)
+    const face = h('div', 'hc-face')
+    face.append(this.portrait)
+    pf.append(face, this.monLv)
     const main = h('div', 'hc-main')
-    const top = h('div', 'hc-top')
-    top.append(this.monName, this.monLv)
-    const hp = h('div', 'hc-hp', '<span>HP</span>')
-    const bar = h('div', 'bar')
-    bar.append(this.hpLag, this.hpFill)
-    hp.append(bar)
-    const bottom = h('div', 'hc-bottom')
-    bottom.append(this.types, this.hpNums)
     const xp = h('div', 'hc-xp')
     xp.append(this.xpFill)
-    main.append(top, hp, bottom, xp)
+    main.append(this.monName, xp, this.party)
     this.card.append(pf, main)
-    root.append(this.card, this.party, this.hideBadge)
+    root.append(this.card, this.hideBadge)
 
     // Top right: map, chips, feed
     const tr = h('div', 'topright')
@@ -447,23 +439,21 @@ export class Hud {
     if (this.portraitId !== m.species.id * 2 + (m.shiny ? 1 : 0)) {
       this.portraitId = m.species.id * 2 + (m.shiny ? 1 : 0)
       this.portrait.src = spriteUrl(m.species.id, { shiny: m.shiny })
-      this.types.innerHTML = m.species.types.map((t) => `<em style="background:${TYPE_COLOR[t]}">${TYPE_NL[t]}</em>`).join('')
       this.card.classList.remove('swap')
       void this.card.offsetWidth
       this.card.classList.add('swap')
     }
     this.monName.textContent = `${m.shiny ? '✦' : ''}${m.name}`
-    this.monLv.textContent = `Lv${m.level}`
+    this.monLv.textContent = `${m.level}`
     const k = Math.max(0, m.hp / m.maxHp)
-    if (k < this.lastK - 0.001) this.card.classList.add('hurt')
-    else this.card.classList.remove('hurt')
+    // The ring flashes red for a moment on every hit
+    const now = performance.now()
+    if (k < this.lastK - 0.001) this.hurtUntil = now + 220
+    this.card.classList.toggle('hurt', now < this.hurtUntil)
     this.lastK = k
-    // The red "damage taken" bar trails behind the real one
-    this.lagK = k > this.lagK ? k : this.lagK + (k - this.lagK) * 0.06
-    this.hpFill.style.width = `${k * 100}%`
-    this.hpLag.style.width = `${this.lagK * 100}%`
-    this.hpFill.style.background = k > 0.5 ? 'var(--hp-green)' : k > 0.2 ? 'var(--hp-yellow)' : 'var(--hp-red)'
-    this.hpNums.textContent = `${Math.ceil(m.hp)} / ${Math.round(m.maxHp)}`
+    this.card.style.setProperty('--hp', `${k * 360}deg`)
+    this.card.style.setProperty('--hc', k > 0.5 ? '#40d860' : k > 0.2 ? '#f8c020' : '#f84030')
+    this.card.classList.toggle('low', k > 0 && k < 0.25)
     this.xpFill.style.width = `${(m.xp / xpNeeded(m.level)) * 100}%`
 
     // Party badges
