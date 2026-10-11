@@ -9,6 +9,7 @@ import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpac
 import { BOT_TRAINERS, TRAINERS } from '../data/trainers'
 import { effectiveness, TYPE_COLOR } from '../data/types'
 import { cry, sfx } from '../audio'
+import type { ItemSound } from '../moveSfx'
 import { LEVEL_CAP, Mon, Trainer, xpNeeded, type AimDir } from './entities'
 import { Rng } from './rng'
 import { preloadMon } from './sprites'
@@ -21,6 +22,7 @@ import type { Command } from '../net/protocol'
 import type { ClientState } from '../net/sync'
 
 export type ItemKind = 'master' | 'potion' | 'candy' | 'revive'
+const PICKUP_SOUND: Record<ItemKind, ItemSound> = { master: 'pickupMaster', potion: 'pickupPotion', candy: 'pickupCandy', revive: 'pickupRevive' }
 export const ITEM_SPRITE: Record<ItemKind, string> = {
   master: 'master-ball', potion: 'potion', candy: 'rare-candy', revive: 'revive',
 }
@@ -418,6 +420,23 @@ export class Game {
   }
 
   /** Play a sound for everyone who can see (x, y). */
+  /**
+   * A sound from a spot in the world for everyone in earshot: panned left/right
+   * from their camera and fainter further away (full volume for `owners`).
+   * `skipRemote`: that player's own device already played it.
+   */
+  soundAt(x: number, y: number, name: SfxName, args: unknown[], o: { owners?: (Trainer | null | undefined)[]; skipRemote?: Trainer | null; range?: number } = {}) {
+    const range = o.range ?? 15
+    for (const v of this.viewers) {
+      if (o.skipRemote && v.tr === o.skipRemote && !v.local) continue
+      const dx = x - v.camX, dy = y - v.camY, d = Math.hypot(dx, dy)
+      if (d > range) continue
+      const near = 1 - d / range
+      const gain = o.owners?.includes(v.tr) ? 1 : 0.6 * near * near
+      v.sfx(name, ...args, Math.max(-1, Math.min(1, dx / 9)), gain)
+    }
+  }
+
   private sfxAt(x: number, y: number, name: SfxName, ...args: unknown[]) {
     for (const v of this.viewers) if (this.seenBy(v, x, y)) v.sfx(name, ...args)
   }
@@ -869,15 +888,17 @@ export class Game {
     if (this.send) {
       // Client: the host runs the move; we only predict the cooldown and facing.
       this.aim(m, tgt, dir)
-      sfx.cast(mv.tier)
+      // Play our own move right away; the host skips sending it back to us
+      if (mv.charge > 0) sfx.moveCharge(mv.fx, mv.tier, mv.charge)
+      else sfx.moveCast(mv.fx, mv.tier)
       this.send({ t: 'move', s: slot, tg: tgt?.id, d: dir })
       return true
     }
-    if (m.owner?.isPlayer) sfx.cast(mv.tier)
     if (mv.tier >= 1)
       this.addFx({ kind: 'callout', x: m.x, y: m.y - 1.9, t: 0, life: 1, color: TYPE_COLOR[mv.type], text: mv.name, big: mv.tier >= 3 })
     this.aim(m, tgt, dir)
     if (mv.charge > 0) {
+      this.soundAt(m.x, m.y, 'moveCharge', [mv.fx, mv.tier, mv.charge], { owners: [m.owner], skipRemote: m.owner })
       m.charging = { move: mv, t: mv.charge, total: mv.charge, tgt, dir }
       fxCast(this.vfx, mv, m, this.nearCam(m.x, m.y))
       return true
@@ -973,6 +994,7 @@ export class Game {
     const near = this.nearCam(m.x, m.y)
     const v = this.vfx
     m.castT = 0.18
+    this.soundAt(m.x, m.y, 'moveCast', [mv.fx, mv.tier], { owners: [m.owner], skipRemote: charged ? null : m.owner })
     if (!charged) fxCast(v, mv, m, near)
     else if (near) v.shakeBy(3)
 
@@ -1209,8 +1231,9 @@ export class Game {
             color: eff > 1 ? '#ffd040' : '#b8b8c8', text: eff > 1 ? 'Super effectief!' : 'Weinig effect',
           })
         if (mine) v.sfx('hitConfirm')
-        if (mine || hurt) v.sfx('hit', eff > 1)
+        if (hurt) v.sfx('hit', eff > 1)
       }
+      this.soundAt(tgt.x, tgt.y, 'moveHit', [mv.fx, mv.tier + (eff > 1 ? 0.5 : 0)], { owners: [src.owner, tgt.owner] })
       onHit(this.vfx, mv, tgt, eff, this.nearCam(tgt.x, tgt.y))
       if (this.mode === 'solo' && (src.owner?.isPlayer || tgt.owner?.isPlayer) && (mv.tier >= 2 || eff > 1)) this.hitStop = Math.max(this.hitStop, 0.035 + mv.tier * 0.015)
     }
@@ -1438,6 +1461,7 @@ export class Game {
     w.dash = null
     tr.throwFx = { x: tr.x, y: tr.y - 0.7, tx: w.x, ty: w.y - 0.4, t: 0, master }
     this.catches.push({ tr, mon: w, t: 1.0, master })
+    this.soundAt(tr.x, tr.y, 'item', [master ? 'throwMaster' : 'throw'], { owners: [tr], range: 12 })
     return true
   }
 
@@ -1450,6 +1474,8 @@ export class Game {
     for (const tr of this.trainers) tr.catchCd = Math.max(0, tr.catchCd - dt)
     for (const c of [...this.catches]) {
       c.t -= dt
+      // The ball wobbles twice before it clicks shut (or bursts open)
+      for (const at of [0.55, 0.25]) if (c.t + dt > at && c.t <= at) this.soundAt(c.mon.x, c.mon.y, 'item', ['shake'], { owners: [c.tr], range: 12 })
       if (c.tr.throwFx) c.tr.throwFx.t += dt
       if (c.t > 0) continue
       this.catches.splice(this.catches.indexOf(c), 1)
@@ -1462,7 +1488,7 @@ export class Game {
       if (c.tr.brain && c.mon.legendary && !c.master && !this.rng.chance(BOT_LEGEND_CATCH)) {
         c.mon.catching = false
         c.tr.catchCd = BOT_RETRY
-        this.sfxAt(c.mon.x, c.mon.y, 'faint')
+        this.soundAt(c.mon.x, c.mon.y, 'item', ['breakOut'], { range: 12 })
         this.addFx({ kind: 'poof', x: c.mon.x, y: c.mon.y - 0.4, t: 0, life: 0.4, color: '#ffffff' })
         this.addFx({ kind: 'text', x: c.mon.x, y: c.mon.y - 1.6, t: 0, life: 0.9, color: '#ffd040', text: 'Uitgebroken!', small: true })
         continue
@@ -1524,7 +1550,7 @@ export class Game {
     tr.potions--
     m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.5)
     this.addFx({ kind: 'heal', x: m.x, y: m.y - 0.5, t: 0, life: 0.7, color: '#80f080' })
-    this.vOf(tr)?.sfx('heal')
+    this.soundAt(tr.x, tr.y, 'item', ['potion'], { owners: [tr], range: 8 })
     return true
   }
 
@@ -1539,7 +1565,7 @@ export class Game {
     const m = tr.party[idx]
     m.hp = Math.round(m.maxHp * 0.5)
     const v = this.vOf(tr)
-    v?.sfx('heal')
+    v?.sfx('item', 'revive')
     v?.hooks.toast(`${m.name} is weer fit!`, '#80f080')
     return true
   }
@@ -1575,7 +1601,7 @@ export class Game {
 
   private applyItem(tr: Trainer, kind: ItemKind) {
     const v = this.vOf(tr)
-    v?.sfx('pickup')
+    v?.sfx('item', PICKUP_SOUND[kind])
     switch (kind) {
       case 'master':
         tr.masterBalls++

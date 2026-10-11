@@ -19,6 +19,7 @@ import { showLoading } from './ui/loading'
 import { wipe } from './ui/transition'
 import { currentMusic, playMusic, setTempo } from './music'
 import { sfx } from './audio'
+import { playItem, playMoveCast, playMoveCharge, playMoveHit, resetSfx } from './moveSfx'
 import { profile } from './profile'
 import { cleanCode, Room } from './net/room'
 import type { ChatLine, HostMsg, LobbyPlayer, MatchChoice } from './net/protocol'
@@ -739,6 +740,6 @@ function frame(now: number) {
 requestAnimationFrame(frame)
 
 // Handy for debugging from the console.
-;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game }, get room() { return room }, get music() { return currentMusic() }, remotes, snapshot }
+;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game }, get room() { return room }, get music() { return currentMusic() }, remotes, snapshot, sound: { cast: playMoveCast, hit: playMoveHit, charge: playMoveCharge, item: playItem, reset: resetSfx } }
 
 toTitle()

@@ -1,0 +1,516 @@
+import type { MoveFx } from './data/moves'
+
+/**
+ * Synthesised move and item sounds (WebAudio, no files). Every move gets its
+ * own sound from three ingredients:
+ * - its type's timbre (fire hisses and crackles, water bubbles, electric
+ *   buzzes and cracks, ice chimes, rock crunches, a dragon growls, ...),
+ * - its kind's shape (a bolt is a short launch, a beam holds, a nova booms on
+ *   landing, a burst blasts around the user, a dash whooshes, ...),
+ * - its strength: tier 0 is short and light, tier 3 long and heavy with a sub
+ *   boom and more reverb.
+ * Sounds are panned and faded by distance from the viewer's camera.
+ */
+
+type Fam =
+  | 'normal' | 'fire' | 'water' | 'grass' | 'electric' | 'ice' | 'fight' | 'poison' | 'ground'
+  | 'wind' | 'psychic' | 'bug' | 'rock' | 'ghost' | 'dragon' | 'dark' | 'steel'
+type Shape = 'melee' | 'bolt' | 'spread' | 'dash' | 'beam' | 'burst' | 'nova' | 'zap'
+
+/** Each move's family, shape and a pitch of its own (so moves sharing both still differ). */
+const MOVES: Record<MoveFx, [Fam, Shape, number]> = {
+  tackle: ['normal', 'melee', 1], star: ['normal', 'spread', 1.2], voice: ['normal', 'burst', 1], hyperbeam: ['normal', 'beam', 0.8],
+  ember: ['fire', 'bolt', 1.1], flamewheel: ['fire', 'dash', 1], flamethrower: ['fire', 'beam', 0.95], fireblast: ['fire', 'nova', 0.8],
+  water: ['water', 'bolt', 1.15], aquajet: ['water', 'dash', 1.05], surf: ['water', 'burst', 0.9], hydropump: ['water', 'beam', 0.85],
+  whip: ['grass', 'melee', 1.1], leaf: ['grass', 'spread', 1.15], energy: ['grass', 'bolt', 1], solarbeam: ['grass', 'beam', 0.9],
+  thundershock: ['electric', 'zap', 1.2], spark: ['electric', 'dash', 1.05], thunderbolt: ['electric', 'zap', 0.95], thunder: ['electric', 'nova', 0.8],
+  ice: ['ice', 'bolt', 1.15], snow: ['ice', 'spread', 1.25], icebeam: ['ice', 'beam', 1], blizzard: ['ice', 'burst', 0.85],
+  kick: ['fight', 'melee', 1.05], aura: ['fight', 'bolt', 1], closecombat: ['fight', 'dash', 0.9], focusblast: ['fight', 'nova', 0.85],
+  sting: ['poison', 'bolt', 1.2], poison: ['poison', 'spread', 1.05], sludgebomb: ['poison', 'nova', 0.9], gunkshot: ['poison', 'beam', 0.8],
+  mud: ['ground', 'bolt', 1.1], quake: ['ground', 'burst', 0.9], earthpower: ['ground', 'nova', 0.85],
+  wind: ['wind', 'bolt', 1.1], aerialace: ['wind', 'dash', 1.05], hurricane: ['wind', 'nova', 0.85],
+  psy: ['psychic', 'bolt', 1.1], psybeam: ['psychic', 'beam', 1], psyshock: ['psychic', 'nova', 0.9], psychic: ['psychic', 'burst', 0.85],
+  bugbite: ['bug', 'melee', 1.1], pin: ['bug', 'spread', 1.2], signalbeam: ['bug', 'beam', 1], bugbuzz: ['bug', 'burst', 0.9],
+  rock: ['rock', 'bolt', 1.05], rocktomb: ['rock', 'nova', 0.95], stoneedge: ['rock', 'nova', 0.85],
+  lick: ['ghost', 'melee', 1.1], shadowsneak: ['ghost', 'dash', 1], shadowball: ['ghost', 'bolt', 0.9], shadowforce: ['ghost', 'burst', 0.8],
+  dragonrage: ['dragon', 'bolt', 1.05], dragonclaw: ['dragon', 'melee', 1], dragonpulse: ['dragon', 'beam', 0.95], dracometeor: ['dragon', 'nova', 0.8],
+  bite: ['dark', 'melee', 1.1], darkpulse: ['dark', 'bolt', 0.95], nightdaze: ['dark', 'burst', 0.85],
+  metalclaw: ['steel', 'melee', 1.1], mirror: ['steel', 'bolt', 1.2], flashcannon: ['steel', 'beam', 1], meteormash: ['steel', 'nova', 0.85],
+  discharge: ['electric', 'burst', 1],
+  claw: ['normal', 'melee', 1.15],
+}
+
+// ---------------------------------------------------------------- engine
+
+let c: AudioContext | null = null
+let bus: GainNode | null = null
+let wet: GainNode | null = null
+let noiseBuf: AudioBuffer | null = null
+let voices = 0
+const lastPlay = new Map<string, number>()
+
+function setup(ctx: AudioContext) {
+  if (c === ctx && bus) return
+  c = ctx
+  const comp = ctx.createDynamicsCompressor()
+  comp.threshold.value = -16
+  comp.ratio.value = 5
+  comp.attack.value = 0.003
+  comp.release.value = 0.15
+  bus = ctx.createGain()
+  bus.gain.value = 0.9
+  bus.connect(comp).connect(ctx.destination)
+  // Short room reverb for the big ones
+  const len = Math.floor(ctx.sampleRate * 1.4)
+  const ir = ctx.createBuffer(2, len, ctx.sampleRate)
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch)
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3)
+  }
+  const conv = ctx.createConvolver()
+  conv.buffer = ir
+  wet = ctx.createGain()
+  wet.gain.value = 0.5
+  wet.connect(conv).connect(bus)
+  const nlen = ctx.sampleRate * 2
+  noiseBuf = ctx.createBuffer(1, nlen, ctx.sampleRate)
+  const nd = noiseBuf.getChannelData(0)
+  for (let i = 0; i < nlen; i++) nd[i] = Math.random() * 2 - 1
+}
+
+/** One voice: a gain (vol) → panner → bus (+ reverb send). Returns its input and start time. */
+function voice(ctx: AudioContext, pan: number, vol: number, rev: number, life: number) {
+  setup(ctx)
+  const g = ctx.createGain()
+  g.gain.value = vol
+  const p = ctx.createStereoPanner()
+  p.pan.value = Math.max(-1, Math.min(1, pan))
+  g.connect(p).connect(bus!)
+  if (rev > 0) {
+    const s = ctx.createGain()
+    s.gain.value = rev
+    p.connect(s).connect(wet!)
+  }
+  voices++
+  setTimeout(() => {
+    voices--
+    g.disconnect()
+  }, (life + 1.6) * 1000)
+  return { out: g, t: ctx.currentTime + 0.005 }
+}
+
+interface Osc { type?: OscillatorType; f: number; f2?: number; dur: number; vol: number; at?: number; attack?: number; vib?: [number, number]; lin?: boolean; dist?: boolean }
+function osc(ctx: AudioContext, out: AudioNode, t0: number, o: Osc) {
+  const t = t0 + (o.at ?? 0)
+  const s = ctx.createOscillator()
+  const g = ctx.createGain()
+  s.type = o.type ?? 'square'
+  s.frequency.setValueAtTime(o.f, t)
+  if (o.f2) {
+    if (o.lin) s.frequency.linearRampToValueAtTime(o.f2, t + o.dur)
+    else s.frequency.exponentialRampToValueAtTime(Math.max(20, o.f2), t + o.dur)
+  }
+  if (o.vib) {
+    const l = ctx.createOscillator()
+    const lg = ctx.createGain()
+    l.frequency.value = o.vib[0]
+    lg.gain.value = o.vib[1]
+    l.connect(lg).connect(s.frequency)
+    l.start(t)
+    l.stop(t + o.dur + 0.05)
+  }
+  const a = o.attack ?? 0.004
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.linearRampToValueAtTime(o.vol, t + a)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur)
+  let node: AudioNode = s
+  if (o.dist) {
+    const ws = ctx.createWaveShaper()
+    const curve = new Float32Array(256)
+    for (let i = 0; i < 256; i++) {
+      const x = (i / 128) - 1
+      curve[i] = Math.tanh(x * 4)
+    }
+    ws.curve = curve
+    node = s.connect(ws)
+  }
+  node.connect(g).connect(out)
+  s.start(t)
+  s.stop(t + o.dur + 0.05)
+}
+
+interface Noise { dur: number; vol: number; at?: number; attack?: number; filter?: BiquadFilterType; f?: number; f2?: number; q?: number; wob?: [number, number] }
+function noise(ctx: AudioContext, out: AudioNode, t0: number, o: Noise) {
+  const t = t0 + (o.at ?? 0)
+  const s = ctx.createBufferSource()
+  s.buffer = noiseBuf
+  s.loop = true
+  const g = ctx.createGain()
+  const a = o.attack ?? 0.004
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.linearRampToValueAtTime(o.vol, t + a)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur)
+  let node: AudioNode = s
+  if (o.filter) {
+    const f = ctx.createBiquadFilter()
+    f.type = o.filter
+    f.frequency.setValueAtTime(o.f ?? 1000, t)
+    if (o.f2) f.frequency.exponentialRampToValueAtTime(Math.max(30, o.f2), t + o.dur)
+    f.Q.value = o.q ?? 1
+    if (o.wob) {
+      const l = ctx.createOscillator()
+      const lg = ctx.createGain()
+      l.frequency.value = o.wob[0]
+      lg.gain.value = o.wob[1]
+      l.connect(lg).connect(f.frequency)
+      l.start(t)
+      l.stop(t + o.dur + 0.05)
+    }
+    node = s.connect(f)
+  }
+  node.connect(g).connect(out)
+  s.start(t, Math.random() * 1.5)
+  s.stop(t + o.dur + 0.05)
+}
+
+/** Random little clicks (crackling fire, gravel, sparks). */
+function crackle(ctx: AudioContext, out: AudioNode, t0: number, dur: number, n: number, vol: number, f = 3000) {
+  for (let i = 0; i < n; i++) noise(ctx, out, t0, { at: Math.random() * dur, dur: 0.012 + Math.random() * 0.02, vol: vol * (0.5 + Math.random() * 0.5), filter: 'highpass', f })
+}
+
+const r = (a: number, b: number) => a + Math.random() * (b - a)
+
+// ---------------------------------------------------------------- timbres
+
+type Ctx = { ctx: AudioContext; o: AudioNode; t: number; p: number; k: number; len: number }
+
+/** The sound of a type, either launching (cast) or landing (impact). */
+const TIMBRE: Record<Fam, { cast: (x: Ctx) => void; hit: (x: Ctx) => void }> = {
+  normal: {
+    cast: ({ ctx, o, t, p, len }) => {
+      noise(ctx, o, t, { dur: len, vol: 0.5, filter: 'bandpass', f: 900 * p, f2: 2400 * p, q: 1.2 })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      osc(ctx, o, t, { type: 'sine', f: 180 * p, f2: 55, dur: 0.16 + k * 0.1, vol: 0.9 })
+      noise(ctx, o, t, { dur: 0.08 + k * 0.05, vol: 0.6, filter: 'lowpass', f: 2600 })
+    },
+  },
+  fire: {
+    cast: ({ ctx, o, t, p, len, k }) => {
+      noise(ctx, o, t, { dur: len, vol: 0.7, attack: 0.03, filter: 'bandpass', f: 500 * p, f2: 1800 * p, q: 0.8 })
+      noise(ctx, o, t, { dur: len * 0.9, vol: 0.35, filter: 'lowpass', f: 700 })
+      crackle(ctx, o, t, len, 6 + k * 14, 0.5, 2500)
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      noise(ctx, o, t, { dur: 0.3 + k * 0.4, vol: 0.9, filter: 'lowpass', f: 2200 * p, f2: 260 })
+      crackle(ctx, o, t, 0.4 + k * 0.4, 8 + k * 16, 0.45, 2200)
+    },
+  },
+  water: {
+    cast: ({ ctx, o, t, p, len, k }) => {
+      noise(ctx, o, t, { dur: len, vol: 0.45, attack: 0.02, filter: 'bandpass', f: 1400 * p, q: 0.7 })
+      for (let i = 0; i < 3 + k * 5; i++) osc(ctx, o, t, { type: 'sine', at: r(0, len * 0.8), f: r(300, 500) * p, f2: r(900, 1500) * p, dur: 0.06, vol: 0.35 })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      noise(ctx, o, t, { dur: 0.25 + k * 0.3, vol: 0.85, filter: 'bandpass', f: 1800 * p, f2: 500, q: 0.6 })
+      for (let i = 0; i < 4 + k * 4; i++) osc(ctx, o, t, { type: 'sine', at: r(0.02, 0.3), f: r(400, 700) * p, f2: r(1000, 1800) * p, dur: 0.05, vol: 0.25 })
+    },
+  },
+  grass: {
+    cast: ({ ctx, o, t, p, len }) => {
+      noise(ctx, o, t, { dur: len * 0.7, vol: 0.4, filter: 'highpass', f: 2800 * p })
+      osc(ctx, o, t, { type: 'triangle', f: 520 * p, f2: 880 * p, dur: Math.min(0.25, len), vol: 0.4 })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      noise(ctx, o, t, { dur: 0.12 + k * 0.1, vol: 0.7, filter: 'bandpass', f: 2400 * p, q: 1.5 })
+      osc(ctx, o, t, { type: 'sine', f: 220 * p, f2: 90, dur: 0.12 + k * 0.08, vol: 0.6 })
+      osc(ctx, o, t, { type: 'triangle', at: 0.03, f: 1320 * p, dur: 0.12, vol: 0.18 })
+    },
+  },
+  electric: {
+    cast: ({ ctx, o, t, p, len, k }) => {
+      osc(ctx, o, t, { type: 'square', f: 900 * p, f2: 260 * p, dur: len, vol: 0.35, vib: [48, 260] })
+      osc(ctx, o, t, { type: 'sawtooth', f: 1800 * p, f2: 600 * p, dur: len * 0.7, vol: 0.15, vib: [71, 500] })
+      crackle(ctx, o, t, len, 8 + k * 16, 0.55, 4500)
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      noise(ctx, o, t, { dur: 0.06, vol: 1, filter: 'highpass', f: 3000 })
+      osc(ctx, o, t, { type: 'square', f: 1400 * p, f2: 180, dur: 0.14 + k * 0.08, vol: 0.45, vib: [55, 300] })
+      crackle(ctx, o, t, 0.2 + k * 0.3, 6 + k * 10, 0.5, 5000)
+    },
+  },
+  ice: {
+    cast: ({ ctx, o, t, p, len, k }) => {
+      for (let i = 0; i < 2 + k * 2; i++) osc(ctx, o, t, { type: 'triangle', at: i * 0.04, f: [1760, 2637, 2093, 3136][i] * p, dur: 0.18 + len * 0.4, vol: 0.28 })
+      noise(ctx, o, t, { dur: len, vol: 0.3, filter: 'highpass', f: 5000, attack: 0.02 })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      noise(ctx, o, t, { dur: 0.1 + k * 0.08, vol: 0.9, filter: 'highpass', f: 3500 })
+      for (let i = 0; i < 4 + k * 4; i++) osc(ctx, o, t, { type: 'sine', at: r(0, 0.12), f: r(2200, 5200) * p, dur: r(0.05, 0.14), vol: 0.22 })
+      osc(ctx, o, t, { type: 'sine', f: 300 * p, f2: 120, dur: 0.1, vol: 0.4 })
+    },
+  },
+  fight: {
+    cast: ({ ctx, o, t, p, len }) => {
+      noise(ctx, o, t, { dur: Math.min(0.18, len), vol: 0.6, filter: 'bandpass', f: 700 * p, f2: 1600 * p, q: 1.3 })
+      osc(ctx, o, t, { type: 'sine', f: 260 * p, f2: 520 * p, dur: len, vol: 0.3, vib: [9, 25] })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      osc(ctx, o, t, { type: 'sine', f: 150 * p, f2: 45, dur: 0.2 + k * 0.12, vol: 1 })
+      noise(ctx, o, t, { dur: 0.06, vol: 0.8, filter: 'lowpass', f: 2200 })
+    },
+  },
+  poison: {
+    cast: ({ ctx, o, t, p, len }) => {
+      osc(ctx, o, t, { type: 'sine', f: 220 * p, f2: 130 * p, dur: len, vol: 0.45, vib: [14, 30] })
+      noise(ctx, o, t, { dur: len, vol: 0.3, filter: 'lowpass', f: 900, f2: 300 })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      noise(ctx, o, t, { dur: 0.25 + k * 0.25, vol: 0.8, filter: 'lowpass', f: 1200 * p, f2: 180, q: 4 })
+      for (let i = 0; i < 3 + k * 4; i++) osc(ctx, o, t, { type: 'sine', at: r(0.03, 0.35), f: r(120, 220) * p, f2: r(300, 500), dur: 0.07, vol: 0.35 })
+    },
+  },
+  ground: {
+    cast: ({ ctx, o, t, p, len }) => {
+      noise(ctx, o, t, { dur: len, vol: 0.6, filter: 'lowpass', f: 300 * p, attack: 0.03 })
+      osc(ctx, o, t, { type: 'sine', f: 70 * p, f2: 45, dur: len, vol: 0.7 })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      osc(ctx, o, t, { type: 'sine', f: 90 * p, f2: 32, dur: 0.35 + k * 0.5, vol: 1 })
+      noise(ctx, o, t, { dur: 0.3 + k * 0.6, vol: 0.85, filter: 'lowpass', f: 600 * p, f2: 120 })
+      crackle(ctx, o, t, 0.4, 6 + k * 8, 0.35, 1200)
+    },
+  },
+  wind: {
+    cast: ({ ctx, o, t, p, len, k }) => {
+      noise(ctx, o, t, { dur: len, vol: 0.7, attack: len * 0.3, filter: 'bandpass', f: 600 * p, f2: 2600 * p, q: 2, wob: k > 0.6 ? [6, 500] : undefined })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      noise(ctx, o, t, { dur: 0.18 + k * 0.4, vol: 0.75, filter: 'bandpass', f: 1600 * p, f2: 500, q: 1.5, wob: k > 0.6 ? [9, 600] : undefined })
+      osc(ctx, o, t, { type: 'sine', f: 160 * p, f2: 70, dur: 0.12, vol: 0.4 })
+    },
+  },
+  psychic: {
+    cast: ({ ctx, o, t, p, len }) => {
+      osc(ctx, o, t, { type: 'sine', f: 420 * p, f2: 900 * p, dur: len, vol: 0.4, vib: [12, 45], attack: 0.04 })
+      osc(ctx, o, t, { type: 'sine', f: 427 * p, f2: 912 * p, dur: len, vol: 0.3, vib: [9, 30], attack: 0.04 })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      osc(ctx, o, t, { type: 'sine', f: 1100 * p, f2: 260, dur: 0.22 + k * 0.2, vol: 0.55, vib: [18, 80] })
+      osc(ctx, o, t, { type: 'triangle', f: 1650 * p, f2: 400, dur: 0.18 + k * 0.15, vol: 0.25 })
+      noise(ctx, o, t, { dur: 0.15, vol: 0.3, filter: 'bandpass', f: 2500, q: 3 })
+    },
+  },
+  bug: {
+    cast: ({ ctx, o, t, p, len }) => {
+      osc(ctx, o, t, { type: 'sawtooth', f: 190 * p, f2: 230 * p, dur: len, vol: 0.35, vib: [32, 18] })
+      noise(ctx, o, t, { dur: len, vol: 0.25, filter: 'bandpass', f: 3200 * p, q: 3, wob: [30, 800] })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      for (let i = 0; i < 3 + k * 3; i++) noise(ctx, o, t, { at: i * 0.035, dur: 0.025, vol: 0.7, filter: 'highpass', f: 2500 * p })
+      osc(ctx, o, t, { type: 'sine', f: 200 * p, f2: 90, dur: 0.1, vol: 0.4 })
+    },
+  },
+  rock: {
+    cast: ({ ctx, o, t, p, len }) => {
+      noise(ctx, o, t, { dur: len, vol: 0.55, filter: 'bandpass', f: 400 * p, f2: 900 * p, q: 1 })
+      crackle(ctx, o, t, len, 5, 0.3, 900)
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      osc(ctx, o, t, { type: 'sine', f: 110 * p, f2: 38, dur: 0.25 + k * 0.3, vol: 1 })
+      noise(ctx, o, t, { dur: 0.2 + k * 0.3, vol: 0.9, filter: 'lowpass', f: 1500 * p, f2: 300 })
+      crackle(ctx, o, t, 0.35 + k * 0.3, 10 + k * 10, 0.5, 1000)
+    },
+  },
+  ghost: {
+    cast: ({ ctx, o, t, p, len }) => {
+      osc(ctx, o, t, { type: 'sine', f: 520 * p, f2: 260 * p, dur: len + 0.1, vol: 0.38, vib: [5, 18], attack: len * 0.4 })
+      osc(ctx, o, t, { type: 'triangle', f: 528 * p, f2: 250 * p, dur: len + 0.1, vol: 0.22, vib: [4, 14], attack: len * 0.4 })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      noise(ctx, o, t, { dur: 0.3 + k * 0.3, vol: 0.6, attack: 0.05, filter: 'lowpass', f: 900 * p, f2: 200 })
+      osc(ctx, o, t, { type: 'sine', f: 230 * p, f2: 70, dur: 0.3 + k * 0.25, vol: 0.7 })
+    },
+  },
+  dragon: {
+    cast: ({ ctx, o, t, p, len }) => {
+      osc(ctx, o, t, { type: 'sawtooth', f: 95 * p, f2: 70 * p, dur: len + 0.05, vol: 0.45, vib: [24, 12], dist: true, attack: 0.03 })
+      noise(ctx, o, t, { dur: len, vol: 0.5, filter: 'bandpass', f: 500 * p, f2: 1200 * p, q: 1.2, attack: 0.03 })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      osc(ctx, o, t, { type: 'sine', f: 120 * p, f2: 38, dur: 0.3 + k * 0.35, vol: 1, dist: true })
+      noise(ctx, o, t, { dur: 0.25 + k * 0.35, vol: 0.8, filter: 'lowpass', f: 1800 * p, f2: 250 })
+    },
+  },
+  dark: {
+    cast: ({ ctx, o, t, p, len }) => {
+      osc(ctx, o, t, { type: 'sawtooth', f: 170 * p, f2: 110 * p, dur: len, vol: 0.3, vib: [7, 15] })
+      noise(ctx, o, t, { dur: len, vol: 0.35, filter: 'bandpass', f: 1100 * p, q: 2 })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      noise(ctx, o, t, { dur: 0.05, vol: 0.9, filter: 'bandpass', f: 1800, q: 2 })
+      osc(ctx, o, t, { type: 'sine', f: 140 * p, f2: 45, dur: 0.22 + k * 0.2, vol: 0.9 })
+    },
+  },
+  steel: {
+    cast: ({ ctx, o, t, p, len }) => {
+      for (const [m, v] of [[1, 0.3], [2.76, 0.18], [5.4, 0.1]]) osc(ctx, o, t, { type: 'sine', f: 900 * p * m, dur: 0.25 + len * 0.5, vol: v })
+      noise(ctx, o, t, { dur: len, vol: 0.35, filter: 'highpass', f: 4000, attack: 0.02 })
+    },
+    hit: ({ ctx, o, t, p, k }) => {
+      for (const [m, v] of [[1, 0.45], [2.76, 0.25], [5.4, 0.14], [8.9, 0.08]]) osc(ctx, o, t, { type: 'sine', f: 520 * p * m, dur: 0.3 + k * 0.4, vol: v })
+      noise(ctx, o, t, { dur: 0.05, vol: 0.7, filter: 'highpass', f: 2500 })
+    },
+  },
+}
+
+/** A shared swish for melee swings and dashes. */
+function swish(x: Ctx, dur: number) {
+  noise(x.ctx, x.o, x.t, { dur, vol: 0.55, attack: dur * 0.4, filter: 'bandpass', f: 700 * x.p, f2: 2600 * x.p, q: 1.6 })
+}
+/** Deep boom under the strongest impacts. */
+function sub(x: Ctx, vol: number) {
+  osc(x.ctx, x.o, x.t, { type: 'sine', f: 65, f2: 28, dur: 0.5 + x.k * 0.5, vol })
+}
+
+// ---------------------------------------------------------------- public API
+
+/** Testing: forget the voice count and throttle (e.g. between offline renders). */
+export function resetSfx() {
+  voices = 0
+  lastPlay.clear()
+}
+
+function play(ctx: AudioContext | null, muted: boolean, key: string, gap: number, pan: number, vol: number, rev: number, life: number, draw: (o: AudioNode, t: number) => void) {
+  if (!ctx || muted || vol < 0.03) return
+  const now = performance.now()
+  if (now - (lastPlay.get(key) ?? 0) < gap) return
+  // Too much going on: drop the quieter sounds
+  if (voices > 22 || (voices > 12 && vol < 0.4)) return
+  lastPlay.set(key, now)
+  const { out, t } = voice(ctx, pan, vol, rev, life)
+  draw(out, t)
+}
+
+/** A move going off: the launch (bolt, beam, swing, ...) in its type's timbre. */
+export function playMoveCast(ctx: AudioContext | null, muted: boolean, fx: MoveFx, tier: number, pan = 0, gain = 1) {
+  const m = MOVES[fx]
+  if (!m) return
+  const [fam, shape, pitch] = m
+  const k = tier / 3
+  const p = pitch * r(0.96, 1.04)
+  const len = { melee: 0.12, bolt: 0.14, spread: 0.1, dash: 0.24, beam: 0.35, burst: 0.3, nova: 0.18, zap: 0.12 }[shape] * (1 + k * 0.9)
+  const vol = (0.07 + k * 0.06) * gain
+  play(ctx, muted, 'c' + fx, 45, pan, vol, 0.05 + k * 0.25, len, (o, t) => {
+    const x: Ctx = { ctx: ctx!, o, t, p, k, len }
+    const T = TIMBRE[fam]
+    switch (shape) {
+      case 'melee':
+        swish(x, 0.1 + k * 0.05)
+        break
+      case 'dash':
+        swish(x, len)
+        T.cast({ ...x, len: len * 0.8 })
+        break
+      case 'spread':
+        for (let i = 0; i < 3; i++) T.cast({ ...x, t: t + i * 0.06, len: 0.08 + k * 0.05, p: p * (1 + i * 0.05) })
+        break
+      case 'burst':
+        // The blast happens right around the user: launch and impact at once
+        T.cast(x)
+        T.hit({ ...x, k: Math.min(1, k + 0.2) })
+        if (k >= 0.6) sub(x, 0.6 + k * 0.3)
+        break
+      case 'nova':
+        // Wind-up; the boom comes when it lands
+        T.cast({ ...x, len: len * 0.7 })
+        osc(x.ctx, o, t, { type: 'sine', f: 300 * p, f2: 900 * p, dur: len, vol: 0.18 })
+        break
+      default:
+        T.cast(x)
+    }
+  })
+}
+
+/** A move landing on a target: its type's impact, heavier for stronger moves. */
+export function playMoveHit(ctx: AudioContext | null, muted: boolean, fx: MoveFx, tier: number, pan = 0, gain = 1) {
+  const m = MOVES[fx]
+  if (!m) return
+  const [fam, shape, pitch] = m
+  const k = tier / 3
+  const p = pitch * r(0.95, 1.05)
+  const vol = (0.08 + k * 0.08) * gain * (shape === 'nova' ? 1.25 : 1)
+  play(ctx, muted, 'h' + fx, 55, pan, vol, 0.08 + k * 0.3, 0.6 + k, (o, t) => {
+    const x: Ctx = { ctx: ctx!, o, t, p, k, len: 0.2 }
+    TIMBRE[fam].hit(x)
+    if (shape === 'nova' || k >= 0.99) sub(x, 0.7 + k * 0.3)
+  })
+}
+
+/** A big move charging up (Solar Beam, Hyper Beam, ...): a rising swell. */
+export function playMoveCharge(ctx: AudioContext | null, muted: boolean, fx: MoveFx, tier: number, dur: number, pan = 0, gain = 1) {
+  const m = MOVES[fx]
+  if (!m) return
+  const [, , pitch] = m
+  play(ctx, muted, 'g' + fx, 100, pan, (0.06 + tier * 0.02) * gain, 0.2, dur, (o, t) => {
+    osc(ctx!, o, t, { type: 'sine', f: 200 * pitch, f2: 1200 * pitch, dur: dur + 0.05, vol: 0.5, attack: dur * 0.8, lin: true, vib: [14, 20] })
+    osc(ctx!, o, t, { type: 'triangle', f: 400 * pitch, f2: 2400 * pitch, dur: dur + 0.05, vol: 0.2, attack: dur * 0.8, lin: true })
+    noise(ctx!, o, t, { dur: dur + 0.05, vol: 0.25, attack: dur * 0.9, filter: 'bandpass', f: 600, f2: 4000, q: 3 })
+  })
+}
+
+// ---------------------------------------------------------------- items
+
+export type ItemSound = 'potion' | 'revive' | 'throw' | 'throwMaster' | 'shake' | 'breakOut' | 'pickupBall' | 'pickupPotion' | 'pickupCandy' | 'pickupRevive' | 'pickupMaster'
+
+export function playItem(ctx: AudioContext | null, muted: boolean, name: ItemSound, pan = 0, gain = 1) {
+  play(ctx, muted, 'i' + name, 40, pan, 0.11 * gain, 0.15, 1.2, (o, t) => {
+    const x = ctx!
+    switch (name) {
+      case 'potion':
+        // Spray, then a soft healing shimmer
+        noise(x, o, t, { dur: 0.32, vol: 0.55, attack: 0.02, filter: 'highpass', f: 3500 })
+        ;[784, 988, 1175, 1568].forEach((f, i) => osc(x, o, t, { type: 'triangle', at: 0.18 + i * 0.07, f, dur: 0.22, vol: 0.32 }))
+        break
+      case 'revive':
+        // Crystal chime that climbs
+        ;[523, 659, 784, 1047, 1319, 1568, 2093].forEach((f, i) => osc(x, o, t, { type: 'sine', at: i * 0.06, f, dur: 0.4, vol: 0.28 }))
+        noise(x, o, t, { dur: 0.6, vol: 0.18, attack: 0.2, filter: 'highpass', f: 6000 })
+        break
+      case 'throw':
+        noise(x, o, t, { dur: 0.28, vol: 0.5, attack: 0.1, filter: 'bandpass', f: 800, f2: 2200, q: 2 })
+        osc(x, o, t, { type: 'square', f: 600, f2: 1200, dur: 0.12, vol: 0.12 })
+        break
+      case 'throwMaster':
+        noise(x, o, t, { dur: 0.35, vol: 0.45, attack: 0.1, filter: 'bandpass', f: 900, f2: 3000, q: 2 })
+        ;[1319, 1568, 2093, 2637].forEach((f, i) => osc(x, o, t, { type: 'sine', at: 0.05 + i * 0.05, f, dur: 0.25, vol: 0.25 }))
+        break
+      case 'shake':
+        // The ball wobbles: two quick clicks
+        osc(x, o, t, { type: 'square', f: 300, f2: 180, dur: 0.05, vol: 0.4 })
+        osc(x, o, t, { type: 'square', at: 0.09, f: 260, f2: 160, dur: 0.05, vol: 0.35 })
+        break
+      case 'breakOut':
+        noise(x, o, t, { dur: 0.18, vol: 0.8, filter: 'bandpass', f: 1500, q: 1 })
+        osc(x, o, t, { type: 'square', f: 900, f2: 200, dur: 0.22, vol: 0.3 })
+        break
+      case 'pickupBall':
+        osc(x, o, t, { type: 'square', f: 660, dur: 0.06, vol: 0.3 })
+        osc(x, o, t, { type: 'square', at: 0.06, f: 990, dur: 0.1, vol: 0.3 })
+        break
+      case 'pickupPotion':
+        for (let i = 0; i < 3; i++) osc(x, o, t, { type: 'sine', at: i * 0.05, f: 500 + i * 220, f2: 900 + i * 300, dur: 0.07, vol: 0.35 })
+        break
+      case 'pickupCandy':
+        ;[1047, 1319, 1568].forEach((f, i) => osc(x, o, t, { type: 'square', at: i * 0.045, f, dur: 0.07, vol: 0.2 }))
+        break
+      case 'pickupRevive':
+        ;[880, 1319, 1760].forEach((f, i) => osc(x, o, t, { type: 'triangle', at: i * 0.06, f, dur: 0.18, vol: 0.3 }))
+        break
+      case 'pickupMaster':
+        ;[784, 988, 1175, 1568, 1976].forEach((f, i) => osc(x, o, t, { type: 'sine', at: i * 0.05, f, dur: 0.3, vol: 0.28 }))
+        noise(x, o, t, { dur: 0.5, vol: 0.2, attack: 0.15, filter: 'highpass', f: 6500 })
+        break
+    }
+  })
+}

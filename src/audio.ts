@@ -1,4 +1,6 @@
 /** Tiny chiptune-ish sound effects with WebAudio; no audio files needed. */
+import type { MoveFx } from './data/moves'
+import { playItem, playMoveCast, playMoveCharge, playMoveHit, type ItemSound } from './moveSfx'
 let ctx: AudioContext | null = null
 let muted = false
 
@@ -58,9 +60,6 @@ export const sfx = {
     noise(strong ? 0.14 : 0.07, strong ? 0.09 : 0.05)
     tone(strong ? 180 : 260, 0.08, 'square', 0.04, -120)
   },
-  cast(tier: number) {
-    tone(520 + tier * 120, 0.09, 'square', 0.025, 300)
-  },
   faint() {
     tone(600, 0.35, 'square', 0.05, -500)
   },
@@ -112,6 +111,22 @@ export const sfx = {
   ko() {
     noise(0.25, 0.08)
     tone(140, 0.3, 'sawtooth', 0.05, -80)
+  },
+  /** A move going off (its own sound per move, heavier for stronger moves); pan -1..1, gain 0..1. */
+  moveCast(fx: MoveFx, tier: number, pan = 0, gain = 1) {
+    playMoveCast(ctx, muted, fx, tier, pan, gain)
+  },
+  /** A move landing on something. */
+  moveHit(fx: MoveFx, tier: number, pan = 0, gain = 1) {
+    playMoveHit(ctx, muted, fx, tier, pan, gain)
+  },
+  /** A big move charging up before it fires. */
+  moveCharge(fx: MoveFx, tier: number, dur: number, pan = 0, gain = 1) {
+    playMoveCharge(ctx, muted, fx, tier, dur, pan, gain)
+  },
+  /** Items: potion, revive, ball throws and wobbles, pickups. */
+  item(name: ItemSound, pan = 0, gain = 1) {
+    playItem(ctx, muted, name, pan, gain)
   },
   /** Raid: a boss attack is coming (two quick alarm beeps). */
   warn() {

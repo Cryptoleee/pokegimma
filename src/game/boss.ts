@@ -619,6 +619,8 @@ function gridLit(h: Hazard, x: number, y: number) {
 
 function resolveHazard(g: Game, h: Hazard) {
   const v = g.vfx
+  // The boss's attacks land with the heaviest version of their move's sound
+  g.soundAt(h.x, h.y, 'moveHit', [h.fx, h.atk === 'vent' || h.atk === 'arc' || h.atk === 'grid' ? 2 : 3], { range: 20 })
   const r = g.raid
   const a = r?.def.attacks.find((x) => x.id === h.atk)
   // Fusion Bolt: Zekrom races down the line it just lit up
