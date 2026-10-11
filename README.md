@@ -1,3 +1,5 @@
+<p align="center"><img src="branding/stormbreak-logo-1200.png" alt="Stormbreak Royale" width="600"></p>
+
 # Stormbreak Royale
 
 Een real-time Pokémon battle royale voor de browser, mobile first, in de stijl van Black/White.
