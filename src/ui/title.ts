@@ -7,6 +7,47 @@ import { playMusic } from '../music'
  * blue lightning, Reshiram's side drifts with embers, an energy seam pulses
  * between them, and the logo gets a metallic shine.
  */
+const BOLT = '<svg viewBox="0 0 24 40"><polygon points="15,0 2,22 11,22 7,40 22,15 13,15 19,0" /></svg>'
+
+/** The logo. `?logo=` previews name ideas (stormfront, stormbreak, thunderthrone). */
+function logoHtml(v: string | null) {
+  switch (v) {
+    case 'stormfront':
+      return `<div class="tlogo v-front">
+        <div class="tmark bolt-badge">${BOLT}</div>
+        <div class="word w-front" data-t="STORMFRONT">STORMFRONT</div>
+        <div class="frontline"><span>BATTLE ROYALE</span></div>
+        <div class="tag">12 trainers · 1 storm · 1 winnaar</div>
+      </div>`
+    case 'stormbreak':
+      return `<div class="tlogo v-break">
+        <div class="tball cracked"></div>
+        <div class="breakrow">
+          <div class="word w-storm" data-t="STORM">STORM</div>
+          <div class="crack">${BOLT}</div>
+          <div class="word w-break" data-t="BREAK">BREAK</div>
+        </div>
+        <div class="ribbon dark"><span>ROYALE</span></div>
+        <div class="tag">Breek door de storm</div>
+      </div>`
+    case 'thunderthrone':
+      return `<div class="tlogo v-throne">
+        <div class="tmark crown"><svg viewBox="0 0 64 40"><polygon class="c" points="4,36 2,8 18,20 32,2 46,20 62,8 60,36" /><rect class="c" x="4" y="32" width="56" height="7" /><polygon class="g" points="34,12 27,25 32,25 29,34 38,20 33,20 36,12" /></svg></div>
+        <div class="word w-thunder" data-t="THUNDER">THUNDER</div>
+        <div class="word w-throne" data-t="THRONE">THRONE</div>
+        <div class="ribbon royal"><span>ROYALE</span></div>
+        <div class="tag">Overleef de storm · claim de troon</div>
+      </div>`
+    default:
+      return `<div class="tlogo">
+        <div class="tball"></div>
+        <div class="word">BATTLEMON</div>
+        <div class="ribbon"><span>ROYALE</span></div>
+        <div class="tag">12 trainers · 1 winnaar</div>
+      </div>`
+  }
+}
+
 export function showTitle(onStart: () => void): () => void {
   const el = document.getElementById('screen')!
   el.innerHTML = `
@@ -15,12 +56,7 @@ export function showTitle(onStart: () => void): () => void {
       <div class="tvignette"></div>
       <div class="legend-l"><img class="px" src="${animatedUrl(644)}" alt="Zekrom"></div>
       <div class="legend-r"><img class="px" src="${animatedUrl(643)}" alt="Reshiram"></div>
-      <div class="tlogo">
-        <div class="tball"></div>
-        <div class="word">BATTLEMON</div>
-        <div class="ribbon"><span>ROYALE</span></div>
-        <div class="tag">12 trainers · 1 winnaar</div>
-      </div>
+      ${logoHtml(new URLSearchParams(location.search).get('logo'))}
       <div class="tpress">Tik om te starten</div>
       <div class="tfoot">Fanproject · Pokémon © Nintendo / Game Freak</div>
     </div>`
