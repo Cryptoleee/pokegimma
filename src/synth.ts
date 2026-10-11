@@ -29,6 +29,8 @@ export interface Track {
   drums: string[]
   /** Drum lines for the last bar of every 4 (fills). */
   fill?: string[]
+  /** Drum lines for the second half (the B part), if different. */
+  drumsB?: string[]
   /** Crash on the first beat every N bars. */
   crashEvery?: number
   /** Shuffle the off 16ths (0..0.3). */
@@ -62,6 +64,8 @@ function chordTones(c: string, octave: number): number[] {
 
 interface Rack {
   ctx: BaseAudioContext
+  /** Everything ends here: fade and disconnect this to stop a track. */
+  master: GainNode
   out: GainNode
   verb: GainNode
   delay: GainNode
@@ -83,7 +87,8 @@ export function makeRack(ctx: BaseAudioContext, dest: AudioNode, bpm: number): R
   comp.ratio.value = 4
   comp.attack.value = 0.004
   comp.release.value = 0.18
-  comp.connect(dest)
+  const master = ctx.createGain()
+  comp.connect(master).connect(dest)
   const out = ctx.createGain()
   out.gain.value = 0.72
   out.connect(comp)
@@ -116,7 +121,7 @@ export function makeRack(ctx: BaseAudioContext, dest: AudioNode, bpm: number): R
   const noise = ctx.createBuffer(1, nlen, ctx.sampleRate)
   const nd = noise.getChannelData(0)
   for (let i = 0; i < nlen; i++) nd[i] = Math.random() * 2 - 1
-  return { ctx, out, verb, delay, noise, p25: pulseWave(ctx, 0.25), p12: pulseWave(ctx, 0.125) }
+  return { ctx, master, out, verb, delay, noise, p25: pulseWave(ctx, 0.25), p12: pulseWave(ctx, 0.125) }
 }
 
 function env(g: GainNode, t: number, a: number, peak: number, sus: number, dur: number, rel: number) {
@@ -370,7 +375,7 @@ function step(r: Rack, tr: Track, bar: number, s: number, t: number, sd: number)
   // Pad
   if (tr.pad && s === 0) for (const m of chordTones(chord, 4)) play(r, tr.inst.pad ?? 'strings', m, t, sd * 16, VOL[tr.inst.pad ?? 'strings'] * 0.7 * gain)
   // Drums
-  const lines = tr.fill && bar % 4 === 3 ? tr.fill : tr.drums
+  const lines = tr.fill && bar % 4 === 3 ? tr.fill : tr.drumsB && bar >= tr.lead.length / 2 ? tr.drumsB : tr.drums
   for (const line of lines) {
     const d = line[s]
     if (!d || d === '.') continue
@@ -414,12 +419,13 @@ export async function renderSequence(parts: { track: Track; bars: number }[], ta
   return ctx.startRendering()
 }
 
-/** Live player with a lookahead scheduler. */
+/** Live player with a lookahead scheduler. Tempo can change while it plays. */
 export class Player {
   private r: Rack | null = null
   private tr: Track | null = null
   private n = 0
-  private t0 = 0
+  /** Grid time of the next step (swing is added on top). */
+  private next = 0
   private timer: number | undefined
   tempo = 1
   onStep?: (bar: number, step: number) => void
@@ -431,7 +437,7 @@ export class Player {
     if (!tr) return
     this.r = makeRack(this.ctx, this.dest, tr.bpm)
     this.n = 0
-    this.t0 = this.ctx.currentTime + 0.08
+    this.next = this.ctx.currentTime + 0.08
     this.timer = window.setInterval(() => this.tick(), 25)
     this.tick()
   }
@@ -444,9 +450,9 @@ export class Player {
     clearInterval(this.timer)
     this.timer = undefined
     if (this.r) {
-      const out = this.r.out
-      out.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03)
-      setTimeout(() => out.disconnect(), 400)
+      const m = this.r.master
+      m.gain.setTargetAtTime(0, this.ctx.currentTime, 0.04)
+      setTimeout(() => m.disconnect(), 600)
       this.r = null
     }
     this.tr = null
@@ -455,21 +461,21 @@ export class Player {
   private tick() {
     const tr = this.tr, r = this.r
     if (!tr || !r) return
-    const sd = 60 / (tr.bpm * this.tempo) / 4
     const total = tr.lead.length * 16
-    let t = this.t0 + stepTime(tr, this.n, sd)
-    while (t < this.ctx.currentTime + 0.15) {
+    // Back from a background tab: skip what was missed instead of playing it all at once
+    if (this.next < this.ctx.currentTime - 0.25) this.next = this.ctx.currentTime + 0.05
+    while (this.next < this.ctx.currentTime + 0.15) {
       if (this.n >= total && !tr.loop) {
         this.stop()
         return
       }
-      const i = this.n % total
-      step(r, tr, Math.floor(i / 16), i % 16, t, sd)
-      const bar = Math.floor(i / 16), s = i % 16
-      const delay = Math.max(0, (t - this.ctx.currentTime) * 1000)
-      if (this.onStep) setTimeout(() => this.onStep?.(bar, s), delay)
+      const sd = 60 / (tr.bpm * this.tempo) / 4
+      const t = this.next + (this.n % 2 ? (tr.swing ?? 0) * sd : 0)
+      const i = this.n % total, bar = Math.floor(i / 16), s = i % 16
+      step(r, tr, bar, s, t, sd)
+      if (this.onStep) setTimeout(() => this.onStep?.(bar, s), Math.max(0, (t - this.ctx.currentTime) * 1000))
       this.n++
-      t = this.t0 + stepTime(tr, this.n, sd)
+      this.next += sd
     }
   }
 }

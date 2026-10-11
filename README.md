@@ -108,7 +108,7 @@ Nieuwe bazen zijn vooral data: een rij in `src/data/bosses.ts` met hun aanvallen
 
 ## Presentatie
 
-- **Soundtrack:** eigen chiptune-muziek die live gesequenced wordt met WebAudio: titel, menu, gevecht (versnelt in de finale), overwinning en nederlaag. Plus Pokémon-cries via PokéAPI.
+- **Soundtrack:** "Castelia Nights", eigen muziek in Black/White-stijl die live in de browser wordt gespeeld door een kleine DS-achtige synth (`src/synth.ts`): pulse-lead, marimba, synthbas, strijkers, drums en galm. Er zijn nummers voor het titelscherm, het menu, de battle royale (versnelt in de finale), de raid-baas (versnelt in de laatste fase), overwinning en nederlaag. Twee alternatieve sets staan in `src/data/soundtracks.ts`. Plus Pokémon-cries via PokéAPI.
 - **Cinematisch:** een titelscherm met Zekrom en Reshiram, Black/White-schermovergangen, keuzeschermen als podium, een drop-in met aftelling bij de start, een evolutie-cutscene, banners voor level-ups, nieuwe aanvallen, legendarische Pokémon en KO's, en een resultaatscherm met confetti.
 - **Wereld:** weer per wereld (sneeuw, zand, as, gloeiende vonken, vuurvliegjes), wolkschaduwen, golvend en glinsterend water, ritselend gras, stofwolkjes, zwevende pollen, een gloeiende stormmuur met bliksem en regen, en een vignet.
 

@@ -15,7 +15,7 @@ import { showEvolution } from './ui/cutscene'
 import { showLobby, showMenu, type MenuState } from './ui/menu'
 import { showLoading } from './ui/loading'
 import { wipe } from './ui/transition'
-import { playMusic, setTempo } from './music'
+import { currentMusic, playMusic, setTempo } from './music'
 import { profile } from './profile'
 import { cleanCode, Room } from './net/room'
 import type { ChatLine, HostMsg, LobbyPlayer, MatchChoice } from './net/protocol'
@@ -160,7 +160,7 @@ function enterMatch(g: Game) {
   stopGame()
   game = g
   viewing = true
-  playMusic('battle')
+  playMusic(g.kind === 'raid' ? 'boss' : 'battle')
   if (g.mode !== 'client') hud = makeHud(g)
   if (desktop) setTimeout(() => game === g && hud?.toast('WASD lopen · klik = aanval · Q E R = krachten · Esc pauze'), INTRO_TIME * 1000 + 600)
   // Extra history entry so the phone's back button asks before leaving.
@@ -624,7 +624,7 @@ function frame(now: number) {
     g.update(dt)
     if (g.mode === 'host') hostNet(g, dt)
     if (viewing && (g.mode !== 'client' || g.net?.placed)) {
-      setTempo(g.kind === 'raid' ? ((g.raidView?.phase ?? 0) >= 2 ? 1.22 : 1.12) : g.zone.phase >= 4 ? 1.12 : 1)
+      setTempo(g.kind === 'raid' ? ((g.raidView?.phase ?? 0) >= 2 ? 1.08 : 1) : g.zone.phase >= 4 ? 1.08 : 1)
       render(g, ctx, canvas.width, canvas.height)
       hud?.update()
     }
@@ -634,6 +634,6 @@ function frame(now: number) {
 requestAnimationFrame(frame)
 
 // Handy for debugging from the console.
-;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game }, get room() { return room }, remotes, snapshot }
+;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game }, get room() { return room }, get music() { return currentMusic() }, remotes, snapshot }
 
 toTitle()
