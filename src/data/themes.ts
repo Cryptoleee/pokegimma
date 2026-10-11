@@ -3,11 +3,11 @@
  * pick one per match; raid arenas have their own.
  */
 
-export type ThemeId = 'forest' | 'desert' | 'snow' | 'volcano' | 'night' | 'crater' | 'icecave'
+export type ThemeId = 'forest' | 'desert' | 'snow' | 'volcano' | 'night' | 'crater' | 'icecave' | 'plateau' | 'sky' | 'lab'
 
 /** What stands where trees would: also decides how the blocked border looks. */
-export type DecorStyle = 'oak' | 'pine' | 'cactus' | 'dead' | 'cliff' | 'icewall'
-export type Weather = 'none' | 'rain' | 'snow' | 'sand' | 'ash' | 'embers' | 'fireflies'
+export type DecorStyle = 'oak' | 'pine' | 'cactus' | 'dead' | 'cliff' | 'icewall' | 'sky' | 'labwall'
+export type Weather = 'none' | 'rain' | 'snow' | 'sand' | 'ash' | 'embers' | 'fireflies' | 'wind' | 'psy'
 
 export interface WorldTheme {
   id: ThemeId
@@ -164,6 +164,52 @@ export const THEMES: Record<ThemeId, WorldTheme> = {
     weather: 'snow',
     tint: 'rgba(80,140,255,0.08)',
     mini: { grass: '#bcdcf0', tall: '#bcdcf0', path: '#a8cce4', sand: '#d4e8f6', water: '#2a5a8a', tree: '#24406a' },
+  },
+  plateau: {
+    ...FOREST, id: 'plateau', name: 'Stormtop', icon: '⛈️', royale: false,
+    grass: ['#5a6474', '#4a5262', '#6e788a'],
+    tall: ['#5a6474', '#4a5262', '#6e788a'],
+    path: ['#646e80', '#525a6a', '#7a8496'],
+    sand: ['#4a5262', '#3e4654'],
+    decor: 'cliff',
+    canopy: ['#12161e', '#262c38', '#222834', '#2a303c', '#6a7a98'],
+    trunk: ['#14181e', '#363e4c', '#262c38'],
+    rock: ['#1a1e26', '#4a5262', '#7a8496'],
+    border: '#0a0c12',
+    weather: 'rain',
+    tint: 'rgba(30,50,120,0.18)',
+    dark: true,
+    mini: { grass: '#5a6474', tall: '#5a6474', path: '#646e80', sand: '#4a5262', water: '#2a5a8a', tree: '#12161e' },
+  },
+  sky: {
+    ...FOREST, id: 'sky', name: 'Hemelpilaar', icon: '🌪️', royale: false,
+    grass: ['#e8f0fa', '#d0dcee', '#ffffff'],
+    tall: ['#e8f0fa', '#d0dcee', '#ffffff'],
+    path: ['#d8e4f4', '#c4d2e8', '#f4f8ff'],
+    sand: ['#c8d6ea', '#b4c4de'],
+    decor: 'sky',
+    canopy: ['#5a9ae0', '#7ab4f0', '#8cc0f4', '#a0ccf8', '#ffffff'],
+    trunk: ['#7ab4f0', '#8cc0f4', '#6aa4e4'],
+    rock: ['#5a6a7a', '#a8b4c0', '#e4ecf4'],
+    border: '#5a9ae0',
+    weather: 'wind',
+    tint: 'rgba(120,200,255,0.06)',
+    mini: { grass: '#e8f0fa', tall: '#e8f0fa', path: '#d8e4f4', sand: '#c8d6ea', water: '#5a9ae0', tree: '#5a9ae0' },
+  },
+  lab: {
+    ...FOREST, id: 'lab', name: 'Psychisch lab', icon: '🧪', royale: false,
+    grass: ['#3a2e58', '#30264a', '#4a3c6e'],
+    tall: ['#3a2e58', '#30264a', '#4a3c6e'],
+    path: ['#443666', '#382c56', '#56487c'],
+    sand: ['#2e2448', '#261e3c'],
+    decor: 'labwall',
+    canopy: ['#140e22', '#2a2040', '#261c3a', '#30244a', '#a080e0'],
+    trunk: ['#18122a', '#3a2e58', '#2a2040'],
+    rock: ['#1e1830', '#5a4a80', '#a090d0'],
+    border: '#0c0816',
+    weather: 'psy',
+    tint: 'rgba(150,80,255,0.08)',
+    mini: { grass: '#3a2e58', tall: '#3a2e58', path: '#443666', sand: '#2e2448', water: '#5a3a8a', tree: '#140e22' },
   },
 }
 

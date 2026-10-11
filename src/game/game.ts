@@ -1,7 +1,7 @@
 import { PARTY_MAX, rarityOf, ROSTER, SPECIES, TEAM_SIZE, WILD, type Rarity } from '../data/pokemon'
 import { eventTimes, startEvent, updateEvents, type WorldEvent } from './events'
 import { roleInfo } from '../data/roles'
-import { raidDown, setupRaid, updateRaid, type Hazard, type RaidState } from './boss'
+import { raidDown, setupRaid, updateRaid, type Hazard, type RaidState, type RaidView } from './boss'
 import { movesetFor, SLOT_UNLOCK, type Move, type MoveFx } from '../data/moves'
 import { Vfx } from './vfx'
 import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpact, onMelee, onZap, pal, projectileEnd, projectileTick } from './moveFx'
@@ -287,7 +287,9 @@ export class Game {
   /** Raid: the boss fight state (host and solo). */
   raid: RaidState | null = null
   /** Raid HUD info, on the host and on clients: time left, boss phase, pillars standing. */
-  raidView: { timeLeft: number; phase: number } | null = null
+  raidView: RaidView | null = null
+  /** Raid: Mewtwo's mirror images (drawn see-through, can't be hit). */
+  clones: Mon[] = []
   /** Raid: telegraphed boss attacks on the ground (synced to clients). */
   hazards: Hazard[] = []
   /** >0 while spawning effects that clients draw themselves (not sent over the network). */
@@ -517,6 +519,7 @@ export class Game {
     tr.mon.revealT = Math.max(0, tr.mon.revealT - dt)
     // Remote players move themselves; their position arrives over the network.
     const len = tr.remote ? tr.netMoving : this.walk(tr, dt)
+    if (!tr.remote) this.windPush(tr, dt)
 
     // Active Pokémon
     const m = tr.mon
@@ -583,6 +586,7 @@ export class Game {
       p.vx = this.input.mx
       p.vy = this.input.my
       const moving = this.walk(p, dt)
+      this.windPush(p, dt)
       p.swapCd = Math.max(0, p.swapCd - dt)
       for (const m of p.party) for (let i = 0; i < 4; i++) m.cds[i] = Math.max(0, m.cds[i] - dt)
       const dir = this.cursorDir(p.mon)
@@ -643,7 +647,15 @@ export class Game {
     }
     for (const n of this.novas) n.t = Math.max(0.001, n.t - dt)
     for (const e of this.events) e.t = Math.max(0, e.t - dt)
-    for (const h of this.hazards) h.t = Math.max(0, h.t - dt)
+    for (const h of this.hazards) {
+      h.t = Math.max(0, h.t - dt)
+      // Tornados keep moving between snapshots
+      if (h.t <= 0 && h.dur > 0) {
+        h.x += h.vx * dt
+        h.y += h.vy * dt
+        h.dur = Math.max(0, h.dur - dt)
+      }
+    }
     if (this.raidView) this.raidView.timeLeft = Math.max(0, this.raidView.timeLeft - dt)
     for (const tr of this.trainers) if (tr.respawnT > 0) tr.respawnT = Math.max(0, tr.respawnT - dt)
     for (const tr of this.trainers) if (tr.throwFx) tr.throwFx.t += dt
@@ -672,6 +684,13 @@ export class Game {
       this.camX = p.x
       this.camY = p.y
     }
+  }
+
+  /** Delta Stream: the wind shoves your own trainer along (everyone moves their own). */
+  windPush(tr: Trainer, dt: number) {
+    const w = this.raidView?.wind
+    if (!w || !tr.alive || tr.mon.fainted) return
+    this.tryMove(tr, w[0] * dt, w[1] * dt, 0.3)
   }
 
   /** Walks a trainer along its input vector. Returns the input strength. */

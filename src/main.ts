@@ -82,7 +82,9 @@ function setupFor(c: MatchChoice, humans: LobbyPlayer[]): MatchSetup {
   if (c.kind !== 'raid') return { seed, humans, kind: c.kind, theme: pickTheme(c.theme, seed) }
   const last = store.get<BossId | ''>('lastBoss', '')
   const pool = BOSS_LIST.filter((b) => b !== last)
-  const boss = pool[Math.floor(Math.random() * pool.length)] ?? BOSS_LIST[0]
+  // Dev/testing: ?boss=<id> fixes the boss
+  const forced = new URLSearchParams(location.search).get('boss') as BossId | null
+  const boss = forced && BOSS_LIST.includes(forced) ? forced : pool[Math.floor(Math.random() * pool.length)] ?? BOSS_LIST[0]
   store.set('lastBoss', boss)
   return { seed, humans, kind: c.kind, theme: pickTheme(c.theme, seed), boss }
 }

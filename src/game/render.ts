@@ -78,7 +78,12 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
     const mvis = vis(g, m, tr.isPlayer)
     if (tr.alive && m && !m.fainted && inView(m.x, m.y) && mvis > 0) ents.push({ y: m.y, draw: () => drawMon(g, ctx, m, time, mvis) })
   }
-  for (const w of g.wilds) if (inView(w.x, w.y)) ents.push({ y: w.y, draw: () => drawMon(g, ctx, w, time) })
+  // Raid: Rayquaza flies out of sight and comes down again; Mewtwo's mirror images are see-through
+  const air = g.raidView?.air ?? 0
+  for (const w of g.wilds)
+    if (inView(w.x, w.y)) ents.push({ y: w.y, draw: () => (w.boss && air > 0 ? drawMon(g, ctx, w, time, 1 - air * 0.9, air * 150) : drawMon(g, ctx, w, time)) })
+  for (const c of g.clones)
+    if (inView(c.x, c.y)) ents.push({ y: c.y, draw: () => drawMon(g, ctx, c, time, 0.5 + 0.12 * Math.sin(time * 5 + c.x)) })
   ents.sort((a, b) => a.y - b.y)
   for (const e of ents) e.draw()
 
@@ -209,7 +214,7 @@ function drawTrainer(g: Game, ctx: CanvasRenderingContext2D, tr: Trainer, _time:
   grassOver(g, ctx, tr.x, tr.y)
 }
 
-function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, fade = 1) {
+function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, fade = 1, rise = 0) {
   const back = m.dir === 'up'
   const s = monSprite(m.species.id, back, m.shiny)
   const px = m.x * TILE, py = m.y * TILE
@@ -249,7 +254,7 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
   ctx.save()
   const jolt = m.joltT > 0 ? (Math.random() - 0.5) * 3 : 0
   const lift = m.liftT > 0 ? -Math.sin(Math.min(1, m.liftT / 0.5) * Math.PI) * 6 : 0
-  ctx.translate(Math.round(px + m.aimX * lunge + jolt), Math.round(py + bob + m.aimY * lunge + lift))
+  ctx.translate(Math.round(px + m.aimX * lunge + jolt), Math.round(py + bob + m.aimY * lunge + lift - rise))
   if (flip) ctx.scale(-1, 1)
   if (m.state === 'weak') ctx.rotate(0.25)
   if (m.castT > 0) ctx.scale(1 + lunge * 0.02, 1 - lunge * 0.02)
@@ -811,7 +816,7 @@ function drawWater(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: numbe
 const motes: { x: number; y: number; s: number; ph: number; v: number }[] = []
 /** Ambient particles per world: pollen, rain, snow, sand, ash, embers or fireflies. */
 function drawWeather(w: Weather, ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number) {
-  const n = w === 'rain' ? 90 : w === 'snow' || w === 'sand' ? 70 : w === 'ash' ? 50 : 30
+  const n = w === 'rain' ? 90 : w === 'snow' || w === 'sand' ? 70 : w === 'ash' || w === 'wind' ? 50 : w === 'psy' ? 45 : 30
   while (motes.length < n) motes.push({ x: ox + Math.random() * vw, y: oy + Math.random() * vh, s: 0.6 + Math.random(), ph: Math.random() * 6, v: 0.6 + Math.random() * 0.8 })
   motes.length = n
   for (const m of motes) {
@@ -821,12 +826,15 @@ function drawWeather(w: Weather, ctx: CanvasRenderingContext2D, ox: number, oy: 
       case 'sand': m.x += 3.2 * m.v; m.y += Math.sin(time * 3 + m.ph) * 0.3; break
       case 'ash': m.x += Math.sin(time * 0.6 + m.ph) * 0.2 + 0.1; m.y += 0.25 * m.v; break
       case 'embers': m.x += Math.sin(time * 1.3 + m.ph) * 0.3; m.y -= 0.5 * m.v; break
+      case 'wind': m.x += 6 * m.v; m.y += Math.sin(time * 2 + m.ph) * 0.4; break
+      case 'psy': m.x += Math.sin(time * 0.8 + m.ph) * 0.25; m.y -= 0.18 * m.v; break
       default: m.x += Math.sin(time * 0.7 + m.ph) * 0.15 + 0.12; m.y += Math.cos(time * 0.5 + m.ph) * 0.1 - 0.05
     }
     if (m.x < ox - 10 || m.x > ox + vw + 10 || m.y < oy - 10 || m.y > oy + vh + 10) {
       m.x = ox + Math.random() * vw
       m.y = w === 'rain' || w === 'snow' || w === 'ash' ? oy - 5 : w === 'embers' ? oy + vh + 5 : oy + Math.random() * vh
-      if (w === 'sand') m.x = ox - 5
+      if (w === 'sand' || w === 'wind') m.x = ox - 5
+      if (w === 'psy') m.y = oy + vh + 5
     }
     const tw = 0.5 + 0.5 * Math.sin(time * 2 + m.ph)
     switch (w) {
@@ -849,6 +857,14 @@ function drawWeather(w: Weather, ctx: CanvasRenderingContext2D, ox: number, oy: 
       case 'embers':
         ctx.fillStyle = `rgba(255,${140 + Math.round(80 * tw)},40,${0.5 + 0.5 * tw})`
         ctx.fillRect(m.x, m.y, 1.5, 1.5)
+        break
+      case 'wind':
+        ctx.fillStyle = 'rgba(255,255,255,0.35)'
+        ctx.fillRect(m.x, m.y, 10 * m.s, 1)
+        break
+      case 'psy':
+        ctx.fillStyle = `rgba(230,140,255,${0.25 + 0.6 * tw})`
+        ctx.fillRect(m.x, m.y, 1.5 * m.s, 1.5 * m.s)
         break
       case 'fireflies':
         ctx.fillStyle = `rgba(220,255,120,${0.2 + 0.8 * tw * tw})`

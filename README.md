@@ -116,6 +116,9 @@ Een raid is PvE: jij (en tot 11 vrienden) tegen één legendarische baas, in een
 | --- | --- | --- | --- |
 | **Reshiram** | Vulkaankrater | Lavascheuren branden als je erop staat; uit vier kraters spuit lava (Uitbarsting) | Blue Flare (kegel), Fusion Flare (meteoren), Hittegolf, Vuurring, en in fase 3 Cross Flame: draaiende vlammenstralen |
 | **Kyurem** | IJsgrot | De vloer is glad, waardoor je doorglijdt; ijspilaren geven dekking en breken na drie treffers | IJsadem (bevriest je), Icicle Crash, Dragon Pulse, Glaciate, Vriesgolf, en in fase 3 Blizzard: de hele arena, behalve achter een pilaar |
+| **Zekrom** | Stormtop | Vier bliksemafleiders blokkeren je pad en schieten om de paar seconden stroom naar elkaar: sta niet tussen twee masten | Bolt Strike (inslagen uit een donderwolk), Fusion Bolt (Zekrom raast over de lijn), Discharge, Donderring, en in fase 3 Onweer: inslagen over de hele arena en alle afleiders tegelijk |
+| **Rayquaza** | Hemelpilaar | Een wolkenvloer met lucht als rand; wervelwinden trekken door de arena en doen schade zolang je erin staat | Dragon Ascent (vliegt op en landt op een speler), Outrage (drie lijnen), Draco Meteor, Hurricane (tornado's), en in fase 3 Delta Stream: harde wind die iedereen één kant op duwt |
+| **Mewtwo** | Psychisch lab | Het vloerraster laadt op: de helft van de vakken (dambordpatroon) slaat toe, dus ga op tijd naar een donker vak | Psystrike (kegel), Shadow Ball, Teleport (verschijnt naast je en slaat om zich heen), Psychische ring, en in fase 3 twee klonen die de aanvallen meedoen |
 
 Nieuwe bazen zijn vooral data: een rij in `src/data/bosses.ts` met hun aanvallen, plus eventueel een arena in `src/game/world.ts`.
 

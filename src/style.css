@@ -5135,19 +5135,21 @@ button:disabled {
   position: relative;
   flex: none;
   display: flex;
-  width: 84px;
-  height: 60px;
+  width: 104px;
+  height: 58px;
 }
 .cp-sil img {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
   image-rendering: pixelated;
-  filter: brightness(0) drop-shadow(0 0 6px rgba(255, 255, 255, 0.5));
+  filter: brightness(0) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
 }
 .cp-sil img + img {
-  margin-left: -28px;
-  margin-top: 6px;
+  margin-left: -29px;
+}
+.cp-sil img:nth-child(even) {
+  margin-top: 13px;
 }
 .cp-sil i {
   position: absolute;
@@ -5178,16 +5180,18 @@ button:disabled {
   padding: 4px 10px;
 }
 .lb-choice .cp-sil {
-  width: 64px;
+  width: 78px;
   height: 44px;
 }
 .lb-choice .cp-sil img {
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
 }
 .lb-choice .cp-sil img + img {
-  margin-left: -20px;
-  margin-top: 2px;
+  margin-left: -23px;
+}
+.lb-choice .cp-sil img:nth-child(even) {
+  margin-top: 10px;
 }
 /* Title on landscape phones: smaller logo, higher up, clear of "Tik om te starten" */
 @media (orientation: landscape) and (max-height: 560px) {

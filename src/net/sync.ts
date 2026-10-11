@@ -6,7 +6,8 @@ import type { Fx, Game, GameHooks, GameResult, ItemKind, Viewer } from '../game/
 import { preloadMon } from '../game/sprites'
 import type { Vfx } from '../game/vfx'
 import type { Command, NetEvent, RosterEntry } from './protocol'
-import { bossAttack, type Hazard } from '../game/boss'
+import { bossAttack, cloneMon, type Hazard } from '../game/boss'
+import { BOSSES } from '../data/bosses'
 
 /**
  * Multiplayer state sync. The host runs the real simulation; ~20 times a second
@@ -18,7 +19,7 @@ import { bossAttack, type Hazard } from '../game/boss'
 const DIRS: Dir[] = ['down', 'up', 'left', 'right']
 const STATES: WildState[] = ['roam', 'aggro', 'weak']
 const ITEMS: ItemKind[] = ['master', 'potion', 'candy', 'revive']
-const SHAPES: Hazard['shape'][] = ['circle', 'cone', 'line', 'ring']
+const SHAPES: Hazard['shape'][] = ['circle', 'cone', 'line', 'ring', 'grid']
 const r2 = (v: number) => Math.round(v * 100) / 100
 const r1 = (v: number) => Math.round(v * 10) / 10
 
@@ -159,8 +160,8 @@ export function snapshot(g: Game, v: RemoteViewer) {
     n: g.novas.filter((n) => near(n.x, n.y)).map((n) => [r2(n.x), r2(n.y), r2(n.t), n.total, n.move.name, n.r, r2(n.sx), r2(n.sy)]),
     z: [r2(z.x), r2(z.y), r2(z.r), r2(z.nx), r2(z.ny), z.nr, z.phase, r2(z.t), z.shrinking ? 1 : 0, r2(z.fromX), r2(z.fromY), r2(z.fromR)],
     ev: g.events.map((e) => [e.id, e.kind === 'drop' ? 0 : 1, r2(e.x), r2(e.y), r1(e.t), e.total, e.species ?? 0]),
-    hz: g.hazards.map((h) => [h.id, SHAPES.indexOf(h.shape), r2(h.x), r2(h.y), r2(h.ang), h.r, h.inner, h.width, r2(h.t), r2(h.total), h.type, h.both ? 1 : 0, h.atk]),
-    rv: g.raidView ? [r1(g.raidView.timeLeft), g.raidView.phase, ...g.world.pillars.map((p) => p.hp)] : undefined,
+    hz: g.hazards.map((h) => [h.id, SHAPES.indexOf(h.shape), r2(h.x), r2(h.y), r2(h.ang), h.r, h.inner, h.width, r2(Math.max(0, h.t)), r2(h.total), h.type, h.both ? 1 : 0, h.atk, r2(h.vx), r2(h.vy), r2(h.dur)]),
+    rv: g.raidView ? raidViewState(g) : undefined,
     me: {
       p: me.party.map((m) => m.id), ac: me.active, mb: me.masterBalls, po: me.potions, re: me.revives,
       k: me.kos, c: me.caught, sw: r2(me.swapCd), sp: me.spectate?.id ?? 0, dd: r1(me.diedAt),
@@ -319,8 +320,8 @@ type Snap = {
   z: number[]
   it?: [number, number, number][]
   ev?: [number, number, number, number, number, number, number][]
-  hz?: [number, number, number, number, number, number, number, number, number, number, string, number, string][]
-  rv?: number[]
+  hz?: [number, number, number, number, number, number, number, number, number, number, string, number, string, number, number, number][]
+  rv?: RaidViewState
   me: Record<string, number & number[]>
 }
 
@@ -400,19 +401,50 @@ export function applySnapshot(g: Game, raw: unknown) {
   ;[z.x, z.y, z.r, z.nx, z.ny, z.nr, z.phase, z.t] = s.z
   z.shrinking = !!s.z[8]
   ;[z.fromX, z.fromY, z.fromR] = [s.z[9], s.z[10], s.z[11]]
-  if (s.hz) g.hazards = s.hz.map(([id, sh, x, y, ang, r, inner, width, t, total, type, both, atk]) => {
+  if (s.hz) g.hazards = s.hz.map(([id, sh, x, y, ang, r, inner, width, t, total, type, both, atk, vx, vy, dur]) => {
     const a = bossAttack(g, atk)
     return {
       id, shape: SHAPES[sh], x, y, ang, r, inner, width, t, total, type: type as Hazard['type'], both: !!both,
-      dmg: 0, fx: a?.fx ?? 'earthpower', freeze: 0, cover: !!a?.cover, atk,
+      dmg: 0, fx: a?.fx ?? 'earthpower', freeze: 0, cover: !!a?.cover, atk, vx, vy, dur, dps: 0,
     }
   })
   if (s.rv) {
-    g.raidView = { timeLeft: s.rv[0], phase: s.rv[1] }
-    s.rv.slice(2).forEach((hp, i) => { if (!hp) g.world.breakPillar(i) })
+    const rv = s.rv
+    g.raidView = { timeLeft: rv.t, phase: rv.p, wind: rv.w, clones: rv.c, air: rv.a ?? 0 }
+    rv.pl.forEach((hp, i) => { if (!hp) g.world.breakPillar(i) })
+    // Mirror images: create or drop them to match, then put them where the host has them
+    const cl = rv.c ?? []
+    if (g.clones.length !== cl.length) g.clones = cl.map(([x, y]) => cloneMon(BOSSES[g.setup.boss ?? 'reshiram'].species, x, y))
+    g.clones.forEach((m, i) => {
+      const [x, y] = cl[i]
+      m.mvx = x - m.x
+      m.mvy = y - m.y
+      m.x = x
+      m.y = y
+    })
   }
   if (s.ev) g.events = s.ev.map(([id, k, x, y, t, total, species]) => ({ id, kind: k ? 'swarm' : 'drop', x, y, t, total, species: species || undefined }))
   if (s.it) g.items = s.it.map(([x, y, k], i) => ({ x, y, kind: ITEMS[k], bob: g.items[i]?.bob ?? Math.random() * 6 }))
+}
+
+/** The raid HUD and arena state as sent to clients. */
+interface RaidViewState {
+  t: number
+  p: number
+  w?: [number, number]
+  c?: [number, number][]
+  a?: number
+  /** Ice pillars' HP (0 = broken). */
+  pl: number[]
+}
+
+function raidViewState(g: Game): RaidViewState {
+  const rv = g.raidView!
+  const o: RaidViewState = { t: r1(rv.timeLeft), p: rv.phase, pl: g.world.pillars.map((p) => p.hp) }
+  if (rv.wind) o.w = [r2(rv.wind[0]), r2(rv.wind[1])]
+  if (rv.clones) o.c = rv.clones.map(([x, y]) => [r2(x), r2(y)])
+  if (rv.air) o.a = r2(rv.air)
+  return o
 }
 
 /** Plays the host's events (effects, sounds, banners) on the client. */

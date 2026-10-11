@@ -12,6 +12,8 @@ export enum T {
   ICE,
   /** Arena only: blocks movement and beams; can shatter. */
   PILLAR,
+  /** Arena only (Stormtop): a lightning rod, blocks movement. */
+  ROD,
 }
 
 export interface House {
@@ -32,7 +34,7 @@ export interface Town {
 const TOWN_NAMES = ['Nuvema', 'Accumula', 'Striaton', 'Nacrene', 'Castelia', 'Nimbasa', 'Driftveil', 'Icirrus', 'Opelucid']
 
 /** Raid arenas carved out of the middle of the map. */
-export type ArenaKind = 'crater' | 'icecave'
+export type ArenaKind = 'crater' | 'icecave' | 'plateau' | 'sky' | 'lab'
 
 export interface WorldOpts {
   theme?: ThemeId
@@ -58,6 +60,10 @@ export class World {
   vents: { x: number; y: number }[] = []
   /** Ice cave: 2x2 ice pillars (top-left tile) that block beams and can shatter. */
   pillars: { x: number; y: number; hp: number }[] = []
+  /** Stormtop: lightning rods (tile coords) that arc to their neighbours. */
+  rods: { x: number; y: number }[] = []
+  /** Psychic lab: size of the floor grid cells (tiles). */
+  static readonly LAB_CELL = 3
 
   constructor(public rng: Rng, opts: WorldOpts = {}) {
     this.theme = THEMES[opts.theme ?? (opts.arena ?? 'forest')]
@@ -79,7 +85,7 @@ export class World {
 
   blockedTile(tx: number, ty: number): boolean {
     const t = this.at(tx, ty)
-    return t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR
+    return t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR || t === T.ROD
   }
 
   /** World coords are in tiles (floats). */
@@ -142,7 +148,7 @@ export class World {
     this.tall = []
     for (let i = 0; i < MAP * MAP; i++) {
       const t = this.tiles[i]
-      const walk = !(t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR)
+      const walk = !(t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR || t === T.ROD)
       if (walk && !seen[i]) this.tiles[i] = T.TREE
       else if (walk) {
         this.walkable.push(i)
@@ -166,9 +172,28 @@ export class World {
         if (kind === 'crater') {
           if (veins.fbm(x, y) > 0.62) t = T.SAND
           else if (rng.next() < 0.008 && d > 5) t = T.ROCK
-        } else if (rng.next() < 0.06 && d > 3) t = T.SAND
+        } else if (kind === 'icecave' && rng.next() < 0.06 && d > 3) t = T.SAND
+        else if (kind === 'plateau' && veins.fbm(x, y) > 0.6) t = T.SAND
+        else if (kind === 'sky' && veins.fbm(x, y) > 0.64) t = T.SAND
         this.set(x, y, t)
       }
+    if (kind === 'plateau') {
+      // Four lightning rods on the diagonals (none between the spawn and the boss)
+      for (let i = 0; i < 4; i++) {
+        const a = Math.PI / 4 + (i * Math.PI) / 2
+        const rx = Math.floor(c + Math.cos(a) * 9.5), ry = Math.floor(c + Math.sin(a) * 9.5)
+        this.set(rx, ry, T.ROD)
+        this.rods.push({ x: rx, y: ry })
+      }
+    } else if (kind === 'sky') {
+      // Broken pillars of the Sky Pillar's roof: a little cover, clear of the
+      // spawn arc at the bottom of the arena
+      for (let i = 0; i < 6; i++) {
+        if (i === 1) continue
+        const a = (i / 6) * Math.PI * 2 + Math.PI / 6
+        this.set(Math.floor(c + Math.cos(a) * 7.5), Math.floor(c + Math.sin(a) * 7.5), T.ROCK)
+      }
+    }
     if (kind === 'crater') {
       // Glowing cracks running out from the middle of the crater
       for (let i = 0; i < 6; i++) {
@@ -188,7 +213,7 @@ export class World {
         for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) this.set(vx + dx, vy + dy, T.LAVA)
         this.vents.push({ x: vx, y: vy })
       }
-    } else {
+    } else if (kind === 'icecave') {
       // Six ice pillars in a ring: cover from beams and blizzards (none right
       // between the spawn at the bottom and the boss)
       for (let i = 0; i < 6; i++) {
@@ -342,6 +367,8 @@ export class World {
         const t = this.at(tx, ty)
         const x = tx * TILE, y = ty * TILE
         if (t === T.ICE || t === T.PILLAR) drawIce(g, x, y, th, tx, ty)
+        else if (this.arena === 'lab' && t !== T.TREE) drawLabFloor(g, x, y, th, tx, ty)
+        else if (this.arena === 'sky' && t !== T.TREE) drawCloud(g, x, y, th, tx, ty)
         else drawGrass(g, x, y, r, th)
         switch (t) {
           case T.TALL: drawTall(g, x, y, th); break
@@ -363,6 +390,7 @@ export class World {
     for (const h of this.houses) drawHouse(g, o, h)
     for (const p of this.pillars) if (p.hp > 0) drawPillar(g, o, p.x * TILE, p.y * TILE)
     for (const v of this.vents) drawVent(g, v.x * TILE, v.y * TILE)
+    for (const rd of this.rods) drawRod(g, o, rd.x * TILE, rd.y * TILE)
 
     // Minimap
     this.mini = canvas(MAP, MAP)
@@ -371,7 +399,7 @@ export class World {
     const col: Record<number, string> = {
       [T.GRASS]: mc.grass, [T.TALL]: mc.tall, [T.PATH]: mc.path, [T.SAND]: mc.sand, [T.WATER]: mc.water,
       [T.TREE]: mc.tree, [T.ROCK]: '#909098', [T.HOUSE]: '#e05848', [T.FLOWER]: mc.grass, [T.BRIDGE]: '#c09060',
-      [T.LAVA]: '#ff7020', [T.ICE]: '#cce8f8', [T.PILLAR]: '#ffffff',
+      [T.LAVA]: '#ff7020', [T.ICE]: '#cce8f8', [T.PILLAR]: '#ffffff', [T.ROD]: '#ffe060',
     }
     for (let ty = 0; ty < MAP; ty++)
       for (let tx = 0; tx < MAP; tx++) {
@@ -542,6 +570,49 @@ function drawRock(g: CanvasRenderingContext2D, x: number, y: number, th: WorldTh
 /** Blocking "tree" tiles: real trees, or cliffs / ice walls around an arena. */
 function drawTrunk(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, x: number, y: number, th: WorldTheme, w: World, tx: number, ty: number) {
   const [shadow, trunk, trunkDark] = th.trunk
+  if (th.decor === 'sky') {
+    // Open sky around the cloud floor: gradient blue with drifting cloud puffs
+    let h = ((tx * 73856093) ^ (ty * 19349663)) >>> 0
+    g.fillStyle = (tx + ty) % 2 ? th.canopy[1] : th.canopy[2]
+    g.fillRect(x, y, TILE, TILE)
+    if (h % 7 === 0) {
+      g.fillStyle = 'rgba(255,255,255,0.55)'
+      g.fillRect(x + (h % 6), y + ((h >> 3) % 8), 9, 3)
+      g.fillRect(x + (h % 6) + 2, y + ((h >> 3) % 8) - 2, 5, 2)
+    }
+    // Fluffy cloud lip where the floor ends
+    const floorUp = ty > 0 && !w.blockedTile(tx, ty - 1)
+    if (floorUp) {
+      g.fillStyle = '#ffffff'
+      for (let i = 0; i < 4; i++) g.fillRect(x + i * 4, y, 4, 4 + ((tx * 3 + i) % 3) * 2)
+      g.fillStyle = '#c8d8ee'
+      g.fillRect(x, y + 7, TILE, 2)
+    }
+    return
+  }
+  if (th.decor === 'labwall') {
+    // Lab wall: dark panels with glowing seams
+    g.fillStyle = th.canopy[0]
+    g.fillRect(x, y, TILE, TILE)
+    g.fillStyle = th.canopy[1]
+    g.fillRect(x + 1, y + 1, TILE - 2, TILE - 2)
+    g.fillStyle = th.canopy[0]
+    g.fillRect(x + 1, y + 8, TILE - 2, 1)
+    if ((tx * 5 + ty * 3) % 9 === 0) {
+      g.fillStyle = th.canopy[4]
+      g.fillRect(x + 4, y + 4, 2, 2)
+    }
+    const floorBelow = !w.blockedTile(tx, ty + 1) && ty + 1 < MAP
+    if (floorBelow) {
+      g.fillStyle = trunk
+      g.fillRect(x, y + 8, TILE, 8)
+      g.fillStyle = th.canopy[4]
+      g.globalAlpha = 0.6
+      g.fillRect(x, y + 8, TILE, 1)
+      g.globalAlpha = 1
+    }
+    return
+  }
   if (th.decor === 'cliff' || th.decor === 'icewall') {
     const [sh, a, b, c, hi] = th.canopy
     g.fillStyle = sh
@@ -651,6 +722,53 @@ function drawPillar(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, x:
   o.beginPath(); o.moveTo(x + w / 2, y - 24); o.lineTo(x + w - 5, y + 4); o.lineTo(x + w - 7, y + w - 6); o.lineTo(x + 7, y + w - 6); o.lineTo(x + 5, y + 4); o.closePath(); o.fill()
   o.fillStyle = '#e8f8ff'
   o.beginPath(); o.moveTo(x + w / 2 - 1, y - 20); o.lineTo(x + w / 2 + 3, y + 6); o.lineTo(x + w / 2 - 2, y + 20); o.lineTo(x + 9, y + 6); o.closePath(); o.fill()
+}
+
+/** Psychic lab floor: metal plates with the 3x3 grid the floor attack follows. */
+function drawLabFloor(g: CanvasRenderingContext2D, x: number, y: number, th: WorldTheme, tx: number, ty: number) {
+  const [base, dark, light] = th.grass
+  g.fillStyle = base
+  g.fillRect(x, y, TILE, TILE)
+  g.fillStyle = dark
+  g.fillRect(x, y + TILE - 1, TILE, 1)
+  g.fillRect(x + TILE - 1, y, 1, TILE)
+  g.fillStyle = light
+  if ((tx * 3 + ty * 5) % 7 === 0) g.fillRect(x + 3, y + 3, 2, 2)
+  // Cell borders every LAB_CELL tiles, aligned to the arena
+  const cell = World.LAB_CELL, o = ARENA_C - ARENA_R
+  g.fillStyle = 'rgba(190,150,255,0.35)'
+  if ((tx - o) % cell === 0) g.fillRect(x, y, 1, TILE)
+  if ((ty - o) % cell === 0) g.fillRect(x, y, TILE, 1)
+}
+
+/** Cloud floor of the Sky Pillar: soft white with blue shading. */
+function drawCloud(g: CanvasRenderingContext2D, x: number, y: number, th: WorldTheme, tx: number, ty: number) {
+  const [base, dark, light] = th.grass
+  g.fillStyle = base
+  g.fillRect(x, y, TILE, TILE)
+  const h = ((tx * 92837111) ^ (ty * 689287499)) >>> 0
+  g.fillStyle = dark
+  g.fillRect(x + (h % 10), y + ((h >> 4) % 12), 6, 2)
+  g.fillStyle = light
+  g.fillRect(x + ((h >> 8) % 10), y + ((h >> 12) % 10), 5, 3)
+}
+
+/** Lightning rod: a metal mast with a glowing coil (the top sits on the overlay). */
+function drawRod(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, x: number, y: number) {
+  g.fillStyle = 'rgba(0,0,0,0.35)'
+  g.fillRect(x + 1, y + 12, 14, 4)
+  g.fillStyle = '#3a404c'
+  g.fillRect(x + 4, y + 6, 8, 10)
+  o.fillStyle = '#1a1e26'
+  o.fillRect(x + 6, y - 30, 4, 38)
+  o.fillStyle = '#8a94a8'
+  o.fillRect(x + 7, y - 30, 2, 38)
+  for (let i = 0; i < 4; i++) {
+    o.fillStyle = i % 2 ? '#ffd030' : '#c89018'
+    o.fillRect(x + 3, y - 22 + i * 4, 10, 2)
+  }
+  o.fillStyle = '#fff6a0'
+  o.fillRect(x + 6, y - 34, 4, 4)
 }
 
 /** Lava vent: a dark cone around a glowing pool. */

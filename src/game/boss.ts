@@ -5,9 +5,9 @@ import { TYPE_COLOR, type PType } from '../data/types'
 import { Mon, type Trainer } from './entities'
 import type { Game } from './game'
 import { drawCharge, onBeam, onImpact } from './moveFx'
-import { disc, drawGlow, drawShape } from './vfx'
+import { disc, drawGlow, drawShape, type DecalKind, type Shape } from './vfx'
 import { preloadMon } from './sprites'
-import { ARENA_C, ARENA_R, T, TILE } from './world'
+import { ARENA_C, ARENA_R, T, TILE, World } from './world'
 
 /**
  * Raid mode: a boss in the middle of an arena, everyone else against it.
@@ -39,6 +39,15 @@ export interface Hazard {
   both: boolean
   /** Which attack made it (boss attack id, or 'vent'): picks the build-up visuals. */
   atk: string
+  /** Tornados: velocity (tiles/s) while active. */
+  vx: number
+  vy: number
+  /** Seconds a lingering hazard (tornado) stays active after its warning. */
+  dur: number
+  /** Damage per second while active, as a share of max HP. */
+  dps: number
+  /** Host only: time until the next damage tick of a lingering hazard. */
+  tick?: number
 }
 
 export interface RaidState {
@@ -58,10 +67,30 @@ export interface RaidState {
   result: 'won' | 'lost' | null
   goalX: number
   goalY: number
-  /** Lava vents take turns erupting. */
-  ventT: number
+  /** The arena's own hazard (vents, lightning rods, tornados, the floor grid). */
+  envT: number
   /** A potion appears in the arena every so often. */
   potionT: number
+  /** The boss stands still for its attack (no wandering). */
+  busyT: number
+  /** Rayquaza in the air: leaps up, comes down on (x, y). */
+  air: { t: number; total: number; x: number; y: number } | null
+  /** Delta Stream: shoves every player along (dx, dy) tiles/s once delay runs out. */
+  wind: { dx: number; dy: number; delay: number; t: number } | null
+  /** Mirror images that cast along (Mewtwo's last phase). */
+  clones: { x: number; y: number; a: number }[]
+}
+
+/** What every player sees of the raid (host and clients): synced as `rv`. */
+export interface RaidView {
+  timeLeft: number
+  phase: number
+  /** Delta Stream blowing: push per second (tiles). */
+  wind?: [number, number]
+  /** Mirror images' positions. */
+  clones?: [number, number][]
+  /** How far up the boss flew (0 on the ground, 1 out of sight). */
+  air?: number
 }
 
 let hazardId = 1
@@ -73,10 +102,17 @@ export function finalForm(id: number): number {
   return sp.id
 }
 
-/** Spots around the arena edge to (re)spawn at, one per player. */
-export function spawnPoint(i: number, n: number): [number, number] {
+/** Spots around the arena edge to (re)spawn at, one per player (never inside a rock or rod). */
+export function spawnPoint(g: Game, i: number, n: number): [number, number] {
   const a = Math.PI / 2 + (i - (n - 1) / 2) * 0.42
-  return [ARENA_C + Math.cos(a) * (ARENA_R - 4.5), ARENA_C + Math.sin(a) * (ARENA_R - 4.5)]
+  const x = ARENA_C + Math.cos(a) * (ARENA_R - 4.5), y = ARENA_C + Math.sin(a) * (ARENA_R - 4.5)
+  const free = (x: number, y: number) => [[-0.4, -0.3], [0.4, -0.3], [-0.4, 0.3], [0.4, 0.3]].every(([dx, dy]) => !g.world.blocked(x + dx, y + dy))
+  for (let d = 0; d <= 3; d += 0.5)
+    for (let k = 0; k < (d ? 12 : 1); k++) {
+      const sx = x + Math.cos((k / 12) * Math.PI * 2) * d, sy = y + Math.sin((k / 12) * Math.PI * 2) * d
+      if (free(sx, sy)) return [sx, sy]
+    }
+  return [x, y]
 }
 
 /** Host and solo: turn the match into a raid. */
@@ -96,7 +132,7 @@ export function setupRaid(g: Game, id: keyof typeof BOSSES) {
     tr.revives = 0
     tr.masterBalls = 0
     tr.lives = RAID_LIVES
-    const [x, y] = spawnPoint(i, humans.length)
+    const [x, y] = spawnPoint(g, i, humans.length)
     tr.x = x
     tr.y = y
     tr.mon.x = x
@@ -113,8 +149,10 @@ export function setupRaid(g: Game, id: keyof typeof BOSSES) {
   g.wilds.push(boss)
   g.raid = {
     def, boss, phase: 0, nextT: 3, cds: {}, moveT: 2, invulnT: 0, timeLeft: RAID_TIME, result: null,
-    goalX: boss.x, goalY: boss.y, ventT: 6, potionT: 20,
+    goalX: boss.x, goalY: boss.y, envT: def.arena === 'crater' ? 6 : 7, potionT: 20,
+    busyT: 0, air: null, wind: null, clones: [],
   }
+  g.clones = []
   // The arena has no storm: park the zone far outside it
   g.zone.x = g.zone.nx = ARENA_C
   g.zone.y = g.zone.ny = ARENA_C
@@ -137,9 +175,9 @@ export function updateRaid(g: Game, dt: number) {
   const r = g.raid!
   if (r.result) return
   r.timeLeft -= dt
-  g.raidView = { timeLeft: Math.max(0, r.timeLeft), phase: r.phase }
   const boss = r.boss
   r.invulnT = Math.max(0, r.invulnT - dt)
+  r.busyT = Math.max(0, r.busyT - dt)
 
   // Lava burns, players come back after going down
   for (const tr of g.trainers) {
@@ -183,6 +221,8 @@ export function updateRaid(g: Game, dt: number) {
       const slot = g.bestSlot(boss, d)
       if (slot >= 0) g.useMove(boss, slot, nearest)
     }
+  }
+  if (!boss.fainted && nearest && r.invulnT <= 0 && !r.air) {
     r.nextT -= dt
     if (r.nextT <= 0) {
       const a = pickAttack(r)
@@ -192,19 +232,23 @@ export function updateRaid(g: Game, dt: number) {
         r.nextT = [4.3, 3.6, 2.9][r.phase] + a.warn + (a.sweep ? a.sweep.count * (a.stagger ?? 0) : 0)
       } else r.nextT = 0.5
     }
-    // Lava vents erupt on their own every few seconds (the arena fights too)
-    if (r.def.arena === 'crater') {
-      r.ventT -= dt
-      if (r.ventT <= 0) {
-        r.ventT = [11, 9, 7][r.phase]
-        const v = g.world.vents[Math.floor(Math.random() * g.world.vents.length)]
-        addHazard(g, { shape: 'circle', x: v.x, y: v.y, ang: 0, r: 2.6, inner: 0, width: 0, t: 1.35, dmg: 0.35, fx: 'earthpower', type: 'fire', freeze: 0, cover: false, both: false, atk: 'vent' })
-      }
+    // The arena fights too: vents, lightning rods, tornados, the floor grid
+    r.envT -= dt
+    if (r.envT <= 0) arenaHazard(g, r)
+  }
+
+  // Rayquaza in the air: once out of sight it moves over the landing spot
+  if (r.air) {
+    r.air.t -= dt
+    if (r.air.total - r.air.t > AIR_UP) {
+      boss.x = r.goalX = r.air.x
+      boss.y = r.goalY = r.air.y
     }
+    if (r.air.t <= 0) r.air = null
   }
 
   // Lumber around: keep close to the action, stay in the middle part of the arena
-  if (!boss.fainted && boss.castT <= 0 && !boss.charging) {
+  if (!boss.fainted && boss.castT <= 0 && !boss.charging && r.busyT <= 0 && !r.air) {
     if (nearest && Math.random() < dt * 0.6) {
       const a = Math.random() * Math.PI * 2
       r.goalX = ARENA_C + (nearest.x - ARENA_C) * 0.4 + Math.cos(a) * 2
@@ -223,20 +267,167 @@ export function updateRaid(g: Game, dt: number) {
       boss.aimY = nearest.y - boss.y
       boss.aimT = 0.3
     }
+  } else boss.mvx = boss.mvy = 0
+
+  // Mirror images circle the arena
+  r.clones.forEach((c, i) => {
+    c.a += dt * 0.22
+    c.x = ARENA_C + Math.cos(c.a) * 7.5
+    c.y = ARENA_C + Math.sin(c.a) * 6.5
+    const m = g.clones[i]
+    if (m) {
+      m.mvx = c.x - m.x
+      m.mvy = c.y - m.y
+      m.x = c.x
+      m.y = c.y
+      if (nearest) {
+        m.aimX = nearest.x - m.x
+        m.aimY = nearest.y - m.y
+        m.dir = Math.abs(m.aimX) > Math.abs(m.aimY) ? (m.aimX > 0 ? 'right' : 'left') : m.aimY > 0 ? 'down' : 'up'
+      }
+    }
+  })
+
+  // Delta Stream: a wind that pushes every player along
+  let wind: [number, number] | undefined
+  if (r.wind) {
+    if (r.wind.delay > 0) r.wind.delay -= dt
+    else {
+      r.wind.t -= dt
+      wind = [r.wind.dx, r.wind.dy]
+      if (r.wind.t <= 0) r.wind = null
+    }
+  }
+  g.raidView = {
+    timeLeft: Math.max(0, r.timeLeft), phase: r.phase, wind,
+    clones: r.clones.length ? r.clones.map((c) => [c.x, c.y] as [number, number]) : undefined,
+    air: r.air ? airLift(r.air.total - r.air.t, r.air.t) : 0,
   }
 
-  // Hazards land
+  // Hazards land; tornados then stay a while and roam
   for (const h of [...g.hazards]) {
+    const was = h.t
     h.t -= dt
     if (h.t > 0) continue
-    g.hazards.splice(g.hazards.indexOf(h), 1)
-    resolveHazard(g, h)
+    if (h.dur <= 0) {
+      g.hazards.splice(g.hazards.indexOf(h), 1)
+      resolveHazard(g, h)
+      continue
+    }
+    if (was > 0) resolveHazard(g, h)
+    updateTornado(g, h, dt)
+    h.dur -= dt
+    if (h.dur <= 0) {
+      g.hazards.splice(g.hazards.indexOf(h), 1)
+      g.vfx.burst(h.x, h.y - 0.5, { n: 14, speed: 4, cols: PAL.flying.cols, shape: 'smoke', s0: 4, s1: 9, life: 0.6, flat: 0.5 })
+    }
   }
 
   // How does it end?
   if (boss.fainted) r.result = 'won'
   else if (r.timeLeft <= 0 || g.trainers.every((t) => !t.alive)) r.result = 'lost'
   if (r.result) endRaid(g, r)
+}
+
+/** Seconds Rayquaza takes to fly out of sight, and to come back down. */
+const AIR_UP = 0.45, AIR_DOWN = 0.3
+/** How far up the boss is (0 on the ground, 1 out of sight). */
+function airLift(up: number, left: number) {
+  return Math.max(0, Math.min(1, up / AIR_UP, left / AIR_DOWN))
+}
+
+/** Each arena's own trouble, on a timer that speeds up with the phases. */
+function arenaHazard(g: Game, r: RaidState) {
+  const w = g.world
+  switch (r.def.arena) {
+    case 'crater': {
+      r.envT = [11, 9, 7][r.phase]
+      const v = w.vents[Math.floor(Math.random() * w.vents.length)]
+      addHazard(g, { shape: 'circle', x: v.x, y: v.y, ang: 0, r: 2.6, inner: 0, width: 0, t: 1.35, dmg: 0.35, fx: 'earthpower', type: 'fire', freeze: 0, cover: false, both: false, atk: 'vent' })
+      break
+    }
+    case 'plateau':
+      r.envT = [8, 6.5, 5][r.phase]
+      rodArc(g, Math.floor(Math.random() * w.rods.length))
+      break
+    case 'sky':
+      r.envT = [12, 10, 8][r.phase]
+      spawnTornado(g, { n: 1, speed: 1.5, dur: 5, dps: 0.24 }, 1.4, 0.25, 'flying')
+      break
+    case 'lab': {
+      r.envT = [10, 8, 6.5][r.phase]
+      addHazard(g, { shape: 'grid', x: ARENA_C, y: ARENA_C, ang: 0, r: ARENA_R, inner: Math.random() < 0.5 ? 0 : 1, width: World.LAB_CELL, t: 1.8, dmg: 0.3, fx: 'psychic', type: 'psychic', freeze: 0, cover: false, both: false, atk: 'grid' })
+      for (const v of g.viewers) v.hooks.toast('Het vloerraster laadt op: zoek een donker vak!', '#ff90e0')
+      break
+    }
+    default:
+      r.envT = 10
+  }
+}
+
+/** Stormtop: lightning jumps from rod i to the next one round the arena. */
+function rodArc(g: Game, i: number, warn = 1.4) {
+  const rods = g.world.rods
+  if (rods.length < 2) return
+  const a = rods[i % rods.length], b = rods[(i + 1) % rods.length]
+  const ax = a.x + 0.5, ay = a.y + 0.5, bx = b.x + 0.5, by = b.y + 0.5
+  addHazard(g, { shape: 'line', x: ax, y: ay, ang: Math.atan2(by - ay, bx - ax), r: Math.hypot(bx - ax, by - ay), inner: 0, width: 1.4, t: warn, dmg: 0.35, fx: 'discharge', type: 'electric', freeze: 0, cover: false, both: false, atk: 'arc' })
+}
+
+/** Whirlwinds that rise near the edge of the arena and then go after people. */
+function spawnTornado(g: Game, tw: { n: number; speed: number; dur: number; dps: number }, warn: number, dmg: number, atk: string) {
+  const foes = targets(g)
+  for (let i = 0; i < tw.n; i++) {
+    // Start on the edge, on the side of someone (but not on top of them)
+    const f = foes.length ? foes[(i + Math.floor(Math.random() * foes.length)) % foes.length] : null
+    const base = f ? Math.atan2(f.y - ARENA_C, f.x - ARENA_C) : Math.random() * Math.PI * 2
+    const a = base + (i - (tw.n - 1) / 2) * 1.1 + (Math.random() - 0.5) * 0.6
+    const x = ARENA_C + Math.cos(a) * (ARENA_R - 2.5), y = ARENA_C + Math.sin(a) * (ARENA_R - 2.5)
+    const dir = Math.atan2(ARENA_C - y, ARENA_C - x)
+    addHazard(g, {
+      shape: 'circle', x, y, ang: 0, r: 1.7, inner: 0, width: 0, t: warn + i * 0.25, dmg, fx: 'hurricane', type: 'flying', freeze: 0, cover: false, both: false, atk,
+      vx: Math.cos(dir) * tw.speed, vy: Math.sin(dir) * tw.speed, dur: tw.dur, dps: tw.dps,
+    })
+  }
+}
+
+/** A tornado on the move: turns (slowly) toward the closest Pokémon and hurts anyone inside. */
+function updateTornado(g: Game, h: Hazard, dt: number) {
+  const foes = targets(g)
+  let best: Mon | null = null, bd = Infinity
+  for (const f of foes) {
+    const d = Math.hypot(f.x - h.x, f.y - h.y)
+    if (d < bd) { bd = d; best = f }
+  }
+  const sp = Math.hypot(h.vx, h.vy) || 1.6
+  let ang = Math.atan2(h.vy, h.vx)
+  // Lazy homing: only on someone close by, and it turns slowly (you can step aside)
+  if (best && bd < 9 && (h.tick ?? 0) < 0.3) {
+    let da = Math.atan2(best.y - h.y, best.x - h.x) - ang
+    da = Math.atan2(Math.sin(da), Math.cos(da))
+    ang += Math.max(-0.7 * dt, Math.min(0.7 * dt, da))
+  }
+  ang += Math.sin(g.time * 1.7 + h.id) * 0.6 * dt
+  // Bounce back off the edge of the arena
+  const cx = h.x + Math.cos(ang) * sp * dt, cy = h.y + Math.sin(ang) * sp * dt
+  if (Math.hypot(cx - ARENA_C, cy - ARENA_C) > ARENA_R - 1.5) ang = Math.atan2(ARENA_C - h.y, ARENA_C - h.x)
+  h.vx = Math.cos(ang) * sp
+  h.vy = Math.sin(ang) * sp
+  h.x += h.vx * dt
+  h.y += h.vy * dt
+  if (Math.random() < dt * 10) g.vfx.burst(h.x + (Math.random() - 0.5) * 2, h.y, { n: 2, speed: 3, dir: -Math.PI / 2, spread: 1.2, cols: PAL.flying.cols, shape: 'streak', s0: 3, s1: 1, life: 0.4, flat: 0.5 })
+  // Damage in ticks so the numbers stay readable
+  // (after a hit it wanders off for a moment instead of chasing the same Pokémon)
+  h.tick = (h.tick ?? 0) - dt
+  if (h.tick > 0) return
+  let hit = false
+  for (const m of foes) {
+    if (Math.hypot(m.x - h.x, m.y - h.y) > h.r) continue
+    g.applyDamage(m, m.maxHp * h.dps * 0.5, null)
+    g.vfx.burst(m.x, m.y - 0.5, { n: 6, speed: 4, cols: PAL.flying.cols, shape: 'streak', s0: 3, s1: 1, life: 0.35 })
+    hit = true
+  }
+  h.tick = hit ? 1.2 : 0
 }
 
 function closest(boss: Mon, foes: Mon[]) {
@@ -256,33 +447,110 @@ function pickAttack(r: RaidState): BossAttack | null {
   return ready[0]
 }
 
-function addHazard(g: Game, h: Omit<Hazard, 'id' | 'total'>) {
-  g.hazards.push({ ...h, id: hazardId++, total: h.t })
+type NewHazard = Omit<Hazard, 'id' | 'total' | 'vx' | 'vy' | 'dur' | 'dps'> & Partial<Pick<Hazard, 'vx' | 'vy' | 'dur' | 'dps'>>
+function addHazard(g: Game, h: NewHazard) {
+  g.hazards.push({ vx: 0, vy: 0, dur: 0, dps: 0, ...h, id: hazardId++, total: h.t })
   g.vfx.mark(h.x, h.y)
+}
+
+/** A spot near (x, y) the boss can stand on, inside the arena. */
+function standSpot(g: Game, x: number, y: number) {
+  const d = Math.hypot(x - ARENA_C, y - ARENA_C), max = ARENA_R - 3
+  if (d > max) {
+    x = ARENA_C + ((x - ARENA_C) / d) * max
+    y = ARENA_C + ((y - ARENA_C) / d) * max
+  }
+  for (let i = 0; i < 8 && g.world.blocked(x, y); i++) {
+    x += (ARENA_C - x) * 0.25
+    y += (ARENA_C - y) * 0.25
+  }
+  return [x, y] as const
 }
 
 /** Lay out an attack's hazards on the ground. */
 function castAttack(g: Game, r: RaidState, a: BossAttack, foes: Mon[]) {
   const boss = r.boss
-  const base = { ang: 0, r: a.r ?? 2, inner: a.inner ?? 0, width: a.width ?? 1, dmg: a.dmg, fx: a.fx, type: a.type, freeze: a.freeze ?? 0, cover: !!a.cover, both: false, atk: a.id }
   const pick = a.target === 'random' ? foes[Math.floor(Math.random() * foes.length)] : closest(boss, foes)
   const aimAt = pick ?? { x: boss.x, y: boss.y + 3 }
-  const ang = Math.atan2(aimAt.y - boss.y, aimAt.x - boss.x)
-  boss.castT = 0.9
-  boss.aimX = Math.cos(ang)
-  boss.aimY = Math.sin(ang)
-  boss.aimT = a.warn
-  g.callout(boss, a.name, TYPE_COLOR[a.type])
-  for (const v of g.viewers) if (Math.hypot(v.camX - boss.x, v.camY - boss.y) < 20) v.sfx('warn')
+  // Teleport: blink next to the target first (a step toward the middle, so it's never in a wall)
+  if (a.move === 'teleport' && pick) {
+    const v = g.vfx, p = palOf(a.type, a.id)
+    v.mark(boss.x, boss.y)
+    v.burst(boss.x, boss.y - 1, { n: 22, speed: 6, cols: p.cols, shape: 'star', add: true, s0: 4, s1: 1, life: 0.5 })
+    v.ring(boss.x, boss.y - 0.5, 2.4, p.cols[2], 0.4, 5)
+    const d = Math.hypot(ARENA_C - pick.x, ARENA_C - pick.y) || 1
+    const [nx, ny] = standSpot(g, pick.x + ((ARENA_C - pick.x) / d) * 2.5, pick.y + ((ARENA_C - pick.y) / d) * 2.5)
+    boss.x = r.goalX = nx
+    boss.y = r.goalY = ny
+    v.mark(nx, ny)
+    v.glow(nx, ny - 1, 70, p.glow, 0.5)
+    v.burst(nx, ny - 1, { n: 26, speed: 7, cols: p.cols, shape: 'star', add: true, s0: 5, s1: 1, life: 0.6 })
+    v.flash(0.25, '255,190,255')
+    r.busyT = a.warn
+  }
+  castFrom(g, r, a, foes, boss.x, boss.y, aimAt, true)
+  if (a.move === 'dash' || a.move === 'land') r.busyT = a.warn + 0.2
+  if (a.move === 'land' && pick) {
+    // Up it goes: out of reach until it lands on the circle
+    r.air = { t: a.warn, total: a.warn, x: pick.x, y: pick.y }
+    r.invulnT = Math.max(r.invulnT, a.warn)
+    boss.liftT = 0.5
+    g.vfx.mark(boss.x, boss.y)
+    g.vfx.burst(boss.x, boss.y - 0.3, { n: 24, speed: 7, cols: palOf(a.type, a.id).cols, shape: 'streak', add: true, s0: 5, s1: 1, life: 0.5, flat: 0.5 })
+    g.vfx.ring(boss.x, boss.y, 3, palOf(a.type, a.id).cols[2], 0.5, 6)
+    g.vfx.shakeBy(5)
+  }
+  // Mirror images join in with the aimed and self-centred attacks
+  if (r.clones.length && (a.shape === 'cone' || (a.shape === 'circle' && a.target === 'self')))
+    for (const c of r.clones) castFrom(g, r, { ...a, move: undefined }, foes, c.x, c.y, closestTo(c.x, c.y, foes) ?? aimAt, false)
+  // The storm sets every lightning rod off as well
+  if (a.rods) g.world.rods.forEach((_, i) => rodArc(g, i, a.warn + 0.4))
+  if (a.tornado) spawnTornado(g, a.tornado, a.warn, a.dmg, a.id)
+  if (a.wind) {
+    // Blow everyone toward the side of the arena furthest from them... mostly
+    const ang = Math.random() * Math.PI * 2
+    r.wind = { dx: Math.cos(ang) * a.wind.force, dy: Math.sin(ang) * a.wind.force, delay: a.warn, t: a.wind.dur }
+    for (const v of g.viewers) v.hooks.toast('Delta Stream: loop tegen de wind in!', '#a0f0e8')
+  }
+}
+
+function closestTo(x: number, y: number, foes: Mon[]) {
+  let best: Mon | null = null, bd = Infinity
+  for (const f of foes) {
+    const d = Math.hypot(f.x - x, f.y - y)
+    if (d < bd) { bd = d; best = f }
+  }
+  return best
+}
+
+/** One caster (the boss or a mirror image) lays out an attack from (ox, oy). */
+function castFrom(g: Game, r: RaidState, a: BossAttack, foes: Mon[], ox: number, oy: number, aimAt: { x: number; y: number }, main: boolean) {
+  const boss = r.boss
+  const base = { ang: 0, r: a.r ?? 2, inner: a.inner ?? 0, width: a.width ?? 1, dmg: a.dmg, fx: a.fx, type: a.type, freeze: a.freeze ?? 0, cover: !!a.cover, both: false, atk: a.id }
+  const ang = Math.atan2(aimAt.y - oy, aimAt.x - ox)
+  if (main) {
+    boss.castT = 0.9
+    boss.aimX = Math.cos(ang)
+    boss.aimY = Math.sin(ang)
+    boss.aimT = a.warn
+    g.callout(boss, a.name, TYPE_COLOR[a.type])
+    for (const v of g.viewers) if (Math.hypot(v.camX - boss.x, v.camY - boss.y) < 20) v.sfx('warn')
+  }
+  // Tornado and wind attacks are all about the whirlwinds: no circles of their own
+  if (a.tornado) return
 
   switch (a.shape) {
     case 'circle': {
       if (a.target === 'self') {
-        addHazard(g, { ...base, shape: 'circle', x: boss.x, y: boss.y, t: a.warn })
+        addHazard(g, { ...base, shape: 'circle', x: ox, y: oy, t: a.warn })
         break
       }
       if (a.target === 'vents') {
         g.world.vents.forEach((v, i) => addHazard(g, { ...base, shape: 'circle', x: v.x, y: v.y, t: a.warn + i * (a.stagger ?? 0) }))
+        break
+      }
+      if (a.target === 'nearest' || a.target === 'random') {
+        addHazard(g, { ...base, shape: 'circle', x: aimAt.x, y: aimAt.y, t: a.warn })
         break
       }
       const spots: [number, number][] = foes.map((f) => [f.x, f.y])
@@ -294,20 +562,24 @@ function castAttack(g: Game, r: RaidState, a: BossAttack, foes: Mon[]) {
       break
     }
     case 'ring':
-      addHazard(g, { ...base, shape: 'ring', x: boss.x, y: boss.y, t: a.warn })
+      addHazard(g, { ...base, shape: 'ring', x: ox, y: oy, t: a.warn })
       break
     case 'cone':
-      addHazard(g, { ...base, shape: 'cone', x: boss.x, y: boss.y, ang, r: a.len ?? 9, t: a.warn })
+      addHazard(g, { ...base, shape: 'cone', x: ox, y: oy, ang, r: a.len ?? 9, t: a.warn })
       break
     case 'line': {
       const n = a.sweep?.count ?? 1
       const dirSign = Math.random() < 0.5 ? 1 : -1
+      // One-way sweeps fan out from the aim (centred on it); sweeps through the boss turn one way
+      const start = a.oneWay ? -((n - 1) / 2) * (a.sweep?.step ?? 0) * dirSign : 0
       for (let i = 0; i < n; i++) {
-        const la = ang + dirSign * i * (a.sweep?.step ?? 0)
-        addHazard(g, { ...base, shape: 'line', x: boss.x, y: boss.y, ang: la, r: a.len ?? 14, t: a.warn + i * (a.stagger ?? 0), both: !!a.sweep })
+        const la = ang + start + dirSign * i * (a.sweep?.step ?? 0)
+        addHazard(g, { ...base, shape: 'line', x: ox, y: oy, ang: la, r: a.len ?? 14, t: a.warn + i * (a.stagger ?? 0), both: !!a.sweep && !a.oneWay })
       }
       break
     }
+    case 'grid':
+      break
   }
 }
 
@@ -333,12 +605,34 @@ export function inHazard(h: Hazard, x: number, y: number) {
       const across = Math.abs(-dx * uy + dy * ux)
       return across <= h.width / 2 && (h.both ? Math.abs(along) <= h.r : along >= -0.5 && along <= h.r)
     }
+    case 'grid':
+      return d <= h.r + 1 && gridLit(h, x, y)
   }
 }
 
+/** The floor grid: is the cell under (x, y) one of the lit ones? */
+function gridLit(h: Hazard, x: number, y: number) {
+  const o = ARENA_C - ARENA_R
+  const cx = Math.floor((x - o) / h.width), cy = Math.floor((y - o) / h.width)
+  return (((cx + cy) % 2) + 2) % 2 === h.inner
+}
+
 function resolveHazard(g: Game, h: Hazard) {
-  impactFx(g, h)
   const v = g.vfx
+  const r = g.raid
+  const a = r?.def.attacks.find((x) => x.id === h.atk)
+  // Fusion Bolt: Zekrom races down the line it just lit up
+  if (r && a?.move === 'dash' && !r.boss.fainted) {
+    const [ex, ey] = standSpot(g, h.x + Math.cos(h.ang) * (h.r - 1), h.y + Math.sin(h.ang) * (h.r - 1))
+    const p = palOf(h.type, h.atk)
+    for (let i = 0; i < 3; i++) v.bolt(r.boss.x, r.boss.y - 1, ex, ey - 1, { col: i ? p.cols[2] : '#ffffff', w: 3.2 - i * 0.8, life: 0.45, jag: 10, branches: 3, strands: 2 })
+    r.boss.x = r.goalX = ex
+    r.boss.y = r.goalY = ey
+    r.boss.liftT = 0.4
+    v.mark(ex, ey)
+    v.glow(ex, ey - 1, 90, p.glow, 0.5)
+  }
+  impactFx(g, h)
   // Ice pillars take a beating from everything but the blizzard they shelter you from
   if (!h.cover)
     g.world.pillars.forEach((pl, i) => {
@@ -390,11 +684,34 @@ function enrage(g: Game, r: RaidState) {
       if (d < 7) for (let i = 0; i < 10; i++) g.tryMove(o, (dx / d) * 0.3, (dy / d) * 0.3, 0.3)
     }
   }
+  // Mewtwo splits: mirror images that cast along with it
+  if (r.def.clonesFrom != null && r.phase >= r.def.clonesFrom && !r.clones.length) {
+    for (let i = 0; i < 2; i++) {
+      const a = Math.atan2(boss.y - ARENA_C, boss.x - ARENA_C) + (i ? -1 : 1) * (Math.PI * 2) / 3
+      r.clones.push({ x: ARENA_C + Math.cos(a) * 7.5, y: ARENA_C + Math.sin(a) * 6.5, a })
+    }
+    g.clones = r.clones.map((c) => cloneMon(r.def.species, c.x, c.y))
+    for (const c of r.clones) {
+      g.vfx.mark(c.x, c.y)
+      g.vfx.bolt(boss.x, boss.y - 1.2, c.x, c.y - 1.2, { col: r.def.color, w: 2.4, jag: 10, branches: 2, strands: 2, life: 0.5 })
+      g.vfx.burst(c.x, c.y - 1, { n: 26, speed: 7, cols: palOf('psychic').cols, shape: 'star', add: true, s0: 5, s1: 1, life: 0.7 })
+    }
+    for (const v of g.viewers) v.hooks.toast('Mewtwo splitst zich: de klonen vallen mee aan!', r.def.color)
+  }
   // Two potions to keep going
   for (let i = 0; i < 2; i++) {
     const a = Math.random() * Math.PI * 2
     g.items.push({ x: ARENA_C + Math.cos(a) * 8, y: ARENA_C + Math.sin(a) * 8, kind: 'potion', bob: 0 })
   }
+}
+
+/** A see-through copy of the boss (drawn only, it can't be hit). */
+export function cloneMon(species: number, x: number, y: number) {
+  const m = new Mon(species, 60)
+  m.boss = true
+  m.x = x
+  m.y = y
+  return m
 }
 
 /** A player's Pokémon went down: lose a life, come back in a moment (or you're out). */
@@ -411,7 +728,7 @@ export function raidDown(g: Game, tr: Trainer) {
 
 function respawn(g: Game, tr: Trainer) {
   const i = g.trainers.indexOf(tr)
-  const [x, y] = spawnPoint(i, g.trainers.length)
+  const [x, y] = spawnPoint(g, i, g.trainers.length)
   tr.x = x
   tr.y = y
   const m = tr.mon
@@ -428,6 +745,8 @@ function respawn(g: Game, tr: Trainer) {
 
 function endRaid(g: Game, r: RaidState) {
   const won = r.result === 'won'
+  r.clones = []
+  g.clones = []
   if (won) {
     const b = r.boss
     g.vfx.mark(b.x, b.y)
@@ -452,9 +771,18 @@ const PAL = {
   blue: { cols: ['#ffffff', '#e0f4ff', '#90d0ff', '#50a0ff', '#3068f0'], glow: '#5aa0ff', rgb: '60,130,255', spike: ['#c8e8ff', '#4070d0'] },
   ice: { cols: ['#ffffff', '#e4f6ff', '#a8dcff', '#70b8f0', '#4a88d0'], glow: '#9ad8ff', rgb: '40,120,240', spike: ['#f4fcff', '#5a9ee0'] },
   dragon: { cols: ['#ffffff', '#e8dcff', '#b898ff', '#8860f0', '#6038d0'], glow: '#9a70ff', rgb: '150,90,255', spike: ['#c0a8ff', '#6040c0'] },
+  emerald: { cols: ['#ffffff', '#e0ffe8', '#98f0b0', '#50d070', '#20a050'], glow: '#60f090', rgb: '70,215,120', spike: ['#c0ffd0', '#208048'] },
+  electric: { cols: ['#ffffff', '#fffbd0', '#ffe860', '#ffc820', '#e09a10'], glow: '#ffe040', rgb: '255,215,50', spike: ['#fff4a0', '#c09010'] },
+  flying: { cols: ['#ffffff', '#f0fcff', '#c8f0f0', '#90dcd8', '#58b8c0'], glow: '#b0f4ec', rgb: '160,235,225', spike: ['#ffffff', '#70c0c8'] },
+  psychic: { cols: ['#ffffff', '#ffe0f4', '#ff98d8', '#e060c0', '#a040b0'], glow: '#ff70d0', rgb: '240,100,210', spike: ['#ffc8ec', '#a03890'] },
+  ghost: { cols: ['#ffffff', '#e8d8ff', '#a888e0', '#7050b8', '#402878'], glow: '#9060e0', rgb: '125,75,210', spike: ['#d0c0ff', '#402878'] },
 }
 type Pal = (typeof PAL)['fire']
-const palOf = (t: PType, atk = ''): Pal => (atk === 'blueflare' ? PAL.blue : t === 'ice' ? PAL.ice : t === 'dragon' ? PAL.dragon : PAL.fire)
+const palOf = (t: PType, atk = ''): Pal =>
+  atk === 'blueflare' ? PAL.blue
+  : atk === 'dragonascent' || atk === 'outrage' ? PAL.emerald
+  : t === 'ice' ? PAL.ice : t === 'dragon' ? PAL.dragon : t === 'electric' ? PAL.electric
+  : t === 'flying' ? PAL.flying : t === 'psychic' ? PAL.psychic : t === 'ghost' ? PAL.ghost : PAL.fire
 const rand = (a: number, b: number) => a + Math.random() * (b - a)
 
 /** The boss attack behind a hazard (none for the crater's own vents). */
@@ -462,10 +790,15 @@ export function bossAttack(g: Game, atk: string): BossAttack | undefined {
   return BOSSES[g.setup.boss ?? 'reshiram'].attacks.find((a) => a.id === atk)
 }
 
+/** Particle shape and ground mark that go with an attack type. */
+const shapeOf = (t: PType): Shape => (t === 'ice' ? 'shard' : t === 'fire' ? 'flame' : t === 'electric' ? 'streak' : t === 'flying' ? 'smoke' : 'star')
+const decalOf = (t: PType): DecalKind | null => (t === 'ice' ? 'frost' : t === 'fire' || t === 'electric' ? 'scorch' : t === 'flying' ? null : t === 'psychic' ? 'glass' : 'crack')
+
 /** Big impacts that fill the whole shape and leave marks on the ground. */
 function impactFx(g: Game, h: Hazard) {
-  const v = g.vfx, p = palOf(h.type, h.atk), ice = h.type === 'ice'
+  const v = g.vfx, p = palOf(h.type, h.atk), ice = h.type === 'ice', elec = h.type === 'electric'
   const mv = moveFor({ name: '', fx: h.fx, type: h.type })
+  const shape = shapeOf(h.type), decal = decalOf(h.type)
   v.mark(h.x, h.y)
   switch (h.shape) {
     case 'circle': {
@@ -487,6 +820,14 @@ function impactFx(g: Game, h: Hazard) {
         return
       }
       const r = h.r
+      if (h.dur > 0) {
+        // A tornado touches down: a gust and a ring of dust
+        v.burst(h.x, h.y - 0.3, { n: 20, speed: 6, cols: p.cols, shape: 'smoke', s0: 5, s1: 10, life: 0.7, flat: 0.5, drag: 2 })
+        v.burst(h.x, h.y - 0.6, { n: 14, dir: -Math.PI / 2, spread: 0.6, speed: 9, cols: p.cols, shape: 'streak', add: true, s0: 4, s1: 1, life: 0.5 })
+        v.ring(h.x, h.y, r * 1.4, p.cols[2], 0.5, 6)
+        v.shakeBy(4)
+        return
+      }
       onImpact(v, mv, h.x, h.y, r)
       v.glow(h.x, h.y, 34 * r, p.glow, 0.9)
       v.ring(h.x, h.y, r * 1.25, p.cols[2], 0.55, 7)
@@ -500,25 +841,35 @@ function impactFx(g: Game, h: Hazard) {
         }
         v.burst(h.x, h.y - 0.3, { n: 24, speed: 8, cols: p.cols, shape: 'shard', s0: 3.5, s1: 1, life: 0.7, grav: 10, flat: 0.7 })
         v.decal(h.x, h.y, r * 0.9, 'frost', 7)
-      } else {
+      } else if (h.type === 'fire') {
         // A column of fire, a flame shockwave and flying rocks
         v.burst(h.x, h.y - 0.2, { n: 20, dir: -Math.PI / 2, spread: 0.35, speed: 10 + r * 2, cols: p.cols, shape: 'flame', add: true, s0: 7, s1: 11, life: 0.95, grav: -3, drag: 1.5 })
         v.burst(h.x, h.y, { n: 14, speed: r * 4, cols: p.cols, shape: 'flame', add: true, s0: 6, s1: 9, life: 0.7, flat: 0.6, drag: 3 })
         v.burst(h.x, h.y - 0.3, { n: 8, speed: 7, cols: ['#3a2a20', '#5a4030', '#2a1a14'], shape: 'rock', s0: 2.5, s1: 1.5, life: 0.8, grav: 14, vr: 8 })
         v.decal(h.x, h.y, r * 0.9, h.atk === 'vent' || h.atk === 'eruption' ? 'crater' : 'scorch', 7)
+      } else {
+        // Lightning out of the sky, a dragon's crash or a psychic blast: a column, a shockwave, debris
+        if (elec)
+          for (let i = 0; i < 2; i++)
+            v.bolt(h.x + rand(-1.5, 1.5), h.y - 9, h.x + rand(-0.4, 0.4), h.y - 0.2, { col: i ? p.cols[2] : '#ffffff', w: 3 - i * 0.9, jag: 12, branches: 2 - i, strands: 1, life: 0.4 })
+        v.burst(h.x, h.y - 0.2, { n: 18, dir: -Math.PI / 2, spread: 0.45, speed: 9 + r * 2, cols: p.cols, shape, add: true, s0: 6, s1: 2, life: 0.75, grav: elec ? 4 : -2, drag: 1.5 })
+        v.burst(h.x, h.y, { n: 16, speed: r * 4.5, cols: p.cols, shape, add: true, s0: 5, s1: 2, life: 0.6, flat: 0.6, drag: 3 })
+        v.burst(h.x, h.y - 0.3, { n: 7, speed: 7, cols: ['#3a3440', '#585060', '#24202a'], shape: 'rock', s0: 2.5, s1: 1.5, life: 0.8, grav: 14, vr: 8 })
+        if (decal) v.decal(h.x, h.y, r * 0.9, decal, 7)
       }
       v.shakeBy(Math.min(9, 3 + r * 1.2))
       return
     }
     case 'ring': {
-      // A crown of flame columns or ice spikes all the way round
+      // A crown of flame columns, ice spikes or sparks all the way round
       const mid = (h.inner + Math.min(h.r, ARENA_R)) / 2, n = 18
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2 + rand(-0.08, 0.08)
         const x = h.x + Math.cos(a) * mid, y = h.y + Math.sin(a) * mid
         if (ice) v.pillar(x, y, rand(20, 34), 5, p.spike[0], p.spike[1], 1, i * 0.015, '#e8f6ff')
         else {
-          v.burst(x, y - 0.2, { n: 5, dir: -Math.PI / 2, spread: 0.4, speed: 9, cols: p.cols, shape: 'flame', add: true, s0: 6, s1: 9, life: 0.9, grav: -3, drag: 1.5 })
+          v.burst(x, y - 0.2, { n: 5, dir: -Math.PI / 2, spread: 0.4, speed: 9, cols: p.cols, shape, add: true, s0: 6, s1: shape === 'flame' ? 9 : 2, life: 0.9, grav: -3, drag: 1.5 })
+          if (elec && i % 3 === 0) v.bolt(x, y - 6, x, y - 0.2, { col: p.cols[1], w: 2, jag: 10, branches: 1, strands: 1, life: 0.35 })
           if (i % 3 === 0) v.glow(x, y, 40, p.glow, 0.8)
         }
       }
@@ -529,7 +880,7 @@ function impactFx(g: Game, h: Hazard) {
       return
     }
     case 'cone': {
-      // A wave of flame or frost rolling over the whole cone
+      // A wave rolling over the whole cone
       const ox = h.x, oy = h.y - 0.6
       v.glow(ox, oy, 60, p.glow, 0.5)
       onBeam(v, mv, ox, oy, h.x + Math.cos(h.ang) * h.r, h.y + Math.sin(h.ang) * h.r - 0.4, () => [ox, oy])
@@ -538,29 +889,50 @@ function impactFx(g: Game, h: Hazard) {
           const a = h.ang + (s / 2) * h.width * 0.8, d = (h.r * i) / 4.4
           const x = h.x + Math.cos(a) * d, y = h.y + Math.sin(a) * d
           if (ice && i % 2 === 0) v.pillar(x, y, 12 + i * 4, 3.5, p.spike[0], p.spike[1], 0.9, i * 0.05, '#e8f6ff')
-          v.burst(x, y - 0.2, { n: 5, dir: h.ang, spread: 0.5, speed: 6 + i, cols: p.cols, shape: ice ? 'flake' : 'flame', add: !ice, s0: 5 + i * 0.6, s1: 8, life: 0.8, drag: 2, grav: ice ? 0 : -2, flat: 0.7 })
+          v.burst(x, y - 0.2, { n: 5, dir: h.ang, spread: 0.5, speed: 6 + i, cols: p.cols, shape: ice ? 'flake' : shape, add: !ice, s0: 5 + i * 0.6, s1: shape === 'flame' ? 8 : 2, life: 0.8, drag: 2, grav: h.type === 'fire' ? -2 : 0, flat: 0.7 })
           if (s === 0) v.glow(x, y, 30 + i * 8, p.glow, 0.7)
         }
-      for (let i = 1; i <= 3; i++)
-        v.decal(h.x + Math.cos(h.ang) * h.r * (i / 3.5), h.y + Math.sin(h.ang) * h.r * (i / 3.5), 1.2 + i * 0.3, ice ? 'frost' : 'scorch', 6)
+      if (decal)
+        for (let i = 1; i <= 3; i++)
+          v.decal(h.x + Math.cos(h.ang) * h.r * (i / 3.5), h.y + Math.sin(h.ang) * h.r * (i / 3.5), 1.2 + i * 0.3, decal, 6)
       v.shakeBy(7)
       return
     }
     case 'line': {
-      // The beam, then a trail of fire / ice / dragon sparks along its whole length
       const ux = Math.cos(h.ang), uy = Math.sin(h.ang)
       const sx = h.both ? h.x - ux * h.r : h.x, sy = h.both ? h.y - uy * h.r : h.y
-      onBeam(v, mv, sx, sy - 0.4, h.x + ux * h.r, h.y + uy * h.r - 0.4, () => [sx, sy - 0.4])
-      const shape = h.type === 'dragon' ? 'star' : ice ? 'shard' : 'flame'
+      if (h.atk === 'arc') {
+        // Lightning jumps from rod to rod
+        for (let i = 0; i < 2; i++) v.bolt(sx, sy - 1.6, h.x + ux * h.r, h.y + uy * h.r - 1.6, { col: i ? p.cols[2] : '#ffffff', w: 3 - i * 0.8, jag: 14, branches: 2, strands: 1, life: 0.5 })
+        for (const [x, y] of [[sx, sy], [h.x + ux * h.r, h.y + uy * h.r]]) {
+          v.glow(x, y - 1.6, 70, p.glow, 0.5)
+          v.burst(x, y - 1.6, { n: 14, speed: 7, cols: p.cols, shape: 'streak', add: true, s0: 4, s1: 1, life: 0.5 })
+        }
+      } else onBeam(v, mv, sx, sy - 0.4, h.x + ux * h.r, h.y + uy * h.r - 0.4, () => [sx, sy - 0.4])
+      // Then a trail of sparks along its whole length
       let n = 0
       for (let d = (h.both ? -h.r : 0) + 1; d <= h.r; d += h.both ? 3 : 2.2) {
         const x = h.x + ux * d, y = h.y + uy * d
         if (Math.hypot(x - ARENA_C, y - ARENA_C) > ARENA_R + 1) continue
-        v.burst(x, y - 0.2, { n: h.both ? 3 : 5, speed: 3, cols: p.cols, shape, add: true, s0: 6, s1: 8, life: 0.8, grav: ice ? 6 : -3, flat: 0.6 })
-        if (n++ % (h.both ? 4 : 2) === 0) v.decal(x, y, 1.1, ice ? 'frost' : 'scorch', 4)
+        v.burst(x, y - 0.2, { n: h.both ? 3 : 5, speed: 3, cols: p.cols, shape, add: true, s0: 6, s1: shape === 'flame' ? 8 : 2, life: 0.8, grav: ice ? 6 : -3, flat: 0.6 })
+        if (decal && n++ % (h.both ? 4 : 2) === 0) v.decal(x, y, 1.1, decal, 4)
       }
       v.glow(h.x, h.y - 0.6, 50, p.glow, 0.4)
       v.shakeBy(h.both ? 4 : 6)
+      return
+    }
+    case 'grid': {
+      // Every lit cell bursts with psychic energy at once
+      const c = h.width, o = ARENA_C - ARENA_R
+      for (let gy = o; gy < ARENA_C + ARENA_R; gy += c)
+        for (let gx = o; gx < ARENA_C + ARENA_R; gx += c) {
+          const x = gx + c / 2, y = gy + c / 2
+          if (Math.hypot(x - ARENA_C, y - ARENA_C) > ARENA_R || !gridLit(h, x, y)) continue
+          v.burst(x, y - 0.3, { n: 4, dir: -Math.PI / 2, spread: 0.8, speed: 6, cols: p.cols, shape: 'star', add: true, s0: 5, s1: 1, life: 0.6 })
+          v.glow(x, y, 46, p.glow, 0.5)
+        }
+      v.flash(0.35, '255,170,240')
+      v.shakeBy(6)
       return
     }
   }
@@ -598,12 +970,72 @@ function hazardPath(ctx: CanvasRenderingContext2D, h: Hazard) {
       ctx.closePath()
       break
     }
+    case 'grid': {
+      // The lit cells of the checkerboard inside the arena
+      const c = h.width, o = ARENA_C - ARENA_R
+      for (let gy = o; gy < ARENA_C + ARENA_R; gy += c)
+        for (let gx = o; gx < ARENA_C + ARENA_R; gx += c) {
+          if (Math.hypot(gx + c / 2 - ARENA_C, gy + c / 2 - ARENA_C) > ARENA_R || !gridLit(h, gx + c / 2, gy + c / 2)) continue
+          ctx.rect(gx * TILE + 1, gy * TILE + 1, c * TILE - 2, c * TILE - 2)
+        }
+      break
+    }
   }
+}
+
+/** A whirlwind on the ground: dust spinning round, darker in the middle. */
+function drawTornadoGround(ctx: CanvasRenderingContext2D, h: Hazard, time: number) {
+  const x = h.x * TILE, y = h.y * TILE, R = h.r * TILE
+  ctx.save()
+  ctx.fillStyle = 'rgba(40,70,80,0.22)'
+  ctx.beginPath()
+  ctx.ellipse(x, y, R, R * 0.55, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.lineWidth = 2
+  for (let i = 0; i < 3; i++) {
+    const a = time * 7 + i * 2.1
+    ctx.strokeStyle = `rgba(200,250,245,${0.5 - i * 0.12})`
+    ctx.beginPath()
+    ctx.ellipse(x, y, R * (1 - i * 0.22), R * 0.55 * (1 - i * 0.22), 0, a, a + 2.2)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+/** The funnel of a whirlwind, rising from the ground (k grows it while it forms). */
+function drawTornadoFunnel(ctx: CanvasRenderingContext2D, h: Hazard, time: number, k: number) {
+  const x = h.x * TILE, y = h.y * TILE, R = h.r * TILE
+  const H = 90 * k, n = 9
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1)
+    const wob = Math.sin(time * 5 + f * 4 + h.id) * 6 * f
+    const cy = y - f * H, rx = R * (0.35 + f * 1.1), ry = rx * 0.32
+    const a = time * 9 + f * 3
+    ctx.strokeStyle = `rgba(210,250,245,${(0.35 + 0.3 * (1 - f)) * k})`
+    ctx.lineWidth = 2.5 - f
+    ctx.beginPath()
+    ctx.ellipse(x + wob, cy, rx, ry, 0, a, a + 4.2)
+    ctx.stroke()
+  }
+  // Debris caught in the wind
+  for (let i = 0; i < 7; i++) {
+    const f = (time * 0.9 + i / 7) % 1
+    const a = time * 8 + i * 2.4
+    const rx = R * (0.4 + f * 1.1)
+    disc(ctx, x + Math.cos(a) * rx, y - f * H + Math.sin(a) * rx * 0.3, 1.6, i % 2 ? '#e0fff8' : '#a0d8d0')
+  }
+  ctx.restore()
 }
 
 /** Telegraphs on the ground: the shape, a texture that moves, filling up until it hits. */
 export function drawHazards(g: Game, ctx: CanvasRenderingContext2D, time: number) {
   for (const h of g.hazards) {
+    if (h.dur > 0 && h.t <= 0) {
+      drawTornadoGround(ctx, h, time)
+      continue
+    }
     // A sweep (Cross Flame) lays all its beams at once; only the next ones show in
     // full, a short while before they fire. The rest is a faint outline that shows
     // which way the sweep turns.
@@ -727,6 +1159,23 @@ export function drawHazards(g: Game, ctx: CanvasRenderingContext2D, time: number
         disc(ctx, x + Math.sin(i * 2.7) * R * 0.45, y + Math.cos(i * 1.9) * R * 0.3, 1 + f * 3 * (0.5 + k), f < 0.8 ? '#ffb040' : '#fff0a0')
       }
     }
+    // Lightning rods: sparks crawl along the line between them
+    if (h.atk === 'arc') {
+      const ux = Math.cos(h.ang), uy = Math.sin(h.ang)
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.strokeStyle = `rgba(255,240,140,${0.35 + 0.55 * k})`
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      const n = Math.ceil(h.r * 2)
+      for (let i = 0; i <= n; i++) {
+        const d = (i / n) * h.r * TILE, j = (Math.sin(time * 40 + i * 1.7) * 4 + Math.sin(time * 23 + i * 3.1) * 3) * (0.4 + k)
+        const px = x + ux * d - uy * j, py = y + uy * d + ux * j - 18
+        if (i) ctx.lineTo(px, py)
+        else ctx.moveTo(px, py)
+      }
+      ctx.stroke()
+      ctx.globalCompositeOperation = 'source-over'
+    }
     // About to hit: the shape flashes white
     if (h.t < 0.22) {
       hazardPath(ctx, h)
@@ -737,11 +1186,60 @@ export function drawHazards(g: Game, ctx: CanvasRenderingContext2D, time: number
   }
 }
 
+/** Delta Stream: streaks blowing across the arena and an arrow next to you. */
+function drawWind(g: Game, ctx: CanvasRenderingContext2D, time: number, w: [number, number]) {
+  const ang = Math.atan2(w[1], w[0]), ux = Math.cos(ang), uy = Math.sin(ang)
+  const span = (ARENA_R + 4) * 2 * TILE, x0 = (ARENA_C - ARENA_R - 4) * TILE, y0 = x0
+  ctx.save()
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  for (let i = 0; i < 70; i++) {
+    // Each streak runs along the wind, wrapping round the arena square
+    const along = (i * 61.7 + time * (380 + (i % 5) * 40)) % span
+    const side = (i * 97.3) % span - span / 2
+    const sx = x0 + span / 2 + ux * (along - span / 2) - uy * side, sy = y0 + span / 2 + uy * (along - span / 2) + ux * side
+    const len = 14 + (i % 4) * 6
+    ctx.moveTo(sx, sy)
+    ctx.lineTo(sx - ux * len, sy - uy * len)
+  }
+  // A dark edge under each white streak so it reads on the white cloud floor too
+  ctx.strokeStyle = 'rgba(40,90,110,0.45)'
+  ctx.lineWidth = 3.5
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(240,255,252,0.85)'
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+  // An arrow by your trainer so you know which way to fight it
+  const p = g.player
+  if (p?.alive) {
+    const pulse = 0.6 + 0.4 * Math.sin(time * 8)
+    const cx = p.x * TILE + ux * 26, cy = p.y * TILE - 20 + uy * 26
+    ctx.translate(cx, cy)
+    ctx.rotate(ang)
+    ctx.fillStyle = `rgba(255,255,255,${0.75 * pulse + 0.2})`
+    ctx.strokeStyle = 'rgba(20,60,70,0.8)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(10, 0)
+    ctx.lineTo(-4, -8)
+    ctx.lineTo(-4, -3)
+    ctx.lineTo(-12, -3)
+    ctx.lineTo(-12, 3)
+    ctx.lineTo(-4, 3)
+    ctx.lineTo(-4, 8)
+    ctx.closePath()
+    ctx.stroke()
+    ctx.fill()
+  }
+  ctx.restore()
+}
+
 /**
  * Drawn above the actors: what is on its way (meteors, icicles, embers), the
  * blizzard closing in, and the boss charging up its attack.
  */
 export function drawHazardsSky(g: Game, ctx: CanvasRenderingContext2D, time: number) {
+  if (g.raidView?.wind) drawWind(g, ctx, time, g.raidView.wind)
   if (!g.hazards.length) return
   const boss = g.wilds.find((w) => w.boss && !w.fainted)
   let charge: { h: Hazard; k: number } | null = null
@@ -750,6 +1248,11 @@ export function drawHazardsSky(g: Game, ctx: CanvasRenderingContext2D, time: num
     const p = palOf(h.type, h.atk)
     const x = h.x * TILE, y = h.y * TILE
     const a = bossAttack(g, h.atk)
+    if (h.dur > 0) {
+      // A tornado forming, then roaming
+      drawTornadoFunnel(ctx, h, time, h.t > 0 ? k * 0.6 : Math.min(1, h.dur / 0.4))
+      continue
+    }
     if (a && (a.shape !== 'circle' || a.target === 'self') && !a.cover && (!charge || k > charge.k)) charge = { h, k }
     if (a?.cover) {
       // Blizzard: snow fog and wind sweeping the cave, thicker as it builds
@@ -789,7 +1292,26 @@ export function drawHazardsSky(g: Game, ctx: CanvasRenderingContext2D, time: num
     ctx.fill()
     if (kk <= 0) continue
     const size = 3 + h.r * 1.8
-    if (h.type === 'ice') {
+    if (h.type === 'electric') {
+      // A thundercloud gathers over the spot, flickering more as it charges
+      const cy = y - 70, w = 10 + h.r * 9 * (0.5 + 0.5 * kk)
+      ctx.fillStyle = `rgba(40,44,70,${0.5 + 0.35 * kk})`
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath()
+        ctx.ellipse(x + i * w * 0.35, cy + Math.abs(i) * 3, w * 0.4, w * 0.24, 0, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      if (Math.sin(time * 37 + h.id * 7) > 0.6 - kk * 0.8) {
+        drawGlow(ctx, x, cy, w * 1.2, p.glow, 0.35 * kk)
+        ctx.strokeStyle = `rgba(255,245,170,${0.4 + 0.5 * kk})`
+        ctx.lineWidth = 1.2
+        ctx.beginPath()
+        ctx.moveTo(x + Math.sin(time * 50) * 6, cy + 6)
+        ctx.lineTo(x + Math.sin(time * 31) * 8, cy + 18)
+        ctx.lineTo(x + Math.sin(time * 43) * 5, cy + 28)
+        ctx.stroke()
+      }
+    } else if (h.type === 'ice') {
       const ix = x + 24 * (1 - kk), iy = y - 4 - 230 * (1 - kk) * (1 - kk)
       drawGlow(ctx, ix, iy - size * 2, size * 4, p.glow, 0.7)
       ctx.fillStyle = '#4a88d0'
