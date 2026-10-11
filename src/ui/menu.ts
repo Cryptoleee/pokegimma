@@ -1,4 +1,5 @@
 import qrcode from 'qrcode-generator'
+import logoSmall from '../assets/stormbreak-logo-small.webp'
 import { animatedUrl, SPECIES, spriteUrl } from '../data/pokemon'
 import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
 import { sfx } from '../audio'
@@ -85,7 +86,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
     <div class="home">
       <div class="home-top">
         <button class="sel-back" aria-label="Terug naar het titelscherm">◀</button>
-        <div class="home-logo"><b>STORM<i>BREAK</i></b><span>ROYALE</span></div>
+        <div class="home-logo"><img src="${logoSmall}" alt="Stormbreak Royale"></div>
       </div>
       <div class="home-stage">
         <div class="hs-bg"></div>

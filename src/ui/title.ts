@@ -1,20 +1,27 @@
 import { animatedUrl } from '../data/pokemon'
 import { sfx, unlockAudio } from '../audio'
 import { playMusic } from '../music'
+import logoUrl from '../assets/stormbreak-logo.webp'
 
 /**
  * Cinematic title: a living Black vs. White split. Zekrom's side crackles with
  * blue lightning, Reshiram's side drifts with embers, an energy seam pulses
  * between them, and the logo gets a metallic shine.
  */
-/** The Stormbreak logo: STORM (steel) and BREAK (molten gold), split by a glowing crack. */
-const LOGO = `<div class="tlogo v-break">
-  <div class="sb-mark">
-    <div class="wbox b-storm"><span class="wback">STORM</span><div class="word w-storm" data-t="STORM">STORM</div></div>
-    <svg class="crack" viewBox="0 0 20 100" preserveAspectRatio="none"><polyline points="13,0 7,20 14,38 5,58 13,76 8,100" /></svg>
-    <div class="wbox b-break"><span class="wback">BREAK</span><div class="word w-break" data-t="BREAK">BREAK</div></div>
+/**
+ * The Stormbreak logo (artwork), cut into three layers along its lightning crack:
+ * STORM, BREAK and the ROYALE ribbon. BREAK keeps getting knocked loose, the
+ * crack flashes, sparks fly and a shine sweeps over the letters.
+ */
+const LOGO = `<div class="tlogo v-art">
+  <div class="logo-art" style="--logo: url(${logoUrl})">
+    <img class="lp lp-rib" src="${logoUrl}" alt="">
+    <img class="lp lp-storm" src="${logoUrl}" alt="Stormbreak Royale">
+    <img class="lp lp-break" src="${logoUrl}" alt="">
+    <svg class="lp-crack" viewBox="0 0 2220 687" preserveAspectRatio="none"><polyline points="1300,0 1215,110 1160,170 1148,300 1145,420 1150,470 1140,525" /></svg>
+    <div class="lp-shine"></div>
+    <div class="lp-sparks">${Array.from({ length: 8 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>
   </div>
-  <div class="ribbon dark"><span>ROYALE</span></div>
   <div class="tag">Breek door de storm</div>
 </div>`
 
