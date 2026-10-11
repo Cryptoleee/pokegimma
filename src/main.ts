@@ -223,10 +223,10 @@ function onEnd(r: GameResult) {
     ])
     return
   }
-  showResults(r, trainer.sprite, { label: 'Naar de lobby ▶', run: () => wipe(toLobby) }, [
-    ...watch,
-    { label: 'Hoofdmenu', run: () => leaveRoom() },
-  ])
+  // Online the match usually goes on for your friends: watching is the main option, the lobby can wait
+  const lobby = { label: 'Naar de lobby', run: () => wipe(toLobby) }
+  if (watch.length) showResults(r, trainer.sprite, { label: 'Kijk verder 👁', run: () => spectate() }, [lobby, { label: 'Hoofdmenu', run: () => leaveRoom() }])
+  else showResults(r, trainer.sprite, { ...lobby, label: 'Naar de lobby ▶' }, [{ label: 'Hoofdmenu', run: () => leaveRoom() }])
 }
 
 // ---------- Watching after you're out ----------

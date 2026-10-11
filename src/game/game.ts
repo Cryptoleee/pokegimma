@@ -165,7 +165,12 @@ export interface GameHooks {
 export const INTRO_TIME = 5.3
 /** How close you must be to spot someone hiding in tall grass (tiles). */
 export const BUSH_SIGHT = 2.8
-const REVEAL_TIME = 1.2
+/** Attacking from the grass gives you (and your trainer) away for this long. */
+const REVEAL_TIME = 3
+/** Getting hit also shows where you are. */
+const HIT_REVEAL = 2
+/** Stepping into tall grass: this long before you're actually hidden. */
+const GRASS_HIDE = 0.8
 
 export interface GameResult {
   won: boolean
@@ -552,6 +557,9 @@ export class Game {
     tr.swapCd = Math.max(0, tr.swapCd - dt)
     tr.revealT = Math.max(0, tr.revealT - dt)
     tr.mon.revealT = Math.max(0, tr.mon.revealT - dt)
+    // Out of the grass you're always seen, and stay seen for a moment after stepping in
+    if (!this.world.isTall(tr.x, tr.y)) tr.revealT = Math.max(tr.revealT, GRASS_HIDE)
+    if (!this.world.isTall(tr.mon.x, tr.mon.y)) tr.mon.revealT = Math.max(tr.mon.revealT, GRASS_HIDE)
     // Remote players move themselves; their position arrives over the network.
     const len = tr.remote ? tr.netMoving : this.walk(tr, dt)
     if (!tr.remote) this.windPush(tr, dt)
@@ -883,6 +891,7 @@ export class Game {
     const tgt = target ?? (dir ? this.dirTarget(m, mv.range + 1, dir) : this.autoTarget(m, mv.range + 1.5))
     m.aimDist = dir ? Math.max(1.2, mv.range * dir.k) : null
     m.revealT = REVEAL_TIME
+    if (m.owner) m.owner.revealT = REVEAL_TIME
     m.combatT = 0
     if (m.owner?.isPlayer && tgt) {
       this.lastTarget = tgt
@@ -1206,7 +1215,8 @@ export class Game {
     if (tgt.boss && src.owner) src.owner.bossDmg += Math.min(dmg, tgt.hp + dmg)
     if (src.owner && tgt.owner && tgt.owner !== src.owner) src.owner.dmg += Math.min(dmg, tgt.hp + dmg)
     tgt.flash = 0.12
-    tgt.revealT = REVEAL_TIME
+    tgt.revealT = Math.max(tgt.revealT, HIT_REVEAL)
+    if (tgt.owner) tgt.owner.revealT = Math.max(tgt.owner.revealT, HIT_REVEAL)
     tgt.combatT = 0
     src.combatT = 0
     if (src.owner) tgt.lastHitBy = src.owner
@@ -1217,6 +1227,9 @@ export class Game {
     const kb = 0.12 * roleInfo(tgt.species.id).knock
     if (!tgt.legendary) this.tryMove(tgt, (dx / d) * kb, (dy / d) * kb, 0.2)
 
+    // Impact sound for everyone in earshot, even if the target is hidden in the grass.
+    // Novas already boomed where they landed.
+    if (mv.kind !== 'nova') this.soundAt(tgt.x, tgt.y, 'moveHit', [mv.fx, mv.tier + (eff > 1 ? 0.5 : 0)], { owners: [src.owner, tgt.owner] })
     const visible = this.onScreen(tgt.x, tgt.y)
     if (visible) {
       const jx = this.rng.range(-0.35, 0.35)
@@ -1237,7 +1250,6 @@ export class Game {
         if (mine) v.sfx('hitConfirm')
         if (hurt) v.sfx('hit', eff > 1)
       }
-      this.soundAt(tgt.x, tgt.y, 'moveHit', [mv.fx, mv.tier + (eff > 1 ? 0.5 : 0)], { owners: [src.owner, tgt.owner] })
       onHit(this.vfx, mv, tgt, eff, this.nearCam(tgt.x, tgt.y))
       if (this.mode === 'solo' && (src.owner?.isPlayer || tgt.owner?.isPlayer) && (mv.tier >= 2 || eff > 1)) this.hitStop = Math.max(this.hitStop, 0.035 + mv.tier * 0.015)
     }
@@ -1309,7 +1321,7 @@ export class Game {
     if (m.fainted) return
     m.hp -= dmg
     m.combatT = 0
-    m.revealT = REVEAL_TIME
+    m.revealT = Math.max(m.revealT, HIT_REVEAL)
     if (!quiet) {
       m.flash = 0.15
       m.joltT = 0.25
@@ -1862,6 +1874,7 @@ export class Game {
       n.t -= dt
       if (n.t > 0) continue
       this.novas.splice(this.novas.indexOf(n), 1)
+      this.soundAt(n.x, n.y, 'moveHit', [n.move.fx, n.move.tier * Math.min(1, n.mult + 0.3)], { owners: [n.src.owner] })
       let any = false
       for (const e of this.enemiesOf(n.src))
         if (Math.hypot(e.x - n.x, e.y - n.y) < n.r + bulk(e)) {
