@@ -785,6 +785,7 @@ export class Game {
   /** Rustling grass and footstep dust. */
   private stepFx(x: number, y: number, dt: number) {
     const t = this.world.at(Math.floor(x), Math.floor(y))
+    if (t === T.TALL) this.world.rustle.set(Math.floor(y) * 128 + Math.floor(x), this.time)
     if (t === T.TALL && Math.random() < dt * 9)
       this.vfx.burst(x, y - 0.1, { n: 2, speed: 2, dir: -Math.PI / 2, spread: 1, cols: ['#88d858', '#48a838', '#2c7a30'], shape: 'leaf', s0: 1.8, s1: 1, life: 0.5, grav: 6 })
     else if ((t === T.PATH || t === T.SAND) && Math.random() < dt * 6)

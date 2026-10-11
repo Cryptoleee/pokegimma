@@ -7,6 +7,7 @@ import { trainerSpriteUrl } from '../data/trainers'
 import { drawCharge, drawDashAura, drawIncoming, drawMelee, drawProjectile } from './moveFx'
 import { drawGlow } from './vfx'
 import { T, TILE } from './world'
+import { FLOWER_FRAMES, hash, TALL_FRAMES, TALL_TOP, tileArt, WATER_FRAMES } from './tiles'
 import type { Weather } from '../data/themes'
 import { drawEvents } from './events'
 import { drawHazards, drawHazardsSky } from './boss'
@@ -58,6 +59,8 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // Ground marks (scorch, frost, craters) under everything else
   drawWater(g, ctx, ox, oy, vw, vh, time)
   g.vfx.drawDecals(ctx)
+  // Swaying tall grass and nodding flowers (open-world maps)
+  drawFoliage(g, ctx, ox, oy, vw, vh, time)
   g.vfx.drawUnder(ctx)
   // Raid: boss attacks telegraphed on the ground
   drawHazards(g, ctx, time)
@@ -182,9 +185,49 @@ function shadow(ctx: CanvasRenderingContext2D, x: number, y: number, w: number) 
 
 function grassOver(g: Game, ctx: CanvasRenderingContext2D, x: number, y: number) {
   const tx = Math.floor(x), ty = Math.floor(y)
+  const fancy = !g.world.arena
   for (let dx = -1; dx <= 1; dx++)
-    if (g.world.isTall(tx + dx + 0.5, ty + 0.5))
-      ctx.drawImage(g.world.ground, (tx + dx) * TILE, ty * TILE + 8, TILE, 8, (tx + dx) * TILE, ty * TILE + 8, TILE, 8)
+    if (g.world.isTall(tx + dx + 0.5, ty + 0.5)) {
+      if (fancy) {
+        // The front half of the (swaying) grass in front of whoever stands in it
+        const c = tallFrame(g, tx + dx, ty, g.time)
+        ctx.drawImage(c, 0, TALL_TOP + 7, TILE, 9, (tx + dx) * TILE, ty * TILE + 7, TILE, 9)
+      } else ctx.drawImage(g.world.ground, (tx + dx) * TILE, ty * TILE + 8, TILE, 8, (tx + dx) * TILE, ty * TILE + 8, TILE, 8)
+    }
+}
+
+/** The tall-grass frame for a tile right now: a gust rolls across the field; it shakes when walked through. */
+function tallFrame(g: Game, tx: number, ty: number, time: number) {
+  const art = tileArt(g.world.theme)
+  const v = Math.floor(hash(tx, ty, 5) * art.tall.length)
+  const rt = g.world.rustle.get(ty * 128 + tx)
+  let f: number
+  if (rt !== undefined && time - rt < 0.5 && time >= rt) f = Math.floor(time * 18 + tx) % TALL_FRAMES
+  else {
+    const wave = Math.sin(time * 1.7 - tx * 0.35 - ty * 0.18)
+    f = wave > 0.55 ? 1 : wave < -0.55 ? 3 : (Math.floor(time * 0.9 + hash(tx, ty, 6) * 4) % 2) * 2
+  }
+  return art.tall[v][f]
+}
+
+/** Tall grass and flowers in view, drawn per frame so they can move. */
+function drawFoliage(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number) {
+  const w = g.world
+  if (w.arena) return
+  const art = tileArt(w.theme)
+  const tx0 = Math.max(0, Math.floor(ox / TILE)), ty0 = Math.max(0, Math.floor(oy / TILE))
+  const tx1 = Math.min(127, Math.ceil((ox + vw) / TILE)), ty1 = Math.min(128, Math.ceil((oy + vh) / TILE) + 1)
+  if ((tx1 - tx0) * (ty1 - ty0) > 9000) return
+  for (let ty = ty0; ty < ty1 && ty < 128; ty++)
+    for (let tx = tx0; tx <= tx1; tx++) {
+      const t = w.at(tx, ty)
+      if (t === T.TALL) ctx.drawImage(tallFrame(g, tx, ty, time), tx * TILE, ty * TILE - TALL_TOP)
+      else if (t === T.FLOWER && art.flowers.length) {
+        const c = art.flowers[Math.floor(hash(tx, ty, 7) * art.flowers.length)]
+        const f = Math.floor(time * 2.2 + hash(tx, ty, 8) * FLOWER_FRAMES) % FLOWER_FRAMES
+        ctx.drawImage(c[f], tx * TILE, ty * TILE - 2)
+      }
+    }
 }
 
 const TRAINER_SCALE = 0.42
@@ -787,6 +830,12 @@ function drawWater(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: numbe
       const seed = (tx * 73856093) ^ (ty * 19349663)
       const ph = (seed & 1023) / 163
       const k = Math.sin(time * 1.6 + ph)
+      if (lava && !g.world.arena && tile === T.WATER) {
+        // Lava lake: bright streaks drifting slowly over the surface
+        const fr = tileArt(g.world.theme).water[Math.floor(time * 2.5) % WATER_FRAMES]
+        ctx.drawImage(fr, (tx % 2) * TILE, (ty % 2) * TILE, TILE, TILE, tx * TILE, ty * TILE, TILE, TILE)
+        continue
+      }
       if (lava) {
         // Pulsing glow and the odd bubble
         ctx.fillStyle = `rgba(255,${180 + Math.round(60 * k)},60,${0.18 + 0.14 * k})`
@@ -799,10 +848,21 @@ function drawWater(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: numbe
         continue
       }
       if (liquid === 'ice') continue
-      // Rolling wave line
-      const wy = ty * TILE + 4 + ((time * 6 + ph * 3) % 10)
-      ctx.fillStyle = 'rgba(200,228,255,0.45)'
-      ctx.fillRect(tx * TILE + 2 + Math.sin(time * 2 + ph) * 2, wy, 6, 1)
+      if (!g.world.arena) {
+        // Drifting ripples (a seamless 32 px pattern) and foam breathing along the shore
+        const fr = tileArt(g.world.theme).water[Math.floor(time * 5) % WATER_FRAMES]
+        ctx.drawImage(fr, (tx % 2) * TILE, (ty % 2) * TILE, TILE, TILE, tx * TILE, ty * TILE, TILE, TILE)
+        const up = g.world.at(tx, ty - 1)
+        if (up !== T.WATER && up !== T.BRIDGE) {
+          ctx.fillStyle = `rgba(255,255,255,${0.25 + 0.2 * Math.sin(time * 2.2 + tx * 0.7)})`
+          ctx.fillRect(tx * TILE, ty * TILE + 3 + Math.round(Math.sin(time * 1.5 + tx * 0.5)), TILE, 1)
+        }
+      } else {
+        // Rolling wave line
+        const wy = ty * TILE + 4 + ((time * 6 + ph * 3) % 10)
+        ctx.fillStyle = 'rgba(200,228,255,0.45)'
+        ctx.fillRect(tx * TILE + 2 + Math.sin(time * 2 + ph) * 2, wy, 6, 1)
+      }
       // Sparkle
       if (k > 0.86) {
         const sx = tx * TILE + (seed & 15), sy = ty * TILE + ((seed >> 4) & 15)

@@ -1,5 +1,6 @@
 import { Rng } from './rng'
 import { THEMES, type ThemeId, type WorldTheme } from '../data/themes'
+import { hash, mix, paintGrass, shade, tallBed, tileArt, tone } from './tiles'
 
 export const TILE = 16
 export const MAP = 128
@@ -50,6 +51,8 @@ export class World {
   houses: House[] = []
   towns: Town[] = []
   tall: number[] = []
+  /** Tall grass someone just walked through (tile index → time): it shakes. */
+  rustle = new Map<number, number>()
   walkable: number[] = []
   ground!: HTMLCanvasElement
   overlay!: HTMLCanvasElement
@@ -366,28 +369,45 @@ export class World {
       for (let tx = 0; tx < MAP; tx++) {
         const t = this.at(tx, ty)
         const x = tx * TILE, y = ty * TILE
+        // Open-world maps get the detailed BW tiles; raid arenas keep their own floors
+        const fancy = !this.arena
         if (t === T.ICE || t === T.PILLAR) drawIce(g, x, y, th, tx, ty)
         else if (this.arena === 'lab' && t !== T.TREE) drawLabFloor(g, x, y, th, tx, ty)
         else if (this.arena === 'sky' && t !== T.TREE) drawCloud(g, x, y, th, tx, ty)
+        else if (fancy) paintGrass(g, x, y, tx, ty, th)
         else drawGrass(g, x, y, r, th)
         switch (t) {
-          case T.TALL: drawTall(g, x, y, th); break
-          case T.PATH: drawPath(g, x, y, r, this, tx, ty, th); break
-          case T.SAND: drawSand(g, x, y, r, th); break
-          case T.WATER: drawWater(g, x, y, this, tx, ty, th); break
+          // Tall grass and flowers are drawn (animated) every frame on top of this
+          case T.TALL: fancy ? tallBed(g, x, y, th) : drawTall(g, x, y, th); break
+          case T.PATH: fancy ? paintPath(g, x, y, this, tx, ty, th) : drawPath(g, x, y, r, this, tx, ty, th); break
+          case T.SAND: fancy ? paintSand(g, x, y, tx, ty, th, this) : drawSand(g, x, y, r, th); break
+          case T.WATER: fancy && th.liquid === 'water' ? paintWater(g, x, y, this, tx, ty, th) : fancy && th.liquid === 'lava' ? paintLava(g, x, y, this, tx, ty, th) : drawWater(g, x, y, this, tx, ty, th); break
           case T.BRIDGE: drawBridge(g, x, y, th); break
-          case T.FLOWER: drawFlower(g, x, y, r, th); break
-          case T.ROCK: drawRock(g, x, y, th); break
-          case T.TREE: drawTrunk(g, o, x, y, th, this, tx, ty); break
+          case T.FLOWER: if (!fancy) drawFlower(g, x, y, r, th); break
+          case T.ROCK: fancy ? paintRock(g, x, y, tx, ty, th) : drawRock(g, x, y, th); break
+          case T.TREE: fancy && isTree(th) ? treeBase(g, x, y, th) : drawTrunk(g, o, x, y, th, this, tx, ty); break
           case T.LAVA: drawLava(g, x, y, this, tx, ty); break
         }
       }
-    // Canopies on the overlay so things walking "behind" a tree are covered.
-    if (th.decor === 'oak' || th.decor === 'pine' || th.decor === 'dead' || th.decor === 'cactus')
+    // Trees on the overlay so things walking "behind" a tree are covered.
+    if (isTree(th)) {
+      const art = tileArt(th)
       for (let ty = 0; ty < MAP; ty++)
-        for (let tx = 0; tx < MAP; tx++)
-          if (this.at(tx, ty) === T.TREE) drawCanopy(o, tx * TILE, ty * TILE, (tx * 7 + ty * 13) % 3, th)
-    for (const h of this.houses) drawHouse(g, o, h)
+        for (let tx = 0; tx < MAP; tx++) {
+          if (this.at(tx, ty) !== T.TREE) continue
+          if (this.arena) {
+            drawCanopy(o, tx * TILE, ty * TILE, (tx * 7 + ty * 13) % 3, th)
+            continue
+          }
+          const v = Math.floor(hash(tx, ty, 77) * 3)
+          const c = art.trees[v]
+          // A pixel of jitter so a forest doesn't look stamped
+          const jx = Math.round((hash(tx, ty, 78) - 0.5) * 2), jy = Math.round((hash(tx, ty, 79) - 0.5) * 2)
+          const ax = th.decor === 'pine' ? 3 : th.decor === 'dead' ? 4 : th.decor === 'cactus' ? 0 : 7
+          o.drawImage(c, tx * TILE - ax + jx, ty * TILE + TILE - c.height + (th.decor === 'oak' ? -4 : th.decor === 'pine' ? -5 : th.decor === 'dead' ? -1 : 0) + jy)
+        }
+    }
+    for (const h of this.houses) (this.arena ? drawHouse : paintHouse)(g, o, h)
     for (const p of this.pillars) if (p.hp > 0) drawPillar(g, o, p.x * TILE, p.y * TILE)
     for (const v of this.vents) drawVent(g, v.x * TILE, v.y * TILE)
     for (const rd of this.rods) drawRod(g, o, rd.x * TILE, rd.y * TILE)
@@ -858,5 +878,304 @@ class Noise {
       f *= 2.1
     }
     return s / norm
+  }
+}
+
+// ---------- Detailed BW tiles for the open-world maps (see tiles.ts) ----------
+
+const isTree = (th: WorldTheme) => th.decor === 'oak' || th.decor === 'pine' || th.decor === 'dead' || th.decor === 'cactus'
+
+function px(g: CanvasRenderingContext2D, x: number, y: number, c: string, w = 1, h = 1) {
+  g.fillStyle = c
+  g.fillRect(x, y, w, h)
+}
+
+/** Shadow (and a trunk) on the ground under a tree; the crown is on the overlay. */
+function treeBase(g: CanvasRenderingContext2D, x: number, y: number, th: WorldTheme) {
+  const [, trunk, trunkDark] = th.trunk
+  const sh = mix(th.grass[0], '#000000', 0.32)
+  for (let yy = 0; yy < 5; yy++) {
+    const half = Math.round(7 * Math.sqrt(1 - ((yy - 2) / 2.6) ** 2))
+    px(g, x + 8 - half, y + 11 + yy, sh, half * 2, 1)
+  }
+  if (th.decor === 'dead' || th.decor === 'cactus') return
+  const out = shade(trunkDark, -0.4)
+  px(g, x + 5, y + 6, out, 6, 9)
+  px(g, x + 6, y + 6, trunk, 4, 8)
+  px(g, x + 6, y + 6, mix(trunk, '#ffffff', 0.2), 1, 8)
+  px(g, x + 9, y + 6, trunkDark, 1, 8)
+  px(g, x + 4, y + 14, out, 2, 1)
+  px(g, x + 10, y + 14, out, 2, 1)
+}
+
+/** Dirt path with grassy, slightly ragged edges and a few pebbles. */
+function paintPath(g: CanvasRenderingContext2D, x: number, y: number, w: World, tx: number, ty: number, th: WorldTheme) {
+  const [base, speck] = th.path
+  const t = tone(tx, ty)
+  px(g, x, y, mix(base, t > 0 ? '#ffffff' : speck, Math.abs(t) * 0.12), TILE, TILE)
+  for (let i = 0; i < 4; i++) {
+    const sx = x + 1 + Math.floor(hash(tx, ty, 60 + i) * 13), sy = y + 1 + Math.floor(hash(tx, ty, 70 + i) * 13)
+    px(g, sx, sy, speck, i % 2 ? 2 : 1, 1)
+  }
+  if (hash(tx, ty, 80) < 0.25) {
+    const sx = x + 3 + Math.floor(hash(tx, ty, 81) * 9), sy = y + 3 + Math.floor(hash(tx, ty, 82) * 9)
+    px(g, sx, sy + 1, shade(speck, -0.25), 3, 1)
+    px(g, sx, sy, mix(base, '#ffffff', 0.45), 2, 1)
+  }
+  const isPath = (a: number, b: number) => { const k = w.at(a, b); return k === T.PATH || k === T.BRIDGE || k === T.HOUSE }
+  const [gb, gd] = th.grass
+  const lip = shade(base, -0.18)
+  // Grass creeps over the edge: 1-2 px, ragged
+  const edge = (horizontal: boolean, at: number, inward: number) => {
+    for (let i = 0; i < TILE; i++) {
+      const deep = hash(tx * 3 + (horizontal ? i : at), ty * 3 + (horizontal ? at : i), 90) < 0.35 ? 2 : 1
+      for (let d = 0; d < deep + 1; d++) {
+        const c = d < deep ? (d === deep - 1 && hash(i, d, tx + ty) < 0.4 ? gd : gb) : lip
+        const xx = horizontal ? x + i : x + at + inward * d, yy = horizontal ? y + at + inward * d : y + i
+        px(g, xx, yy, c)
+      }
+    }
+  }
+  if (!isPath(tx, ty - 1)) edge(true, 0, 1)
+  if (!isPath(tx, ty + 1)) edge(true, TILE - 1, -1)
+  if (!isPath(tx - 1, ty)) edge(false, 0, 1)
+  if (!isPath(tx + 1, ty)) edge(false, TILE - 1, -1)
+}
+
+/** Sand with soft wind ripples; grass creeps over its edges. */
+function paintSand(g: CanvasRenderingContext2D, x: number, y: number, tx: number, ty: number, th: WorldTheme, w?: World) {
+  const [base, speck] = th.sand
+  const t = tone(tx, ty)
+  px(g, x, y, mix(base, t > 0 ? '#ffffff' : speck, Math.abs(t) * 0.15), TILE, TILE)
+  const lt = mix(base, '#ffffff', 0.18), rip = mix(base, speck, 0.65)
+  for (let r = 0; r < 3; r++) {
+    if (hash(tx, ty, 160 + r) < 0.55) continue
+    const ry = y + 2 + r * 5 + Math.floor(hash(tx, ty, 100 + r) * 2)
+    const x0 = Math.floor(hash(tx, ty, 110 + r) * 6), len = 5 + Math.floor(hash(tx, ty, 120 + r) * 6)
+    for (let i = 0; i < len && x0 + i < TILE; i++) {
+      const dy = Math.round(Math.sin((i / len) * Math.PI) * -1)
+      px(g, x + x0 + i, ry + dy, rip)
+      px(g, x + x0 + i, ry + dy - 1, lt)
+    }
+  }
+  if (!w) return
+  const grassy = (a: number, b: number) => { const k = w.at(a, b); return k === T.GRASS || k === T.TALL || k === T.FLOWER || k === T.TREE }
+  const [gb, gd] = th.grass
+  const lip = shade(base, -0.12)
+  const edge = (horizontal: boolean, at: number, inward: number) => {
+    for (let i = 0; i < TILE; i++) {
+      const deep = 1 + Math.floor(hash(tx * 5 + (horizontal ? i : at), ty * 5 + (horizontal ? at : i), 150) * 3)
+      for (let d = 0; d <= deep; d++) {
+        const c = d < deep ? (d === deep - 1 && hash(i, d, tx * 7 + ty) < 0.45 ? gd : gb) : lip
+        px(g, horizontal ? x + i : x + at + inward * d, horizontal ? y + at + inward * d : y + i, c)
+      }
+    }
+  }
+  if (grassy(tx, ty - 1)) edge(true, 0, 1)
+  if (grassy(tx, ty + 1)) edge(true, TILE - 1, -1)
+  if (grassy(tx - 1, ty)) edge(false, 0, 1)
+  if (grassy(tx + 1, ty)) edge(false, TILE - 1, -1)
+}
+
+/** Water: shallow near the shore, deeper in the middle (per pixel, in bands), foam on the shore and a dark lip under banks. */
+function paintWater(g: CanvasRenderingContext2D, x: number, y: number, w: World, tx: number, ty: number, th: WorldTheme) {
+  const [base, , foam, deep] = th.water
+  const land = (a: number, b: number) => { const k = w.at(a, b); return k !== T.WATER && k !== T.BRIDGE }
+  const R = 2
+  const near: [number, number][] = []
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (land(tx + dx, ty + dy)) near.push([(tx + dx) * TILE, (ty + dy) * TILE])
+  const bands = [mix(base, foam, 0.24), mix(base, foam, 0.11), base, mix(base, deep, 0.3)]
+  const cuts = [4, 11, 24]
+  for (let yy = 0; yy < TILE; yy++)
+    for (let xx = 0; xx < TILE; xx++) {
+      const pxl = x + xx + 0.5, pyl = y + yy + 0.5
+      let d = 99
+      for (const [lx, ly] of near) {
+        const ddx = Math.max(lx - pxl, 0, pxl - (lx + TILE)), ddy = Math.max(ly - pyl, 0, pyl - (ly + TILE))
+        d = Math.min(d, Math.hypot(ddx, ddy))
+      }
+      // A checker dither where two bands meet keeps the steps soft
+      let band = cuts.findIndex((c) => d < c)
+      if (band < 0) band = 3
+      if (band < 3 && d > cuts[band] - 1.2 && (xx + yy) % 2 === 0) band++
+      px(g, x + xx, y + yy, bands[band])
+    }
+  const fm = mix(foam, '#ffffff', 0.3), soft = mix(foam, bands[0], 0.5)
+  const up = land(tx, ty - 1), dn = land(tx, ty + 1), lf = land(tx - 1, ty), rt = land(tx + 1, ty)
+  if (up) { px(g, x, y, shade(th.grass[0], -0.35), TILE, 1); px(g, x, y + 1, fm, TILE, 1); px(g, x, y + 2, soft, TILE, 1) }
+  if (lf) { px(g, x, y, fm, 1, TILE); px(g, x + 1, y, soft, 1, TILE) }
+  if (rt) { px(g, x + 15, y, fm, 1, TILE); px(g, x + 14, y, soft, 1, TILE) }
+  if (dn) { px(g, x, y + 14, mix(bands[0], deep, 0.6), TILE, 1); px(g, x, y + 15, shade(deep, -0.2), TILE, 1) }
+  // Inner corners: a little foam where only the diagonal is land
+  if (!up && !lf && land(tx - 1, ty - 1)) { px(g, x, y, fm, 2, 1); px(g, x, y + 1, fm, 1, 1) }
+  if (!up && !rt && land(tx + 1, ty - 1)) { px(g, x + 14, y, fm, 2, 1); px(g, x + 15, y + 1, fm, 1, 1) }
+}
+
+/** Lava lake: a dark crust along the shore, hotter toward the middle, with cooling plates. */
+function paintLava(g: CanvasRenderingContext2D, x: number, y: number, w: World, tx: number, ty: number, th: WorldTheme) {
+  const [base, wave, foam, deep] = th.water
+  const land = (a: number, b: number) => { const k = w.at(a, b); return k !== T.WATER && k !== T.BRIDGE }
+  const near: [number, number][] = []
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (land(tx + dx, ty + dy)) near.push([(tx + dx) * TILE, (ty + dy) * TILE])
+  const crust = '#2a1a16'
+  const bands = [crust, shade(deep, -0.15), deep, base, mix(base, wave, 0.55), wave]
+  const cuts = [1.5, 3, 6, 12, 22]
+  for (let yy = 0; yy < TILE; yy++)
+    for (let xx = 0; xx < TILE; xx++) {
+      const pxl = x + xx + 0.5, pyl = y + yy + 0.5
+      let d = 99
+      for (const [lx, ly] of near) {
+        const ddx = Math.max(lx - pxl, 0, pxl - (lx + TILE)), ddy = Math.max(ly - pyl, 0, pyl - (ly + TILE))
+        d = Math.min(d, Math.hypot(ddx, ddy))
+      }
+      let band = cuts.findIndex((c) => d < c)
+      if (band < 0) band = 5
+      if (band > 0 && band < 5 && d > cuts[band] - 1 && (xx + yy) % 2 === 0) band++
+      // Cooling crust plates drifting on the hot middle
+      const gx = x + xx, gy = y + yy
+      const plate = Math.sin(gx * 0.09 + Math.sin(gy * 0.05) * 3) + Math.sin(gy * 0.11 + Math.sin(gx * 0.07) * 2) + Math.sin((gx + gy) * 0.047)
+      let col = bands[band]
+      if (band >= 3 && plate > 2.0) col = plate > 2.3 ? shade(deep, -0.35) : deep
+      else if (band >= 4 && plate < -2.15) col = foam
+      px(g, gx, gy, col)
+    }
+}
+
+/** A round boulder lit from the top left, with an outline and a crack. */
+function paintRock(g: CanvasRenderingContext2D, x: number, y: number, tx: number, ty: number, th: WorldTheme) {
+  const [outline, base, hi] = th.rock
+  const cx = 8, cy = 9, rx = 6.5, ry = 5.5
+  px(g, x + 2, y + 13, 'rgba(0,0,0,0.22)', 13, 2)
+  for (let yy = 0; yy < TILE; yy++)
+    for (let xx = 0; xx < TILE; xx++) {
+      const nx = (xx + 0.5 - cx) / rx, ny = (yy + 0.5 - cy) / ry
+      const d = nx * nx + ny * ny
+      if (d > 1.25) continue
+      if (d > 1) { px(g, x + xx, y + yy, outline); continue }
+      const l = -(nx * 0.6 + ny * 0.8)
+      px(g, x + xx, y + yy, l > 0.45 ? hi : l > -0.15 ? base : mix(base, outline, 0.45))
+    }
+  const s = hash(tx, ty, 140) < 0.5 ? 1 : -1
+  px(g, x + 8, y + 7, mix(base, outline, 0.6))
+  px(g, x + 8 + s, y + 8, mix(base, outline, 0.6))
+  px(g, x + 8 + s, y + 9, mix(base, outline, 0.6))
+}
+
+/** BW-style house: shingled roof with a chimney (overlay), sided walls, framed windows, door and step. */
+function paintHouse(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, h: House) {
+  const x = h.x * TILE, y = h.y * TILE, W = h.w * TILE, H = h.h * TILE
+  const ink = '#2a2430'
+  // Shadow on the ground (light comes from the top left)
+  g.fillStyle = 'rgba(0,0,0,0.2)'
+  g.fillRect(x + 6, y + H - 3, W, 5)
+  g.fillRect(x + W - 2, y + 30, 6, H - 30)
+  // Walls
+  const wall = h.center ? '#f8f8f6' : '#f2e8d6', wallDark = h.center ? '#d8dce4' : '#ddd0b8'
+  px(g, x + 2, y + 28, ink, W - 4, H - 28)
+  px(g, x + 3, y + 28, wall, W - 6, H - 31)
+  for (let i = x + 7; i < x + W - 4; i += 6) px(g, i, y + 34, wallDark, 1, H - 40)
+  px(g, x + 3, y + 28, 'rgba(0,0,0,0.28)', W - 6, 4) // shade under the eaves
+  // Stone foundation
+  const stone = '#a8a090'
+  px(g, x + 3, y + H - 7, stone, W - 6, 4)
+  px(g, x + 3, y + H - 7, '#c8c0b0', W - 6, 1)
+  for (let i = x + 6; i < x + W - 4; i += 7) px(g, i, y + H - 6, '#888070', 1, 3)
+  if (h.center) {
+    // Red band and big sliding glass doors
+    px(g, x + 3, y + 32, '#e04848', W - 6, 4)
+    px(g, x + 3, y + 35, '#a82c30', W - 6, 1)
+    px(g, x + 13, y + 40, ink, 22, H - 43)
+    for (const dx of [14, 24]) {
+      px(g, x + dx, y + 41, '#78b8f0', 10, H - 45)
+      px(g, x + dx, y + 41, '#a8d8ff', 10, 3)
+      px(g, x + dx + 2, y + 45, '#e8f6ff', 1, 6)
+      px(g, x + dx + 3, y + 44, '#e8f6ff', 1, 3)
+    }
+    px(g, x + 24, y + 41, ink, 1, H - 45)
+  } else {
+    // Wooden door in a frame, with a knob and a step
+    px(g, x + 18, y + 42, ink, 12, H - 45)
+    px(g, x + 19, y + 43, '#a87040', 10, H - 47)
+    px(g, x + 19, y + 43, '#c08850', 10, 1)
+    px(g, x + 21, y + 46, '#8a5830', 6, 5)
+    px(g, x + 21, y + 53, '#8a5830', 6, 5)
+    px(g, x + 26, y + 51, '#f8d040', 2, 2)
+  }
+  px(g, x + 16, y + H - 3, '#c8c0b0', 16, 3)
+  px(g, x + 16, y + H - 3, '#e0d8c8', 16, 1)
+  // Window with a frame, cross bar, reflection, sill and flower box
+  const wx = x + W - 24, wy = y + 40
+  px(g, wx - 1, wy - 1, ink, 16, 13)
+  px(g, wx, wy, '#5a90d0', 14, 11)
+  px(g, wx, wy, '#9ad0f8', 14, 5)
+  px(g, wx + 6, wy, '#f8f8f8', 2, 11)
+  px(g, wx, wy + 5, '#f8f8f8', 14, 1)
+  px(g, wx + 2, wy + 2, '#ffffff', 2, 1)
+  px(g, wx + 1, wy + 3, '#ffffff', 1, 1)
+  px(g, wx - 2, wy + 11, '#8a6040', 18, 3)
+  for (let i = 0; i < 8; i++) px(g, wx - 1 + i * 2, wy + 10 - (i % 2), ['#f05868', '#f8d038', '#f890c0'][i % 3], 1, 1)
+  if (h.center) px(g, wx - 2, wy + 11, '#d8dce4', 18, 2)
+
+  // Roof on the overlay: shingle rows, ridge cap, eaves, verges
+  const rx = x - 1, ry = y - 8, rw = W + 2, rh = 41
+  const roof = h.roof
+  o.fillStyle = ink
+  o.fillRect(rx, ry, rw, rh)
+  o.fillStyle = roof
+  o.fillRect(rx + 1, ry + 1, rw - 2, rh - 2)
+  const rowH = 5
+  for (let r = 0, yy = ry + 5; yy < ry + rh - 4; r++, yy += rowH) {
+    const k = (yy - ry) / rh
+    o.fillStyle = mix(roof, '#000000', 0.05 + k * 0.12)
+    o.fillRect(rx + 1, yy, rw - 2, rowH)
+    o.fillStyle = mix(roof, '#ffffff', 0.16)
+    o.fillRect(rx + 1, yy, rw - 2, 1)
+    o.fillStyle = shade(roof, -0.3)
+    o.fillRect(rx + 1, yy + rowH - 1, rw - 2, 1)
+    o.fillStyle = shade(roof, -0.22)
+    for (let sx = rx + 3 + (r % 2) * 4; sx < rx + rw - 2; sx += 8) o.fillRect(sx, yy + 1, 1, rowH - 2)
+  }
+  // Ridge cap
+  o.fillStyle = shade(roof, 0.28)
+  o.fillRect(rx + 1, ry + 1, rw - 2, 3)
+  o.fillStyle = ink
+  o.fillRect(rx + 1, ry + 4, rw - 2, 1)
+  // Verges and eaves
+  o.fillStyle = shade(roof, -0.35)
+  o.fillRect(rx + 1, ry + 1, 2, rh - 2)
+  o.fillRect(rx + rw - 3, ry + 1, 2, rh - 2)
+  o.fillStyle = shade(roof, -0.45)
+  o.fillRect(rx + 1, ry + rh - 4, rw - 2, 3)
+  o.fillStyle = mix(roof, '#ffffff', 0.35)
+  o.fillRect(rx + 1, ry + rh - 4, rw - 2, 1)
+  if (h.center) {
+    // Poké Ball emblem on a white band
+    o.fillStyle = '#f8f8f8'
+    o.fillRect(rx + rw / 2 - 11, ry + 12, 22, 16)
+    o.fillStyle = ink
+    o.fillRect(rx + rw / 2 - 11, ry + 12, 22, 1)
+    o.fillRect(rx + rw / 2 - 11, ry + 27, 22, 1)
+    const cx = rx + rw / 2, cy = ry + 20
+    for (let yy = -7; yy <= 7; yy++)
+      for (let xx = -7; xx <= 7; xx++) {
+        const d = xx * xx + yy * yy
+        if (d > 49) continue
+        o.fillStyle = d > 36 || Math.abs(yy) < 1 ? ink : d < 5 ? (d < 2 ? '#f8f8f8' : ink) : yy < 0 ? '#e83838' : '#f8f8f8'
+        o.fillRect(cx + xx, cy + yy, 1, 1)
+      }
+  } else {
+    // Brick chimney
+    const cx = rx + rw - 18, cy = ry - 6
+    o.fillStyle = ink
+    o.fillRect(cx - 1, cy - 1, 10, 16)
+    o.fillStyle = '#b05a48'
+    o.fillRect(cx, cy + 2, 8, 12)
+    o.fillStyle = '#7a3a30'
+    for (let r = 0; r < 4; r++) o.fillRect(cx, cy + 4 + r * 3, 8, 1)
+    for (let r = 0; r < 4; r++) o.fillRect(cx + (r % 2 ? 2 : 5), cy + 2 + r * 3, 1, 2)
+    o.fillStyle = '#6a5e60'
+    o.fillRect(cx - 1, cy, 10, 3)
+    o.fillStyle = '#8a8084'
+    o.fillRect(cx - 1, cy, 10, 1)
   }
 }

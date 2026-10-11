@@ -22,7 +22,7 @@ import { sfx } from './audio'
 import { profile } from './profile'
 import { cleanCode, Room } from './net/room'
 import type { ChatLine, HostMsg, LobbyPlayer, MatchChoice } from './net/protocol'
-import { pickTheme } from './data/themes'
+import { pickTheme, THEMES, type ThemeId } from './data/themes'
 import { applyEvents, applySnapshot, initClient, recordVfx, remoteViewer, runCommand, snapshot, type RemoteViewer } from './net/sync'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
@@ -82,7 +82,9 @@ let choice: MatchChoice = { kind: saved.kind ?? 'royale', theme: saved.theme ?? 
  */
 function setupFor(c: MatchChoice, humans: LobbyPlayer[]): MatchSetup {
   const seed = Date.now() % 1e9
-  if (c.kind !== 'raid') return { seed, humans, kind: c.kind, theme: pickTheme(c.theme, seed) }
+  // Dev/testing: ?theme=<id> fixes the world
+  const forcedTheme = new URLSearchParams(location.search).get('theme') as ThemeId | null
+  if (c.kind !== 'raid') return { seed, humans, kind: c.kind, theme: forcedTheme && forcedTheme in THEMES ? forcedTheme : pickTheme(c.theme, seed) }
   const last = store.get<BossId | ''>('lastBoss', '')
   const pool = BOSS_LIST.filter((b) => b !== last)
   // Dev/testing: ?boss=<id> fixes the boss
