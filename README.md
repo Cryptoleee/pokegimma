@@ -4,7 +4,7 @@
 
 Een real-time Pokémon battle royale voor de browser, mobile first, in de stijl van Black/White.
 
-**Speel:** https://pokegimma.vercel.app
+**Speel:** https://stormbreak.app
 
 Er zijn twee modi: **Battle Royale** (12 trainers, laatste die overblijft wint) en **Raid** (alleen of samen tegen één enorme eindbaas). Beide kun je solo of met vrienden spelen.
 
