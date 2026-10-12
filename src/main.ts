@@ -28,6 +28,7 @@ import type { ChatLine, HostMsg, LobbyPlayer, MatchChoice } from './net/protocol
 import { pickTheme, THEMES, type ThemeId } from './data/themes'
 import { applyEvents, applySnapshot, initClient, recordVfx, remoteViewer, runCommand, snapshot, type RemoteViewer } from './net/sync'
 import { L, onLangChange, tx } from './i18n'
+import { initStats, statsStateChanged, trackEnd, trackMatch } from './stats'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
@@ -70,6 +71,10 @@ const remotes = new Map<string, RemoteViewer>()
 let netT = 0
 /** Join code from a shared link (?join=ABCD). */
 let pendingJoin = cleanCode(new URLSearchParams(location.search).get('join') ?? '')
+
+/** For the creator stats: what you're doing, and how you're playing. */
+const statsMode = () => (room ? (room.quick ? 'quick' : 'friends') : 'solo') as 'solo' | 'quick' | 'friends'
+initStats(() => (game && viewing && !game.over ? (game.kind === 'raid' ? 'raid' : 'br') : room ? 'lobby' : 'menu'))
 
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -125,6 +130,7 @@ function toMenu(extra: Partial<MenuState> = {}) {
   lobbyUi = null
   playMusic('menu')
   const code = pendingJoin
+  statsStateChanged()
   showMenu({ trainer, team, choice, code: code || undefined, ...extra }, {
     solo: (c) => {
       choice = c
@@ -181,6 +187,14 @@ function enterMatch(g: Game) {
   stopGame()
   game = g
   viewing = true
+  trackMatch({
+    k: g.kind === 'raid' ? 'raid' : 'br',
+    m: statsMode(),
+    mon: team[0],
+    w: g.setup.theme,
+    boss: g.setup.boss,
+    h: g.setup.humans.length,
+  })
   playMusic(g.kind === 'raid' ? 'boss' : 'battle')
   if (g.mode !== 'client') hud = makeHud(g)
   if (desktop) setTimeout(() => game === g && hud?.toast(L('WASD move · click = attack · Q E R = moves · Esc pause', 'WASD lopen · klik = aanval · Q E R = krachten · Esc pauze')), INTRO_TIME * 1000 + 600)
@@ -219,6 +233,7 @@ const soloAgain = () => wipe(startSolo, { flash: true })
 const soloOtherTeam = () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), L('Start the battle ▶', 'Start de battle ▶')))
 
 function onEnd(r: GameResult) {
+  if (game) trackEnd({ k: game.kind === 'raid' ? 'raid' : 'br', m: statsMode(), r: r.raid ? (r.won ? 'clear' : 'fail') : r.won ? 'win' : 'lose', boss: r.raid?.boss })
   hud?.destroy()
   hud = null
   // The match goes on without you (bots or other players still in it): you can watch
@@ -417,6 +432,7 @@ function joinRoom(code: string) {
 
 function toLobby() {
   if (!room) return toMenu()
+  statsStateChanged()
   // Guests drop the match they were watching; the host keeps simulating until it's over.
   if (game?.mode !== 'host') stopGame()
   else {

@@ -131,8 +131,17 @@ Nieuwe bazen zijn vooral data: een rij in `src/data/bosses.ts` met hun aanvallen
 - **Geluidseffecten:** elke aanval heeft een eigen gesynthetiseerd geluid (`src/moveSfx.ts`): de klank van het type, de vorm van de aanval en zwaarder naarmate de aanval sterker is. Geluiden van anderen komen uit de goede richting en worden zachter op afstand. Items (potion, revive, ballen, oppakken) hebben ook hun eigen geluid. Raid-bazen hebben een eigen, zwaardere set: elke aanval zwelt aan tijdens de waarschuwing en slaat in met een diepe dreun over de hele arena, plus geluid voor de dash, het opstijgen en neerkomen, de teleport, de klonen, tornado's en Delta Stream, de bliksemafleiders, lavagaten, het vloerraster en brekende ijspilaren. De baas brult bij de start, de nieuwe fase klinkt als een ontlading en zijn nederlaag als een instorting.
 - **Omroeper:** een stem met een Japans accent (ElevenLabs, `src/assets/voice/`, afgespeeld door `src/voice.ts`) roept het titelscherm, het aftellen, de storm, legendarische Pokémon, K.O.'s, raid-fases en winst of verlies om. De muziek gaat even zachter terwijl hij praat.
 - **Opties:** via ⚙️ in het menu zet je muziek, stemmen en geluidseffecten los aan of uit; de keuze wordt onthouden.
+- **Talen:** Engels (standaard) en Nederlands, te kiezen op het titelscherm, het home-scherm en in Opties (`src/i18n.ts`).
 - **Cinematisch:** een titelscherm met Zekrom en Reshiram, Black/White-schermovergangen, keuzeschermen als podium, een drop-in met aftelling bij de start, een evolutie-cutscene, banners voor level-ups, nieuwe aanvallen, legendarische Pokémon en KO's, en een resultaatscherm met confetti.
 - **Wereld:** weer per wereld (sneeuw, zand, as, gloeiende vonken, vuurvliegjes), wolkschaduwen, golvend en glinsterend water, ritselend gras, stofwolkjes, zwevende pollen, een gloeiende stormmuur met bliksem en regen, en een vignet.
+
+## Statistieken (voor de maker)
+
+`/stats` is een los paneel met anonieme tellingen: wie er nu online is (menu, lobby, battle royale of raid), spelers per dag en per maand, nieuwe spelers, potjes per modus, speeltijd, drukte per uur, populaire partners, bazen met hun winstpercentage, werelden, uitslagen, apparaat, taal en bronnen. Deel je link met `?via=naam` (bijv. `stormbreak.app/?via=tiktok`) en die bron telt apart.
+
+- **Hoe:** de game stuurt kleine events naar `api/t.ts` (Vercel Function); `api/stats.ts` levert ze aan het paneel. Opslag in Upstash Redis. Per apparaat een willekeurige id (niet je speler-id), geen namen, geen IP-adressen. Op localhost en het lokale netwerk wordt niets verstuurd; in het paneel kun je je eigen apparaat uitzetten.
+- **Instellen (eenmalig, in Vercel):** Storage → Create Database → Upstash for Redis → verbinden met dit project; Settings → Environment Variables → `STATS_KEY` = je eigen wachtwoord; daarna opnieuw deployen. Zonder deze instellingen doet de game niets met stats en toont `/stats` deze stappen.
+- **Kosten:** een speler met het spel open kost ongeveer één Redis-commando per 90 seconden. Houd de gratis limiet van Upstash in de gaten als het druk wordt.
 
 ## Code
 
@@ -144,7 +153,11 @@ src/
   net/        multiplayer: rooms (PeerJS), protocol, state-sync tussen host en spelers
   ui/         titel, uitleg, menu, lobby, keuzeschermen, HUD, cutscenes, resultaten (DOM boven de canvas)
   music.ts    chiptune-sequencer en soundtrack
+  panel/      het stats-paneel (/stats)
+  i18n.ts     Engels en Nederlands
+  stats.ts    anonieme events voor het stats-paneel
   profile.ts  je naam en speler-id (later te vervangen door een login)
+api/          Vercel Functions: t.ts (events in), stats.ts (paneel-data)
 ```
 
 ## Assets en rechten

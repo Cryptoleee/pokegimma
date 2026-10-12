@@ -1,4 +1,5 @@
 {
+  "rewrites": [{ "source": "/stats", "destination": "/stats.html" }],
   "headers": [
     {
       "source": "/",
@@ -7,6 +8,13 @@
     {
       "source": "/index.html",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+    },
+    {
+      "source": "/stats(.html)?",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, must-revalidate" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
     },
     {
       "source": "/assets/(.*)",
