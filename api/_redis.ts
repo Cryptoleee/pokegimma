@@ -5,24 +5,29 @@
  */
 declare const process: { env: Record<string, string | undefined> }
 
-const env = () => ({
-  url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
-})
+/** Pasted values often keep the quotes from a .env snippet, or a stray space. */
+const clean = (v: string | undefined) => v?.trim().replace(/^(['"])(.*)\1$/, '$2').trim() || undefined
 
+/** One matching pair (KV_* from the Vercel integration, else UPSTASH_REDIS_*), never a mix. */
+const env = () => {
+  const e = process.env
+  const kv = { url: clean(e.KV_REST_API_URL), token: clean(e.KV_REST_API_TOKEN), from: 'KV_REST_API_*' }
+  const up = { url: clean(e.UPSTASH_REDIS_REST_URL), token: clean(e.UPSTASH_REDIS_REST_TOKEN), from: 'UPSTASH_REDIS_REST_*' }
+  return kv.url && kv.token ? kv : up
+}
 export const configured = () => !!(env().url && env().token)
-export const statsKey = () => process.env.STATS_KEY || ''
+export const statsKey = () => clean(process.env.STATS_KEY) ?? ''
 
 export type Cmd = (string | number)[]
 
 export async function pipeline(cmds: Cmd[]): Promise<unknown[]> {
   const { url, token } = env()
-  const r = await fetch(`${url}/pipeline`, {
+  const r = await fetch(`${url!.replace(/\/+$/, '')}/pipeline`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(cmds),
   })
-  if (!r.ok) throw new Error(`redis ${r.status}`)
+  if (!r.ok) throw new Error(`redis ${r.status} (${env().from})`)
   const out = (await r.json()) as { result?: unknown; error?: string }[]
   return out.map((o) => {
     if (o.error) throw new Error(o.error)

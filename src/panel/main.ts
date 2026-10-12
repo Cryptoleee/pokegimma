@@ -327,7 +327,15 @@ async function boot() {
     key = ''
     return gate('key', undefined, 'Verkeerde sleutel.')
   }
-  if (res.status !== 200) return gate('key', undefined, `Fout ${res.status}: ${res.body?.detail ?? res.body?.error ?? ''}`)
+  if (res.status !== 200) {
+    const detail = String(res.body?.detail ?? res.body?.error ?? '')
+    const hint = /redis 401/.test(detail)
+      ? ' Upstash weigert de token: plak UPSTASH_REDIS_REST_TOKEN opnieuw in Vercel (de "TOKEN", niet de read-only) en redeploy.'
+      : /redis 4\d\d|fetch|URL/i.test(detail)
+        ? ' Controleer UPSTASH_REDIS_REST_URL in Vercel en redeploy.'
+        : ''
+    return gate('key', undefined, `Fout ${res.status}: ${detail}.${hint}`)
+  }
   data = res.body as Full
   liveAt = Date.now()
   draw()
