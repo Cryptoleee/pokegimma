@@ -5,7 +5,7 @@ import { decided, scoreRows, type ScoreRow } from './score'
 import { raidDown, raidIntro, setupRaid, updateRaid, type Hazard, type RaidState, type RaidView } from './boss'
 import { movesetFor, SLOT_UNLOCK, type Move, type MoveFx } from '../data/moves'
 import { Vfx } from './vfx'
-import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpact, onMelee, onZap, pal, projectileEnd, projectileTick } from './moveFx'
+import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpact, onMelee, onRelease, onZap, pal, projectileEnd, projectileTick } from './moveFx'
 import { BOT_TRAINERS, TRAINERS } from '../data/trainers'
 import { effectiveness, TYPE_COLOR } from '../data/types'
 import { cry, sfx } from '../audio'
@@ -451,9 +451,6 @@ export class Game {
     }
   }
 
-  private sfxAt(x: number, y: number, name: SfxName, ...args: unknown[]) {
-    for (const v of this.viewers) if (this.seenBy(v, x, y)) v.sfx(name, ...args)
-  }
 
   /** A floating label for everyone who can see it. */
   private addFx(f: Fx) {
@@ -609,6 +606,7 @@ export class Game {
     // Storm
     if (this.kind === 'royale' && this.zone.outside(tr.x, tr.y) && !m.fainted) {
       m.combatT = 0
+      this.vOf(tr)?.sfx('stormTick')
       m.hp -= m.maxHp * this.zone.dps * dt
       if (m.hp <= 0) {
         m.hp = 0
@@ -809,6 +807,7 @@ export class Game {
     if (v && this.regenerating(m)) {
       tr.regenFxT -= dt
       if (tr.regenFxT <= 0) {
+        if (tr.regenFxT < -0.5 || m.combatT - dt < REGEN_DELAY) v.sfx('regen')
         tr.regenFxT = 0.45
         v.fx({ kind: 'heal', x: m.x, y: m.y - 0.5, t: 0, life: 0.7, color: '#80f080' })
       }
@@ -830,13 +829,16 @@ export class Game {
       this.vfx.burst(x, y + 0.1, { n: 1, speed: 0.6, cols: ['#e8d8b0', '#d0c098'], shape: 'smoke', s0: 1.5, s1: 3.5, life: 0.45, flat: 0.4 })
   }
 
-  sendOut(tr: Trainer, idx: number) {
+  /** `manual`: the player switched themselves (their own device already played the sound). */
+  sendOut(tr: Trainer, idx: number, manual = false) {
     tr.active = idx
     const m = tr.mon
     m.x = tr.x
     m.y = tr.y + 0.4
     m.dash = null
     this.addFx({ kind: 'poof', x: m.x, y: m.y - 0.4, t: 0, life: 0.4, color: '#ffffff' })
+    this.soundAt(m.x, m.y, 'sendOut', [], { owners: [tr], skipRemote: manual ? tr : null, range: 12 })
+    for (const v of this.viewers) if (Math.hypot(v.camX - m.x, v.camY - m.y) < 10) v.cry(m.species.id, v.tr === tr ? 0.3 : 0.15)
   }
 
   switchTo(tr: Trainer, idx: number): boolean {
@@ -844,13 +846,12 @@ export class Game {
       if (!tr.alive || idx === tr.active || !tr.party[idx] || tr.party[idx].fainted || tr.swapCd > 0) return false
       tr.swapCd = 1.2
       this.send({ t: 'switch', i: idx })
-      sfx.select()
+      sfx.sendOut()
       return true
     }
     if (!tr.alive || idx === tr.active || !tr.party[idx] || tr.party[idx].fainted || tr.swapCd > 0) return false
     tr.swapCd = 1.2
-    this.sendOut(tr, idx)
-    if (tr.isPlayer) sfx.select()
+    this.sendOut(tr, idx, true)
     return true
   }
 
@@ -1016,7 +1017,7 @@ export class Game {
     m.castT = 0.18
     this.soundAt(m.x, m.y, 'moveCast', [mv.name], { owners: [m.owner], skipRemote: charged ? null : m.owner })
     if (!charged) fxCast(v, mv, m, near)
-    else if (near) v.shakeBy(3)
+    else if (near) onRelease(v, mv, m)
 
     switch (mv.kind) {
       case 'melee': {
@@ -1207,7 +1208,10 @@ export class Game {
     // Raid boss: shrugs off hits while it roars into a new phase; its ordinary moves hit softer
     if (tgt.boss && this.raid && this.raid.invulnT > 0) {
       const v = this.vOf(src.owner)
-      if (v && this.seenBy(v, tgt.x, tgt.y)) v.fx({ kind: 'text', x: tgt.x, y: tgt.y - 2.2, t: 0, life: 0.6, color: '#b8b8c8', text: 'Immuun', small: true })
+      if (v && this.seenBy(v, tgt.x, tgt.y)) {
+        v.fx({ kind: 'text', x: tgt.x, y: tgt.y - 2.2, t: 0, life: 0.6, color: '#b8b8c8', text: 'Immuun', small: true })
+        v.sfx('clink')
+      }
       return
     }
     // Raid bosses never fully resist: every partner can win the fight
@@ -1254,7 +1258,7 @@ export class Game {
             kind: 'text', x: tgt.x, y: tgt.y - 2.1, t: 0, life: 0.9, small: true,
             color: eff > 1 ? '#ffd040' : '#b8b8c8', text: eff > 1 ? 'Super effectief!' : 'Weinig effect',
           })
-        if (mine) v.sfx('hitConfirm')
+        if (mine) v.sfx('hitConfirm', eff < 1, eff > 1)
         if (hurt) v.sfx('hit', eff > 1)
       }
       onHit(this.vfx, mv, tgt, eff, this.nearCam(tgt.x, tgt.y))
@@ -1273,7 +1277,7 @@ export class Game {
   }
 
   private onFaint(m: Mon, by: Mon | null) {
-    this.sfxAt(m.x, m.y, 'faint')
+    this.soundAt(m.x, m.y, 'faint', [], { owners: [m.owner, by?.owner], range: 16 })
     if (this.nearCam(m.x, m.y)) {
       // KO punctuation: freeze, flash ring and a burst of stars
       this.vfx.ring(m.x, m.y - 0.2, 1.8, '#ffffff', 0.5, 5)
@@ -1298,7 +1302,12 @@ export class Game {
       m.claim = by?.owner ?? null
       m.claimT = m.legendary ? CLAIM_TIME_LEGEND : CLAIM_TIME
       if (by?.owner) this.gainXp(by, koXp)
-      if (m.legendary) for (const v of this.viewers) v.hooks.feed(`${m.name} is verzwakt! Vang hem snel!`)
+      this.vOf(by?.owner)?.sfx('catchable')
+      if (m.legendary)
+        for (const v of this.viewers) {
+          v.hooks.feed(`${m.name} is verzwakt! Vang hem snel!`)
+          if (v.tr !== by?.owner) v.sfx('catchable')
+        }
       return
     }
     const tr = m.owner
@@ -1369,7 +1378,7 @@ export class Game {
       )
     }
     if (by && by !== tr) this.vOf(by)?.hooks.banner({ kind: 'ko', title: 'Trainer uitgeschakeld!', sub: `${tr.name} · nog ${this.alive.length} over`, trainer: tr.def.sprite, voice: 'ko' })
-    this.sfxAt(tr.x, tr.y, 'ko')
+    this.soundAt(tr.x, tr.y, 'ko', [], { owners: [tr, by], range: 18 })
     // Drop loot
     const drops: ItemKind[] = [
       ...Array(tr.masterBalls).fill('master'), ...Array(tr.potions).fill('potion'), ...Array(tr.revives).fill('revive'),
@@ -1378,6 +1387,7 @@ export class Game {
       const a = (i / Math.max(1, drops.length)) * Math.PI * 2
       this.items.push({ x: tr.x + Math.cos(a) * 0.9, y: tr.y + Math.sin(a) * 0.9, kind, bob: Math.random() * 6 })
     })
+    if (drops.length) this.soundAt(tr.x, tr.y, 'loot', [], { range: 12 })
     tr.masterBalls = tr.potions = tr.revives = 0
     const v = this.vOf(tr)
     if (v) {
@@ -1838,6 +1848,7 @@ export class Game {
     const i = this.wilds.indexOf(w)
     if (i >= 0) this.wilds.splice(i, 1)
     this.addFx({ kind: 'poof', x: w.x, y: w.y - 0.4, t: 0, life: 0.4, color: '#ffffff' })
+    this.soundAt(w.x, w.y, 'poof', [], { range: 10 })
   }
 
   // ---------------- Projectiles & effects ----------------
@@ -1871,7 +1882,10 @@ export class Game {
       if (dead) {
         this.projs.splice(this.projs.indexOf(p), 1)
         if (this.onScreen(p.x, p.y)) projectileEnd(this.vfx, p.move.fx, p.x, p.y, hit)
-        if (!hit && p.mult >= 0.5) this.miss(p.src, p.x, p.y)
+        if (!hit && p.mult >= 0.5) {
+          this.miss(p.src, p.x, p.y)
+          this.soundAt(p.x, p.y, 'fizzle', [], { owners: [p.src.owner], range: 10 })
+        }
       }
     }
   }

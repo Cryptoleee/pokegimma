@@ -40,7 +40,6 @@ export function startEvent(g: Game, kind: WorldEvent['kind']) {
     const [x, y] = g.world.randomWalkable((x, y) => inside(x, y) && !g.world.isTall(x, y))
     g.events.push({ id: nextId++, kind, x, y, t: DROP_TIME, total: DROP_TIME })
     for (const v of g.viewers) {
-      v.sfx('banner')
       v.hooks.banner({ kind: 'storm', title: 'Bevoorrading!', sub: 'Een kist valt uit de lucht · volg de pijl', color: '#58d0ff', voice: 'supply' })
       v.hooks.feed('📦 Bevoorrading onderweg: Master Ball, Potions en Rare Candy')
     }
@@ -65,7 +64,7 @@ export function startEvent(g: Game, kind: WorldEvent['kind']) {
   }
   g.events.push({ id: nextId++, kind, x: cx, y: cy, t: SWARM_TIME, total: SWARM_TIME, species })
   for (const v of g.viewers) {
-    v.sfx('banner')
+    v.cry(species, 0.3)
     v.hooks.banner({ kind: 'storm', title: 'Een zwerm!', sub: 'Zes wilde Pokémon in het gras · volg de pijl', mon: species, color: '#7ce07c', voice: 'swarm' })
     v.hooks.feed('🐾 Er is een zwerm wilde Pokémon gespot', { mon: species })
   }
@@ -74,7 +73,10 @@ export function startEvent(g: Game, kind: WorldEvent['kind']) {
 /** Host: tick events; the drop lands and spills its loot. */
 export function updateEvents(g: Game, dt: number) {
   for (const e of [...g.events]) {
+    const was = e.t
     e.t -= dt
+    // The crate whistles down for its last second
+    if (e.kind === 'drop' && was > 1.1 && e.t <= 1.1) g.soundAt(e.x, e.y, 'incoming', [], { range: 22 })
     if (e.t > 0) continue
     g.events.splice(g.events.indexOf(e), 1)
     if (e.kind !== 'drop') continue
@@ -88,7 +90,7 @@ export function updateEvents(g: Game, dt: number) {
     g.vfx.glow(e.x, e.y - 0.4, 50, '#ffffff', 0.5)
     g.vfx.burst(e.x, e.y - 0.4, { n: 26, speed: 7, cols: ['#ffffff', '#a0e8ff', '#58d0ff'], shape: 'star', add: true, s0: 3, s1: 0.5, life: 0.8, vr: 10 })
     g.vfx.shakeBy(5)
-    for (const v of g.viewers) if (Math.hypot(v.camX - e.x, v.camY - e.y) < 14) v.sfx('ko')
+    g.soundAt(e.x, e.y, 'crate', [], { range: 22 })
   }
 }
 

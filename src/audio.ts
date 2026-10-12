@@ -78,6 +78,36 @@ function noise(dur: number, vol = 0.05) {
   s.start()
 }
 
+/** Noise through a band-pass filter (rustles, thuds, hisses). */
+function bandNoise(dur: number, vol: number, f: number, q = 1, delay = 0, f2 = 0) {
+  if (!ctx || sfxOff()) return
+  const t = ctx.currentTime + delay
+  const len = Math.floor(ctx.sampleRate * dur)
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+  const d = buf.getChannelData(0)
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len)
+  const s = ctx.createBufferSource()
+  const flt = ctx.createBiquadFilter()
+  flt.type = 'bandpass'
+  flt.frequency.setValueAtTime(f, t)
+  if (f2) flt.frequency.exponentialRampToValueAtTime(f2, t + dur)
+  flt.Q.value = q
+  const g = ctx.createGain()
+  g.gain.value = vol
+  s.buffer = buf
+  s.connect(flt).connect(g).connect(ctx.destination)
+  s.start(t)
+}
+
+/** Throttle: at most one of `key` every `ms`. */
+const lastAt = new Map<string, number>()
+function every(key: string, ms: number) {
+  const now = performance.now()
+  if (now - (lastAt.get(key) ?? -1e9) < ms) return false
+  lastAt.set(key, now)
+  return true
+}
+
 let lastHit = 0
 export const sfx = {
   hit(strong = false) {
@@ -109,9 +139,10 @@ export const sfx = {
     tone(990, 0.05, 'square', 0.035)
   },
   /** Crisp tick when your attack connects. */
-  hitConfirm() {
+  hitConfirm(weak = false, strong = false) {
+    if (weak) return tone(520, 0.06, 'square', 0.03, -120)
     tone(1760, 0.04, 'square', 0.03)
-    tone(2640, 0.03, 'square', 0.015, 0, 0.02)
+    tone(strong ? 3520 : 2640, strong ? 0.06 : 0.03, 'square', strong ? 0.025 : 0.015, 0, 0.02)
   },
     whoosh() {
     noise(0.22, 0.05)
@@ -160,6 +191,151 @@ export const sfx = {
   item(name: ItemSound, pan = 0, gain = 1) {
     playItem(ctx, sfxOff(), name, pan, gain)
   },
+  // ---------- World (these arrive with pan/gain when sent from a spot in the world) ----------
+  /** Your Pokémon comes out of its ball. */
+  sendOut(_pan = 0, gain = 1) {
+    tone(260, 0.16, 'square', 0.05 * gain, 700)
+    bandNoise(0.18, 0.12 * gain, 2400, 1.2, 0.02)
+    tone(1180, 0.08, 'triangle', 0.05 * gain, 0, 0.14)
+  },
+  /** A projectile smacks into a wall or fizzles out. */
+  fizzle(_pan = 0, gain = 1) {
+    if (!every('fizzle', 70)) return
+    bandNoise(0.12, 0.16 * gain, 700, 1.5, 0, 200)
+  },
+  /** Hitting something that can't be hurt right now (a boss roaring into its next phase). */
+  clink() {
+    if (!every('clink', 120)) return
+    tone(2200, 0.09, 'triangle', 0.05)
+    tone(3300, 0.12, 'sine', 0.03, 0, 0.02)
+  },
+  /** A Pokémon frozen solid. */
+  freeze(_pan = 0, gain = 1) {
+    ;[2600, 3400, 2900, 3900].forEach((f, i) => tone(f, 0.12, 'sine', 0.035 * gain, -600, i * 0.04))
+    bandNoise(0.35, 0.1 * gain, 5000, 2)
+  },
+  /** A wild Pokémon is worn out: now's your chance to catch it. */
+  catchable(_pan = 0, gain = 1) {
+    tone(988, 0.08, 'square', 0.04 * gain)
+    tone(1319, 0.14, 'square', 0.04 * gain, 0, 0.08)
+  },
+  /** A Pokémon runs off or disappears in a puff. */
+  poof(_pan = 0, gain = 1) {
+    if (!every('poof', 120)) return
+    bandNoise(0.25, 0.14 * gain, 1500, 0.8, 0, 400)
+    tone(700, 0.15, 'triangle', 0.03 * gain, -400)
+  },
+  /** Loot spilling on the ground. */
+  loot(_pan = 0, gain = 1) {
+    if (!every('loot', 150)) return
+    ;[1568, 2093, 1760, 2349].forEach((f, i) => tone(f, 0.06, 'square', 0.025 * gain, 0, i * 0.05))
+  },
+  /** Something new appears to pick up (a potion in the raid arena). */
+  spawnChime(_pan = 0, gain = 1) {
+    ;[1047, 1568].forEach((f, i) => tone(f, 0.18, 'triangle', 0.04 * gain, 0, i * 0.08))
+  },
+  /** The supply crate whistling down. */
+  incoming(_pan = 0, gain = 1) {
+    tone(1800, 1.1, 'sine', 0.035 * gain, -1300)
+  },
+  /** The crate slams down and bursts open. */
+  crate(_pan = 0, gain = 1) {
+    tone(110, 0.35, 'square', 0.07 * gain, -70)
+    bandNoise(0.4, 0.3 * gain, 300, 0.7)
+    bandNoise(0.2, 0.15 * gain, 2200, 1, 0.05)
+    ;[1047, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.1, 'square', 0.035 * gain, 0, 0.2 + i * 0.06))
+  },
+  /** Standing in the storm: an electric sting. */
+  stormTick() {
+    if (!every('storm', 450)) return
+    bandNoise(0.12, 0.12, 3000, 2)
+    tone(180, 0.12, 'sawtooth', 0.03, -60)
+  },
+  /** Burning on lava. */
+  burn() {
+    if (!every('burn', 400)) return
+    bandNoise(0.2, 0.14, 900, 0.8, 0, 2500)
+  },
+  /** Out of combat: health starts coming back. */
+  regen() {
+    if (!every('regen', 2500)) return
+    ;[784, 1047].forEach((f, i) => tone(f, 0.1, 'triangle', 0.03, 0, i * 0.07))
+  },
+
+  // ---------- HUD / UI (local only) ----------
+  /** Stepping into tall grass. */
+  rustle() {
+    if (!every('rustle', 300)) return
+    bandNoise(0.22, 0.09, 3200, 0.8)
+    bandNoise(0.15, 0.06, 1800, 1, 0.07)
+  },
+  /** Can't do that (move on cooldown, no item, ...). */
+  denied() {
+    if (!every('denied', 180)) return
+    tone(160, 0.09, 'square', 0.04)
+    tone(120, 0.1, 'square', 0.04, 0, 0.07)
+  },
+  /** Something went wrong (no name, bad code, couldn't connect). */
+  error() {
+    tone(220, 0.12, 'square', 0.05)
+    tone(165, 0.18, 'square', 0.05, 0, 0.11)
+  },
+  /** Your ultimate is ready again. */
+  ready() {
+    tone(1319, 0.06, 'square', 0.035)
+    tone(1976, 0.12, 'square', 0.03, 0, 0.06)
+  },
+  /** Low health: a heartbeat. */
+  heartbeat() {
+    tone(70, 0.12, 'sine', 0.12, -20)
+    tone(62, 0.14, 'sine', 0.1, -20, 0.16)
+  },
+  /** The storm starts closing in: a rising siren. */
+  siren() {
+    tone(330, 0.5, 'sawtooth', 0.03, 330)
+    tone(330, 0.5, 'sawtooth', 0.03, 330, 0.55)
+    bandNoise(0.9, 0.08, 200, 0.6)
+  },
+  /** Learned a new move. */
+  newMove() {
+    ;[659, 784, 988, 1319].forEach((f, i) => tone(f, 0.12, 'square', 0.045, 0, i * 0.08))
+  },
+  /** You win! */
+  fanfare() {
+    ;[523, 659, 784, 1047].forEach((f, i) => tone(f, i === 3 ? 0.5 : 0.12, 'square', 0.05, 0, i * 0.12))
+    ;[392, 523, 659].forEach((f, i) => tone(f, 0.45, 'triangle', 0.04, 0, 0.36 + i * 0.01))
+  },
+  /** Knocked out / out of lives / raid lost. */
+  down() {
+    ;[523, 466, 415, 349].forEach((f, i) => tone(f, i === 3 ? 0.5 : 0.16, 'square', 0.045, 0, i * 0.16))
+  },
+  /** Lobby: someone joined, left, got ready, everyone is ready. */
+  join() {
+    tone(784, 0.08, 'square', 0.04)
+    tone(1175, 0.12, 'square', 0.04, 0, 0.08)
+  },
+  leave() {
+    tone(784, 0.08, 'square', 0.04)
+    tone(523, 0.14, 'square', 0.04, 0, 0.08)
+  },
+  readyTick() {
+    tone(1568, 0.06, 'square', 0.03)
+  },
+  allReady() {
+    ;[784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.1, 'square', 0.04, 0, i * 0.06))
+  },
+  /** Results: a number counting up. */
+  tick() {
+    if (!every('tick', 45)) return
+    tone(1760, 0.02, 'square', 0.02)
+  },
+  /** Results: your medal (1 gold, 2 silver, 3 bronze, else a plain ding). */
+  medal(place = 0) {
+    const base = place === 1 ? 1568 : place === 2 ? 1319 : place === 3 ? 1175 : 988
+    tone(base, 0.4, 'triangle', 0.06)
+    tone(base * 1.5, 0.5, 'sine', 0.035, 0, 0.05)
+  },
+
   /** Raid: a boss attack is coming (two quick alarm beeps). */
   warn() {
     tone(880, 0.07, 'square', 0.035)

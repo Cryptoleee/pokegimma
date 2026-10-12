@@ -69,12 +69,13 @@ const TABLE: Record<PType, Def[]> = {
   steel: [['Metal Claw', 'melee', 'metalclaw'], ['Mirror Shot', 'bolt', 'mirror'], ['Flash Cannon', 'beam', 'flashcannon'], ['Meteor Mash', 'nova', 'meteormash']],
 }
 
-/** Big beams need a moment to charge up, like in the games. */
-const CHARGE: Partial<Record<MoveFx, number>> = { solarbeam: 0.55, hyperbeam: 0.45, hydropump: 0.3, flashcannon: 0.25, focusblast: 0.2 }
+/** Big beams need a moment to charge up, like in the games (and hit a bit harder for it). */
+const CHARGE: Partial<Record<MoveFx, number>> = { solarbeam: 1.0, hyperbeam: 0.9, hydropump: 0.7, flashcannon: 0.55, focusblast: 0.55 }
+const CHARGE_POWER = 1.15
 
 function make(type: PType, tier: number): Move {
   const [name, kind, fx] = TABLE[type][tier]
-  return { name, type, kind, fx, power: TIER_POWER[tier], cooldown: TIER_CD[tier], range: RANGE[kind], tier, charge: CHARGE[fx] ?? 0 }
+  return { name, type, kind, fx, power: Math.round(TIER_POWER[tier] * (CHARGE[fx] ? CHARGE_POWER : 1)), cooldown: TIER_CD[tier], range: RANGE[kind], tier, charge: CHARGE[fx] ?? 0 }
 }
 
 /** Four move slots derived from a species' types. Slot 3 borrows the secondary type. */

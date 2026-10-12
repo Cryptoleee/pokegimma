@@ -58,6 +58,8 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
     </div>`
   playMusic(r.won ? 'victory' : 'defeat')
   setTimeout(() => cry(r.best.species.id, 0.3), 600)
+  // The medal lands with a ding (higher for a better place)
+  setTimeout(() => sfx.medal(r.raid ? (r.won ? 1 : 0) : r.place), 350)
 
   // Count the stats up
   el.querySelectorAll<HTMLElement>('.res-stats b').forEach((b, i) => {
@@ -66,7 +68,9 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
     const tick = (now: number) => {
       const k = Math.min(1, Math.max(0, (now - t0) / 900))
       const v = Math.round(target * (1 - Math.pow(1 - k, 3)))
-      b.textContent = b.dataset.fmt === 'time' ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}` : `${v}`
+      const text = b.dataset.fmt === 'time' ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}` : `${v}`
+      if (text !== b.textContent && k > 0 && k < 1) sfx.tick()
+      b.textContent = text
       if (k < 1) requestAnimationFrame(tick)
       else if (target > 0) sfx.blip()
     }

@@ -61,6 +61,17 @@ interface Ring {
   w: number
 }
 
+/** Anime-style hit flare: a bright four-point star of light. */
+interface Flare {
+  x: number
+  y: number
+  size: number
+  col: string
+  t: number
+  life: number
+  rot: number
+}
+
 interface Flash {
   x: number
   y: number
@@ -139,6 +150,7 @@ export class Vfx {
   decals: Decal[] = []
   rings: Ring[] = []
   flashes: Flash[] = []
+  flares: Flare[] = []
   bolts: Bolt[] = []
   beams: Beam[] = []
   pillars: Pillar[] = []
@@ -174,6 +186,11 @@ export class Vfx {
   }
   glow(x: number, y: number, r: number, col: string, life = 0.3) {
     this.flashes.push({ x, y, r, t: 0, life, col })
+  }
+  /** A four-point star of light (size in world px). */
+  flare(x: number, y: number, size: number, col: string, life = 0.22) {
+    if (this.flares.length > 18) this.flares.shift()
+    this.flares.push({ x, y, size, col, t: 0, life, rot: (Math.random() - 0.5) * 0.5 })
   }
   decal(x: number, y: number, r: number, kind: DecalKind, life = 4) {
     if (this.decals.length > 80) this.decals.shift()
@@ -243,6 +260,7 @@ export class Vfx {
     }
     age(this.rings)
     age(this.flashes)
+    age(this.flares)
     age(this.bolts)
     age(this.beams)
     age(this.decals)
@@ -292,12 +310,34 @@ export class Vfx {
     for (const r of this.rings) drawRing(ctx, r)
     for (const b of this.bolts) drawBolt(ctx, b)
     for (const p of this.parts) drawParticle(ctx, p)
+    for (const f of this.flares) drawFlare(ctx, f)
     ctx.globalAlpha = 1
     ctx.globalCompositeOperation = 'source-over'
   }
 }
 
 // ---------------- Primitives ----------------
+
+/** Four-point star flare: two long thin streaks of light that flare out and fade fast. */
+function drawFlare(ctx: CanvasRenderingContext2D, f: Flare) {
+  const k = f.t / f.life
+  // Snaps open, then shrinks away
+  const open = k < 0.18 ? k / 0.18 : 1 - (k - 0.18) / 0.82
+  const len = f.size * (0.7 + 0.5 * Math.min(1, k * 4))
+  const a = Math.max(0, open)
+  ctx.save()
+  ctx.translate(f.x * TILE, f.y * TILE)
+  ctx.rotate(f.rot)
+  for (let i = 0; i < 2; i++) {
+    ctx.save()
+    ctx.rotate((i * Math.PI) / 2)
+    ctx.scale(1, 0.09)
+    drawGlow(ctx, 0, 0, len, f.col, a)
+    ctx.restore()
+  }
+  drawGlow(ctx, 0, 0, f.size * 0.35, '#ffffff', a)
+  ctx.restore()
+}
 
 const glowCache = new Map<string, HTMLCanvasElement>()
 

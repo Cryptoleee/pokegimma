@@ -17,8 +17,10 @@ export function showPartyFull(mon: Mon, party: Mon[], choose: (idx: number) => v
       </div>
       <button class="btn ghost" data-i="-1">Laat ${mon.name} gaan</button>
     </div>`
+  sfx.banner()
   modal.querySelectorAll<HTMLElement>('[data-i]').forEach((b) =>
     b.addEventListener('click', () => {
+      Number(b.dataset.i) < 0 ? sfx.release() : sfx.select()
       modal.classList.add('hidden')
       modal.innerHTML = ''
       choose(Number(b.dataset.i))
@@ -93,6 +95,7 @@ export function showOptions() {
       const on = !channelPref(c)
       setChannel(c, on)
       b.setAttribute('aria-checked', String(on))
+      if (!on) sfx.select()
       // A taste of what you just switched on
       if (on && c === 'sfx') sfx.select()
       if (on && c === 'voice') say('go')
@@ -106,5 +109,9 @@ export function showOptions() {
     sfx.select()
     close()
   })
-  modal.addEventListener('click', (e) => e.target === modal && close(), { once: true })
+  modal.addEventListener('click', (e) => {
+    if (e.target !== modal) return
+    sfx.select()
+    close()
+  })
 }

@@ -56,7 +56,7 @@ export function remoteViewer(tr: Trainer): RemoteViewer {
   return v
 }
 
-const RECORD = new Set(['burst', 'ring', 'glow', 'decal', 'bolt', 'beam', 'pillar', 'shakeBy', 'flash', 'dimScreen', 'mark'])
+const RECORD = new Set(['burst', 'ring', 'glow', 'flare', 'decal', 'bolt', 'beam', 'pillar', 'shakeBy', 'flash', 'dimScreen', 'mark'])
 const SCREEN = new Set(['shakeBy', 'flash', 'dimScreen'])
 
 /**

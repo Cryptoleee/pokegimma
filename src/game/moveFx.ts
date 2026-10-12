@@ -108,24 +108,43 @@ export function onCast(v: Vfx, mv: Move, m: Mon, near: boolean) {
   const p = pal(mv.fx)
   const x = m.x, y = m.y - 0.45
   if (mv.tier >= 3 && DIM[mv.fx]) v.dimScreen(DIM[mv.fx]!, mv.charge > 0 ? 1.1 + mv.charge : 0.9)
-  // Muzzle flash toward the target
-  v.glow(x + m.aimX * 0.4, y + m.aimY * 0.4, mv.tier >= 2 ? 14 : 9, p.glow, 0.18)
-  if (mv.tier >= 1) spray(v, mv.fx, x + m.aimX * 0.4, y + m.aimY * 0.4, 4 + mv.tier * 2, 2.5, { dir: Math.atan2(m.aimY, m.aimX), spread: 0.7 })
+  // Muzzle flash toward the target: bigger and brighter for stronger moves
+  const mx = x + m.aimX * 0.45, my = y + m.aimY * 0.45
+  v.glow(mx, my, 10 + mv.tier * 6, p.glow, 0.2)
+  if (mv.tier >= 1) spray(v, mv.fx, mx, my, 4 + mv.tier * 3, 2.5 + mv.tier * 0.6, { dir: Math.atan2(m.aimY, m.aimX), spread: 0.7 })
+  if (mv.tier >= 2) {
+    v.flare(mx, my, 18 + mv.tier * 8, p.glow, 0.2)
+    v.ring(m.x, m.y, 0.8 + mv.tier * 0.25, p.glow, 0.3, 2 + mv.tier)
+  }
 }
 
-/** Called every frame while a big move charges up (k: 0→1). */
+/** Called every frame while a big move charges up (k: 0→1). Local only: drawCharge does the rest. */
 export function chargeTick(v: Vfx, mv: Move, x: number, y: number, k: number) {
   const p = pal(mv.fx)
-  // Particles stream inward and the core swells
-  for (let i = 0; i < 2; i++) {
+  if (Math.random() < 0.5 + k * 0.5) {
     const a = rnd(0, Math.PI * 2)
-    const d = rnd(1.2, 2)
+    const d = rnd(1.4, 2.2)
     v.burst(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.8, {
-      n: 1, dir: a + Math.PI, spread: 0.05, speed: d * 3.2, cols: p.cols, shape: mv.fx === 'hyperbeam' || mv.fx === 'solarbeam' ? 'streak' : p.shape,
-      add: true, s0: 2.5, s1: 1, life: 0.32, drag: 0,
+      n: 1, dir: a + Math.PI, spread: 0.05, speed: d * (3 + k * 2), cols: p.cols, shape: mv.fx === 'hyperbeam' || mv.fx === 'solarbeam' ? 'streak' : p.shape,
+      add: true, s0: 2.5 + k, s1: 1, life: 0.32, drag: 0,
     })
   }
-  if (Math.random() < 0.3) v.glow(x, y, 8 + k * 16, p.glow, 0.15)
+  // Dust lifting off the ground as the power peaks
+  if (k > 0.5 && Math.random() < k * 0.4) v.burst(x + rnd(-1, 1), y + 0.5, { n: 1, speed: 0.6, dir: -Math.PI / 2, spread: 0.4, cols: p.cols.slice(1), shape: 'sq', s0: 1.6, s1: 0.4, life: 0.5, grav: -3 })
+  if (k > 0.8) v.shakeBy(1 + (k - 0.8) * 8)
+}
+
+/** The moment a charged move lets go. */
+export function onRelease(v: Vfx, mv: Move, m: Mon) {
+  const p = pal(mv.fx)
+  const x = m.x + m.aimX * 0.4, y = m.y - 0.45 + m.aimY * 0.4
+  v.glow(x, y, 40, p.glow, 0.4)
+  v.glow(m.x, m.y - 0.4, 22, '#ffffff', 0.22)
+  v.flare(x, y, 56, p.glow, 0.4)
+  v.ring(m.x, m.y, 2.4, p.glow, 0.5, 7)
+  v.ring(m.x, m.y, 1.4, '#ffffff', 0.35, 3)
+  v.burst(m.x, m.y + 0.2, { n: 14, speed: 6, cols: p.cols, shape: 'smoke', s0: 3, s1: 7, life: 0.55, flat: 0.45, drag: 3 })
+  v.shakeBy(7 + mv.tier)
 }
 
 // ---------------- Projectiles ----------------
@@ -167,8 +186,9 @@ export function projectileTick(v: Vfx, fx: MoveFx, x: number, y: number, vx: num
 
 export function projectileEnd(v: Vfx, fx: MoveFx, x: number, y: number, hit: boolean) {
   const p = pal(fx)
-  const n = hit ? 12 : 6
-  v.glow(x, y, hit ? 16 : 9, p.glow, 0.22)
+  const n = hit ? 14 : 6
+  v.glow(x, y, hit ? 20 : 10, p.glow, 0.24)
+  if (hit) v.flare(x, y, 20, p.glow, 0.16)
   switch (fx) {
     case 'ember': case 'dragonrage':
       spray(v, fx, x, y, n, 3.5)
@@ -213,7 +233,8 @@ export function projectileEnd(v: Vfx, fx: MoveFx, x: number, y: number, hit: boo
 export function onZap(v: Vfx, mv: Move, x1: number, y1: number, x2: number, y2: number, big: boolean, chain = false) {
   v.bolt(x1, y1, x2, y2, { w: big ? 2.6 : 1.7, jag: big ? 9 : 6, branches: big ? 3 : 1, strands: big ? 2 : 1, life: big ? 0.38 : 0.22 })
   if (!chain && big) v.bolt(x1, y1, x2, y2, { w: 1.2, jag: 12, branches: 1, life: 0.3 })
-  v.glow(x2, y2, big ? 26 : 16, '#f8e048', 0.3)
+  v.glow(x2, y2, big ? 30 : 18, '#f8e048', 0.32)
+  v.flare(x2, y2, big ? 44 : 22, '#fff8a0', big ? 0.26 : 0.16)
   v.burst(x2, y2, { n: big ? 18 : 9, speed: big ? 7 : 5, cols: P.electric.cols, shape: 'streak', add: true, s0: 2, s1: 0.5, life: 0.35 })
   if (big) {
     v.ring(x2, y2 + 0.3, 1.3, '#f8e048', 0.35, 3)
@@ -232,6 +253,9 @@ export function onBeam(v: Vfx, mv: Move, x1: number, y1: number, x2: number, y2:
   const len = Math.hypot(x2 - x1, y2 - y1)
   const dx = Math.cos(a), dy = Math.sin(a)
   const big = mv.tier >= 3
+  // Blinding muzzle and a flare where the beam hits
+  v.flare(x1, y1, big ? 44 : 26, p.glow, big ? 0.34 : 0.24)
+  v.flare(x2, y2, big ? 38 : 22, p.glow, big ? 0.3 : 0.2)
   switch (mv.fx) {
     case 'flamethrower': {
       // A real stream: lots of flame particles flying out for half a second.
@@ -326,6 +350,8 @@ export function onBeam(v: Vfx, mv: Move, x1: number, y1: number, x2: number, y2:
 export function onBurst(v: Vfx, mv: Move, x: number, y: number, r: number) {
   const big = mv.tier >= 3
   const p = pal(mv.fx)
+  v.flare(x, y - 0.3, 26 + r * 12 + (big ? 16 : 0), p.glow, big ? 0.34 : 0.24)
+  v.glow(x, y, 24 + r * 10, p.glow, 0.35)
   switch (mv.fx) {
     case 'surf': {
       // A rolling wave crest that sweeps outward
@@ -416,11 +442,12 @@ export function onBurst(v: Vfx, mv: Move, x: number, y: number, r: number) {
 
 export function onImpact(v: Vfx, mv: Move, x: number, y: number, r: number) {
   const big = mv.tier >= 3
+  v.flare(x, y - 0.4, 30 + r * 16 + (big ? 20 : 0), pal(mv.fx).glow, big ? 0.38 : 0.28)
   switch (mv.fx) {
     case 'thunder':
       v.bolt(x, y - 14, x, y - 0.3, { w: 4.5, jag: 14, branches: 5, strands: 3, life: 0.5 })
       v.bolt(x + rnd(-1, 1), y - 14, x + rnd(-1.5, 1.5), y, { w: 2, jag: 10, branches: 2, life: 0.35 })
-      v.flash(0.8)
+      v.flash(0.55)
       v.shakeBy(9)
       v.glow(x, y, 70, '#fff8a0', 0.6)
       v.ring(x, y, r * 1.3, '#f8e048', 0.6, 8)
@@ -553,7 +580,10 @@ export function onMelee(v: Vfx, mv: Move, x: number, y: number, ax: number, ay: 
       v.burst(x, y, { n: hit ? 10 : 4, speed: 5, cols: ['#ffffff', '#fff0c0'], shape: 'streak', add: true, s0: 2, s1: 0.5, life: 0.25 })
       smoke(v, x, y + 0.35, 2, false, 4)
   }
-  if (hit) v.ring(x, y + 0.2, 0.9, p.glow, 0.25, 3)
+  if (hit) {
+    v.ring(x, y + 0.2, 1 + mv.tier * 0.25, p.glow, 0.28, 3 + mv.tier)
+    v.flare(x, y, 18 + mv.tier * 8, p.glow, 0.16)
+  }
 }
 
 // ---------------- Dash ----------------
@@ -601,10 +631,17 @@ export function onHit(v: Vfx, mv: Move, tgt: Mon, eff: number, near: boolean) {
   if (mv.fx === 'psychic' || mv.fx === 'psyshock' || mv.fx === 'psybeam') tgt.liftT = 0.5
   if (!near) return
   const x = tgt.x, y = tgt.y - 0.5
-  // White impact star
-  v.burst(x, y, { n: eff > 1 ? 10 : 6, speed: eff > 1 ? 7 : 5, cols: ['#ffffff', p.cols[1]], shape: 'streak', add: true, s0: 2.2, s1: 0.5, life: 0.25 })
-  v.glow(x, y, eff > 1 ? 22 : 14, '#ffffff', 0.15)
-  if (eff > 1) v.ring(x, y + 0.3, 1.1, '#ffd040', 0.35, 3)
+  // Power 0 (a jab) … 1.3 (a super-effective ultimate)
+  const pw = mv.tier / 3 + (eff > 1 ? 0.3 : 0)
+  // Light first (the screen shake that follows is placed at the last effect)
+  v.glow(x, y, 16 + pw * 26, p.glow, 0.24)
+  v.glow(x, y, 9 + pw * 10, '#ffffff', 0.14)
+  v.flare(x, y, 16 + pw * 34, p.glow, 0.16 + pw * 0.08)
+  // White impact streaks plus a spray of the move's own particles
+  v.burst(x, y, { n: 6 + Math.round(pw * 12), speed: 5 + pw * 4, cols: ['#ffffff', p.cols[1]], shape: 'streak', add: true, s0: 2.2 + pw, s1: 0.5, life: 0.25 + pw * 0.08 })
+  if (pw >= 0.3) spray(v, mv.fx, x, y, 3 + Math.round(pw * 8), 3 + pw * 3, { life: 0.4 + pw * 0.2 })
+  if (pw >= 0.6 || eff > 1) v.ring(x, y + 0.3, 0.9 + pw * 0.8, eff > 1 ? '#ffd040' : p.glow, 0.35, 2 + pw * 3)
+  if (pw >= 0.6) v.shakeBy(2 + pw * 3.5)
 }
 
 // ---------------- Drawing helpers used by the renderer ----------------
@@ -1096,19 +1133,91 @@ export function drawDashAura(ctx: CanvasRenderingContext2D, fx: MoveFx, x: numbe
 }
 
 /** Energy gathering around a Pokémon charging a big move. */
-export function drawCharge(ctx: CanvasRenderingContext2D, fx: MoveFx, x: number, y: number, k: number, time: number) {
+export function drawCharge(ctx: CanvasRenderingContext2D, fx: MoveFx, x: number, y: number, k: number, time: number, footY = y + 12) {
   const p = pal(fx)
-  drawGlow(ctx, x, y, 10 + k * 26, p.glow, 0.45 + k * 0.4)
-  drawGlow(ctx, x, y, 4 + k * 9, '#ffffff', 0.5 + k * 0.5)
+  // 1. A glowing circle on the ground that spins faster as it fills up
+  ctx.save()
+  ctx.translate(x, footY)
+  ctx.scale(1, 0.42)
+  const R = 16 + k * 14
+  drawGlow(ctx, 0, 0, R * 1.5, p.glow, 0.35 + k * 0.45)
+  ctx.globalAlpha = 0.45 + k * 0.5
+  ctx.strokeStyle = p.cols[1]
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(0, 0, R, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.lineWidth = 1.2
+  ctx.strokeStyle = '#ffffff'
+  ctx.beginPath()
+  ctx.arc(0, 0, R * 0.72, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k)
+  ctx.stroke()
+  // Runes on the rim
+  const spin = time * (1.5 + k * 6)
+  ctx.fillStyle = p.cols[0]
+  for (let i = 0; i < 8; i++) {
+    const a = spin + (i * Math.PI) / 4
+    ctx.fillRect(Math.cos(a) * R - 1.5, Math.sin(a) * R - 1.5, 3, 3)
+  }
+  ctx.restore()
+
+  // 2. Energy streams in from all sides, faster and denser as it fills
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  const n = 8 + Math.round(k * 10)
+  for (let i = 0; i < n; i++) {
+    const ph = (time * (1.4 + k * 2.2) + i * 0.618) % 1
+    const a = i * 2.39996 + time * 0.6
+    const d0 = (1 - ph) * (46 - k * 8)
+    const d1 = Math.max(0, d0 - 7 - k * 6)
+    ctx.globalAlpha = Math.min(1, ph * 2) * (0.5 + k * 0.5)
+    ctx.strokeStyle = i % 3 ? p.cols[1] : '#ffffff'
+    ctx.lineWidth = 1 + k
+    ctx.beginPath()
+    ctx.moveTo(x + Math.cos(a) * d0, y + Math.sin(a) * d0 * 0.75)
+    ctx.lineTo(x + Math.cos(a) * d1, y + Math.sin(a) * d1 * 0.75)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+/** The glowing core of a charge-up, drawn in front of the Pokémon. */
+export function drawChargeCore(ctx: CanvasRenderingContext2D, fx: MoveFx, x: number, y: number, k: number, time: number) {
+  const p = pal(fx)
+  const e = k * k
+  // 3. The core: swells, whitens and throbs faster toward release
+  const throb = 1 + 0.12 * Math.sin(time * (12 + k * 36))
+  drawGlow(ctx, x, y, (14 + e * 44) * throb, p.glow, 0.6 + k * 0.4)
+  drawGlow(ctx, x, y, (6 + e * 18) * throb, '#ffffff', 0.65 + k * 0.35)
+  // A solid, white-hot orb with a coloured rim
+  ctx.globalAlpha = 0.55 + k * 0.45
+  disc(ctx, x, y, (2.5 + e * 6) * throb + 1.2, p.cols[2] ?? p.glow)
+  disc(ctx, x, y, (2.5 + e * 6) * throb, '#ffffff')
+  ctx.globalAlpha = 1
+  // Shrinking rings pulled into the core
   ctx.strokeStyle = p.cols[1]
   ctx.lineWidth = 1.2
-  ctx.globalAlpha = 0.8
   for (let i = 0; i < 3; i++) {
-    const rr = 26 * (1 - ((k * 2 + i / 3) % 1))
+    const rr = (30 - k * 6) * (1 - ((time * (1.2 + k * 2) + i / 3) % 1))
+    ctx.globalAlpha = 0.35 + k * 0.5
     ctx.beginPath()
     ctx.ellipse(x, y, rr, rr * 0.7, 0, 0, Math.PI * 2)
     ctx.stroke()
   }
   ctx.globalAlpha = 1
-  void time
+  // 4. Almost there: a star flare opens up
+  if (k > 0.7) {
+    const f = (k - 0.7) / 0.3
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(time * 0.8)
+    for (let i = 0; i < 2; i++) {
+      ctx.save()
+      ctx.rotate((i * Math.PI) / 2)
+      ctx.scale(1, 0.08)
+      drawGlow(ctx, 0, 0, 20 + f * 40, '#ffffff', f * 0.9)
+      ctx.restore()
+    }
+    ctx.restore()
+  }
 }

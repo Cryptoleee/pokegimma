@@ -322,14 +322,33 @@ function spectateTick(dt: number) {
 
 // ---------- Multiplayer ----------
 
+/** Lobby sounds: who joined or left, who got ready, everyone ready. */
+let lobbySeen: { pids: string[]; ready: number } | null = null
+function lobbySounds() {
+  const r = room
+  if (!r) return (lobbySeen = null)
+  const pids = r.players.map((p) => p.pid)
+  const ready = r.players.filter((p) => p.ready).length
+  const prev = lobbySeen
+  lobbySeen = { pids, ready }
+  if (!prev || !lobbyUi) return
+  if (pids.some((p) => !prev.pids.includes(p))) sfx.join()
+  else if (prev.pids.some((p) => !pids.includes(p))) sfx.leave()
+  else if (ready > prev.ready) ready === pids.length && pids.length > 1 ? sfx.allReady() : sfx.readyTick()
+}
+
 function roomEvents() {
   return {
-    lobby: () => lobbyUi?.refresh(),
+    lobby: () => {
+      lobbySounds()
+      lobbyUi?.refresh()
+    },
     chat: (m: ChatLine) => {
       lobbyUi?.chat(m)
       if (viewing) hud?.chatLine(m, m.pid === profile().id)
     },
     closed: (reason: string) => {
+      sfx.error()
       room = null
       remotes.clear()
       wipe(() => toMenu({ error: reason }))
@@ -347,6 +366,7 @@ function roomEvents() {
       game.removeViewer(v.tr)
       v.tr.remote = false
       if (v.tr.alive) game.giveBrain(v.tr)
+      sfx.leave()
       hud?.toast(`${p.name} heeft het potje verlaten`)
     },
   }
@@ -359,7 +379,10 @@ function hostRoom() {
       r.choice = { ...choice }
       wipe(toLobby)
     })
-    .catch((e: Error) => toMenu({ error: e.message }))
+    .catch((e: Error) => {
+      sfx.error()
+      toMenu({ error: e.message })
+    })
 }
 
 function joinRoom(code: string) {
@@ -372,6 +395,7 @@ function joinRoom(code: string) {
     })
     .catch((e: Error) => {
       pendingJoin = ''
+      sfx.error()
       toMenu({ error: e.message, code })
     })
 }
@@ -499,6 +523,7 @@ function confirmLeave() {
   g.held.fill(false)
   g.input.mx = g.input.my = 0
   confirming = true
+  sfx.select()
   const text = !room ? undefined : room.isHost
     ? 'Jij bent de host: als je stopt, stopt het potje voor iedereen.'
     : 'Je verlaat het potje en de lobby.'
@@ -589,7 +614,7 @@ window.addEventListener('keydown', (e) => {
   if (k in ATTACK_KEYS) {
     const slot = ATTACK_KEYS[k]
     // Fire on press (a quick tap must never be lost), keep firing while held
-    if (!e.repeat && p.alive && g.introT <= 0) g.useMove(p.mon, slot, undefined, g.cursorDir(p.mon))
+    if (!e.repeat && p.alive && g.introT <= 0 && !g.useMove(p.mon, slot, undefined, g.cursorDir(p.mon)) && (p.mon.cds[slot] > 0 || !p.mon.unlocked(slot))) sfx.denied()
     g.held[slot] = true
   }
   if (e.repeat) return

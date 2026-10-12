@@ -185,6 +185,7 @@ export function updateRaid(g: Game, dt: number) {
     const m = tr.mon
     if (!m.fainted && g.world.at(Math.floor(m.x), Math.floor(m.y)) === T.LAVA) {
       g.applyDamage(m, m.maxHp * 0.1 * dt, null, true)
+      g.vOf(tr)?.sfx('burn')
       if (Math.random() < dt * 8) g.vfx.burst(m.x, m.y - 0.2, { n: 2, speed: 2, dir: -Math.PI / 2, spread: 0.6, cols: ['#ffb030', '#ff6020'], shape: 'flame', s0: 2.5, s1: 0.5, life: 0.4 })
     }
     if (m.fainted && tr.respawnT > 0) {
@@ -200,6 +201,7 @@ export function updateRaid(g: Game, dt: number) {
     if (g.items.filter((it) => it.kind === 'potion').length < 3) {
       const [x, y] = g.world.randomWalkable((x, y) => g.world.at(Math.floor(x), Math.floor(y)) !== T.LAVA && Math.hypot(x - ARENA_C, y - ARENA_C) < ARENA_R - 3)
       g.items.push({ x, y, kind: 'potion', bob: 0 })
+      g.soundAt(x, y, 'spawnChime', [], { range: 26 })
       g.vfx.mark(x, y)
       g.vfx.ring(x, y, 1.2, '#80f080', 0.5, 4)
     }
@@ -667,6 +669,7 @@ function resolveHazard(g: Game, h: Hazard) {
     g.applyDamage(m, m.maxHp * h.dmg, null)
     if (h.freeze && !m.fainted) {
       m.frozenT = Math.max(m.frozenT, h.freeze)
+      g.soundAt(m.x, m.y, 'freeze', [], { owners: [m.owner], range: 14 })
       m.tintCol = '#a0e0ff'
       m.tintT = h.freeze
       g.addFxPublic({ kind: 'text', x: m.x, y: m.y - 2.1, t: 0, life: 0.9, color: '#a0e0ff', text: 'Bevroren!', small: true })
@@ -728,6 +731,7 @@ function enrage(g: Game, r: RaidState) {
     const a = Math.random() * Math.PI * 2
     g.items.push({ x: ARENA_C + Math.cos(a) * 8, y: ARENA_C + Math.sin(a) * 8, kind: 'potion', bob: 0 })
   }
+  g.soundAt(ARENA_C, ARENA_C, 'spawnChime', [], { global: true })
 }
 
 /** A see-through copy of the boss (drawn only, it can't be hit). */
@@ -764,7 +768,6 @@ function respawn(g: Game, tr: Trainer) {
   g.vfx.mark(m.x, m.y)
   g.vfx.ring(m.x, m.y - 0.2, 1.6, '#ffffff', 0.5, 6)
   const v = g.vOf(tr)
-  v?.sfx('release')
   v?.hooks.toast(`Terug in de strijd! Nog ${tr.lives} ${tr.lives === 1 ? 'leven' : 'levens'}`, '#80f080')
 }
 

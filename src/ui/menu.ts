@@ -165,7 +165,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
     const m = el.querySelector('.home > .mm-msg') as HTMLElement
     m.className = 'mm-msg err'
     m.textContent = 'Vul eerst je naam in'
-    sfx.select()
+    sfx.error()
     return false
   }
   const busy = (text: string) => {
@@ -211,6 +211,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
     if (c.length !== 4) {
       msg.className = 'mm-msg sheet-msg err'
       msg.textContent = 'Een code heeft 4 tekens'
+      sfx.error()
       code.focus()
       return
     }

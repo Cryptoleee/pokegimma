@@ -93,6 +93,7 @@ export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; s
   // Tap the tip to see the next one
   tipEl.addEventListener('click', () => {
     clearInterval(tipTimer)
+    sfx.select()
     next()
   })
 

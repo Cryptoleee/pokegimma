@@ -45,6 +45,11 @@ export class Hud {
   private moveBtns: HTMLDivElement[] = []
   private moveKey = ''
   private readyState = [true, true, true, true]
+  /** Sound state: in the grass last frame, next heartbeat, respawn second shown, raid-timer warnings given. */
+  private wasGrass = false
+  private beatAt = 0
+  private respawnSec = 0
+  private timerWarned = new Set<number>()
   private itemBtns: Record<string, HTMLDivElement> = {}
   private catchBtn = h('button', 'catch2 hidden', '<span>VANG!</span><kbd>Spatie</kbd>')
   private knob = h('div', 'stick-knob')
@@ -142,11 +147,13 @@ export class Hud {
         input.blur()
       }
       btn.onclick = () => {
+        sfx.select()
         btn.classList.remove('unread')
         if (bar.classList.toggle('hidden')) input.blur()
       }
       bar.addEventListener('submit', (e) => {
         e.preventDefault()
+        if (input.value.trim()) sfx.blip()
         say(input.value)
         input.value = ''
         close()
@@ -157,6 +164,7 @@ export class Hud {
       })
       bar.querySelectorAll<HTMLButtonElement>('.cb-quick button').forEach((b) =>
         b.addEventListener('click', () => {
+          sfx.blip()
           say(b.textContent!)
           close()
         }),
@@ -203,17 +211,22 @@ export class Hud {
     const g = this.g, p = g.player
     if (!p.alive) return
     if (key === 'master') {
-      if (p.masterBalls <= 0) return this.toast('Je hebt geen Master Ball')
+      if (p.masterBalls <= 0) return this.deny('Je hebt geen Master Ball')
       const t = g.masterTarget(p)
-      if (!t) return this.toast('Geen wilde Pokémon dichtbij')
+      if (!t) return this.deny('Geen wilde Pokémon dichtbij')
       g.throwBall(p, t, true)
     } else if (key === 'potion') {
-      if (p.potions <= 0) return this.toast('Geen Potions')
-      if (!g.usePotion(p)) this.toast('Je Pokémon is al fit')
+      if (p.potions <= 0) return this.deny('Geen Potions')
+      if (!g.usePotion(p)) this.deny('Je Pokémon is al fit')
     } else {
-      if (p.revives <= 0) return this.toast('Geen Revives')
-      if (!g.useRevive(p)) this.toast('Niemand is verslagen')
+      if (p.revives <= 0) return this.deny('Geen Revives')
+      if (!g.useRevive(p)) this.deny('Niemand is verslagen')
     }
+  }
+
+  private deny(text: string) {
+    sfx.denied()
+    this.toast(text)
   }
 
   /**
@@ -286,8 +299,10 @@ export class Hud {
       const d = Math.hypot(dx, dy)
       const p = g.player
       const ok = p.alive && !g.paused && g.introT <= 0
-      if (ok && aiming && d > DEAD) g.useMove(p.mon, slot, undefined, { x: dx / d, y: dy / d, k: Math.min(1, d / MAXD) })
-      else if (ok && !aiming && !autoFired) g.useMove(p.mon, slot)
+      let fired = true
+      if (ok && aiming && d > DEAD) fired = g.useMove(p.mon, slot, undefined, { x: dx / d, y: dy / d, k: Math.min(1, d / MAXD) })
+      else if (ok && !aiming && !autoFired) fired = g.useMove(p.mon, slot)
+      if (!fired && (p.mon.cds[slot] > 0 || !p.mon.unlocked(slot))) sfx.denied()
       reset()
     }
     // iOS can take over a long press (text selection, system menus) without ever
@@ -417,7 +432,12 @@ export class Hud {
     if (big) this.bannerEl.querySelectorAll('.bn').forEach((x) => x.remove())
     this.bannerEl.append(el)
     while (this.bannerEl.children.length > 2) this.bannerEl.firstChild!.remove()
-    if (b.kind !== 'fainted') sfx.banner()
+    // Each kind of moment has its own sound (level ups, catches and KOs already played theirs)
+    if (b.kind === 'storm') b.voice === 'storm' || b.voice === 'final_circle' ? sfx.siren() : sfx.banner()
+    else if (b.kind === 'win') sfx.fanfare()
+    else if (b.kind === 'move') sfx.newMove()
+    else if (b.kind === 'fainted') b.voice && sfx.down()
+    else if (b.kind !== 'levelup' && b.kind !== 'caught' && b.kind !== 'ko' && b.kind !== 'legendary') sfx.banner()
     if (b.voice) say(b.voice)
     setTimeout(() => el.classList.add('out'), BANNER_LIFE[b.kind] - 350)
     setTimeout(() => el.remove(), BANNER_LIFE[b.kind])
@@ -518,6 +538,7 @@ export class Hud {
       secs.textContent = f > 0 && m.cds[s] > 0.9 ? `${Math.ceil(m.cds[s])}` : ''
       const ready = f <= 0 && m.unlocked(s)
       if (ready && !this.readyState[s]) {
+        if (s === 3 && p.alive) sfx.ready()
         b.classList.remove('ping')
         void b.offsetWidth
         b.classList.add('ping')
@@ -537,6 +558,8 @@ export class Hud {
     this.catchBtn.classList.toggle('hidden', !p.alive || !g.catchable(p))
 
     const inGrass = p.alive && g.introT <= 0 && g.world.isTall(p.x, p.y)
+    if (inGrass && !this.wasGrass) sfx.rustle()
+    this.wasGrass = inGrass
     const seen = inGrass && !g.hidden(p)
     this.hideBadge.classList.toggle('on', inGrass)
     this.hideBadge.classList.toggle('seen', seen)
@@ -546,7 +569,14 @@ export class Hud {
     this.card.classList.toggle('regen', g.regenerating(m))
 
     // Vignettes
-    this.vLow.classList.toggle('on', p.alive && !m.fainted && k < 0.25)
+    const low = p.alive && !m.fainted && k < 0.25
+    this.vLow.classList.toggle('on', low)
+    // Low health: a heartbeat that quickens as it drops
+    const beatNow = performance.now()
+    if (low && g.introT <= 0 && beatNow >= this.beatAt) {
+      sfx.heartbeat()
+      this.beatAt = beatNow + 620 + k * 2400
+    }
     this.vStorm.classList.toggle('on', p.alive && g.introT <= 0 && g.zone.outside(p.x, p.y))
 
     if (g.kind === 'raid') return this.updateRaid()
@@ -586,6 +616,11 @@ export class Hud {
       const time = this.bossBar.querySelector('.bb-time') as HTMLElement
       time.textContent = `⏱ ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
       time.classList.toggle('low', t <= 30)
+      // Time running out: a warning at 30 and 10 seconds, then every second
+      if ((t === 30 || t === 10 || (t <= 5 && t > 0)) && !this.timerWarned.has(t) && g.introT <= 0) {
+        this.timerWarned.add(t)
+        sfx.warn()
+      }
       this.bossBar.classList.toggle('enraged', (rv?.phase ?? 0) >= 2)
       // Lives: just your hearts solo; with friends a short name before each row of hearts
       // Your own hearts first, then the others
@@ -599,6 +634,9 @@ export class Hud {
     }
     // Down: big countdown until you're back
     const down = p.alive && p.mon.fainted && p.respawnT > 0
+    const sec = down ? Math.ceil(p.respawnT) : 0
+    if (sec !== this.respawnSec && sec > 0) sfx.countdown(false)
+    this.respawnSec = sec
     this.respawnEl.classList.toggle('hidden', !down)
     if (down) this.respawnEl.innerHTML = `<small>${p.mon.name} is verslagen</small><b>${Math.ceil(p.respawnT)}</b><span>nog ${p.lives} ${p.lives === 1 ? 'leven' : 'levens'}</span>`
   }

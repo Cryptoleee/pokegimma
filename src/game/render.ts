@@ -4,7 +4,7 @@ import { BUSH_SIGHT, INTRO_TIME, ITEM_SPRITE } from './game'
 import type { Mon, Trainer } from './entities'
 import { getSprite, itemUrl, monSprite } from './sprites'
 import { trainerSpriteUrl } from '../data/trainers'
-import { drawCharge, drawDashAura, drawIncoming, drawMelee, drawProjectile } from './moveFx'
+import { drawCharge, drawChargeCore, drawDashAura, drawIncoming, drawMelee, drawProjectile, pal } from './moveFx'
 import { drawGlow } from './vfx'
 import { T, TILE } from './world'
 import { FLOWER_FRAMES, hash, TALL_FRAMES, TALL_TOP, tileArt, WATER_FRAMES } from './tiles'
@@ -97,8 +97,17 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   drawEvents(g, ctx, time)
   drawHazardsSky(g, ctx, time)
 
+  // World mood: night darkness, heat haze, cold light (under the effects, so attacks light up the dark)
+  if (theme.tint) {
+    ctx.fillStyle = theme.tint
+    ctx.fillRect(ox - 2, oy - 2, vw + 4, vh + 4)
+  }
+
   // Ultimates dim the world so the effect pops (like BW's battle backdrop fade)
   g.vfx.drawDim(ctx, ox - 4, oy - 4, vw + 8, vh + 8)
+
+  // Light: attacks cast light on the ground around them
+  drawLights(g, ctx, inView, time, ox, oy, Z, cw, ch)
 
   // Telegraphs (and meteors on their way down)
   for (const n of g.novas)
@@ -114,12 +123,6 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
 
   // Cloud shadows drift across the land (not in caves and craters)
   if (!g.world.arena) drawClouds(ctx, ox, oy, vw, vh, time)
-
-  // World mood: night darkness, heat haze, cold light
-  if (theme.tint) {
-    ctx.fillStyle = theme.tint
-    ctx.fillRect(ox - 2, oy - 2, vw + 4, vh + 4)
-  }
 
   // Storm: tinted, rain-swept outside, a crackling energy wall on the edge
   if (g.kind === 'royale') drawStorm(g, ctx, ox, oy, vw, vh, time)
@@ -286,7 +289,7 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
   }
 
   if (m.dash) drawDashAura(ctx, m.dash.move.fx, px, py - dh * 0.45, m.dash.vx, m.dash.vy, time)
-  if (m.charging) drawCharge(ctx, m.charging.move.fx, px, py - dh * 0.5, 1 - m.charging.t / m.charging.total, time)
+  if (m.charging) drawCharge(ctx, m.charging.move.fx, px, py - dh * 0.5, 1 - m.charging.t / m.charging.total, time, py)
   const lunge = m.castT > 0 ? Math.sin((m.castT / 0.18) * Math.PI) * 3 : 0
   let alpha = 1
   if (m.state === 'weak' && m.weakT < 3) alpha = Math.sin(time * 20) > 0 ? 1 : 0.35
@@ -295,12 +298,20 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
   ctx.globalAlpha = alpha
   const flip = back ? m.dir === 'left' : m.dir === 'right'
   ctx.save()
-  const jolt = m.joltT > 0 ? (Math.random() - 0.5) * 3 : 0
+  // Shaking with power while a big move charges; jolted when hit
+  const ck = m.charging ? 1 - m.charging.t / m.charging.total : 0
+  const jolt = m.joltT > 0 ? (Math.random() - 0.5) * 3 : ck > 0 ? (Math.random() - 0.5) * ck * ck * 2.6 : 0
   const lift = m.liftT > 0 ? -Math.sin(Math.min(1, m.liftT / 0.5) * Math.PI) * 6 : 0
   ctx.translate(Math.round(px + m.aimX * lunge + jolt), Math.round(py + bob + m.aimY * lunge + lift - rise))
   if (flip) ctx.scale(-1, 1)
   if (m.state === 'weak') ctx.rotate(0.25)
   if (m.castT > 0) ctx.scale(1 + lunge * 0.02, 1 - lunge * 0.02)
+  // (the charge-up's glowing core sits in front of the sprite: see below)
+  // Impact frame: squashed for a split second when hit
+  if (m.flash > 0) {
+    const q = Math.min(1, m.flash / 0.12)
+    ctx.scale(1 + q * 0.14, 1 - q * 0.12)
+  }
   ctx.drawImage(s.img, s.bx, s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
   const glow = Math.max(
     m.flash > 0 ? 0.85 : 0,
@@ -323,6 +334,8 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
   ctx.restore()
   ctx.globalAlpha = 1
   if (!m.legendary) grassOver(g, ctx, m.x, m.y)
+  // The charge-up's core, held out in front toward the aim
+  if (m.charging) drawChargeCore(ctx, m.charging.move.fx, px + m.aimX * dw * 0.35, py - dh * 0.45 + m.aimY * dh * 0.2, 1 - m.charging.t / m.charging.total, time)
 
   if (m.state === 'weak') {
     // Dizzy stars
@@ -1020,4 +1033,101 @@ function drawStorm(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: numbe
     ctx.stroke()
     ctx.setLineDash([])
   }
+}
+
+/**
+ * Dynamic light: every projectile, charge-up, falling meteor, lightning bolt,
+ * beam and explosion throws a soft pool of light on the ground around it, and
+ * a brighter bloom at its core. Built from state every screen already has, so
+ * it looks the same for every player and costs no network traffic.
+ */
+const HEX = /^#[0-9a-f]{6}$/i
+
+/** Lights are soft, so they're drawn at a quarter of the screen's resolution and scaled up as pixels (fits the pixel art): far cheaper. */
+const LIGHT_RES = 4
+let lightCanvas: HTMLCanvasElement | null = null
+
+function drawLights(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, y: number, m?: number) => boolean, time: number, ox: number, oy: number, Z: number, cw: number, ch: number) {
+  const T = TILE
+  const theme = g.world.theme
+  // Brighter on dark worlds, gentler in daylight so it doesn't wash out
+  const lit = theme.dark ? 1 : theme.tint ? 0.8 : 0.5
+  const pool: [number, number, number, string, number][] = []
+  const add = (x: number, y: number, r: number, col: string, a: number) => {
+    if (pool.length < 50 && a > 0.04 && HEX.test(col) && inView(x / T, y / T, 4)) pool.push([x, y, r, col, a * lit])
+  }
+  for (const p of g.projs) add(p.x * T, p.y * T, 26 + p.move.tier * 9, pal(p.move.fx).glow, 0.55)
+  for (const n of g.novas) {
+    const k = 1 - n.t / n.total
+    add(n.x * T, n.y * T, n.r * T * (0.5 + k * 0.9), pal(n.move.fx).glow, 0.12 + k * k * 0.6)
+  }
+  const mons = [...g.wilds, ...g.trainers.filter((t) => t.alive).map((t) => t.mon)]
+  for (const m of mons) {
+    if (m.charging) {
+      const k = 1 - m.charging.t / m.charging.total
+      const flick = 0.9 + 0.1 * Math.sin(time * (20 + k * 40))
+      add(m.x * T, (m.y - 0.4) * T, 24 + k * 70, pal(m.charging.move.fx).glow, (0.3 + k * 0.6) * flick)
+    }
+    if (m.dash) add(m.x * T, (m.y - 0.3) * T, 40, pal(m.dash.move.fx).glow, 0.45)
+  }
+  const v = g.vfx
+  for (const f of v.flashes) {
+    const k = f.t / f.life
+    add(f.x * T, f.y * T, Math.min(110, f.r * 1.8), f.col, (1 - k) * 0.35)
+  }
+  for (const b of v.bolts) {
+    const k = 1 - b.t / b.life, fl = Math.random() < 0.3 ? 0.5 : 1
+    add(b.x2 * T, b.y2 * T, 50 + b.w * 8, b.col, k * 0.6 * fl)
+    add(((b.x1 + b.x2) / 2) * T, ((b.y1 + b.y2) / 2) * T, 50, b.col, k * 0.45 * fl)
+  }
+  for (const b of v.beams) {
+    const k = 1 - b.t / b.life
+    const len = Math.hypot(b.x2 - b.x1, b.y2 - b.y1), n = Math.min(6, Math.ceil(len / 2))
+    const col = pal(b.style as Parameters<typeof pal>[0]).glow
+    for (let i = 0; i <= n; i++) add((b.x1 + ((b.x2 - b.x1) * i) / n) * T, (b.y1 + ((b.y2 - b.y1) * i) / n) * T, 30 + b.w * 2, col, k * 0.32)
+  }
+  for (const f of v.flares) {
+    const k = f.t / f.life
+    add(f.x * T, f.y * T, f.size * 0.9, f.col, (1 - k) * 0.3)
+  }
+  for (const r of v.rings) {
+    const k = r.t / r.life
+    if (r.r > 1.2) add(r.x * T, r.y * T, r.r * T * (0.6 + k), r.col, (1 - k) * 0.25)
+  }
+  // Raid: the boss's attacks glow brighter just before they land
+  for (const h of g.hazards) {
+    const k = h.total > 0 ? 1 - Math.max(0, h.t) / h.total : 1
+    if (k > 0.6 && h.shape !== 'grid') add(h.x * T, h.y * T, Math.min(6, h.r) * T * 0.9, TYPE_COLOR[h.type], (k - 0.6) * 0.9)
+  }
+  if (!pool.length) return
+  const lw = Math.ceil(cw / LIGHT_RES), lh = Math.ceil(ch / LIGHT_RES)
+  if (!lightCanvas) lightCanvas = document.createElement('canvas')
+  if (lightCanvas.width !== lw || lightCanvas.height !== lh) {
+    lightCanvas.width = lw
+    lightCanvas.height = lh
+  }
+  const lc = lightCanvas.getContext('2d')!
+  lc.setTransform(1, 0, 0, 1, 0, 0)
+  lc.clearRect(0, 0, lw, lh)
+  const k = Z / LIGHT_RES
+  lc.setTransform(k, 0, 0, k, -ox * k, -oy * k)
+  // Only the part of the screen that actually has light in it gets blended
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+  for (const [x, y, r, col, a] of pool) {
+    // Wide, soft pool on the ground + a tighter bloom at the source
+    drawGlow(lc, x, y + 4, r * 1.6, col, a * 0.55)
+    drawGlow(lc, x, y, r * 0.7, col, a * 0.7)
+    const rr = r * 1.6
+    x0 = Math.min(x0, x - rr); y0 = Math.min(y0, y - rr); x1 = Math.max(x1, x + rr); y1 = Math.max(y1, y + rr + 4)
+  }
+  const sx = Math.max(0, Math.floor((x0 - ox) * k)), sy = Math.max(0, Math.floor((y0 - oy) * k))
+  const ex = Math.min(lw, Math.ceil((x1 - ox) * k)), ey = Math.min(lh, Math.ceil((y1 - oy) * k))
+  if (ex <= sx || ey <= sy) return
+  // Blend the light over the scene in one go (in screen space, smoothed)
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.globalCompositeOperation = 'lighter'
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(lightCanvas, sx, sy, ex - sx, ey - sy, sx * LIGHT_RES, sy * LIGHT_RES, (ex - sx) * LIGHT_RES, (ey - sy) * LIGHT_RES)
+  ctx.restore()
 }
