@@ -344,6 +344,7 @@ function arenaHazard(g: Game, r: RaidState) {
       r.envT = [11, 9, 7][r.phase]
       const v = w.vents[Math.floor(Math.random() * w.vents.length)]
       addHazard(g, { shape: 'circle', x: v.x, y: v.y, ang: 0, r: 2.6, inner: 0, width: 0, t: 1.35, dmg: 0.35, fx: 'earthpower', type: 'fire', freeze: 0, cover: false, both: false, atk: 'vent' })
+      g.soundAt(v.x, v.y, 'boss', ['charge', 'earthpower', 0.7, 1.35], { range: 24 })
       break
     }
     case 'plateau':
@@ -358,6 +359,7 @@ function arenaHazard(g: Game, r: RaidState) {
       r.envT = [10, 8, 6.5][r.phase]
       addHazard(g, { shape: 'grid', x: ARENA_C, y: ARENA_C, ang: 0, r: ARENA_R, inner: Math.random() < 0.5 ? 0 : 1, width: World.LAB_CELL, t: 1.8, dmg: 0.3, fx: 'psychic', type: 'psychic', freeze: 0, cover: false, both: false, atk: 'grid' })
       for (const v of g.viewers) v.hooks.toast('Het vloerraster laadt op: zoek een donker vak!', '#ff90e0')
+      g.soundAt(ARENA_C, ARENA_C, 'boss', ['charge', 'psychic', 0.8, 1.8], { global: true })
       break
     }
     default:
@@ -372,6 +374,7 @@ function rodArc(g: Game, i: number, warn = 1.4) {
   const a = rods[i % rods.length], b = rods[(i + 1) % rods.length]
   const ax = a.x + 0.5, ay = a.y + 0.5, bx = b.x + 0.5, by = b.y + 0.5
   addHazard(g, { shape: 'line', x: ax, y: ay, ang: Math.atan2(by - ay, bx - ax), r: Math.hypot(bx - ax, by - ay), inner: 0, width: 1.4, t: warn, dmg: 0.35, fx: 'discharge', type: 'electric', freeze: 0, cover: false, both: false, atk: 'arc' })
+  g.soundAt((ax + bx) / 2, (ay + by) / 2, 'boss', ['charge', 'discharge', 0.7, warn], { range: 24 })
 }
 
 /** Whirlwinds that rise near the edge of the arena and then go after people. */
@@ -486,6 +489,7 @@ function castAttack(g: Game, r: RaidState, a: BossAttack, foes: Mon[]) {
     v.glow(nx, ny - 1, 70, p.glow, 0.5)
     v.burst(nx, ny - 1, { n: 26, speed: 7, cols: p.cols, shape: 'star', add: true, s0: 5, s1: 1, life: 0.6 })
     v.flash(0.25, '255,190,255')
+    g.soundAt(nx, ny, 'boss', ['teleport', a.fx], { global: true })
     r.busyT = a.warn
   }
   castFrom(g, r, a, foes, boss.x, boss.y, aimAt, true)
@@ -495,6 +499,7 @@ function castAttack(g: Game, r: RaidState, a: BossAttack, foes: Mon[]) {
     r.air = { t: a.warn, total: a.warn, x: pick.x, y: pick.y }
     r.invulnT = Math.max(r.invulnT, a.warn)
     boss.liftT = 0.5
+    g.soundAt(boss.x, boss.y, 'boss', ['takeoff', a.fx], { global: true })
     g.vfx.mark(boss.x, boss.y)
     g.vfx.burst(boss.x, boss.y - 0.3, { n: 24, speed: 7, cols: palOf(a.type, a.id).cols, shape: 'streak', add: true, s0: 5, s1: 1, life: 0.5, flat: 0.5 })
     g.vfx.ring(boss.x, boss.y, 3, palOf(a.type, a.id).cols[2], 0.5, 6)
@@ -511,6 +516,7 @@ function castAttack(g: Game, r: RaidState, a: BossAttack, foes: Mon[]) {
     const ang = Math.random() * Math.PI * 2
     r.wind = { dx: Math.cos(ang) * a.wind.force, dy: Math.sin(ang) * a.wind.force, delay: a.warn, t: a.wind.dur }
     for (const v of g.viewers) v.hooks.toast('Delta Stream: loop tegen de wind in!', '#a0f0e8')
+    g.soundAt(ARENA_C, ARENA_C, 'boss', ['wind', a.fx, 1, a.warn + a.wind.dur], { global: true })
   }
 }
 
@@ -535,6 +541,7 @@ function castFrom(g: Game, r: RaidState, a: BossAttack, foes: Mon[], ox: number,
     boss.aimT = a.warn
     g.callout(boss, a.name, TYPE_COLOR[a.type])
     for (const v of g.viewers) if (Math.hypot(v.camX - boss.x, v.camY - boss.y) < 20) v.sfx('warn')
+    g.soundAt(boss.x, boss.y, 'boss', ['charge', a.fx, 1, a.warn], { global: true })
   }
   // Tornado and wind attacks are all about the whirlwinds: no circles of their own
   if (a.tornado) return
@@ -620,9 +627,12 @@ function gridLit(h: Hazard, x: number, y: number) {
 function resolveHazard(g: Game, h: Hazard) {
   const v = g.vfx
   // The boss's attacks land with the heaviest version of their move's sound
-  g.soundAt(h.x, h.y, 'moveHit', [h.fx, h.atk === 'vent' || h.atk === 'arc' || h.atk === 'grid' ? 2 : 3], { range: 20 })
   const r = g.raid
   const a = r?.def.attacks.find((x) => x.id === h.atk)
+  const kind = h.atk === 'vent' ? 'vent' : h.atk === 'arc' ? 'arc' : h.atk === 'grid' ? 'grid' : h.dur > 0 ? 'tornado' : a?.move === 'land' ? 'quake' : a?.move === 'dash' ? 'dash' : 'impact'
+  const size = h.shape === 'circle' && h.r < 2.5 ? 0.75 : 1
+  // Tornados and the floor grid are heard where they are; the boss's blows fill the arena
+  g.soundAt(h.x, h.y, 'boss', [kind, h.fx, size, h.dur > 0 ? h.dur : 1], kind === 'tornado' || kind === 'vent' || kind === 'arc' ? { range: 24 } : { global: true })
   // Fusion Bolt: Zekrom races down the line it just lit up
   if (r && a?.move === 'dash' && !r.boss.fainted) {
     const [ex, ey] = standSpot(g, h.x + Math.cos(h.ang) * (h.r - 1), h.y + Math.sin(h.ang) * (h.r - 1))
@@ -640,6 +650,7 @@ function resolveHazard(g: Game, h: Hazard) {
     g.world.pillars.forEach((pl, i) => {
       if (pl.hp <= 0 || !inHazard(h, pl.x + 1, pl.y + 1)) return
       pl.hp = Math.max(0, pl.hp - 0.34)
+      g.soundAt(pl.x + 1, pl.y + 1, 'boss', ['shatter', 'ice', pl.hp <= 0 ? 1 : 0.4], { range: 24 })
       v.mark(pl.x + 1, pl.y + 1)
       v.burst(pl.x + 1, pl.y + 0.5, { n: 10, speed: 5, cols: ['#ffffff', '#c8ecff', '#8cc4f0'], shape: 'shard', s0: 3, s1: 1, life: 0.6, grav: 8 })
       if (pl.hp <= 0) {
@@ -663,6 +674,16 @@ function resolveHazard(g: Game, h: Hazard) {
   }
 }
 
+/** The fight is about to start: the boss roars and the ground shakes. */
+export function raidIntro(g: Game) {
+  const r = g.raid
+  if (!r) return
+  const b = r.boss
+  for (const v of g.viewers) v.cry(b.species.id, 0.5)
+  g.soundAt(b.x, b.y, 'boss', ['intro', r.def.attacks[0].fx], { global: true })
+  g.vfx.shakeBy(6)
+}
+
 function enrage(g: Game, r: RaidState) {
   r.phase++
   r.invulnT = 1.6
@@ -678,6 +699,7 @@ function enrage(g: Game, r: RaidState) {
   g.vfx.glow(boss.x, boss.y - 0.8, 80, r.def.color, 0.6)
   g.vfx.flash(0.6, '255,255,255')
   g.vfx.shakeBy(10)
+  g.soundAt(boss.x, boss.y, 'boss', ['enrage', r.def.attacks[0].fx], { global: true })
   // Roar: shove everyone back
   for (const tr of g.trainers) {
     if (!tr.alive) continue
@@ -693,6 +715,7 @@ function enrage(g: Game, r: RaidState) {
       r.clones.push({ x: ARENA_C + Math.cos(a) * 7.5, y: ARENA_C + Math.sin(a) * 6.5, a })
     }
     g.clones = r.clones.map((c) => cloneMon(r.def.species, c.x, c.y))
+    g.soundAt(boss.x, boss.y, 'boss', ['clones', 'psychic'], { global: true })
     for (const c of r.clones) {
       g.vfx.mark(c.x, c.y)
       g.vfx.bolt(boss.x, boss.y - 1.2, c.x, c.y - 1.2, { col: r.def.color, w: 2.4, jag: 10, branches: 2, strands: 2, life: 0.5 })
@@ -755,6 +778,7 @@ function endRaid(g: Game, r: RaidState) {
     g.vfx.flash(0.9, '255,255,255')
     g.vfx.shakeBy(14)
     g.vfx.ring(b.x, b.y, 6, '#ffffff', 1, 10)
+    g.soundAt(b.x, b.y, 'boss', ['down', r.def.attacks[0].fx], { global: true })
   }
   for (const v of g.viewers) {
     if (v.done) continue

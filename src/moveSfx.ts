@@ -530,3 +530,158 @@ export function playItem(ctx: AudioContext | null, muted: boolean, name: ItemSou
     }
   }, gain >= 1)
 }
+
+// ---------------------------------------------------------------- raid bosses
+
+/**
+ * Raid boss sounds: bigger, longer and heavier than anything a partner makes.
+ * - charge: the attack building up while its warning is on the ground
+ * - impact / quake: the attack landing (quake = the boss itself crashing down)
+ * - dash, takeoff, teleport: the boss moving
+ * - wind, tornado: Rayquaza's weather, as long as it lasts
+ * - arc, vent, grid, shatter: the arenas (lightning rods, lava vents, floor grid, ice pillars)
+ * - intro, enrage, clones, down: the big moments of the fight
+ */
+export type BossSound =
+  | 'charge' | 'impact' | 'quake' | 'dash' | 'takeoff' | 'teleport' | 'wind' | 'tornado'
+  | 'arc' | 'vent' | 'grid' | 'shatter' | 'intro' | 'enrage' | 'clones' | 'down'
+
+/** A long deep boom with a rumbling tail. */
+function boom(x: Ctx, vol: number, len = 1) {
+  const { ctx, o, t } = x
+  osc(ctx, o, t, { type: 'sine', f: 70, f2: 24, dur: 0.9 * len, vol })
+  osc(ctx, o, t, { type: 'square', f: 110, f2: 32, dur: 0.25 * len, vol: vol * 0.35, dist: true })
+  noise(ctx, o, t, { dur: 1.3 * len, vol: vol * 0.75, filter: 'lowpass', f: 2600, f2: 70 })
+  noise(ctx, o, t, { at: 0.05, dur: 1.8 * len, vol: vol * 0.35, attack: 0.15, filter: 'lowpass', f: 220, f2: 50 })
+}
+
+export function playBoss(ctx: AudioContext | null, muted: boolean, kind: BossSound, fx: MoveFx, size = 1, dur = 1, pan = 0, gain = 1) {
+  const m = MOVES[fx] ?? MOVES.hyperbeam
+  const [fam, , pitch] = m
+  const T = TIMBRE[fam]
+  const s = Math.max(0.3, Math.min(1.2, size))
+  const life = { charge: dur, wind: dur, tornado: dur, down: 3.5, intro: 2.5, enrage: 2, quake: 2.2 }[kind as string] ?? 1.6
+  const vol = { charge: 0.13, impact: 0.3, quake: 0.34, dash: 0.24, takeoff: 0.6, teleport: 0.42, wind: 0.6, tornado: 0.75, arc: 0.22, vent: 0.24, grid: 0.2, shatter: 0.2, intro: 0.3, enrage: 0.3, clones: 0.4, down: 0.36 }[kind] * s * gain
+  // One charge/impact per attack kind at a time, but volleys of meteors still each thud
+  const gap = kind === 'impact' ? 70 : kind === 'charge' ? 150 : 90
+  play(ctx, muted, 'b' + kind + fx, gap, pan, vol, kind === 'charge' ? 0.25 : 0.55, life, (o, t) => {
+    const c = ctx!
+    const x: Ctx = { ctx: c, o, t, p: pitch, k: 1, len: 0.4 }
+    switch (kind) {
+      case 'charge': {
+        // A swell in the attack's own colour that peaks right when it lands
+        const d = Math.max(0.4, Math.min(2.6, dur))
+        noise(c, o, t, { dur: d, vol: 0.55, attack: d * 0.9, filter: 'bandpass', f: 220 * pitch, f2: 2600 * pitch, q: 1.4 })
+        osc(c, o, t, { type: 'sawtooth', f: 45, f2: 95, dur: d, vol: 0.35, attack: d * 0.85, lin: true, vib: [7, 4] })
+        osc(c, o, t, { type: 'sine', f: 160 * pitch, f2: 640 * pitch, dur: d, vol: 0.25, attack: d * 0.8, vib: [11, 18] })
+        T.cast({ ...x, t: t + d * 0.45, len: d * 0.55 })
+        if (fam === 'electric') crackle(c, o, t + d * 0.3, d * 0.7, 26, 0.5, 2500)
+        if (fam === 'rock' || fam === 'ground' || fam === 'fire') noise(c, o, t, { dur: d, vol: 0.5, attack: d * 0.7, filter: 'lowpass', f: 160, f2: 260 })
+        break
+      }
+      case 'impact':
+        boom(x, 1)
+        T.hit({ ...x, k: 1 })
+        T.hit({ ...x, t: t + 0.03, k: 1, p: pitch * 0.7 })
+        break
+      case 'quake':
+        // The boss crashing back down: the biggest single hit, with debris after
+        boom(x, 1.4)
+        T.hit({ ...x, k: 1 })
+        noise(c, o, t, { dur: 1.6, vol: 0.6, attack: 0.05, filter: 'lowpass', f: 380, f2: 60, wob: [9, 80] })
+        crackle(c, o, t + 0.1, 0.9, 30, 0.45, 1400)
+        break
+      case 'dash':
+        noise(c, o, t, { dur: 0.55, vol: 0.9, attack: 0.08, filter: 'bandpass', f: 400, f2: 3800, q: 1.2 })
+        T.cast({ ...x, len: 0.5 })
+        boom({ ...x, t: t + 0.32 }, 0.8, 0.8)
+        if (fam === 'electric') {
+          crackle(c, o, t, 0.6, 40, 0.7, 3000)
+          osc(c, o, t, { type: 'sawtooth', f: 1400, f2: 90, dur: 0.45, vol: 0.4, dist: true })
+        }
+        break
+      case 'takeoff':
+        // Wings and a rush of air, rising out of earshot
+        for (let i = 0; i < 3; i++) noise(c, o, t, { at: i * 0.14, dur: 0.16, vol: 0.7 - i * 0.12, attack: 0.05, filter: 'lowpass', f: 700, f2: 300 })
+        noise(c, o, t, { dur: 0.9, vol: 0.8, attack: 0.25, filter: 'bandpass', f: 300, f2: 5000, q: 1.6 })
+        osc(c, o, t, { type: 'sawtooth', f: 90, f2: 480, dur: 0.8, vol: 0.3, attack: 0.2, vib: [16, 30] })
+        break
+      case 'teleport':
+        // Vwip: folding out of the world and snapping back somewhere else
+        osc(c, o, t, { type: 'sine', f: 2400, f2: 160, dur: 0.14, vol: 0.6 })
+        osc(c, o, t, { at: 0.12, type: 'sine', f: 140, f2: 2600, dur: 0.18, vol: 0.6 })
+        osc(c, o, t, { at: 0.12, type: 'triangle', f: 210, f2: 3900, dur: 0.18, vol: 0.3 })
+        noise(c, o, t, { at: 0.28, dur: 0.35, vol: 0.6, filter: 'bandpass', f: 3000, f2: 500, q: 2 })
+        ;[1568, 2093, 2637].forEach((f, i) => osc(c, o, t, { at: 0.3 + i * 0.04, type: 'sine', f, dur: 0.5, vol: 0.18, vib: [9, 14] }))
+        boom({ ...x, t: t + 0.3 }, 0.45, 0.6)
+        break
+      case 'wind': {
+        // Delta Stream: a howling gale for as long as it blows
+        const d = Math.max(1, dur)
+        noise(c, o, t, { dur: d, vol: 0.9, attack: Math.min(1.2, d * 0.3), filter: 'bandpass', f: 500, q: 0.7, wob: [0.45, 320] })
+        noise(c, o, t, { dur: d, vol: 0.5, attack: Math.min(1, d * 0.3), filter: 'lowpass', f: 180, wob: [0.3, 60] })
+        osc(c, o, t, { type: 'sine', f: 760, dur: d, vol: 0.12, attack: d * 0.4, vib: [0.7, 140] })
+        break
+      }
+      case 'tornado': {
+        const d = Math.max(1, dur)
+        noise(c, o, t, { dur: d, vol: 0.8, attack: 0.4, filter: 'bandpass', f: 650, q: 2.2, wob: [2.6, 380] })
+        noise(c, o, t, { dur: d, vol: 0.55, attack: 0.3, filter: 'lowpass', f: 150, wob: [1.3, 50] })
+        break
+      }
+      case 'arc':
+        // Lightning jumping between two masts
+        crackle(c, o, t, 0.35, 45, 0.9, 2200)
+        osc(c, o, t, { type: 'sawtooth', f: 110, dur: 0.45, vol: 0.5, dist: true, vib: [55, 25] })
+        noise(c, o, t, { dur: 0.08, vol: 1, filter: 'highpass', f: 1800 })
+        boom(x, 0.55, 0.7)
+        break
+      case 'vent':
+        // Lava bursting out of a vent
+        boom(x, 0.8, 0.9)
+        noise(c, o, t, { dur: 1.1, vol: 0.8, attack: 0.05, filter: 'bandpass', f: 600, f2: 180, q: 0.8 })
+        for (let i = 0; i < 10; i++) osc(c, o, t, { at: r(0.1, 0.9), type: 'sine', f: r(70, 130), f2: r(200, 340), dur: 0.09, vol: 0.4 })
+        crackle(c, o, t, 1, 26, 0.5, 2500)
+        break
+      case 'grid':
+        // The floor grid firing: a psychic chord and a hard zap
+        ;[220, 277, 330, 440].forEach((f) => osc(c, o, t, { type: 'square', f, f2: f * 0.5, dur: 0.6, vol: 0.18, vib: [23, 12] }))
+        noise(c, o, t, { dur: 0.5, vol: 0.8, filter: 'bandpass', f: 3500, f2: 300, q: 1.5 })
+        boom(x, 0.6, 0.7)
+        break
+      case 'shatter':
+        // Ice cracking (small) or a whole pillar coming down (big)
+        for (let i = 0; i < 8 + s * 10; i++) osc(c, o, t, { at: r(0, 0.25 * s), type: 'sine', f: r(1800, 6200), dur: r(0.08, 0.3), vol: 0.22 })
+        noise(c, o, t, { dur: 0.25 + s * 0.4, vol: 0.8, filter: 'highpass', f: 2500 })
+        if (s > 0.7) boom(x, 0.7, 0.8)
+        break
+      case 'intro':
+        // The boss makes itself known: a rumble that swells into a hit
+        noise(c, o, t, { dur: 1.4, vol: 0.7, attack: 1, filter: 'lowpass', f: 120, f2: 500 })
+        osc(c, o, t, { type: 'sawtooth', f: 40, f2: 80, dur: 1.2, vol: 0.4, attack: 1, dist: true })
+        boom({ ...x, t: t + 1.05 }, 1, 1.3)
+        T.hit({ ...x, t: t + 1.05, k: 1 })
+        break
+      case 'enrage':
+        // Power surging: a rising chord, then a blast
+        ;[1, 1.5, 2].forEach((mul) => osc(c, o, t, { type: 'sawtooth', f: 70 * mul, f2: 280 * mul, dur: 0.8, vol: 0.22, attack: 0.6, dist: true }))
+        noise(c, o, t, { dur: 0.8, vol: 0.6, attack: 0.7, filter: 'bandpass', f: 200, f2: 4000, q: 1 })
+        boom({ ...x, t: t + 0.75 }, 1.1, 1.3)
+        T.hit({ ...x, t: t + 0.75, k: 1 })
+        break
+      case 'clones':
+        // Two mirror images shimmering into being
+        ;[440, 443, 660, 664, 880].forEach((f, i) => osc(c, o, t, { at: i * 0.05, type: 'sine', f, dur: 1.2, vol: 0.2, attack: 0.4, vib: [5, 9] }))
+        noise(c, o, t, { dur: 1, vol: 0.4, attack: 0.5, filter: 'bandpass', f: 1200, f2: 4000, q: 4 })
+        break
+      case 'down':
+        // The boss goes down: three blasts and a long collapse
+        for (let i = 0; i < 3; i++) boom({ ...x, t: t + i * 0.28 }, 1 - i * 0.15, 1.2 + i * 0.3)
+        T.hit({ ...x, k: 1 })
+        osc(c, o, t, { type: 'sawtooth', f: 420, f2: 35, dur: 1.8, vol: 0.3, dist: true })
+        noise(c, o, t, { at: 0.4, dur: 2.6, vol: 0.55, attack: 0.3, filter: 'lowpass', f: 600, f2: 60 })
+        crackle(c, o, t + 0.3, 1.6, 40, 0.4, 1200)
+        break
+    }
+  }, gain >= 0.99)
+}

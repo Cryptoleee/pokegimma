@@ -1,7 +1,7 @@
 /** Tiny chiptune-ish sound effects with WebAudio; no audio files needed. */
 import type { MoveFx } from './data/moves'
 import { moveByName } from './data/moves'
-import { namePitch, playItem, playMoveCast, playMoveCharge, playMoveHit, type ItemSound } from './moveSfx'
+import { namePitch, playBoss, playItem, playMoveCast, playMoveCharge, playMoveHit, type BossSound, type ItemSound } from './moveSfx'
 let ctx: AudioContext | null = null
 let muted = false
 
@@ -151,6 +151,10 @@ export const sfx = {
   /** A big move charging up before it fires. */
   moveCharge(fx: MoveFx, tier: number, dur: number, pan = 0, gain = 1) {
     playMoveCharge(ctx, sfxOff(), fx, tier, dur, pan, gain)
+  },
+  /** Raid boss: charge-ups, impacts, its moves, the arena and the big moments. */
+  boss(kind: BossSound, fx: MoveFx, size = 1, dur = 1, pan = 0, gain = 1) {
+    playBoss(ctx, sfxOff(), kind, fx, size, dur, pan, gain)
   },
   /** Items: potion, revive, ball throws and wobbles, pickups. */
   item(name: ItemSound, pan = 0, gain = 1) {

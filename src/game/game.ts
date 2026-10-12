@@ -2,7 +2,7 @@ import { PARTY_MAX, rarityOf, ROSTER, SPECIES, TEAM_SIZE, WILD, type Rarity } fr
 import { eventTimes, startEvent, updateEvents, type WorldEvent } from './events'
 import { roleInfo } from '../data/roles'
 import { decided, scoreRows, type ScoreRow } from './score'
-import { raidDown, setupRaid, updateRaid, type Hazard, type RaidState, type RaidView } from './boss'
+import { raidDown, raidIntro, setupRaid, updateRaid, type Hazard, type RaidState, type RaidView } from './boss'
 import { movesetFor, SLOT_UNLOCK, type Move, type MoveFx } from '../data/moves'
 import { Vfx } from './vfx'
 import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpact, onMelee, onZap, pal, projectileEnd, projectileTick } from './moveFx'
@@ -434,11 +434,16 @@ export class Game {
    * from their camera and fainter further away (full volume for `owners`).
    * `skipRemote`: that player's own device already played it.
    */
-  soundAt(x: number, y: number, name: SfxName, args: unknown[], o: { owners?: (Trainer | null | undefined)[]; skipRemote?: Trainer | null; range?: number } = {}) {
+  soundAt(x: number, y: number, name: SfxName, args: unknown[], o: { owners?: (Trainer | null | undefined)[]; skipRemote?: Trainer | null; range?: number; global?: boolean } = {}) {
     const range = o.range ?? 15
     for (const v of this.viewers) {
       if (o.skipRemote && v.tr === o.skipRemote && !v.local) continue
       const dx = x - v.camX, dy = y - v.camY, d = Math.hypot(dx, dy)
+      // Global: the whole arena hears it at full strength (a raid boss), only the panning follows the spot
+      if (o.global) {
+        v.sfx(name, ...args, Math.max(-0.6, Math.min(0.6, dx / 16)), 1)
+        continue
+      }
       if (d > range) continue
       const near = 1 - d / range
       const gain = o.owners?.includes(v.tr) ? 1 : 0.6 * near * near
@@ -476,7 +481,9 @@ export class Game {
     if (this.mode === 'client') return this.clientUpdate(dt)
     if (this.introT > 0) {
       // Drop-in cinematic: the camera swoops down while everyone waits for GO.
+      const was = this.introT
       this.introT -= dt
+      if (this.raid && was > INTRO_TIME - 0.3 && this.introT <= INTRO_TIME - 0.3) raidIntro(this)
       this.updateFx(dt)
       this.introCamera()
       if (this.introT <= 0) this.releasePartner()
