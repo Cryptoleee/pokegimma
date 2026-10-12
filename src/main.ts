@@ -27,6 +27,7 @@ import { cleanCode, probeQuick, Room, stopProbe } from './net/room'
 import type { ChatLine, HostMsg, LobbyPlayer, MatchChoice } from './net/protocol'
 import { pickTheme, THEMES, type ThemeId } from './data/themes'
 import { applyEvents, applySnapshot, initClient, recordVfx, remoteViewer, runCommand, snapshot, type RemoteViewer } from './net/sync'
+import { L, onLangChange, tx } from './i18n'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
@@ -114,6 +115,11 @@ function toTitle() {
   showTitle(() => (pendingJoin ? toMenu() : showIntro(() => wipe(() => toMenu()))))
 }
 
+// A new language re-renders the home screen (the lobby and battle pick it up on their next update)
+onLangChange(() => {
+  if (document.querySelector('#screen > .home')) toMenu()
+})
+
 function toMenu(extra: Partial<MenuState> = {}) {
   stopGame()
   lobbyUi = null
@@ -128,7 +134,7 @@ function toMenu(extra: Partial<MenuState> = {}) {
     host: hostRoom,
     join: joinRoom,
     quick: () => quickPlay(),
-    team: () => wipe(() => pickTeam(() => wipe(() => toMenu()), () => wipe(() => toMenu()), 'Klaar ▶')),
+    team: () => wipe(() => pickTeam(() => wipe(() => toMenu()), () => wipe(() => toMenu()), L('Ready ▶', 'Klaar ▶'))),
     back: () => wipe(toTitle),
   })
   watchOnline()
@@ -136,7 +142,7 @@ function toMenu(extra: Partial<MenuState> = {}) {
   if (code && profile().name && !extra.error) {
     pendingJoin = ''
     const none = () => {}
-    showMenu({ trainer, team, choice, code, busy: `Verbinden met ${code}…` }, { solo: none, host: none, join: none, quick: none, team: none, back: none })
+    showMenu({ trainer, team, choice, code, busy: L(`Connecting to ${code}…`, `Verbinden met ${code}…`) }, { solo: none, host: none, join: none, quick: none, team: none, back: none })
     joinRoom(code)
   }
 }
@@ -161,8 +167,8 @@ function pickTeam(done: () => void, back: () => void, cta: string) {
 
 function hooks(): GameHooks {
   return {
-    toast: (t, c) => hud?.toast(t, c),
-    feed: (t, icon) => hud?.feed(t, icon),
+    toast: (t, c) => hud?.toast(tx(t), c),
+    feed: (t, icon) => hud?.feed(tx(t), icon),
     banner: (b) => hud?.banner(b),
     evolve: (from, to, shiny, done) => showEvolution(from, to, shiny, done),
     partyFull: (mon, choose) => showPartyFull(mon, game!.player.party, choose),
@@ -177,7 +183,7 @@ function enterMatch(g: Game) {
   viewing = true
   playMusic(g.kind === 'raid' ? 'boss' : 'battle')
   if (g.mode !== 'client') hud = makeHud(g)
-  if (desktop) setTimeout(() => game === g && hud?.toast('WASD lopen · klik = aanval · Q E R = krachten · Esc pauze'), INTRO_TIME * 1000 + 600)
+  if (desktop) setTimeout(() => game === g && hud?.toast(L('WASD move · click = attack · Q E R = moves · Esc pause', 'WASD lopen · klik = aanval · Q E R = krachten · Esc pauze')), INTRO_TIME * 1000 + 600)
   // Extra history entry so the phone's back button asks before leaving.
   history.pushState({ battlemon: 'game' }, '')
   guardActive = true
@@ -210,25 +216,25 @@ function startSolo() {
 }
 
 const soloAgain = () => wipe(startSolo, { flash: true })
-const soloOtherTeam = () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), 'Start de battle ▶'))
+const soloOtherTeam = () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), L('Start the battle ▶', 'Start de battle ▶')))
 
 function onEnd(r: GameResult) {
   hud?.destroy()
   hud = null
   // The match goes on without you (bots or other players still in it): you can watch
-  const watch = r.final ? [] : [{ label: 'Kijk verder 👁', run: () => spectate() }]
+  const watch = r.final ? [] : [{ label: L('Keep watching 👁', 'Kijk verder 👁'), run: () => spectate() }]
   if (!room) {
-    showResults(r, trainer.sprite, { label: 'Nog een keer ▶', run: soloAgain }, [
+    showResults(r, trainer.sprite, { label: L('Play again ▶', 'Nog een keer ▶'), run: soloAgain }, [
       ...watch,
-      { label: 'Ander team', run: soloOtherTeam },
-      { label: 'Hoofdmenu', run: () => wipe(() => toMenu()) },
+      { label: L('Other team', 'Ander team'), run: soloOtherTeam },
+      { label: L('Main menu', 'Hoofdmenu'), run: () => wipe(() => toMenu()) },
     ])
     return
   }
   // Online the match usually goes on for your friends: watching is the main option, the lobby can wait
-  const lobby = { label: 'Naar de lobby', run: () => wipe(toLobby) }
-  if (watch.length) showResults(r, trainer.sprite, { label: 'Kijk verder 👁', run: () => spectate() }, [lobby, { label: 'Hoofdmenu', run: () => leaveRoom() }])
-  else showResults(r, trainer.sprite, { ...lobby, label: 'Naar de lobby ▶' }, [{ label: 'Hoofdmenu', run: () => leaveRoom() }])
+  const lobby = { label: L('To the lobby', 'Naar de lobby'), run: () => wipe(toLobby) }
+  if (watch.length) showResults(r, trainer.sprite, { label: L('Keep watching 👁', 'Kijk verder 👁'), run: () => spectate() }, [lobby, { label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }])
+  else showResults(r, trainer.sprite, { ...lobby, label: L('To the lobby ▶', 'Naar de lobby ▶') }, [{ label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }])
 }
 
 // ---------- Watching after you're out ----------
@@ -248,12 +254,12 @@ function spectate() {
   hudRoot.classList.remove('hidden', 'intro-mode')
   hudRoot.innerHTML = `
     <div class="spec-bar">
-      <span class="spec-tag">👁 Toeschouwer</span>
-      <div class="spec-follow"><button class="spec-prev" aria-label="Vorige trainer">◀</button><span class="spec-name"></span><button class="spec-next" aria-label="Volgende trainer">▶</button></div>
+      <span class="spec-tag">👁 ${L('Spectating', 'Toeschouwer')}</span>
+      <div class="spec-follow"><button class="spec-prev" aria-label="${L('Previous trainer', 'Vorige trainer')}">◀</button><span class="spec-name"></span><button class="spec-next" aria-label="${L('Next trainer', 'Volgende trainer')}">▶</button></div>
       <div class="spec-btns">
-        ${room ? '' : '<button class="spec-speed" title="Snelheid">1×</button>'}
-        <button class="spec-board" title="Scorebord (Tab)">🏆</button>
-        <button class="spec-leave">${room ? 'Naar de lobby ▶' : 'Stoppen'}</button>
+        ${room ? '' : `<button class="spec-speed" title="${L('Speed', 'Snelheid')}">1×</button>`}
+        <button class="spec-board" title="${L('Scoreboard (Tab)', 'Scorebord (Tab)')}">🏆</button>
+        <button class="spec-leave">${room ? L('To the lobby ▶', 'Naar de lobby ▶') : L('Stop', 'Stoppen')}</button>
       </div>
     </div>`
   const board = new LiveBoard(hudRoot, g, () => g.player.id)
@@ -295,7 +301,7 @@ function spectateTick(dt: number) {
   const s = spec
   if (!s || s.g !== game) return
   const f = followed(s.g)
-  const name = f ? `Volgt: ${f.name}` : ''
+  const name = f ? L(`Following: ${f.name}`, `Volgt: ${f.name}`) : ''
   if (name !== s.name) {
     s.name = name
     const el = hudRoot.querySelector('.spec-name')
@@ -312,10 +318,10 @@ function spectateTick(dt: number) {
       hudRoot.innerHTML = ''
       viewing = false
       sfx.select()
-      if (room) showFinalBoard(rows, g.kind === 'raid', g.player.id, { label: 'Naar de lobby ▶', run: () => wipe(toLobby) }, [{ label: 'Hoofdmenu', run: () => leaveRoom() }])
-      else showFinalBoard(rows, g.kind === 'raid', g.player.id, { label: 'Nog een keer ▶', run: soloAgain }, [
-        { label: 'Ander team', run: soloOtherTeam },
-        { label: 'Hoofdmenu', run: () => wipe(() => toMenu()) },
+      if (room) showFinalBoard(rows, g.kind === 'raid', g.player.id, { label: L('To the lobby ▶', 'Naar de lobby ▶'), run: () => wipe(toLobby) }, [{ label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }])
+      else showFinalBoard(rows, g.kind === 'raid', g.player.id, { label: L('Play again ▶', 'Nog een keer ▶'), run: soloAgain }, [
+        { label: L('Other team', 'Ander team'), run: soloOtherTeam },
+        { label: L('Main menu', 'Hoofdmenu'), run: () => wipe(() => toMenu()) },
       ])
       playMusic('victory')
     }
@@ -356,7 +362,7 @@ function roomEvents() {
       // Quick play: the host left before the match started: just find another lobby
       if (wasQuick) {
         sfx.leave()
-        lobbyUi?.toast('De host is weg: we zoeken een nieuwe lobby…')
+        lobbyUi?.toast(L('The host left: finding a new lobby…', 'De host is weg: we zoeken een nieuwe lobby…'))
         return quickPlay(true)
       }
       sfx.error()
@@ -376,7 +382,7 @@ function roomEvents() {
       v.tr.remote = false
       if (v.tr.alive) game.giveBrain(v.tr)
       sfx.leave()
-      hud?.toast(`${p.name} heeft het potje verlaten`)
+      hud?.toast(L(`${p.name} left the match`, `${p.name} heeft het potje verlaten`))
     },
   }
 }
@@ -435,7 +441,7 @@ function toLobby() {
         ready = true
         room?.updateMe(me())
         wipe(toLobby)
-      }, () => wipe(toLobby), 'Klaar ▶'))
+      }, () => wipe(toLobby), L('Ready ▶', 'Klaar ▶')))
     },
     ready: (on) => {
       ready = on
@@ -458,7 +464,9 @@ function quickPlay(again = false) {
       room = r
       if (!again) return wipe(toLobby)
       toLobby()
-      lobbyUi?.toast(r.isHost ? 'De host is weg: jij bent nu de host van een nieuwe lobby' : 'De host is weg: je zit in een nieuwe lobby')
+      lobbyUi?.toast(r.isHost
+        ? L('The host left: you\'re now the host of a new lobby', 'De host is weg: jij bent nu de host van een nieuwe lobby')
+        : L('The host left: you\'re in a new lobby now', 'De host is weg: je zit in een nieuwe lobby'))
     })
     .catch((e: Error) => {
       sfx.error()
@@ -608,8 +616,8 @@ function confirmLeave() {
   confirming = true
   sfx.select()
   const text = !room ? undefined : room.isHost
-    ? 'Jij bent de host: als je stopt, stopt het potje voor iedereen.'
-    : 'Je verlaat het potje en de lobby.'
+    ? L('You\'re the host: if you stop, the match ends for everyone.', 'Jij bent de host: als je stopt, stopt het potje voor iedereen.')
+    : L('You\'ll leave the match and the lobby.', 'Je verlaat het potje en de lobby.')
   showLeaveConfirm(
     () => {
       confirming = false

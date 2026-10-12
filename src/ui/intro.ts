@@ -5,6 +5,7 @@ import { trainerSpriteUrl } from '../data/trainers'
 import { TYPE_COLOR, TYPE_NL } from '../data/types'
 import { sfx } from '../audio'
 import { itemUrl } from '../game/sprites'
+import { L } from '../i18n'
 
 /**
  * How-to-play shown after "Tik om te starten": a framed battle scene per
@@ -32,7 +33,7 @@ const key = (k: string, cls = '') => `<span class="tk ${cls}">${k}</span>`
 function moveButtons() {
   const moves = movesetFor(SPECIES[25].types)
   return `<div class="t-moves">${moves
-    .map((m, s) => `<div class="mb s${s} t-press" style="--tc:${TYPE_COLOR[m.type]};--d:${s * 0.7}s"><div class="ring"></div><div class="lbl"><span>${m.name}</span><small>${TYPE_NL[m.type]}</small></div>${desk ? `<span class="tk on-btn">${['Klik', 'Q', 'E', 'R'][s]}</span>` : ''}</div>`)
+    .map((m, s) => `<div class="mb s${s} t-press" style="--tc:${TYPE_COLOR[m.type]};--d:${s * 0.7}s"><div class="ring"></div><div class="lbl"><span>${m.name}</span><small>${TYPE_NL[m.type]}</small></div>${desk ? `<span class="tk on-btn">${[L('Click', 'Klik'), 'Q', 'E', 'R'][s]}</span>` : ''}</div>`)
     .join('')}</div>`
 }
 
@@ -40,23 +41,27 @@ function moveButtons() {
 const hpPlate = (name: string, lv: number, cls: string) =>
   `<div class="t-plate ${cls}"><b>${name}</b><small>Lv${lv}</small><div class="t-hp"><span>HP</span><i><em></em></i></div></div>`
 
-const SLIDES: Slide[] = [
+/** Built when the tutorial opens, so the texts use the current language. */
+const slides = (): Slide[] => [
   {
-    title: 'Welkom',
+    title: L('Welcome', 'Welkom'),
     bg: 'field',
     stage: () => `
       <div class="t-sun"></div>
       ${plat('t-prof-plat')}
       <img class="px t-prof" src="${trainerSpriteUrl('juniper')}" alt="">
       <div class="t-modes">
-        <div class="t-mode br"><b>Battle Royale</b><small>12 trainers · 1 winnaar</small></div>
-        <div class="t-mode raid"><b>Raid</b><small>samen tegen een eindbaas</small></div>
+        <div class="t-mode br"><b>Battle Royale</b><small>${L('12 trainers · 1 winner', '12 trainers · 1 winnaar')}</small></div>
+        <div class="t-mode raid"><b>Raid</b><small>${L('team up against a boss', 'samen tegen een eindbaas')}</small></div>
       </div>
       <div class="t-spark"><i></i><i></i><i></i><i></i><i></i></div>`,
-    text: 'Welkom bij Stormbreak Royale! Ik ben Professor Juniper. Je kunt op twee manieren spelen: een Battle Royale, waarin je als laatste trainer overblijft, of een Raid, waarin je samen een eindbaas verslaat.',
+    text: L(
+      "Welcome to Stormbreak Royale! I'm Professor Juniper. There are two ways to play: a Battle Royale, where you fight to be the last trainer standing, or a Raid, where you team up to take down a boss.",
+      'Welkom bij Stormbreak Royale! Ik ben Professor Juniper. Je kunt op twee manieren spelen: een Battle Royale, waarin je als laatste trainer overblijft, of een Raid, waarin je samen een eindbaas verslaat.',
+    ),
   },
   {
-    title: 'Je partner',
+    title: L('Your partner', 'Je partner'),
     bg: 'field',
     stage: () => `
       <div class="t-trio">
@@ -67,27 +72,36 @@ const SLIDES: Slide[] = [
           })
           .join('')}
       </div>`,
-    text: 'Kies eerst een partner-Pokémon. Elke partner heeft een rol: Aanvaller, Allrounder, Verdediger of Snelheid. Die rol geeft een klein voordeel, zoals meer schade, meer HP of sneller lopen.',
+    text: L(
+      'First, pick a partner Pokémon. Every partner has a role: Attacker, All-Rounder, Defender or Speedster. That role gives a small edge, like more damage, more HP or faster walking.',
+      'Kies eerst een partner-Pokémon. Elke partner heeft een rol: Aanvaller, Allrounder, Verdediger of Snelheid. Die rol geeft een klein voordeel, zoals meer schade, meer HP of sneller lopen.',
+    ),
   },
   {
-    title: 'Besturing',
+    title: L('Controls', 'Besturing'),
     bg: 'field',
     stage: () => `
       ${desk
         ? `<div class="t-keys">
             <div class="t-wasd">${key('W', 'w')}${key('A', 'a')}${key('S', 's')}${key('D', 'd')}</div>
-            <small>lopen</small>
+            <small>${L('move', 'lopen')}</small>
           </div>`
-        : `<div class="t-stick"><div class="stick-base"><em class="n"></em><em class="e"></em><em class="s"></em><em class="w"></em><div class="stick-knob"></div></div><small>lopen</small></div>`}
+        : `<div class="t-stick"><div class="stick-base"><em class="n"></em><em class="e"></em><em class="s"></em><em class="w"></em><div class="stick-knob"></div></div><small>${L('move', 'lopen')}</small></div>`}
       <div class="t-walk">${plat('')}<img class="px t-trainer" src="${trainerSpriteUrl('hilbert')}" alt="">${gif(25, 't-buddy')}</div>
-      ${desk ? '<div class="t-mouse"><i></i><small>klik = aanval</small></div>' : '<div class="t-tap"></div>'}
+      ${desk ? `<div class="t-mouse"><i></i><small>${L('click = attack', 'klik = aanval')}</small></div>` : '<div class="t-tap"></div>'}
       ${moveButtons()}`,
     text: desk
-      ? 'Loop met WASD. Klik om aan te vallen en gebruik Q, E en R voor je krachten: ze richten op je muis. Je kunt ook lopen door de rechtermuisknop ingedrukt te houden.'
-      : 'Beweeg met de joystick links op je scherm. Rechts zitten je aanvallen. Tik om aan te vallen; richten gaat vanzelf. Houd een knop vast en sleep om zelf te richten.',
+      ? L(
+          'Move with WASD. Click to attack and use Q, E and R for your special moves: they aim at your mouse. You can also walk by holding down the right mouse button.',
+          'Loop met WASD. Klik om aan te vallen en gebruik Q, E en R voor je krachten: ze richten op je muis. Je kunt ook lopen door de rechtermuisknop ingedrukt te houden.',
+        )
+      : L(
+          'Move with the joystick on the left of your screen. Your attacks are on the right. Tap to attack; aiming happens on its own. Hold a button and drag to aim yourself.',
+          'Beweeg met de joystick links op je scherm. Rechts zitten je aanvallen. Tik om aan te vallen; richten gaat vanzelf. Houd een knop vast en sleep om zelf te richten.',
+        ),
   },
   {
-    title: 'Vechten en groeien',
+    title: L('Battle and grow', 'Vechten en groeien'),
     bg: 'field',
     stage: () => `
       ${plat('t-foe-plat')}${plat('t-me-plat')}
@@ -97,44 +111,56 @@ const SLIDES: Slide[] = [
       <div class="t-dmg">32</div>
       ${hpPlate('Patrat', 6, 'foe')}
       <div class="t-plate me"><b>Pikachu</b><small>Lv7</small><div class="t-hp full"><span>HP</span><i><em></em></i></div><div class="t-xp"><em></em></div></div>
-      <div class="t-newmove">Nieuwe aanval op Lv 8!</div>`,
-    text: 'Versla wilde Pokémon voor XP. Hoe langer je overleeft, hoe sterker je partner wordt. Op Lv 8, 16 en 25 leert hij een nieuwe aanval, en zo nu en dan evolueert hij!',
+      <div class="t-newmove">${L('New move at Lv 8!', 'Nieuwe aanval op Lv 8!')}</div>`,
+    text: L(
+      'Defeat wild Pokémon for XP. The longer you survive, the stronger your partner gets. At Lv 8, 16 and 25 it learns a new move, and every now and then it evolves!',
+      'Versla wilde Pokémon voor XP. Hoe langer je overleeft, hoe sterker je partner wordt. Op Lv 8, 16 en 25 leert hij een nieuwe aanval, en zo nu en dan evolueert hij!',
+    ),
   },
   {
-    title: 'Vangen',
+    title: L('Catching', 'Vangen'),
     bg: 'field',
     stage: () => `
       ${plat('t-foe-plat')}
       <div class="t-foe t-dizzy">${gif(504)}<div class="t-stars"><i>★</i><i>★</i><i>★</i></div></div>
       <img class="px t-ball" src="${itemUrl('poke-ball')}" alt="">
-      <div class="t-catch"><span>VANG!</span></div>
-      <div class="t-caught">Gevangen!</div>
+      <div class="t-catch"><span>${L('CATCH!', 'VANG!')}</span></div>
+      <div class="t-caught">${L('Caught!', 'Gevangen!')}</div>
       <div class="t-party">${[25, 504, 0].map((id) => `<i class="${id ? '' : 'empty'}">${id ? `<img class="px" src="${spriteUrl(id)}" alt="">` : ''}</i>`).join('')}</div>`,
-    text: `Is een wilde Pokémon verzwakt? Dan verschijnt de knop VANG!${desk ? ' (of druk op Spatie)' : ''}. Zo bouw je een team van maximaal ${PARTY_MAX} Pokémon, en je kunt tijdens het gevecht wisselen.`,
+    text: L(
+      `Is a wild Pokémon weakened? Then the CATCH! button appears${desk ? ' (or press Space)' : ''}. That's how you build a team of up to ${PARTY_MAX} Pokémon, and you can switch during battle.`,
+      `Is een wilde Pokémon verzwakt? Dan verschijnt de knop VANG!${desk ? ' (of druk op Spatie)' : ''}. Zo bouw je een team van maximaal ${PARTY_MAX} Pokémon, en je kunt tijdens het gevecht wisselen.`,
+    ),
   },
   {
-    title: 'Legendarische Pokémon',
+    title: L('Legendary Pokémon', 'Legendarische Pokémon'),
     bg: 'field',
     stage: () => `
       <div class="t-rays"></div>
       ${plat('t-leg-plat')}
       <div class="t-leg">${gif(644)}</div>
-      <div class="t-legtag">★ LEGENDARISCH ★</div>
+      <div class="t-legtag">${L('★ LEGENDARY ★', '★ LEGENDARISCH ★')}</div>
       <img class="px t-mball" src="${itemUrl('master-ball')}" alt="">
       <div class="t-flash"></div>
-      <div class="t-caught gold">Zekrom gevangen!</div>`,
-    text: 'Soms verschijnt er een legendarische Pokémon, zoals Zekrom. Die is ijzersterk. Vind je een Master Ball? Daarmee vang je elke Pokémon in één keer, zelfs een legendarische!',
+      <div class="t-caught gold">${L('Zekrom caught!', 'Zekrom gevangen!')}</div>`,
+    text: L(
+      'Sometimes a Legendary Pokémon appears, like Zekrom. It is incredibly strong. Found a Master Ball? It catches any Pokémon in one go, even a Legendary one!',
+      'Soms verschijnt er een legendarische Pokémon, zoals Zekrom. Die is ijzersterk. Vind je een Master Ball? Daarmee vang je elke Pokémon in één keer, zelfs een legendarische!',
+    ),
   },
   {
-    title: 'De storm',
+    title: L('The storm', 'De storm'),
     bg: 'storm',
     stage: () => `
       <div class="t-map">
         <div class="t-zone"></div>
         <div class="t-dot you"></div><div class="t-dot r1"></div><div class="t-dot r2"></div><div class="t-dot r3"></div><div class="t-dot out"></div>
       </div>
-      <div class="t-stormtag">De storm komt eraan!</div>`,
-    text: 'Pas op voor de storm! Het speelveld krimpt steeds verder en buiten de cirkel verlies je HP. Blijf binnen de cirkel en wees de laatste trainer die overblijft.',
+      <div class="t-stormtag">${L('The storm is coming!', 'De storm komt eraan!')}</div>`,
+    text: L(
+      'Watch out for the storm! The battlefield keeps shrinking, and outside the circle you lose HP. Stay inside the circle and be the last trainer standing.',
+      'Pas op voor de storm! Het speelveld krimpt steeds verder en buiten de cirkel verlies je HP. Blijf binnen de cirkel en wees de laatste trainer die overblijft.',
+    ),
   },
   {
     title: 'Raid',
@@ -144,28 +170,32 @@ const SLIDES: Slide[] = [
       <div class="t-boss">${gif(643)}</div>
       <div class="t-tele"><i></i></div>
       <div class="t-runner">${gif(25)}</div>
-      <div class="t-warn">Rood op de grond = wegwezen!</div>`,
-    text: 'In een raid vecht je met vrienden tegen een enorme eindbaas. Elke grote aanval zie je eerst als vorm op de grond: loop eruit voordat hij volloopt. Succes!',
+      <div class="t-warn">${L('Red on the ground = get out!', 'Rood op de grond = wegwezen!')}</div>`,
+    text: L(
+      'In a raid you fight a huge boss together with friends. Every big attack shows up as a shape on the ground first: get out before it fills up. Good luck!',
+      'In een raid vecht je met vrienden tegen een enorme eindbaas. Elke grote aanval zie je eerst als vorm op de grond: loop eruit voordat hij volloopt. Succes!',
+    ),
   },
 ]
 
 export function showIntro(onDone: () => void) {
+  const SLIDES = slides()
   const el = document.getElementById('screen')!
   el.innerHTML = `
     <div class="tut">
       <div class="tut-top">
         <span class="tut-step"></span>
         <b class="tut-title"></b>
-        <button class="tut-skip skip">Overslaan ▶▶</button>
+        <button class="tut-skip skip">${L('Skip ▶▶', 'Overslaan ▶▶')}</button>
       </div>
       <div class="tut-main">
         <div class="tut-stage"></div>
         <div class="tut-box">
           <p></p>
           <div class="tut-nav">
-            <button class="tut-prev" aria-label="Vorige">◀ Terug</button>
+            <button class="tut-prev" aria-label="${L('Previous', 'Vorige')}">${L('◀ Back', '◀ Terug')}</button>
             <div class="tut-dots">${SLIDES.map((s, i) => `<button data-i="${i}" aria-label="${s.title}"></button>`).join('')}</div>
-            <button class="tut-next">Verder ▶</button>
+            <button class="tut-next">${L('Next ▶', 'Verder ▶')}</button>
           </div>
         </div>
       </div>
@@ -211,7 +241,7 @@ export function showIntro(onDone: () => void) {
       d.classList.toggle('seen', j <= Math.max(seen, i))
     })
     prev.disabled = i === 0
-    next.textContent = i === SLIDES.length - 1 ? 'Spelen! ▶' : 'Verder ▶'
+    next.textContent = i === SLIDES.length - 1 ? L("Let's go! ▶", 'Spelen! ▶') : L('Next ▶', 'Verder ▶')
     next.classList.toggle('last', i === SLIDES.length - 1)
     full = s.text
     clearInterval(typing)

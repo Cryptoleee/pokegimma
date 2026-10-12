@@ -21,6 +21,7 @@ import type { Dir } from './entities'
 import type { Command } from '../net/protocol'
 import type { ClientState } from '../net/sync'
 import type { VoiceLine } from '../voice'
+import { both, type Txt } from '../i18n'
 
 export type ItemKind = 'master' | 'potion' | 'candy' | 'revive'
 const PICKUP_SOUND: Record<ItemKind, ItemSound> = { master: 'pickupMaster', potion: 'pickupPotion', candy: 'pickupCandy', revive: 'pickupRevive' }
@@ -81,7 +82,7 @@ export interface Fx {
   life: number
   color: string
   r?: number
-  text?: string
+  text?: Txt
   vx?: number
   vy?: number
   big?: boolean
@@ -142,8 +143,8 @@ export interface Banner {
   kind: BannerKind
   /** Announcer line to go with it */
   voice?: VoiceLine
-  title: string
-  sub?: string
+  title: Txt
+  sub?: Txt
   /** Pokémon or trainer sprite id to show */
   mon?: number
   shiny?: boolean
@@ -152,8 +153,8 @@ export interface Banner {
 }
 
 export interface GameHooks {
-  toast(text: string, color?: string): void
-  feed(text: string, icon?: { mon?: number; trainer?: string }): void
+  toast(text: Txt, color?: string): void
+  feed(text: Txt, icon?: { mon?: number; trainer?: string }): void
   banner(b: Banner): void
   evolve(from: number, to: number, shiny: boolean, done: () => void): void
   partyFull(mon: Mon, choose: (idx: number) => void): void
@@ -1200,7 +1201,7 @@ export class Game {
   private miss(src: Mon, x: number, y: number) {
     const v = this.vOf(src.owner)
     if (!v || !this.seenBy(v, x, y)) return
-    v.fx({ kind: 'text', x, y: y - 0.3, t: 0, life: 0.6, color: '#b8b8c8', text: 'Mis', small: true })
+    v.fx({ kind: 'text', x, y: y - 0.3, t: 0, life: 0.6, color: '#b8b8c8', text: both('Miss', 'Mis'), small: true })
   }
 
   hit(src: Mon, tgt: Mon, mv: Move, mult = 1) {
@@ -1209,7 +1210,7 @@ export class Game {
     if (tgt.boss && this.raid && this.raid.invulnT > 0) {
       const v = this.vOf(src.owner)
       if (v && this.seenBy(v, tgt.x, tgt.y)) {
-        v.fx({ kind: 'text', x: tgt.x, y: tgt.y - 2.2, t: 0, life: 0.6, color: '#b8b8c8', text: 'Immuun', small: true })
+        v.fx({ kind: 'text', x: tgt.x, y: tgt.y - 2.2, t: 0, life: 0.6, color: '#b8b8c8', text: both('Immune', 'Immuun'), small: true })
         v.sfx('clink')
       }
       return
@@ -1256,7 +1257,7 @@ export class Game {
         if ((mine || hurt) && eff !== 1)
           v.fx({
             kind: 'text', x: tgt.x, y: tgt.y - 2.1, t: 0, life: 0.9, small: true,
-            color: eff > 1 ? '#ffd040' : '#b8b8c8', text: eff > 1 ? 'Super effectief!' : 'Weinig effect',
+            color: eff > 1 ? '#ffd040' : '#b8b8c8', text: eff > 1 ? both('Super effective!', 'Super effectief!') : both('Not very effective', 'Weinig effect'),
           })
         if (mine) v.sfx('hitConfirm', eff < 1, eff > 1)
         if (hurt) v.sfx('hit', eff > 1)
@@ -1305,7 +1306,7 @@ export class Game {
       this.vOf(by?.owner)?.sfx('catchable')
       if (m.legendary)
         for (const v of this.viewers) {
-          v.hooks.feed(`${m.name} is verzwakt! Vang hem snel!`)
+          v.hooks.feed(both(`${m.name} is weakened! Catch it fast!`, `${m.name} is verzwakt! Vang hem snel!`))
           if (v.tr !== by?.owner) v.sfx('catchable')
         }
       return
@@ -1313,7 +1314,7 @@ export class Game {
     const tr = m.owner
     tr.autoSwapT = 0.9
     if (by?.owner) this.gainXp(by, koXp * 1.5)
-    this.vOf(tr)?.hooks.banner({ kind: 'fainted', title: `${m.name} is verslagen!`, sub: tr.healthyIndex() >= 0 ? 'Je volgende Pokémon komt eraan' : undefined, mon: m.species.id, voice: tr.healthyIndex() >= 0 ? undefined : 'lose' })
+    this.vOf(tr)?.hooks.banner({ kind: 'fainted', title: both(`${m.name} fainted!`, `${m.name} is verslagen!`), sub: tr.healthyIndex() >= 0 ? both('Your next Pokémon is coming up', 'Je volgende Pokémon komt eraan') : undefined, mon: m.species.id, voice: tr.healthyIndex() >= 0 ? undefined : 'lose' })
     if (tr.healthyIndex() < 0) this.eliminate(tr, by?.owner ?? m.lastHitBy)
   }
 
@@ -1322,10 +1323,10 @@ export class Game {
     if (!tr.alive) return
     tr.alive = false
     tr.diedAt = this.time
-    for (const v of this.viewers) v.hooks.feed(`${tr === v.tr ? 'Jij bent' : `${tr.name} is`} door je levens heen`, { trainer: tr.def.sprite })
+    for (const v of this.viewers) v.hooks.feed(both(`${tr === v.tr ? 'You are' : `${tr.name} is`} out of lives`, `${tr === v.tr ? 'Jij bent' : `${tr.name} is`} door je levens heen`), { trainer: tr.def.sprite })
     const v = this.vOf(tr)
     if (v) {
-      v.hooks.banner({ kind: 'fainted', title: 'Geen levens meer', sub: 'Je kijkt mee tot de raid voorbij is', mon: tr.mon.species.id, voice: 'lose' })
+      v.hooks.banner({ kind: 'fainted', title: both('Out of lives', 'Geen levens meer'), sub: both('You can watch until the raid is over', 'Je kijkt mee tot de raid voorbij is'), mon: tr.mon.species.id, voice: 'lose' })
       const mate = this.trainers.find((t) => t.alive)
       tr.spectate = mate ?? null
       if (tr.isPlayer) this.spectate = mate ?? null
@@ -1360,7 +1361,7 @@ export class Game {
   }
 
   /** Big name over a Pokémon (boss attack callouts). */
-  callout(m: Mon, text: string, color: string) {
+  callout(m: Mon, text: Txt, color: string) {
     this.addFx({ kind: 'callout', x: m.x, y: m.y - 2.8, t: 0, life: 1.3, color, text, big: true })
   }
 
@@ -1373,11 +1374,13 @@ export class Game {
     for (const v of this.viewers) {
       const who = (t: Trainer, me: string) => (t === v.tr ? me : t.name)
       v.hooks.feed(
-        by && by !== tr ? `${who(by, 'Jij')} schakelde ${who(tr, 'jou')} uit` : `${who(tr, 'Jij')} werd gesloopt door de storm`,
+        by && by !== tr
+          ? both(`${who(by, 'You')} knocked ${who(tr, 'you')} out`, `${who(by, 'Jij')} schakelde ${who(tr, 'jou')} uit`)
+          : both(`${who(tr, 'You')} got wrecked by the storm`, `${who(tr, 'Jij')} werd gesloopt door de storm`),
         { trainer: tr.def.sprite },
       )
     }
-    if (by && by !== tr) this.vOf(by)?.hooks.banner({ kind: 'ko', title: 'Trainer uitgeschakeld!', sub: `${tr.name} · nog ${this.alive.length} over`, trainer: tr.def.sprite, voice: 'ko' })
+    if (by && by !== tr) this.vOf(by)?.hooks.banner({ kind: 'ko', title: both('Trainer knocked out!', 'Trainer uitgeschakeld!'), sub: both(`${tr.name} · ${this.alive.length} left`, `${tr.name} · nog ${this.alive.length} over`), trainer: tr.def.sprite, voice: 'ko' })
     this.soundAt(tr.x, tr.y, 'ko', [], { owners: [tr, by], range: 18 })
     // Drop loot
     const drops: ItemKind[] = [
@@ -1400,7 +1403,7 @@ export class Game {
       last.place = 1
       if (lv) {
         lv.endT = 1.5
-        lv.hooks.banner({ kind: 'win', title: 'WINNAAR!', sub: 'Jij bent de laatste trainer', trainer: last.def.sprite, voice: 'win' })
+        lv.hooks.banner({ kind: 'win', title: both('WINNER!', 'WINNAAR!'), sub: both('You are the last trainer standing', 'Jij bent de laatste trainer'), trainer: last.def.sprite, voice: 'win' })
       }
     }
   }
@@ -1444,7 +1447,7 @@ export class Game {
     SLOT_UNLOCK.forEach((lv, i) => {
       if (lv === m.level && mine) {
         learned = true
-        mine.hooks.banner({ kind: 'move', title: m.moves[i].name, sub: `${m.name} leerde een nieuwe aanval!`, color: TYPE_COLOR[m.moves[i].type], mon: m.species.id, voice: 'new_move' })
+        mine.hooks.banner({ kind: 'move', title: m.moves[i].name, sub: both(`${m.name} learned a new move!`, `${m.name} leerde een nieuwe aanval!`), color: TYPE_COLOR[m.moves[i].type], mon: m.species.id, voice: 'new_move' })
       }
     })
     if (mine && !learned && m.owner?.mon === m) mine.hooks.banner({ kind: 'levelup', title: `Lv ${m.level}`, sub: m.name, mon: m.species.id, shiny: m.shiny, voice: 'levelup' })
@@ -1463,12 +1466,12 @@ export class Game {
         mine.hooks.evolve(sp.id, m.species.id, m.shiny, () => {
           this.paused = false
         })
-        mine.hooks.feed(`${old} evolueerde in ${m.species.name}!`, { mon: m.species.id })
+        mine.hooks.feed(both(`${old} evolved into ${m.species.name}!`, `${old} evolueerde in ${m.species.name}!`), { mon: m.species.id })
       } else if (mine) {
         // Multiplayer can't pause for a cutscene: a banner instead
         mine.sfx('evolve')
-        mine.hooks.banner({ kind: 'levelup', title: `${m.species.name}!`, sub: `${old} evolueerde`, mon: m.species.id, shiny: m.shiny, color: '#80e0ff', voice: 'evolve' })
-        mine.hooks.feed(`${old} evolueerde in ${m.species.name}!`, { mon: m.species.id })
+        mine.hooks.banner({ kind: 'levelup', title: `${m.species.name}!`, sub: both(`${old} evolved`, `${old} evolueerde`), mon: m.species.id, shiny: m.shiny, color: '#80e0ff', voice: 'evolve' })
+        mine.hooks.feed(both(`${old} evolved into ${m.species.name}!`, `${old} evolueerde in ${m.species.name}!`), { mon: m.species.id })
       }
     }
   }
@@ -1523,7 +1526,7 @@ export class Game {
         c.tr.catchCd = BOT_RETRY
         this.soundAt(c.mon.x, c.mon.y, 'item', ['breakOut'], { range: 12 })
         this.addFx({ kind: 'poof', x: c.mon.x, y: c.mon.y - 0.4, t: 0, life: 0.4, color: '#ffffff' })
-        this.addFx({ kind: 'text', x: c.mon.x, y: c.mon.y - 1.6, t: 0, life: 0.9, color: '#ffd040', text: 'Uitgebroken!', small: true })
+        this.addFx({ kind: 'text', x: c.mon.x, y: c.mon.y - 1.6, t: 0, life: 0.9, color: '#ffd040', text: both('Broke free!', 'Uitgebroken!'), small: true })
         continue
       }
       this.completeCatch(c.tr, c.mon)
@@ -1548,10 +1551,10 @@ export class Game {
       v.cry(w.species.id, 0.3)
     }
     if (w.legendary || w.rarity === 'rare')
-      for (const o of this.viewers) o.hooks.feed(`${tr === o.tr ? 'Jij' : tr.name} ving ${w.shiny ? '✦' : ''}${w.name}!`)
+      for (const o of this.viewers) o.hooks.feed(both(`${tr === o.tr ? 'You' : tr.name} caught ${w.shiny ? '✦' : ''}${w.name}!`, `${tr === o.tr ? 'Jij' : tr.name} ving ${w.shiny ? '✦' : ''}${w.name}!`))
     if (tr.party.length < PARTY_MAX) {
       tr.party.push(w)
-      v?.hooks.banner({ kind: 'caught', title: 'Gevangen!', sub: `${w.name} · Lv ${w.level}`, mon: w.species.id, shiny: w.shiny, voice: 'caught' })
+      v?.hooks.banner({ kind: 'caught', title: both('Caught!', 'Gevangen!'), sub: `${w.name} · Lv ${w.level}`, mon: w.species.id, shiny: w.shiny, voice: 'caught' })
       return
     }
     if (v) {
@@ -1560,7 +1563,7 @@ export class Game {
         if (idx >= 0 && tr.alive && !tr.party.includes(w)) {
           tr.party[idx] = w
           if (idx === tr.active) this.sendOut(tr, idx)
-          v.hooks.toast(`${w.name} zit nu in je team`, '#80e080')
+          v.hooks.toast(both(`${w.name} joined your team`, `${w.name} zit nu in je team`), '#80e080')
         }
         this.paused = false
       })
@@ -1599,7 +1602,7 @@ export class Game {
     m.hp = Math.round(m.maxHp * 0.5)
     const v = this.vOf(tr)
     v?.sfx('item', 'revive')
-    v?.hooks.toast(`${m.name} is weer fit!`, '#80f080')
+    v?.hooks.toast(both(`${m.name} is back on its feet!`, `${m.name} is weer fit!`), '#80f080')
     return true
   }
 
@@ -1638,21 +1641,21 @@ export class Game {
     switch (kind) {
       case 'master':
         tr.masterBalls++
-        v?.hooks.toast('Master Ball gevonden! Vang elke wilde Pokémon direct', '#c080ff')
+        v?.hooks.toast(both('Found a Master Ball! Catches any wild Pokémon instantly', 'Master Ball gevonden! Vang elke wilde Pokémon direct'), '#c080ff')
         break
       case 'potion':
         tr.potions++
-        v?.hooks.toast('Potion gevonden')
+        v?.hooks.toast(both('Found a Potion', 'Potion gevonden'))
         break
       case 'revive':
         tr.revives++
-        v?.hooks.toast('Revive gevonden')
+        v?.hooks.toast(both('Found a Revive', 'Revive gevonden'))
         break
       case 'candy': {
         const m = tr.mon.fainted ? tr.party.find((x) => !x.fainted) : tr.mon
         if (!m) return
         this.gainXp(m, xpNeeded(m.level) - m.xp + 0.01)
-        v?.hooks.toast(`Rare Candy! ${m.name} is nu Lv ${m.level}`, '#80c0ff')
+        v?.hooks.toast(both(`Rare Candy! ${m.name} is now Lv ${m.level}`, `Rare Candy! ${m.name} is nu Lv ${m.level}`), '#80c0ff')
         break
       }
     }
@@ -1729,8 +1732,8 @@ export class Game {
     for (const v of this.viewers) {
       v.sfx('legendary')
       v.cry(id, 0.3)
-      v.hooks.banner({ kind: 'legendary', title: `${m.name} verschijnt!`, sub: `Lv ${m.level} · volg de gouden pijl · Master Ball = direct vangen`, mon: id, shiny: m.shiny, color: '#ffd040', voice: 'legendary' })
-      v.hooks.feed(`★ ${m.name} (Lv ${m.level}) is verschenen! Vang hem met een Master Ball`, { mon: id })
+      v.hooks.banner({ kind: 'legendary', title: both(`${m.name} appears!`, `${m.name} verschijnt!`), sub: both(`Lv ${m.level} · follow the golden arrow · Master Ball = instant catch`, `Lv ${m.level} · volg de gouden pijl · Master Ball = direct vangen`), mon: id, shiny: m.shiny, color: '#ffd040', voice: 'legendary' })
+      v.hooks.feed(both(`★ ${m.name} (Lv ${m.level}) has appeared! Catch it with a Master Ball`, `★ ${m.name} (Lv ${m.level}) is verschenen! Vang hem met een Master Ball`), { mon: id })
     }
   }
 
@@ -1959,7 +1962,7 @@ export class Game {
         z.fromX = z.x
         z.fromY = z.y
         z.fromR = z.r
-        for (const v of this.viewers) v.hooks.banner({ kind: 'storm', title: 'De storm komt!', sub: `Fase ${z.phase + 1} van 6 · ga naar de witte cirkel`, color: '#c080ff', voice: z.phase + 1 >= 6 ? 'final_circle' : 'storm' })
+        for (const v of this.viewers) v.hooks.banner({ kind: 'storm', title: both('The storm is coming!', 'De storm komt!'), sub: both(`Phase ${z.phase + 1} of 6 · get into the white circle`, `Fase ${z.phase + 1} van 6 · ga naar de witte cirkel`), color: '#c080ff', voice: z.phase + 1 >= 6 ? 'final_circle' : 'storm' })
       }
     } else {
       const k = Math.min(1, z.t / ph.shrink)

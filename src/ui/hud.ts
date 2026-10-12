@@ -13,6 +13,7 @@ import type { Mon } from '../game/entities'
 import type { ChatLine } from '../net/protocol'
 import { esc, QUICK_CHAT } from './menu'
 import { BOSSES } from '../data/bosses'
+import { L, tx, type Txt } from '../i18n'
 
 const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = '') => {
   const el = document.createElement(tag)
@@ -51,13 +52,13 @@ export class Hud {
   private respawnSec = 0
   private timerWarned = new Set<number>()
   private itemBtns: Record<string, HTMLDivElement> = {}
-  private catchBtn = h('button', 'catch2 hidden', '<span>VANG!</span><kbd>Spatie</kbd>')
+  private catchBtn = h('button', 'catch2 hidden', `<span>${L('CATCH!', 'VANG!')}</span><kbd>${L('Space', 'Spatie')}</kbd>`)
   private knob = h('div', 'stick-knob')
   private base = h('div', 'stick-base hidden')
   private vLow = h('div', 'vign low')
-  private vStorm = h('div', 'vign storm', '<span>BUITEN DE ZONE!</span>')
+  private vStorm = h('div', 'vign storm', `<span>${L('OUTSIDE THE ZONE!', 'BUITEN DE ZONE!')}</span>`)
   private countdown = h('div', 'countdown')
-  private hideBadge = h('div', 'hidebadge', '<i class="eye"></i><span>Verborgen</span>')
+  private hideBadge = h('div', 'hidebadge', `<i class="eye"></i><span>${L('Hidden', 'Verborgen')}</span>`)
   private cdShown = ''
   /** Legendary alert: where it is and how to get it. */
   private legend = h('div', 'legend hidden')
@@ -121,11 +122,11 @@ export class Hud {
       mute.innerHTML = isMuted() ? '🔇' : '🔊'
     }
     const menu = h('button', 'sysbtn', '❚❚')
-    menu.setAttribute('aria-label', 'Pauze')
+    menu.setAttribute('aria-label', L('Pause', 'Pauze'))
     menu.onclick = onMenu
     const score = h('button', 'sysbtn', '🏆')
-    score.setAttribute('aria-label', 'Scorebord')
-    score.title = 'Scorebord (Tab)'
+    score.setAttribute('aria-label', L('Scoreboard', 'Scorebord'))
+    score.title = L('Scoreboard (Tab)', 'Scorebord (Tab)')
     score.onclick = () => this.board.toggle()
     sys.append(menu, mute, score)
     root.append(sys, this.toastEl, this.bannerEl, this.legend, this.bossBar, this.respawnEl)
@@ -139,8 +140,8 @@ export class Hud {
       const btn = h('button', 'sysbtn chatbtn', '💬') as HTMLButtonElement
       btn.setAttribute('aria-label', 'Chat')
       const bar = h('form', 'chatbar hidden', `
-        <div class="cb-quick">${QUICK_CHAT.map((q) => `<button type="button">${q}</button>`).join('')}</div>
-        <div class="cb-row"><input maxlength="80" placeholder="Bericht…" autocomplete="off" enterkeyhint="send"><button type="submit">➤</button></div>`)
+        <div class="cb-quick">${QUICK_CHAT.map((q) => `<button type="button">${tx(q)}</button>`).join('')}</div>
+        <div class="cb-row"><input maxlength="80" placeholder="${L('Message…', 'Bericht…')}" autocomplete="off" enterkeyhint="send"><button type="submit">➤</button></div>`)
       const input = bar.querySelector('input') as HTMLInputElement
       const close = () => {
         bar.classList.add('hidden')
@@ -211,16 +212,16 @@ export class Hud {
     const g = this.g, p = g.player
     if (!p.alive) return
     if (key === 'master') {
-      if (p.masterBalls <= 0) return this.deny('Je hebt geen Master Ball')
+      if (p.masterBalls <= 0) return this.deny(L("You don't have a Master Ball", 'Je hebt geen Master Ball'))
       const t = g.masterTarget(p)
-      if (!t) return this.deny('Geen wilde Pokémon dichtbij')
+      if (!t) return this.deny(L('No wild Pokémon nearby', 'Geen wilde Pokémon dichtbij'))
       g.throwBall(p, t, true)
     } else if (key === 'potion') {
-      if (p.potions <= 0) return this.deny('Geen Potions')
-      if (!g.usePotion(p)) this.deny('Je Pokémon is al fit')
+      if (p.potions <= 0) return this.deny(L('No Potions', 'Geen Potions'))
+      if (!g.usePotion(p)) this.deny(L('Your Pokémon is already healthy', 'Je Pokémon is al fit'))
     } else {
-      if (p.revives <= 0) return this.deny('Geen Revives')
-      if (!g.useRevive(p)) this.deny('Niemand is verslagen')
+      if (p.revives <= 0) return this.deny(L('No Revives', 'Geen Revives'))
+      if (!g.useRevive(p)) this.deny(L('Nobody has fainted', 'Niemand is verslagen'))
     }
   }
 
@@ -382,20 +383,20 @@ export class Hud {
     this.releasers.push(release)
   }
 
-  toast(text: string, color?: string) {
+  toast(text: Txt, color?: string) {
     const d = h('div')
-    d.textContent = text
+    d.textContent = tx(text)
     if (color) d.style.setProperty('--c', color)
     this.toastEl.append(d)
     while (this.toastEl.children.length > 2) this.toastEl.firstChild!.remove()
     setTimeout(() => d.remove(), 2700)
   }
 
-  feed(text: string, icon?: { mon?: number; trainer?: string }) {
+  feed(text: Txt, icon?: { mon?: number; trainer?: string }) {
     const d = h('div')
     if (icon?.mon) d.innerHTML = `<img class="px" src="${spriteUrl(icon.mon)}" alt="">`
     else if (icon?.trainer) d.innerHTML = `<img class="px tr" src="${trainerSpriteUrl(icon.trainer)}" alt="">`
-    d.append(document.createTextNode(text))
+    d.append(document.createTextNode(tx(text)))
     this.feedEl.append(d)
     while (this.feedEl.children.length > 4) this.feedEl.firstChild!.remove()
     setTimeout(() => d.remove(), 6200)
@@ -418,9 +419,9 @@ export class Hud {
     if (b.mon) art = `<img class="px art" src="${animatedUrl(b.mon)}" onerror="this.onerror=null;this.src='${spriteUrl(b.mon, { shiny: b.shiny })}'" alt="">`
     else if (b.trainer) art = `<img class="px art tr" src="${trainerSpriteUrl(b.trainer)}" alt="">`
     const kicker: Partial<Record<Banner['kind'], string>> = {
-      levelup: 'LEVEL UP', move: 'NIEUWE AANVAL', legendary: '★ LEGENDARISCH ★', ko: 'K.O.', caught: 'POKÉ BALL', storm: 'WAARSCHUWING', fainted: 'OEPS', win: 'BATTLE ROYALE',
+      levelup: 'LEVEL UP', move: L('NEW MOVE', 'NIEUWE AANVAL'), legendary: L('★ LEGENDARY ★', '★ LEGENDARISCH ★'), ko: 'K.O.', caught: 'POKÉ BALL', storm: L('WARNING', 'WAARSCHUWING'), fainted: L('OOPS', 'OEPS'), win: 'BATTLE ROYALE',
     }
-    el.innerHTML = `${art}<div class="txt"><small>${kicker[b.kind] ?? ''}</small><b>${b.title}</b>${b.sub ? `<span>${b.sub}</span>` : ''}</div>`
+    el.innerHTML = `${art}<div class="txt"><small>${kicker[b.kind] ?? ''}</small><b>${tx(b.title)}</b>${b.sub ? `<span>${tx(b.sub)}</span>` : ''}</div>`
     // Only one big banner at a time; small ones stack
     const big = b.kind === 'legendary' || b.kind === 'win' || b.kind === 'storm'
     if (b.kind === 'legendary') {
@@ -457,8 +458,8 @@ export class Hud {
         if (label === 'title') {
           const boss = g.kind === 'raid' ? BOSSES[g.setup.boss ?? 'reshiram'] : null
           this.countdown.innerHTML = boss
-            ? `<div class="cd-title raid"><small>RAID · ${boss.title.toUpperCase()}</small><b>${boss.name.toUpperCase()}</b></div>`
-            : `<div class="cd-title"><small>${g.total} TRAINERS · 1 WINNAAR</small><b>BATTLE ROYALE</b></div>`
+            ? `<div class="cd-title raid"><small>RAID · ${tx(boss.title).toUpperCase()}</small><b>${boss.name.toUpperCase()}</b></div>`
+            : `<div class="cd-title"><small>${g.total} TRAINERS · ${L('1 WINNER', '1 WINNAAR')}</small><b>BATTLE ROYALE</b></div>`
           say(boss ? (`raid_${boss.id}` as VoiceLine) : 'br_intro')
         }
         else {
@@ -526,7 +527,7 @@ export class Hud {
         const locked = !m.unlocked(s)
         b.classList.toggle('locked', locked)
         b.style.setProperty('--tc', TYPE_COLOR[mv.type])
-        b.innerHTML = `<div class="ring"></div><div class="cd"></div><div class="lbl">${locked ? `<span class="lock">🔒</span><small>Lv ${SLOT_UNLOCK[s]}</small>` : `<span>${mv.name}</span><small>${TYPE_NL[mv.type]}</small>`}</div><div class="secs"></div><div class="aimknob"></div><kbd>${['Klik', 'Q', 'E', 'R'][s]}</kbd>`
+        b.innerHTML = `<div class="ring"></div><div class="cd"></div><div class="lbl">${locked ? `<span class="lock">🔒</span><small>Lv ${SLOT_UNLOCK[s]}</small>` : `<span>${mv.name}</span><small>${TYPE_NL[mv.type]}</small>`}</div><div class="secs"></div><div class="aimknob"></div><kbd>${[L('Click', 'Klik'), 'Q', 'E', 'R'][s]}</kbd>`
       })
     }
     m.moves.forEach((mv, s) => {
@@ -563,7 +564,7 @@ export class Hud {
     const seen = inGrass && !g.hidden(p)
     this.hideBadge.classList.toggle('on', inGrass)
     this.hideBadge.classList.toggle('seen', seen)
-    const label = seen ? 'Gezien!' : 'Verborgen'
+    const label = seen ? L('Spotted!', 'Gezien!') : L('Hidden', 'Verborgen')
     const span = this.hideBadge.querySelector('span')!
     if (span.textContent !== label) span.textContent = label
     this.card.classList.toggle('regen', g.regenerating(m))
@@ -587,7 +588,7 @@ export class Hud {
     const z = g.zone
     const t = Math.max(0, Math.ceil(z.timeLeft))
     const mm = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
-    this.stormChip.innerHTML = z.phase >= 6 ? '<i>⚡</i>FINALE' : `<i>${z.shrinking ? '⚡' : '⏱'}</i>${mm}`
+    this.stormChip.innerHTML = z.phase >= 6 ? `<i>⚡</i>${L('FINAL', 'FINALE')}` : `<i>${z.shrinking ? '⚡' : '⏱'}</i>${mm}`
     this.stormChip.classList.toggle('closing', z.shrinking)
 
     this.drawMini()
@@ -638,7 +639,7 @@ export class Hud {
     if (sec !== this.respawnSec && sec > 0) sfx.countdown(false)
     this.respawnSec = sec
     this.respawnEl.classList.toggle('hidden', !down)
-    if (down) this.respawnEl.innerHTML = `<small>${p.mon.name} is verslagen</small><b>${Math.ceil(p.respawnT)}</b><span>nog ${p.lives} ${p.lives === 1 ? 'leven' : 'levens'}</span>`
+    if (down) this.respawnEl.innerHTML = `<small>${L(`${p.mon.name} fainted`, `${p.mon.name} is verslagen`)}</small><b>${Math.ceil(p.respawnT)}</b><span>${L(`${p.lives} ${p.lives === 1 ? 'life' : 'lives'} left`, `nog ${p.lives} ${p.lives === 1 ? 'leven' : 'levens'}`)}</span>`
   }
 
   /** Gold alert while a legendary roams: name, distance, an arrow toward it and how to catch it. */
@@ -665,8 +666,8 @@ export class Hud {
     const d = Math.hypot(dx, dy)
     ;(this.legend.querySelector('.lg-arrow') as HTMLElement).style.transform = `rotate(${Math.atan2(dy, dx)}rad)`
     const how = w.state === 'weak'
-      ? (g.claimedByOther(w, p) ? 'Verzwakt, iemand anders mag eerst' : 'Verzwakt! Snel vangen!')
-      : p.masterBalls > 0 ? 'Gooi je Master Ball!' : 'Versla hem, of vang hem met een Master Ball'
+      ? (g.claimedByOther(w, p) ? L('Weakened, someone else gets first try', 'Verzwakt, iemand anders mag eerst') : L('Weakened! Catch it fast!', 'Verzwakt! Snel vangen!'))
+      : p.masterBalls > 0 ? L('Throw your Master Ball!', 'Gooi je Master Ball!') : L('Beat it, or catch it with a Master Ball', 'Versla hem, of vang hem met een Master Ball')
     ;(this.legend.querySelector('span') as HTMLElement).textContent = `${Math.round(d)} m · ${how}`
     this.legend.classList.toggle('near', d < 6)
   }
@@ -685,7 +686,7 @@ export class Hud {
     if (this.legendId !== key) {
       this.legendId = key
       const icon = e.kind === 'drop' ? `<img class="px" src="${itemUrl('master-ball')}" alt="">` : `<img class="px" src="${spriteUrl(e.species ?? 25)}" alt="">`
-      this.legend.innerHTML = `${icon}<div class="lg-txt"><b>${e.kind === 'drop' ? '📦 Bevoorrading' : '🐾 Zwerm'}</b><span></span></div><i class="lg-arrow">➤</i>`
+      this.legend.innerHTML = `${icon}<div class="lg-txt"><b>${e.kind === 'drop' ? L('📦 Supply drop', '📦 Bevoorrading') : L('🐾 Swarm', '🐾 Zwerm')}</b><span></span></div><i class="lg-arrow">➤</i>`
       this.legend.classList.remove('pop')
       void this.legend.offsetWidth
       this.legend.classList.add('pop')
@@ -694,8 +695,8 @@ export class Hud {
     const d = Math.hypot(dx, dy)
     ;(this.legend.querySelector('.lg-arrow') as HTMLElement).style.transform = `rotate(${Math.atan2(dy, dx)}rad)`
     ;(this.legend.querySelector('span') as HTMLElement).textContent = e.kind === 'drop'
-      ? `${Math.round(d)} m · ${e.t > 0.5 ? `landt over ${Math.ceil(e.t)}s` : 'geland!'}`
-      : `${Math.round(d)} m · zes wilde Pokémon`
+      ? `${Math.round(d)} m · ${e.t > 0.5 ? L(`lands in ${Math.ceil(e.t)}s`, `landt over ${Math.ceil(e.t)}s`) : L('landed!', 'geland!')}`
+      : `${Math.round(d)} m · ${L('six wild Pokémon', 'zes wilde Pokémon')}`
     this.legend.classList.toggle('near', d < 6)
   }
 

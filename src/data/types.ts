@@ -1,3 +1,5 @@
+import { L } from '../i18n'
+
 export type PType =
   | 'normal' | 'fire' | 'water' | 'grass' | 'electric' | 'ice' | 'fighting' | 'poison' | 'ground'
   | 'flying' | 'psychic' | 'bug' | 'rock' | 'ghost' | 'dragon' | 'dark' | 'steel'
@@ -9,11 +11,24 @@ export const TYPE_COLOR: Record<PType, string> = {
   dark: '#705848', steel: '#b8b8d0',
 }
 
-export const TYPE_NL: Record<PType, string> = {
+const TYPE_EN: Record<PType, string> = {
+  normal: 'Normal', fire: 'Fire', water: 'Water', grass: 'Grass', electric: 'Electric', ice: 'Ice',
+  fighting: 'Fighting', poison: 'Poison', ground: 'Ground', flying: 'Flying', psychic: 'Psychic',
+  bug: 'Bug', rock: 'Rock', ghost: 'Ghost', dragon: 'Dragon', dark: 'Dark', steel: 'Steel',
+}
+
+const TYPE_DUTCH: Record<PType, string> = {
   normal: 'Normaal', fire: 'Vuur', water: 'Water', grass: 'Gras', electric: 'Elektrisch', ice: 'IJs',
   fighting: 'Vecht', poison: 'Gif', ground: 'Grond', flying: 'Vliegend', psychic: 'Psychisch',
   bug: 'Insect', rock: 'Steen', ghost: 'Geest', dragon: 'Draak', dark: 'Duister', steel: 'Staal',
 }
+
+/** Type display names in the current language (read at the moment of use). */
+export const TYPE_NAME: Record<PType, string> = new Proxy(TYPE_DUTCH, {
+  get: (t, k) => (typeof k === 'string' && k in TYPE_EN ? L(TYPE_EN[k as PType], TYPE_DUTCH[k as PType]) : Reflect.get(t, k)),
+})
+/** Old name, kept for existing readers: also follows the current language. */
+export const TYPE_NL = TYPE_NAME
 
 // Gen V chart: attacker -> defender multipliers that are not 1.
 const CHART: Partial<Record<PType, Partial<Record<PType, number>>>> = {

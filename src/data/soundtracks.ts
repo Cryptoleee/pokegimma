@@ -1,4 +1,5 @@
 import type { Track } from '../synth'
+import { L } from '../i18n'
 
 /**
  * Three original soundtracks in the Pokémon Black/White (Nintendo DS) style.
@@ -27,7 +28,7 @@ const EPIC = ['k..k..k...k..k..', '....s.......s...', 'hhhhhhhhhhhhhhhh']
 const EPIC_FILL = ['k..k..k...k..k..', '....s...t.t.tttt', 'hhhhhhhh........']
 
 const DEFEAT: Track = {
-  title: 'Verslagen', bpm: 84, loop: false,
+  get title() { return L('Defeat', 'Verslagen') }, bpm: 84, loop: false,
   chords: ['Am', 'F', 'Dm', 'E'],
   lead: [
     'E5 - - - C5 - - - A4 - - - - - - -',
@@ -42,12 +43,12 @@ const DEFEAT: Track = {
 export const PACKS: Pack[] = [
   {
     id: 'unova',
-    name: 'Unova Held',
-    blurb: 'Heroïsch koper, strijkers en een slapbas. Het dichtst bij de routes en trainergevechten van Black/White.',
+    get name() { return L('Unova Hero', 'Unova Held') },
+    get blurb() { return L('Heroic brass, strings and a slap bass. Closest to the routes and trainer battles of Black/White.', 'Heroïsch koper, strijkers en een slapbas. Het dichtst bij de routes en trainergevechten van Black/White.') },
     color: '#ff9a3a',
     tracks: {
       title: {
-        title: 'Titel', bpm: 120, loop: true, crashEvery: 8,
+        get title() { return L('Title', 'Titel') }, bpm: 120, loop: true, crashEvery: 8,
         chords: ['D', 'Bm', 'G', 'A', 'D', 'F#m', 'G', 'A'],
         lead: [
           'D5 - - - - - A4 - D5 - E5 - F#5 - - -',
@@ -81,7 +82,7 @@ export const PACKS: Pack[] = [
         drums: CALM,
       },
       battle: {
-        title: 'Gevecht', bpm: 168, loop: true, crashEvery: 8,
+        get title() { return L('Battle', 'Gevecht') }, bpm: 168, loop: true, crashEvery: 8,
         chords: ['Em', 'C', 'D', 'Bm', 'Em', 'C', 'Am', 'B7'],
         lead: [
           'E5 - - B4 - - E5 - G5 - - F#5 - - E5 -',
@@ -98,7 +99,7 @@ export const PACKS: Pack[] = [
         drums: DRIVE, fill: DRIVE_FILL,
       },
       boss: {
-        title: 'Raid-baas', bpm: 176, loop: true,
+        get title() { return L('Raid Boss', 'Raid-baas') }, bpm: 176, loop: true,
         chords: ['Dm', 'Dm', 'Bb', 'C', 'Dm', 'Dm', 'Gm', 'A7'],
         lead: [
           'D5 - - - A5 - - - G5 - F5 - E5 - F5 -',
@@ -115,7 +116,7 @@ export const PACKS: Pack[] = [
         drums: [...EPIC, 'X...............'], fill: EPIC_FILL,
       },
       victory: {
-        title: 'Overwinning', bpm: 132, loop: false,
+        get title() { return L('Victory', 'Overwinning') }, bpm: 132, loop: false,
         chords: ['C', 'F', 'G', 'C'],
         lead: [
           'C5 . C5 . C5 . G5 - - - E5 - G5 - - -',
@@ -133,11 +134,11 @@ export const PACKS: Pack[] = [
   {
     id: 'castelia',
     name: 'Castelia Nights',
-    blurb: 'Jazzy stadsakkoorden, marimba en een synthbas op de vier tellen. Denk aan Castelia City en de Pokémon Musical.',
+    get blurb() { return L('Jazzy city chords, marimba and a synth bass on all four beats. Think Castelia City and the Pokémon Musical.', 'Jazzy stadsakkoorden, marimba en een synthbas op de vier tellen. Denk aan Castelia City en de Pokémon Musical.') },
     color: '#58c8ff',
     tracks: {
       title: {
-        title: 'Titel', bpm: 116, loop: true, gain: 1.3, crashEvery: 8,
+        get title() { return L('Title', 'Titel') }, bpm: 116, loop: true, gain: 1.3, crashEvery: 8,
         chords: ['FM7', 'Em7', 'Dm7', 'CM7', 'FM7', 'Em7', 'Dm7', 'CM7', 'Dm7', 'G7', 'Em7', 'Am7', 'Dm7', 'G7', 'CM7', 'C7'],
         lead: [
           'A5 - - - G5 - A5 - C6 - - - A5 - - -',
@@ -195,7 +196,7 @@ export const PACKS: Pack[] = [
         drums: CALM, drumsB: ['k.......k.....k.', '....x.......x...', '..h.h.h...h.h.h.'],
       },
       battle: {
-        title: 'Gevecht', bpm: 160, loop: true, gain: 1.3, crashEvery: 8,
+        get title() { return L('Battle', 'Gevecht') }, bpm: 160, loop: true, gain: 1.3, crashEvery: 8,
         chords: ['Am', 'F', 'G', 'Em', 'Am', 'F', 'Dm', 'E', 'F', 'G', 'Em', 'Am', 'Dm', 'G', 'C', 'E'],
         lead: [
           'A5 - - - E5 - A5 - C6 - B5 - A5 - E5 -',
@@ -221,7 +222,7 @@ export const PACKS: Pack[] = [
         drums: FOUR, fill: FOUR_FILL, drumsB: ['k...k...k...k...', '....x.......x...', '..o...o...o...o.', 'hhhhhhhhhhhhhhhh'],
       },
       boss: {
-        title: 'Raid-baas', bpm: 172, loop: true, gain: 1.3, crashEvery: 4,
+        get title() { return L('Raid Boss', 'Raid-baas') }, bpm: 172, loop: true, gain: 1.3, crashEvery: 4,
         chords: ['Cm', 'Ab', 'Bb', 'G', 'Cm', 'Ab', 'Fm', 'G7', 'Ab', 'Bb', 'Gm', 'Cm', 'Ab', 'Bb', 'G', 'G7'],
         lead: [
           'C5 - - - G5 - - - Eb5 - D5 - C5 - G4 -',
@@ -248,7 +249,7 @@ export const PACKS: Pack[] = [
         drumsB: ['k...k...k...k.k.', '....s..s....s...', 'hhhhhhhhhhhhhhhh', 'X.......X.......'],
       },
       victory: {
-        title: 'Overwinning', bpm: 128, loop: false, gain: 1.3,
+        get title() { return L('Victory', 'Overwinning') }, bpm: 128, loop: false, gain: 1.3,
         chords: ['FM7', 'G', 'Em7', 'CM7'],
         lead: [
           'C6 - A5 - F5 - A5 - C6 - - - E6 - - -',
@@ -265,12 +266,12 @@ export const PACKS: Pack[] = [
   },
   {
     id: 'legend',
-    name: 'Legende',
-    blurb: 'Dramatisch en orkestraal: strijkers-tremolo, orkesthits en pauken. In de sfeer van de Dragonspiral Tower en het legendarische gevecht.',
+    get name() { return L('Legend', 'Legende') },
+    get blurb() { return L('Dramatic and orchestral: string tremolo, orchestra hits and timpani. In the mood of Dragonspiral Tower and the legendary battle.', 'Dramatisch en orkestraal: strijkers-tremolo, orkesthits en pauken. In de sfeer van de Dragonspiral Tower en het legendarische gevecht.') },
     color: '#c070ff',
     tracks: {
       title: {
-        title: 'Titel', bpm: 108, loop: true,
+        get title() { return L('Title', 'Titel') }, bpm: 108, loop: true,
         chords: ['Am', 'F', 'C', 'G', 'Am', 'F', 'E', 'E'],
         lead: [
           'A4 - - - - - E5 - A5 - - - - - B5 -',
@@ -304,7 +305,7 @@ export const PACKS: Pack[] = [
         drums: ['k.......k.......', '............x...'],
       },
       battle: {
-        title: 'Gevecht', bpm: 152, loop: true, crashEvery: 8,
+        get title() { return L('Battle', 'Gevecht') }, bpm: 152, loop: true, crashEvery: 8,
         chords: ['Gm', 'Eb', 'F', 'D', 'Gm', 'Eb', 'Cm', 'D7'],
         lead: [
           'G5 - - - D5 - G5 - Bb5 - - - A5 - G5 -',
@@ -321,7 +322,7 @@ export const PACKS: Pack[] = [
         drums: DRIVE, fill: EPIC_FILL,
       },
       boss: {
-        title: 'Raid-baas', bpm: 180, loop: true,
+        get title() { return L('Raid Boss', 'Raid-baas') }, bpm: 180, loop: true,
         chords: ['Bm', 'G', 'A', 'F#', 'Bm', 'G', 'Em', 'F#7'],
         lead: [
           'B5 - - - F#5 - - - B5 - C#6 - D6 - - -',
@@ -344,7 +345,7 @@ export const PACKS: Pack[] = [
         drums: [...EPIC, 'X.......X.......'], fill: EPIC_FILL,
       },
       victory: {
-        title: 'Overwinning', bpm: 120, loop: false,
+        get title() { return L('Victory', 'Overwinning') }, bpm: 120, loop: false,
         chords: ['D', 'G', 'A', 'D'],
         lead: [
           'D5 . D5 . D5 . A5 - - - F#5 - A5 - - -',

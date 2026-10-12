@@ -11,6 +11,7 @@ import { FLOWER_FRAMES, hash, TALL_FRAMES, TALL_TOP, tileArt, WATER_FRAMES } fro
 import type { Weather } from '../data/themes'
 import { drawEvents } from './events'
 import { drawHazards, drawHazardsSky } from './boss'
+import { L, tx } from '../i18n'
 
 const FONT = '"Pixelify Sans", monospace'
 
@@ -344,7 +345,7 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
       ctx.fillStyle = '#ffe040'
       ctx.fillRect(px + Math.cos(a) * 8 - 1, py - dh - 2 + Math.sin(a) * 3, 2, 2)
     }
-    if (!m.catching) label(ctx, 'VANG!', px, py - dh - 8, '#ffe040')
+    if (!m.catching) label(ctx, L('CATCH!', 'VANG!'), px, py - dh - 8, '#ffe040')
   }
   if (m.shiny) {
     const a = time * 3
@@ -694,7 +695,7 @@ function drawFx(g: Game, ctx: CanvasRenderingContext2D) {
         ctx.textAlign = 'center'
         ctx.textBaseline = 'bottom'
         const ty = py - Math.min(1, k * 6) * 4
-        const w = ctx.measureText(f.text!).width + 6
+        const w = ctx.measureText(tx(f.text)).width + 6
         const bh = f.big ? 12.5 : 10
         if (f.big) drawGlow(ctx, px, ty - bh / 2, w * 0.7, f.color.length === 7 ? f.color : '#ffffff', 0.5 * (1 - k))
         ctx.fillStyle = 'rgba(248,248,248,0.95)'
@@ -707,7 +708,7 @@ function drawFx(g: Game, ctx: CanvasRenderingContext2D) {
         ctx.fillStyle = f.color
         ctx.fillRect(px - w / 2 + 1, ty - 2, w - 2, 1.5)
         ctx.fillStyle = '#282830'
-        ctx.fillText(f.text!, px, ty - 1.5)
+        ctx.fillText(tx(f.text), px, ty - 1.5)
         break
       }
       case 'text': {
@@ -719,9 +720,9 @@ function drawFx(g: Game, ctx: CanvasRenderingContext2D) {
         ctx.lineWidth = 2.5
         ctx.strokeStyle = '#282830'
         const ty = py - k * 10
-        ctx.strokeText(f.text!, px, ty)
+        ctx.strokeText(tx(f.text), px, ty)
         ctx.fillStyle = f.color
-        ctx.fillText(f.text!, px, ty)
+        ctx.fillText(tx(f.text), px, ty)
         break
       }
       case 'spark':

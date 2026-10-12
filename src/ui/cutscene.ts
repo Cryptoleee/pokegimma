@@ -1,5 +1,6 @@
 import { animatedUrl, SPECIES, spriteUrl } from '../data/pokemon'
 import { cry, sfx } from '../audio'
+import { L } from '../i18n'
 
 /**
  * Classic evolution sequence: the Pokémon glows white and flickers between
@@ -20,7 +21,7 @@ export function showEvolution(from: number, to: number, shiny: boolean, done: ()
     </div>
     <div class="evo-flash"></div>
     <div class="evo-box panel"><p></p></div>
-    <button class="ghost2 evo-skip">Overslaan ▶</button>`
+    <button class="ghost2 evo-skip">${L('Skip ▶', 'Overslaan ▶')}</button>`
   app.append(el)
   const a = el.querySelector('.a') as HTMLElement
   const b = el.querySelector('.b') as HTMLElement
@@ -39,7 +40,7 @@ export function showEvolution(from: number, to: number, shiny: boolean, done: ()
 
   requestAnimationFrame(() => el.classList.add('in'))
   cry(from, 0.3)
-  type(`Wat? ${oldName} evolueert!`)
+  type(L(`What? ${oldName} is evolving!`, `Wat? ${oldName} evolueert!`))
 
   // Flicker between silhouettes, accelerating
   let showNew = false
@@ -72,7 +73,7 @@ export function showEvolution(from: number, to: number, shiny: boolean, done: ()
       b.onerror = () => b.setAttribute('src', spriteUrl(to, { shiny }))
       el.classList.add('done')
       cry(to, 0.35)
-      type(`Gefeliciteerd! ${oldName} evolueerde in ${newName}!`)
+      type(L(`Congratulations! ${oldName} evolved into ${newName}!`, `Gefeliciteerd! ${oldName} evolueerde in ${newName}!`))
     }, 220)
   }
   setTimeout(reveal, 3300)

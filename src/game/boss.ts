@@ -8,6 +8,7 @@ import { drawCharge, onBeam, onImpact } from './moveFx'
 import { disc, drawGlow, drawShape, type DecalKind, type Shape } from './vfx'
 import { preloadMon } from './sprites'
 import { ARENA_C, ARENA_R, T, TILE, World } from './world'
+import { both, inBoth } from '../i18n'
 
 /**
  * Raid mode: a boss in the middle of an arena, everyone else against it.
@@ -360,7 +361,7 @@ function arenaHazard(g: Game, r: RaidState) {
     case 'lab': {
       r.envT = [10, 8, 6.5][r.phase]
       addHazard(g, { shape: 'grid', x: ARENA_C, y: ARENA_C, ang: 0, r: ARENA_R, inner: Math.random() < 0.5 ? 0 : 1, width: World.LAB_CELL, t: 1.8, dmg: 0.3, fx: 'psychic', type: 'psychic', freeze: 0, cover: false, both: false, atk: 'grid' })
-      for (const v of g.viewers) v.hooks.toast('Het vloerraster laadt op: zoek een donker vak!', '#ff90e0')
+      for (const v of g.viewers) v.hooks.toast(both('The floor grid is charging: find a dark tile!', 'Het vloerraster laadt op: zoek een donker vak!'), '#ff90e0')
       g.soundAt(ARENA_C, ARENA_C, 'boss', ['charge', 'psychic', 0.8, 1.8], { global: true })
       break
     }
@@ -517,7 +518,7 @@ function castAttack(g: Game, r: RaidState, a: BossAttack, foes: Mon[]) {
     // Blow everyone toward the side of the arena furthest from them... mostly
     const ang = Math.random() * Math.PI * 2
     r.wind = { dx: Math.cos(ang) * a.wind.force, dy: Math.sin(ang) * a.wind.force, delay: a.warn, t: a.wind.dur }
-    for (const v of g.viewers) v.hooks.toast('Delta Stream: loop tegen de wind in!', '#a0f0e8')
+    for (const v of g.viewers) v.hooks.toast(both('Delta Stream: walk against the wind!', 'Delta Stream: loop tegen de wind in!'), '#a0f0e8')
     g.soundAt(ARENA_C, ARENA_C, 'boss', ['wind', a.fx, 1, a.warn + a.wind.dur], { global: true })
   }
 }
@@ -541,7 +542,7 @@ function castFrom(g: Game, r: RaidState, a: BossAttack, foes: Mon[], ox: number,
     boss.aimX = Math.cos(ang)
     boss.aimY = Math.sin(ang)
     boss.aimT = a.warn
-    g.callout(boss, a.name, TYPE_COLOR[a.type])
+    g.callout(boss, inBoth(() => a.name), TYPE_COLOR[a.type])
     for (const v of g.viewers) if (Math.hypot(v.camX - boss.x, v.camY - boss.y) < 20) v.sfx('warn')
     g.soundAt(boss.x, boss.y, 'boss', ['charge', a.fx, 1, a.warn], { global: true })
   }
@@ -659,7 +660,7 @@ function resolveHazard(g: Game, h: Hazard) {
         v.burst(pl.x + 1, pl.y, { n: 30, speed: 8, cols: ['#ffffff', '#c8ecff', '#8cc4f0'], shape: 'shard', s0: 4, s1: 1, life: 0.9, grav: 10 })
         v.shakeBy(6)
         g.world.breakPillar(i)
-        for (const vw of g.viewers) vw.hooks.feed('🧊 Een ijspilaar is versplinterd!')
+        for (const vw of g.viewers) vw.hooks.feed(both('🧊 An ice pillar shattered!', '🧊 Een ijspilaar is versplinterd!'))
       }
     })
   // Damage everyone inside (behind a pillar is safe from cover attacks)
@@ -672,7 +673,7 @@ function resolveHazard(g: Game, h: Hazard) {
       g.soundAt(m.x, m.y, 'freeze', [], { owners: [m.owner], range: 14 })
       m.tintCol = '#a0e0ff'
       m.tintT = h.freeze
-      g.addFxPublic({ kind: 'text', x: m.x, y: m.y - 2.1, t: 0, life: 0.9, color: '#a0e0ff', text: 'Bevroren!', small: true })
+      g.addFxPublic({ kind: 'text', x: m.x, y: m.y - 2.1, t: 0, life: 0.9, color: '#a0e0ff', text: both('Frozen!', 'Bevroren!'), small: true })
     }
   }
 }
@@ -695,7 +696,7 @@ function enrage(g: Game, r: RaidState) {
   boss.charging = null
   for (const v of g.viewers) {
     v.cry(boss.species.id, 0.5)
-    v.hooks.banner({ kind: 'legendary', title: `${r.def.name} wordt woedend!`, sub: r.phase === 1 ? 'Fase 2 · nieuwe aanvallen' : 'Laatste fase · alles of niets!', mon: boss.species.id, color: r.def.color, voice: r.phase === 1 ? 'enraged' : 'final_phase' })
+    v.hooks.banner({ kind: 'legendary', title: both(`${r.def.name} is enraged!`, `${r.def.name} wordt woedend!`), sub: r.phase === 1 ? both('Phase 2 · new attacks', 'Fase 2 · nieuwe aanvallen') : both('Final phase · all or nothing!', 'Laatste fase · alles of niets!'), mon: boss.species.id, color: r.def.color, voice: r.phase === 1 ? 'enraged' : 'final_phase' })
   }
   g.vfx.mark(boss.x, boss.y)
   g.vfx.ring(boss.x, boss.y, 4, r.def.color, 0.8, 8)
@@ -724,7 +725,7 @@ function enrage(g: Game, r: RaidState) {
       g.vfx.bolt(boss.x, boss.y - 1.2, c.x, c.y - 1.2, { col: r.def.color, w: 2.4, jag: 10, branches: 2, strands: 2, life: 0.5 })
       g.vfx.burst(c.x, c.y - 1, { n: 26, speed: 7, cols: palOf('psychic').cols, shape: 'star', add: true, s0: 5, s1: 1, life: 0.7 })
     }
-    for (const v of g.viewers) v.hooks.toast('Mewtwo splitst zich: de klonen vallen mee aan!', r.def.color)
+    for (const v of g.viewers) v.hooks.toast(both('Mewtwo splits: the clones join the attack!', 'Mewtwo splitst zich: de klonen vallen mee aan!'), r.def.color)
   }
   // Two potions to keep going
   for (let i = 0; i < 2; i++) {
@@ -749,7 +750,7 @@ export function raidDown(g: Game, tr: Trainer) {
   const v = g.vOf(tr)
   if (tr.lives > 0) {
     tr.respawnT = RESPAWN_TIME
-    v?.hooks.banner({ kind: 'fainted', title: `${tr.mon.name} is verslagen!`, sub: `Terug over ${RESPAWN_TIME} s · nog ${tr.lives} ${tr.lives === 1 ? 'leven' : 'levens'}`, mon: tr.mon.species.id })
+    v?.hooks.banner({ kind: 'fainted', title: both(`${tr.mon.name} fainted!`, `${tr.mon.name} is verslagen!`), sub: both(`Back in ${RESPAWN_TIME} s · ${tr.lives} ${tr.lives === 1 ? 'life' : 'lives'} left`, `Terug over ${RESPAWN_TIME} s · nog ${tr.lives} ${tr.lives === 1 ? 'leven' : 'levens'}`), mon: tr.mon.species.id })
     return
   }
   g.eliminateRaid(tr)
@@ -768,7 +769,7 @@ function respawn(g: Game, tr: Trainer) {
   g.vfx.mark(m.x, m.y)
   g.vfx.ring(m.x, m.y - 0.2, 1.6, '#ffffff', 0.5, 6)
   const v = g.vOf(tr)
-  v?.hooks.toast(`Terug in de strijd! Nog ${tr.lives} ${tr.lives === 1 ? 'leven' : 'levens'}`, '#80f080')
+  v?.hooks.toast(both(`Back in the fight! ${tr.lives} ${tr.lives === 1 ? 'life' : 'lives'} left`, `Terug in de strijd! Nog ${tr.lives} ${tr.lives === 1 ? 'leven' : 'levens'}`), '#80f080')
 }
 
 function endRaid(g: Game, r: RaidState) {
@@ -786,8 +787,8 @@ function endRaid(g: Game, r: RaidState) {
   for (const v of g.viewers) {
     if (v.done) continue
     v.hooks.banner(won
-      ? { kind: 'win', title: 'RAID GESLAAGD!', sub: `${r.def.name} is verslagen`, mon: r.boss.species.id, color: '#ffd040', voice: 'raid_win' }
-      : { kind: 'fainted', title: 'Raid mislukt', sub: r.timeLeft <= 0 ? 'De tijd is op' : 'Iedereen is verslagen', mon: r.boss.species.id, voice: 'raid_fail' })
+      ? { kind: 'win', title: both('RAID CLEARED!', 'RAID GESLAAGD!'), sub: both(`${r.def.name} is defeated`, `${r.def.name} is verslagen`), mon: r.boss.species.id, color: '#ffd040', voice: 'raid_win' }
+      : { kind: 'fainted', title: both('Raid failed', 'Raid mislukt'), sub: r.timeLeft <= 0 ? both('Time is up', 'De tijd is op') : both('Everyone fainted', 'Iedereen is verslagen'), mon: r.boss.species.id, voice: 'raid_fail' })
     v.endT = 2.6
   }
 }

@@ -1,5 +1,6 @@
 import { Peer, type DataConnection, type PeerOptions } from 'peerjs'
 import type { ChatLine, Command, GuestMsg, HostMsg, LobbyPlayer, MatchChoice } from './protocol'
+import { L, tx } from '../i18n'
 
 /**
  * A multiplayer room: one phone hosts, the others join with a 4-letter code.
@@ -24,6 +25,20 @@ export const QUICK_MAX = 8
 /** Seconds a fresh quick lobby waits for others. */
 export const QUICK_WAIT = 45
 const quickId = (slot: number) => QUICK_PREFIX + slot
+
+/**
+ * Why the host sends someone away. The host sends the English text; each guest
+ * shows it in their own language (an unknown reason is shown as is).
+ */
+const BYE = {
+  running: { en: 'This match has already started.', nl: 'Dit potje is al bezig.' },
+  full: { en: 'This match is full.', nl: 'Dit potje zit vol.' },
+  closed: { en: 'The host closed the match.', nl: 'De host heeft het potje gesloten.' },
+}
+const byeText = (reason: string) => {
+  const b = Object.values(BYE).find((r) => r.en === reason || r.nl === reason)
+  return b ? tx(b) : reason
+}
 
 /** How one public lobby is doing (from a peek). */
 export interface QuickStatus {
@@ -98,7 +113,7 @@ export class Room {
       }
     } else if (this.host?.open) {
       this.host.send({ t: 'ping' } satisfies GuestMsg)
-      if (now - (this.seen.get(this.host) ?? now) > 10000) this.shut('De verbinding met de host is weggevallen.')
+      if (now - (this.seen.get(this.host) ?? now) > 10000) this.shut(L('Lost the connection to the host.', 'De verbinding met de host is weggevallen.'))
     }
   }
 
@@ -178,7 +193,7 @@ export class Room {
         peer.destroy()
         reject(new Error(msg))
       }
-      const timer = setTimeout(() => fail('Geen verbinding. Zitten jullie allebei op internet?'), timeoutMs)
+      const timer = setTimeout(() => fail(L('No connection. Are you both online?', 'Geen verbinding. Zitten jullie allebei op internet?')), timeoutMs)
       peer.on('error', (e) => {
         if (!settled) fail(friendlyError(e.type, code))
         else console.warn('[room]', e.type, e.message)
@@ -192,7 +207,7 @@ export class Room {
           room.seen.set(c, performance.now())
           if (msg.t === 'ping') return
           if (!settled) {
-            if (msg.t === 'bye') return fail(msg.reason)
+            if (msg.t === 'bye') return fail(byeText(msg.reason))
             settled = true
             clearTimeout(timer)
             resolve(room)
@@ -200,10 +215,10 @@ export class Room {
           room.fromHost(msg)
         })
         c.on('close', () => {
-          if (!settled) fail('De verbinding werd verbroken.')
-          else room.shut('De host heeft het potje verlaten.')
+          if (!settled) fail(L('The connection was lost.', 'De verbinding werd verbroken.'))
+          else room.shut(L('The host left the match.', 'De host heeft het potje verlaten.'))
         })
-        c.on('error', () => fail('De verbinding werd verbroken.'))
+        c.on('error', () => fail(L('The connection was lost.', 'De verbinding werd verbroken.')))
       })
     })
   }
@@ -228,7 +243,7 @@ export class Room {
         /* full, playing or gone: next slot */
       }
     }
-    throw new Error('Alle openbare lobby’s zitten vol. Probeer het zo nog eens.')
+    throw new Error(L('All public lobbies are full. Try again in a moment.', 'Alle openbare lobby’s zitten vol. Probeer het zo nog eens.'))
   }
 
   /** Quick play: join one particular public lobby (moving over from your own empty one). */
@@ -263,7 +278,7 @@ export class Room {
         const known = this.players.some((p) => p.pid === msg.p.pid)
         const turnAway = !known && (this.quick ? !this.quickOpen : this.players.length >= MAX_PLAYERS)
         if (turnAway) {
-          c.send({ t: 'bye', reason: this.running ? 'Dit potje is al bezig.' : 'Dit potje zit vol.' } satisfies HostMsg)
+          c.send({ t: 'bye', reason: this.running ? BYE.running.en : BYE.full.en } satisfies HostMsg)
           setTimeout(() => c.close(), 300)
           return
         }
@@ -370,7 +385,7 @@ export class Room {
       if (msg.choice) this.choice = msg.choice
       if (msg.quick) this.quickEnds = performance.now() + msg.quick.endsIn
       this.on.lobby()
-    } else if (msg.t === 'bye') this.shut(msg.reason)
+    } else if (msg.t === 'bye') this.shut(byeText(msg.reason))
     else this.on.host?.(msg)
   }
 
@@ -394,7 +409,7 @@ export class Room {
     if (this.closed) return
     this.closed = true
     clearInterval(this.beat)
-    if (this.isHost) for (const c of this.conns.values()) if (c.open) c.send({ t: 'bye', reason: 'De host heeft het potje gesloten.' } satisfies HostMsg)
+    if (this.isHost) for (const c of this.conns.values()) if (c.open) c.send({ t: 'bye', reason: BYE.closed.en } satisfies HostMsg)
     setTimeout(() => this.peer?.destroy(), 200)
   }
 
@@ -413,16 +428,16 @@ export class Room {
 function friendlyError(type: string, code = '') {
   switch (type) {
     case 'peer-unavailable':
-      return `Geen potje gevonden met code ${code}. Klopt de code?`
+      return L(`No match found with code ${code}. Is the code right?`, `Geen potje gevonden met code ${code}. Klopt de code?`)
     case 'browser-incompatible':
-      return 'Deze browser ondersteunt geen multiplayer. Probeer Chrome of Safari.'
+      return L('This browser doesn’t support multiplayer. Try Chrome or Safari.', 'Deze browser ondersteunt geen multiplayer. Probeer Chrome of Safari.')
     case 'network':
     case 'server-error':
     case 'socket-error':
     case 'socket-closed':
-      return 'Kan de multiplayer-server niet bereiken. Check je internet.'
+      return L('Can’t reach the multiplayer server. Check your internet.', 'Kan de multiplayer-server niet bereiken. Check je internet.')
     default:
-      return 'Er ging iets mis met de verbinding.'
+      return L('Something went wrong with the connection.', 'Er ging iets mis met de verbinding.')
   }
 }
 

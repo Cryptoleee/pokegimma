@@ -5,6 +5,7 @@ import { playMusic } from '../music'
 import type { GameResult } from '../game/game'
 import { BOSSES } from '../data/bosses'
 import { boardHtml } from './scoreboard'
+import { L } from '../i18n'
 
 /** End-of-match screen: placement badge, your trainer and best Pokémon, counted stats. */
 export interface ResultAction {
@@ -22,19 +23,19 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
       <canvas class="confetti"></canvas>
       <div class="res-glow"></div>
       <div class="res-card">
-        <div class="res-tabs"><button class="on" data-tab="mine">Jouw potje</button><button data-tab="board">Scorebord</button></div>
+        <div class="res-tabs"><button class="on" data-tab="mine">${L('Your match', 'Jouw potje')}</button><button data-tab="board">${L('Scoreboard', 'Scorebord')}</button></div>
         <div class="res-board hidden">
-          <div class="res-sub">${r.final ? 'Eindstand' : 'Tussenstand: het potje loopt nog'}</div>
+          <div class="res-sub">${r.final ? L('Final standings', 'Eindstand') : L('Standings: the match is still going', 'Tussenstand: het potje loopt nog')}</div>
           <div class="sb-scroll">${boardHtml(r.board, !!r.raid, r.me)}</div>
         </div>
         <div class="res-mine">
         ${boss
           ? `<div class="medal raid ${r.won ? 'gold' : 'bronze'}" style="--c:${boss.color}"><img class="px" src="${spriteUrl(boss.species)}" alt=""></div>
-        <div class="res-title">${r.won ? 'Raid geslaagd!' : 'Raid mislukt'}</div>
-        <div class="res-sub">${r.won ? `${boss.name} is verslagen` : `${boss.name} was te sterk… probeer het nog eens`}</div>`
-          : `<div class="medal ${tier}"><small>${r.won ? 'WINNAAR' : 'PLAATS'}</small><b>#${r.place}</b></div>
-        <div class="res-title">${r.won ? 'Kampioen van de arena!' : r.place <= 3 ? 'Bijna! Top 3' : 'Uitgeschakeld'}</div>
-        <div class="res-sub">van de ${r.total} trainers</div>`}
+        <div class="res-title">${r.won ? L('Raid cleared!', 'Raid geslaagd!') : L('Raid failed', 'Raid mislukt')}</div>
+        <div class="res-sub">${r.won ? L(`${boss.name} is defeated`, `${boss.name} is verslagen`) : L(`${boss.name} was too strong… try again`, `${boss.name} was te sterk… probeer het nog eens`)}</div>`
+          : `<div class="medal ${tier}"><small>${r.won ? L('WINNER', 'WINNAAR') : L('PLACE', 'PLAATS')}</small><b>#${r.place}</b></div>
+        <div class="res-title">${r.won ? L('Arena champion!', 'Kampioen van de arena!') : r.place <= 3 ? L('So close! Top 3', 'Bijna! Top 3') : L('Knocked out', 'Uitgeschakeld')}</div>
+        <div class="res-sub">${L(`out of ${r.total} trainers`, `van de ${r.total} trainers`)}</div>`}
         <div class="res-stage">
           <img class="px res-tr" src="${trainerSpriteUrl(trainerSprite)}" alt="">
           <img class="px res-mon" src="${animatedUrl(r.best.species.id)}" onerror="this.onerror=null;this.src='${spriteUrl(r.best.species.id)}'" alt="">
@@ -42,12 +43,12 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
         </div>
         <div class="res-best"><b>${r.best.name}</b> · Lv ${r.best.level}</div>
         <div class="res-stats">${r.raid
-          ? `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>Tijd</span></div>
-          <div><b data-n="${r.raid.dmg}">0</b><span>Schade (${r.raid.share}%)</span></div>
-          <div><b data-n="${r.raid.lives}">0</b><span>Levens over</span></div>`
-          : `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>Overleefd</span></div>
-          <div><b data-n="${r.kos}">0</b><span>Trainers K.O.</span></div>
-          <div><b data-n="${r.caught}">0</b><span>Gevangen</span></div>`}
+          ? `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>${L('Time', 'Tijd')}</span></div>
+          <div><b data-n="${r.raid.dmg}">0</b><span>${L('Damage', 'Schade')} (${r.raid.share}%)</span></div>
+          <div><b data-n="${r.raid.lives}">0</b><span>${L('Lives left', 'Levens over')}</span></div>`
+          : `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>${L('Survived', 'Overleefd')}</span></div>
+          <div><b data-n="${r.kos}">0</b><span>${L("Trainers K.O.'d", 'Trainers K.O.')}</span></div>
+          <div><b data-n="${r.caught}">0</b><span>${L('Caught', 'Gevangen')}</span></div>`}
         </div>
         </div>
         <div class="res-actions">

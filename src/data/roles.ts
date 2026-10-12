@@ -1,5 +1,6 @@
 import { movesetFor, type MoveKind } from './moves'
 import { SPECIES } from './pokemon'
+import { L } from '../i18n'
 
 /**
  * Roles in the spirit of Pokémon Unite. Every roster line has a fixed role
@@ -27,10 +28,10 @@ export interface RoleInfo {
 }
 
 export const ROLES: Record<Role, RoleInfo> = {
-  attacker: { name: 'Aanvaller', color: '#f05a48', icon: '✦', bonus: '+10% schade', dmg: 1.1, hp: 1, knock: 1, speed: 1, dashCd: 1 },
-  allrounder: { name: 'Allrounder', color: '#b070f0', icon: '◆', bonus: '+5% schade, +7% HP', dmg: 1.05, hp: 1.07, knock: 1, speed: 1, dashCd: 1 },
-  defender: { name: 'Verdediger', color: '#48b860', icon: '⬢', bonus: '+15% HP, minder knockback', dmg: 1, hp: 1.15, knock: 0.5, speed: 1, dashCd: 1 },
-  speedster: { name: 'Snelheid', color: '#3aa8f0', icon: '➤', bonus: '+12% loopsnelheid, snellere dash', dmg: 1, hp: 1, knock: 1, speed: 1.12, dashCd: 0.8 },
+  attacker: { get name() { return L('Attacker', 'Aanvaller') }, color: '#f05a48', icon: '✦', get bonus() { return L('+10% damage', '+10% schade') }, dmg: 1.1, hp: 1, knock: 1, speed: 1, dashCd: 1 },
+  allrounder: { get name() { return L('All-Rounder', 'Allrounder') }, color: '#b070f0', icon: '◆', get bonus() { return L('+5% damage, +7% HP', '+5% schade, +7% HP') }, dmg: 1.05, hp: 1.07, knock: 1, speed: 1, dashCd: 1 },
+  defender: { get name() { return L('Defender', 'Verdediger') }, color: '#48b860', icon: '⬢', get bonus() { return L('+15% HP, less knockback', '+15% HP, minder knockback') }, dmg: 1, hp: 1.15, knock: 0.5, speed: 1, dashCd: 1 },
+  speedster: { get name() { return L('Speedster', 'Snelheid') }, color: '#3aa8f0', icon: '➤', get bonus() { return L('+12% walk speed, faster dash', '+12% loopsnelheid, snellere dash') }, dmg: 1, hp: 1, knock: 1, speed: 1.12, dashCd: 0.8 },
 }
 
 export const STYLES: Record<Style, string> = { melee: 'Melee', ranged: 'Ranged' }

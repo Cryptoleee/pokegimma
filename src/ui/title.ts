@@ -3,6 +3,7 @@ import { sfx, unlockAudio } from '../audio'
 import { say } from '../voice'
 import { playMusic } from '../music'
 import logoUrl from '../assets/stormbreak-logo.webp'
+import { bindLangSwitch, L, langSwitch } from '../i18n'
 
 /**
  * Cinematic title: a living Black vs. White split. Zekrom's side crackles with
@@ -14,7 +15,7 @@ import logoUrl from '../assets/stormbreak-logo.webp'
  * STORM, BREAK and the ROYALE ribbon. BREAK keeps getting knocked loose, the
  * crack flashes, sparks fly and a shine sweeps over the letters.
  */
-const LOGO = `<div class="tlogo v-art">
+const LOGO = () => `<div class="tlogo v-art">
   <div class="logo-art" style="--logo: url(${logoUrl})">
     <img class="lp lp-rib" src="${logoUrl}" alt="">
     <img class="lp lp-storm" src="${logoUrl}" alt="Stormbreak Royale">
@@ -23,7 +24,7 @@ const LOGO = `<div class="tlogo v-art">
     <div class="lp-shine"></div>
     <div class="lp-sparks">${Array.from({ length: 8 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>
   </div>
-  <div class="tag">Breek door de storm</div>
+  <div class="tag">${L('Break through the storm', 'Breek door de storm')}</div>
 </div>`
 
 export function showTitle(onStart: () => void): () => void {
@@ -34,9 +35,10 @@ export function showTitle(onStart: () => void): () => void {
       <div class="tvignette"></div>
       <div class="legend-l"><img class="px" src="${animatedUrl(644)}" alt="Zekrom"></div>
       <div class="legend-r"><img class="px" src="${animatedUrl(643)}" alt="Reshiram"></div>
-      ${LOGO}
-      <div class="tpress">Tik om te starten</div>
-      <div class="tfoot">Fanproject · Pokémon © Nintendo / Game Freak</div>
+      ${LOGO()}
+      <div class="tpress">${L('Tap to start', 'Tik om te starten')}</div>
+      ${langSwitch('t-lang')}
+      <div class="tfoot">${L('Fan project', 'Fanproject')} · Pokémon © Nintendo / Game Freak</div>
     </div>`
   const canvas = el.querySelector('.tbg') as HTMLCanvasElement
   const g = canvas.getContext('2d')!
@@ -177,6 +179,13 @@ export function showTitle(onStart: () => void): () => void {
     cancelAnimationFrame(raf)
     window.removeEventListener('resize', resize)
   }
+  // Language: swap the texts in place (the click must not start the game)
+  bindLangSwitch(el, () => {
+    sfx.select()
+    el.querySelector('.tlogo .tag')!.textContent = L('Break through the storm', 'Breek door de storm')
+    el.querySelector('.tpress')!.textContent = L('Tap to start', 'Tik om te starten')
+    el.querySelector('.tfoot')!.textContent = `${L('Fan project', 'Fanproject')} · Pokémon © Nintendo / Game Freak`
+  })
   el.querySelector('.title2')!.addEventListener('click', () => {
     unlockAudio()
     playMusic('title')

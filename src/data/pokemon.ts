@@ -1,3 +1,4 @@
+import { L } from '../i18n'
 import type { PType } from './types'
 
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'legendary'
@@ -170,9 +171,19 @@ export const WILD: Record<Rarity, number[]> = {
   legendary: [150, 643, 644, 646, 384, 638, 639, 640, 494, 144, 145, 146],
 }
 
-export const RARITY_NL: Record<Rarity, string> = {
+const RARITY_EN: Record<Rarity, string> = {
+  common: 'Common', uncommon: 'Uncommon', rare: 'Rare', legendary: 'Legendary',
+}
+const RARITY_DUTCH: Record<Rarity, string> = {
   common: 'Gewoon', uncommon: 'Ongewoon', rare: 'Zeldzaam', legendary: 'Legendarisch',
 }
+
+/** Rarity display names in the current language (read at the moment of use). */
+export const RARITY_NAME: Record<Rarity, string> = new Proxy(RARITY_DUTCH, {
+  get: (t, k) => (typeof k === 'string' && k in RARITY_EN ? L(RARITY_EN[k as Rarity], RARITY_DUTCH[k as Rarity]) : Reflect.get(t, k)),
+})
+/** Old name, kept for existing readers: also follows the current language. */
+export const RARITY_NL = RARITY_NAME
 
 export const RARITY_COLOR: Record<Rarity, string> = {
   common: '#ffffff', uncommon: '#7ce07c', rare: '#58a8ff', legendary: '#ffc830',

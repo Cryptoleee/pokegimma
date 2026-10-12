@@ -3,6 +3,7 @@ import { trainerSpriteUrl } from '../data/trainers'
 import { sfx } from '../audio'
 import type { Game } from '../game/game'
 import { decided, scoreRows, type ScoreRow } from '../game/score'
+import { L } from '../i18n'
 
 /**
  * The match scoreboard: a table of every trainer. Shown live during a match
@@ -14,13 +15,14 @@ const time = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s) % 60).
 
 export function boardHtml(rows: ScoreRow[], raid: boolean, me: number) {
   const multi = rows.filter((r) => r.human).length > 1
+  const dmg = L('Damage', 'Schade')
   const head = raid
-    ? '<th>#</th><th>Trainer</th><th>Pokémon</th><th>Schade</th><th>Levens</th>'
-    : '<th>#</th><th>Trainer</th><th>Pokémon</th><th>K.O.</th><th>Schade</th><th class="opt">Gevangen</th><th class="opt">Tijd</th>'
+    ? `<th>#</th><th>Trainer</th><th>Pokémon</th><th>${dmg}</th><th>${L('Lives', 'Levens')}</th>`
+    : `<th>#</th><th>Trainer</th><th>Pokémon</th><th>K.O.</th><th>${dmg}</th><th class="opt">${L('Caught', 'Gevangen')}</th><th class="opt">${L('Time', 'Tijd')}</th>`
   const body = rows
     .map((r, i) => {
-      const rank = raid ? `${i + 1}` : r.place ? `#${r.place}` : `<span class="sb-live" title="Nog in het spel">●</span>${i + 1}`
-      const tag = r.id === me ? '<em class="sb-me">jij</em>' : multi && r.human ? '<em class="sb-human">speler</em>' : ''
+      const rank = raid ? `${i + 1}` : r.place ? `#${r.place}` : `<span class="sb-live" title="${L('Still in the game', 'Nog in het spel')}">●</span>${i + 1}`
+      const tag = r.id === me ? `<em class="sb-me">${L('you', 'jij')}</em>` : multi && r.human ? `<em class="sb-human">${L('player', 'speler')}</em>` : ''
       const mon = r.mon ? `<img class="px" src="${spriteUrl(r.mon, { shiny: r.shiny })}" alt=""><small>Lv ${r.lv}</small>` : ''
       const out = raid ? r.lives <= 0 && !r.alive : !r.alive
       return `<tr class="${r.id === me ? 'me' : ''} ${out ? 'out' : ''} ${!raid && r.place === 1 ? 'win' : ''}">
@@ -70,7 +72,7 @@ export class LiveBoard {
     const raid = g.kind === 'raid'
     const left = g.trainers.filter((t) => t.alive).length
     this.el.innerHTML = `
-      <div class="sb-head"><b>${raid ? 'Raid · schade' : 'Stand'}</b><small>${raid ? `${left} van ${g.trainers.length} nog in de strijd` : decided(g) ? 'Afgelopen' : `${left} van ${g.trainers.length} trainers over`}</small><button class="sb-close" aria-label="Sluiten">✕</button></div>
+      <div class="sb-head"><b>${raid ? L('Raid · damage', 'Raid · schade') : L('Standings', 'Stand')}</b><small>${raid ? L(`${left} of ${g.trainers.length} still fighting`, `${left} van ${g.trainers.length} nog in de strijd`) : decided(g) ? L('Over', 'Afgelopen') : L(`${left} of ${g.trainers.length} trainers left`, `${left} van ${g.trainers.length} trainers over`)}</small><button class="sb-close" aria-label="${L('Close', 'Sluiten')}">✕</button></div>
       <div class="sb-scroll">${boardHtml(scoreRows(g), raid, this.me())}</div>`
   }
 
@@ -89,13 +91,17 @@ export interface BoardAction {
 export function showFinalBoard(rows: ScoreRow[], raid: boolean, me: number, main: BoardAction, more: BoardAction[]) {
   const el = document.getElementById('screen')!
   const top = rows[0]
-  const title = raid ? 'Raid voorbij' : top && top.place === 1 ? `${top.id === me ? 'Jij' : top.name} wint!` : 'Eindstand'
+  const title = raid
+    ? L('Raid over', 'Raid voorbij')
+    : top && top.place === 1
+      ? top.id === me ? L('You win!', 'Jij wint!') : L(`${top.name} wins!`, `${top.name} wint!`)
+      : L('Final standings', 'Eindstand')
   el.innerHTML = `
     <div class="res sb-final">
       <div class="res-glow"></div>
       <div class="res-card wide">
         <div class="res-title">${title}</div>
-        <div class="res-sub">${raid ? 'Wie deed de meeste schade?' : 'Eindstand van het potje'}</div>
+        <div class="res-sub">${raid ? L('Who dealt the most damage?', 'Wie deed de meeste schade?') : L('Final standings of the match', 'Eindstand van het potje')}</div>
         ${top && !raid ? `<div class="sb-winner"><img class="px tr" src="${trainerSpriteUrl(top.sprite)}" alt="">${top.mon ? `<img class="px mon" src="${spriteUrl(top.mon, { shiny: top.shiny })}" alt="">` : ''}<span>👑</span></div>` : ''}
         <div class="sb-scroll">${boardHtml(rows, raid, me)}</div>
         <div class="res-actions">

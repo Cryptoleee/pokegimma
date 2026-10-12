@@ -4,6 +4,7 @@ import { itemUrl } from '../game/sprites'
 import { sfx } from '../audio'
 import { esc } from './menu'
 import { BOSSES, type BossDef, type BossId } from '../data/bosses'
+import { L, tx } from '../i18n'
 
 /**
  * Pre-match splash: who's in, plus rotating tips. People who joined through a
@@ -16,27 +17,28 @@ interface Tip {
   text: string
 }
 
-const TIPS: Tip[] = [
-  { icon: `<img class="px" src="${animatedUrl(150)}" onerror="this.onerror=null;this.src='${spriteUrl(150)}'" alt="">`, title: 'Legendarische Pokémon', text: 'Twee keer per potje verschijnt er een, met een alarm en een pijl die de weg wijst. Met een <b>Master Ball</b> vang je hem direct!' },
-  { icon: `<img class="px" src="${itemUrl('master-ball')}" alt="">`, title: 'Master Ball', text: 'Raap ze op in de wereld en in dorpjes. Gooi er een (knop links van je aanvallen) en je vangt élke wilde Pokémon meteen.' },
-  { icon: '<i class="ld-eye"></i>', title: 'Verstop je in het hoge gras', text: 'Een oogje boven je laat zien dat je onzichtbaar bent. Alleen wie heel dichtbij staat ziet je. Aanvallen verraadt je even.' },
-  { icon: '<i class="ld-heart">♥</i>', title: 'HP herstelt vanzelf', text: 'Ben je 3 seconden niet in gevecht, dan krijgt je Pokémon langzaam HP terug. Trek je dus even terug als het misgaat.' },
-  { icon: `<img class="px" src="${itemUrl('poke-ball')}" alt="">`, title: 'Vangen', text: 'Versla een wilde Pokémon en tik snel op <b>VANG!</b> Wie hem verslaat mag eerst. Je team kan tot 3 Pokémon groot worden.' },
-  { icon: '<i class="ld-storm">⚡</i>', title: 'De storm', text: 'De paarse storm krimpt. Blijf binnen de witte cirkel op de kaart, anders verliest je Pokémon HP.' },
-  { icon: '<i class="ld-up">▲</i>', title: 'Levelen', text: 'Vechten levert XP op. Op Lv 8, 16 en 25 krijg je een nieuwe aanval, en je Pokémon evolueert onderweg.' },
-  { icon: '<i class="ld-aim">◎</i>', title: 'Richten', text: 'Tik een aanval = automatisch richten. Houd vast = blijven aanvallen. Sleep = zelf richten, loslaten = vuren.' },
-  { icon: `<img class="px" src="${itemUrl('potion')}" alt="">`, title: 'Items', text: 'Potions genezen je Pokémon, met een Revive komt een verslagen Pokémon terug. Tik op je team linksboven om te wisselen.' },
+/** Built when shown, so the tips follow the chosen language. */
+const battleTips = (): Tip[] => [
+  { icon: `<img class="px" src="${animatedUrl(150)}" onerror="this.onerror=null;this.src='${spriteUrl(150)}'" alt="">`, title: L('Legendary Pokémon', 'Legendarische Pokémon'), text: L('One shows up twice a match, with an alarm and an arrow pointing the way. A <b>Master Ball</b> catches it instantly!', 'Twee keer per potje verschijnt er een, met een alarm en een pijl die de weg wijst. Met een <b>Master Ball</b> vang je hem direct!') },
+  { icon: `<img class="px" src="${itemUrl('master-ball')}" alt="">`, title: 'Master Ball', text: L('Pick them up in the world and in villages. Throw one (button left of your moves) and you catch any wild Pokémon on the spot.', 'Raap ze op in de wereld en in dorpjes. Gooi er een (knop links van je aanvallen) en je vangt élke wilde Pokémon meteen.') },
+  { icon: '<i class="ld-eye"></i>', title: L('Hide in the tall grass', 'Verstop je in het hoge gras'), text: L("An eye above you shows you're invisible. Only someone very close can see you. Attacking gives you away for a moment.", 'Een oogje boven je laat zien dat je onzichtbaar bent. Alleen wie heel dichtbij staat ziet je. Aanvallen verraadt je even.') },
+  { icon: '<i class="ld-heart">♥</i>', title: L('HP heals by itself', 'HP herstelt vanzelf'), text: L("Stay out of battle for 3 seconds and your Pokémon slowly gets HP back. So back off for a bit when things go wrong.", 'Ben je 3 seconden niet in gevecht, dan krijgt je Pokémon langzaam HP terug. Trek je dus even terug als het misgaat.') },
+  { icon: `<img class="px" src="${itemUrl('poke-ball')}" alt="">`, title: L('Catching', 'Vangen'), text: L('Beat a wild Pokémon and quickly tap <b>CATCH!</b> Whoever beats it gets first try. Your team can grow to 3 Pokémon.', 'Versla een wilde Pokémon en tik snel op <b>VANG!</b> Wie hem verslaat mag eerst. Je team kan tot 3 Pokémon groot worden.') },
+  { icon: '<i class="ld-storm">⚡</i>', title: L('The storm', 'De storm'), text: L('The purple storm is closing in. Stay inside the white circle on the map, or your Pokémon loses HP.', 'De paarse storm krimpt. Blijf binnen de witte cirkel op de kaart, anders verliest je Pokémon HP.') },
+  { icon: '<i class="ld-up">▲</i>', title: L('Leveling up', 'Levelen'), text: L('Battling earns XP. At Lv 8, 16 and 25 you get a new move, and your Pokémon evolves along the way.', 'Vechten levert XP op. Op Lv 8, 16 en 25 krijg je een nieuwe aanval, en je Pokémon evolueert onderweg.') },
+  { icon: '<i class="ld-aim">◎</i>', title: L('Aiming', 'Richten'), text: L('Tap a move = auto-aim. Hold = keep attacking. Drag = aim yourself, release = fire.', 'Tik een aanval = automatisch richten. Houd vast = blijven aanvallen. Sleep = zelf richten, loslaten = vuren.') },
+  { icon: `<img class="px" src="${itemUrl('potion')}" alt="">`, title: 'Items', text: L('Potions heal your Pokémon, a Revive brings a fainted Pokémon back. Tap your team top left to switch.', 'Potions genezen je Pokémon, met een Revive komt een verslagen Pokémon terug. Tik op je team linksboven om te wisselen.') },
 ]
 
 /** Raid tips: dodging, lives, phases and the arena. */
 function raidTips(boss: BossDef): Tip[] {
   return [
-    { icon: '<i class="ld-warn">⚠</i>', title: 'Rood op de grond = wegwezen!', text: 'Elke grote aanval van de baas zie je eerst als rode vorm op de grond. Loop eruit voordat hij volloopt.' },
-    { icon: `<img class="px" src="${spriteUrl(boss.species)}" alt="">`, title: boss.name, text: boss.envTip },
-    { icon: '<i class="ld-heart">♥</i>', title: '3 levens', text: 'Ga je neer, dan kom je na 4 seconden terug. Na 3 keer kijk je mee. De raid mislukt als iedereen op is of na 4 minuten.' },
-    { icon: '<i class="ld-up">▲</i>', title: 'Drie fases', text: `Op 66% en 33% HP wordt ${boss.name} woedend: hij brult je weg, krijgt nieuwe aanvallen en laat Potions vallen.` },
-    { icon: `<img class="px" src="${itemUrl('potion')}" alt="">`, title: 'Geen herstel vanzelf', text: 'In een raid herstelt je HP niet vanzelf. Raap de Potions op die in de arena verschijnen.' },
-    { icon: '<i class="ld-aim">◎</i>', title: 'Samen sterker', text: 'Met meer spelers heeft de baas meer HP, maar verdeelt hij zijn aanvallen. Blijf niet allemaal op één plek staan!' },
+    { icon: '<i class="ld-warn">⚠</i>', title: L('Red on the ground = get out!', 'Rood op de grond = wegwezen!'), text: L("You see every big boss attack first as a red shape on the ground. Get out before it fills up.", 'Elke grote aanval van de baas zie je eerst als rode vorm op de grond. Loop eruit voordat hij volloopt.') },
+    { icon: `<img class="px" src="${spriteUrl(boss.species)}" alt="">`, title: boss.name, text: tx(boss.envTip) },
+    { icon: '<i class="ld-heart">♥</i>', title: L('3 lives', '3 levens'), text: L("Go down and you're back after 4 seconds. After 3 times you watch. The raid fails when everyone is out or after 4 minutes.", 'Ga je neer, dan kom je na 4 seconden terug. Na 3 keer kijk je mee. De raid mislukt als iedereen op is of na 4 minuten.') },
+    { icon: '<i class="ld-up">▲</i>', title: L('Three phases', 'Drie fases'), text: L(`At 66% and 33% HP ${boss.name} gets furious: it roars you back, gets new attacks and drops Potions.`, `Op 66% en 33% HP wordt ${boss.name} woedend: hij brult je weg, krijgt nieuwe aanvallen en laat Potions vallen.`) },
+    { icon: `<img class="px" src="${itemUrl('potion')}" alt="">`, title: L('No healing by itself', 'Geen herstel vanzelf'), text: L("In a raid your HP doesn't heal by itself. Grab the Potions that show up in the arena.", 'In een raid herstelt je HP niet vanzelf. Raap de Potions op die in de arena verschijnen.') },
+    { icon: '<i class="ld-aim">◎</i>', title: L('Stronger together', 'Samen sterker'), text: L("With more players the boss has more HP, but it spreads its attacks. Don't all stand in one spot!", 'Met meer spelers heeft de baas meer HP, maar verdeelt hij zijn aanvallen. Blijf niet allemaal op één plek staan!') },
   ]
 }
 
@@ -55,6 +57,7 @@ export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; s
   const el = document.createElement('div')
   el.className = 'loading'
   // Legendary + Master Ball first (most asked), then a random mix
+  const TIPS = battleTips()
   const rest = TIPS.slice(2).sort(() => Math.random() - 0.5)
   const boss = opts.raid ? BOSSES[opts.raid] : null
   const tips = boss ? raidTips(boss) : [TIPS[Math.random() < 0.5 ? 0 : 1], TIPS[2], ...rest]
@@ -62,9 +65,9 @@ export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; s
     <div class="ld-bg"></div>
     <div class="ld-l">
     ${boss
-      ? `<div class="ld-head"><small>RAID · ${boss.title.toUpperCase()}</small><b>${boss.name}</b></div>
+      ? `<div class="ld-head"><small>RAID · ${tx(boss.title).toUpperCase()}</small><b>${boss.name}</b></div>
     <div class="ld-boss" style="--c:${boss.color}"><img class="px" src="${animatedUrl(boss.species)}" onerror="this.onerror=null;this.src='${spriteUrl(boss.species)}'" alt=""></div>`
-      : '<div class="ld-head"><small>BATTLE ROYALE</small><b>Potje wordt geladen</b></div>'}
+      : `<div class="ld-head"><small>BATTLE ROYALE</small><b>${L('Loading match', 'Potje wordt geladen')}</b></div>`}
     <div class="ld-players">
       ${opts.players.map((p, i) => `<div class="ld-p" style="--d:${i * 70}ms"><img class="px" src="${trainerSpriteUrl(p.sprite)}" alt="">${p.mon ? `<img class="px ld-mon" src="${spriteUrl(p.mon)}" alt="">` : ''}<span>${esc(p.name)}</span></div>`).join('')}
       ${opts.bots && !boss ? `<div class="ld-p bots" style="--d:${opts.players.length * 70}ms"><b>+${opts.bots}</b><span>bots</span></div>` : ''}
@@ -74,7 +77,7 @@ export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; s
     <div class="ld-tip"></div>
     <div class="ld-dots">${tips.map(() => '<i></i>').join('')}</div>
     <div class="ld-bar"><i></i></div>
-    <div class="ld-foot">${opts.skippable ? '<button class="cta ld-go">Ik ben er klaar voor ▶</button>' : '<span class="ld-wait">Iedereen start tegelijk…</span>'}</div>
+    <div class="ld-foot">${opts.skippable ? `<button class="cta ld-go">${L("I'm ready ▶", 'Ik ben er klaar voor ▶')}</button>` : `<span class="ld-wait">${L('Everyone starts together…', 'Iedereen start tegelijk…')}</span>`}</div>
     </div>`
   app.append(el)
   requestAnimationFrame(() => el.classList.add('in'))

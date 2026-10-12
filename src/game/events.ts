@@ -1,6 +1,7 @@
 import { WILD } from '../data/pokemon'
 import type { Game } from './game'
 import { TILE } from './world'
+import { both } from '../i18n'
 
 /**
  * Battle royale events: a supply drop that falls from the sky after a
@@ -40,8 +41,8 @@ export function startEvent(g: Game, kind: WorldEvent['kind']) {
     const [x, y] = g.world.randomWalkable((x, y) => inside(x, y) && !g.world.isTall(x, y))
     g.events.push({ id: nextId++, kind, x, y, t: DROP_TIME, total: DROP_TIME })
     for (const v of g.viewers) {
-      v.hooks.banner({ kind: 'storm', title: 'Bevoorrading!', sub: 'Een kist valt uit de lucht · volg de pijl', color: '#58d0ff', voice: 'supply' })
-      v.hooks.feed('📦 Bevoorrading onderweg: Master Ball, Potions en Rare Candy')
+      v.hooks.banner({ kind: 'storm', title: both('Supply drop!', 'Bevoorrading!'), sub: both('A crate is falling from the sky · follow the arrow', 'Een kist valt uit de lucht · volg de pijl'), color: '#58d0ff', voice: 'supply' })
+      v.hooks.feed(both('📦 Supply drop incoming: Master Ball, Potions and Rare Candy', '📦 Bevoorrading onderweg: Master Ball, Potions en Rare Candy'))
     }
     return
   }
@@ -65,8 +66,8 @@ export function startEvent(g: Game, kind: WorldEvent['kind']) {
   g.events.push({ id: nextId++, kind, x: cx, y: cy, t: SWARM_TIME, total: SWARM_TIME, species })
   for (const v of g.viewers) {
     v.cry(species, 0.3)
-    v.hooks.banner({ kind: 'storm', title: 'Een zwerm!', sub: 'Zes wilde Pokémon in het gras · volg de pijl', mon: species, color: '#7ce07c', voice: 'swarm' })
-    v.hooks.feed('🐾 Er is een zwerm wilde Pokémon gespot', { mon: species })
+    v.hooks.banner({ kind: 'storm', title: both('A swarm!', 'Een zwerm!'), sub: both('Six wild Pokémon in the grass · follow the arrow', 'Zes wilde Pokémon in het gras · volg de pijl'), mon: species, color: '#7ce07c', voice: 'swarm' })
+    v.hooks.feed(both('🐾 A swarm of wild Pokémon has been spotted', '🐾 Er is een zwerm wilde Pokémon gespot'), { mon: species })
   }
 }
 

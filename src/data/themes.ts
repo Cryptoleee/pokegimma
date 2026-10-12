@@ -1,3 +1,5 @@
+import { L } from '../i18n'
+
 /**
  * World themes: palette, decor style, tile mix and weather. Battle royale maps
  * pick one per match; raid arenas have their own.
@@ -49,7 +51,7 @@ export interface WorldTheme {
 }
 
 const FOREST: WorldTheme = {
-  id: 'forest', name: 'Bos', icon: '🌳', royale: true,
+  id: 'forest', get name() { return L('Forest', 'Bos') }, icon: '🌳', royale: true,
   grass: ['#78c860', '#60b050', '#98d878'],
   tall: ['#4c9c44', '#2e6e30', '#7ccc5c'],
   path: ['#e8d098', '#d0b478', '#a8c870'],
@@ -70,7 +72,7 @@ const FOREST: WorldTheme = {
 export const THEMES: Record<ThemeId, WorldTheme> = {
   forest: FOREST,
   desert: {
-    ...FOREST, id: 'desert', name: 'Woestijn', icon: '🏜️',
+    ...FOREST, id: 'desert', get name() { return L('Desert', 'Woestijn') }, icon: '🏜️',
     grass: ['#e8c878', '#d4b060', '#f4dc98'],
     tall: ['#b8a050', '#7a6a30', '#d8c070'],
     path: ['#d8b070', '#c09858', '#c8a860'],
@@ -88,7 +90,7 @@ export const THEMES: Record<ThemeId, WorldTheme> = {
     mini: { grass: '#e8c878', tall: '#b8a050', path: '#d8b070', sand: '#f4dca0', water: '#40b0c8', tree: '#4a8a40' },
   },
   snow: {
-    ...FOREST, id: 'snow', name: 'Sneeuw', icon: '❄️',
+    ...FOREST, id: 'snow', get name() { return L('Snow', 'Sneeuw') }, icon: '❄️',
     grass: ['#eef4fa', '#d4e0ee', '#ffffff'],
     tall: ['#b8d0dc', '#7898b0', '#e0eef6'],
     path: ['#c8d4e0', '#aebccc', '#dce8f2'],
@@ -106,7 +108,7 @@ export const THEMES: Record<ThemeId, WorldTheme> = {
     mini: { grass: '#e8f0f8', tall: '#b8d0dc', path: '#c8d4e0', sand: '#dfe8f0', water: '#3a78b0', tree: '#22584a' },
   },
   volcano: {
-    ...FOREST, id: 'volcano', name: 'Vulkaan', icon: '🌋',
+    ...FOREST, id: 'volcano', get name() { return L('Volcano', 'Vulkaan') }, icon: '🌋',
     grass: ['#5a4a48', '#4a3c3a', '#6e5c58'],
     tall: ['#6a5a3a', '#3e3220', '#8a7448'],
     path: ['#7a6a5a', '#665646', '#4e4040'],
@@ -125,14 +127,14 @@ export const THEMES: Record<ThemeId, WorldTheme> = {
     mini: { grass: '#5a4a48', tall: '#6a5a3a', path: '#7a6a5a', sand: '#3a3236', water: '#e8501c', tree: '#2e2422' },
   },
   night: {
-    ...FOREST, id: 'night', name: 'Nacht', icon: '🌙',
+    ...FOREST, id: 'night', get name() { return L('Night', 'Nacht') }, icon: '🌙',
     weather: 'fireflies',
     tint: 'rgba(10,20,70,0.42)',
     dark: true,
     border: '#0c2016',
   },
   crater: {
-    ...FOREST, id: 'crater', name: 'Vulkaankrater', icon: '🌋', royale: false,
+    ...FOREST, id: 'crater', get name() { return L('Volcano Crater', 'Vulkaankrater') }, icon: '🌋', royale: false,
     grass: ['#4a3a38', '#3a2e2c', '#5e4a46'],
     tall: ['#4a3a38', '#3a2e2c', '#5e4a46'],
     path: ['#5a4a44', '#4a3c38', '#3a2e2c'],
@@ -149,7 +151,7 @@ export const THEMES: Record<ThemeId, WorldTheme> = {
     mini: { grass: '#4a3a38', tall: '#4a3a38', path: '#5a4a44', sand: '#2e2628', water: '#e8501c', tree: '#140e0e' },
   },
   icecave: {
-    ...FOREST, id: 'icecave', name: 'IJsgrot', icon: '🧊', royale: false,
+    ...FOREST, id: 'icecave', get name() { return L('Ice Cave', 'IJsgrot') }, icon: '🧊', royale: false,
     grass: ['#bcdcf0', '#a4c8e4', '#e4f4ff'],
     tall: ['#bcdcf0', '#a4c8e4', '#e4f4ff'],
     path: ['#a8cce4', '#90b8d8', '#cce4f4'],
@@ -166,7 +168,7 @@ export const THEMES: Record<ThemeId, WorldTheme> = {
     mini: { grass: '#bcdcf0', tall: '#bcdcf0', path: '#a8cce4', sand: '#d4e8f6', water: '#2a5a8a', tree: '#24406a' },
   },
   plateau: {
-    ...FOREST, id: 'plateau', name: 'Stormtop', icon: '⛈️', royale: false,
+    ...FOREST, id: 'plateau', get name() { return L('Storm Peak', 'Stormtop') }, icon: '⛈️', royale: false,
     grass: ['#5a6474', '#4a5262', '#6e788a'],
     tall: ['#5a6474', '#4a5262', '#6e788a'],
     path: ['#646e80', '#525a6a', '#7a8496'],
@@ -182,7 +184,7 @@ export const THEMES: Record<ThemeId, WorldTheme> = {
     mini: { grass: '#5a6474', tall: '#5a6474', path: '#646e80', sand: '#4a5262', water: '#2a5a8a', tree: '#12161e' },
   },
   sky: {
-    ...FOREST, id: 'sky', name: 'Hemelpilaar', icon: '🌪️', royale: false,
+    ...FOREST, id: 'sky', get name() { return L('Sky Pillar', 'Hemelpilaar') }, icon: '🌪️', royale: false,
     // Weathered green-grey stone of the Sky Pillar's roof, moss, open sky around
     grass: ['#8a9c8e', '#6c7e72', '#a4b6a4'],
     tall: ['#8a9c8e', '#5e6e64', '#a8baa8'],
@@ -198,7 +200,7 @@ export const THEMES: Record<ThemeId, WorldTheme> = {
     mini: { grass: '#8a9c8e', tall: '#8a9c8e', path: '#8a9c8e', sand: '#5c8a52', water: '#3a74c4', tree: '#3a74c4' },
   },
   lab: {
-    ...FOREST, id: 'lab', name: 'Psychisch lab', icon: '🧪', royale: false,
+    ...FOREST, id: 'lab', get name() { return L('Psychic Lab', 'Psychisch lab') }, icon: '🧪', royale: false,
     grass: ['#3a2e58', '#30264a', '#4a3c6e'],
     tall: ['#3a2e58', '#30264a', '#4a3c6e'],
     path: ['#443666', '#382c56', '#56487c'],

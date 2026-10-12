@@ -6937,3 +6937,60 @@ button:disabled {
   font-size: 13px;
   color: #d8d0f0;
 }
+
+/* ---------- Language switch (EN | NL) ---------- */
+.lang-sw {
+  display: inline-flex;
+  flex: none;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+}
+.lang-sw button {
+  min-width: 36px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+.lang-sw button.on {
+  background: #fff;
+  color: #14141c;
+}
+.home-lang {
+  margin-left: auto;
+}
+.home-lang + .home-opts {
+  margin-left: 0;
+}
+.t-lang {
+  position: absolute;
+  top: calc(12px + var(--safe-t, 0px));
+  right: 12px;
+  z-index: 5;
+  background: rgba(20, 20, 28, 0.55);
+  backdrop-filter: blur(4px);
+}
+.opt-lang {
+  cursor: default;
+}
+.opt-lang .lang-sw {
+  border-color: var(--ink);
+  background: #eceef4;
+}
+.opt-lang .lang-sw button {
+  color: var(--ink);
+}
+.opt-lang .lang-sw button.on {
+  background: var(--ink);
+  color: #fff;
+}
