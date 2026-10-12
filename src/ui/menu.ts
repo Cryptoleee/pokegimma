@@ -5,7 +5,7 @@ import { animatedUrl, SPECIES, spriteUrl } from '../data/pokemon'
 import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
 import { sfx } from '../audio'
 import { NAME_MAX, profile, setName } from '../profile'
-import { CHAT_MAX, cleanCode, MAX_PLAYERS, type Room } from '../net/room'
+import { CHAT_MAX, cleanCode, MAX_PLAYERS, QUICK_MAX, type Room } from '../net/room'
 import type { ChatLine, MatchChoice } from '../net/protocol'
 import { ROYALE_THEMES, THEMES } from '../data/themes'
 import { BOSS_LIST, BOSSES } from '../data/bosses'
@@ -62,6 +62,8 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
 
 export interface MenuActions {
   solo(c: MatchChoice): void
+  /** Quick play: a public lobby with random players. */
+  quick(): void
   host(): void
   join(code: string): void
   team(): void
@@ -104,8 +106,9 @@ export function showMenu(st: MenuState, on: MenuActions) {
         <input id="mm-name" maxlength="${NAME_MAX}" autocomplete="nickname" spellcheck="false" placeholder="Typ je naam" value="${esc(profile().name)}">
       </div>
       <div class="home-modes">
-        <button class="mode solo"><i>▶</i><b>Solo</b><small>battle royale of raid</small></button>
-        <button class="mode multi"><i>👥</i><b>Multiplayer</b><small>met vrienden, ook online</small></button>
+        <button class="mode quick"><i>⚡</i><b>Snel spel</b><small>online met willekeurige spelers</small><span class="qp-online"><em></em><span>online zoeken…</span></span></button>
+        <button class="mode solo"><i>▶</i><b>Solo</b><small>tegen bots</small></button>
+        <button class="mode multi"><i>👥</i><b>Met vrienden</b><small>eigen potje met code</small></button>
       </div>
       <div class="mm-msg ${st.error && !sheetOpen ? 'err' : ''}"></div>
 
@@ -121,7 +124,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
       <div class="sheet mp-sheet ${sheetOpen ? 'open' : ''}">
         <div class="sheet-card">
           <button class="sheet-x" aria-label="Sluiten">✕</button>
-          <h3>Multiplayer</h3>
+          <h3>Met vrienden</h3>
           <p>Speel samen met vrienden, naast je of online. Tot ${MAX_PLAYERS} spelers; lege plekken worden bots.</p>
           <button class="cta mm-host">＋ Potje maken<small>jij bent de host en krijgt een code</small></button>
           <div class="sheet-or"><span>of doe mee</span></div>
@@ -190,6 +193,14 @@ export function showMenu(st: MenuState, on: MenuActions) {
     solo.classList.add('open')
   })
   click('.solo-go', () => on.solo(choice))
+  click('.mode.quick', () => {
+    setName(name.value)
+    const m = el.querySelector('.home > .mm-msg') as HTMLElement
+    m.className = 'mm-msg busy'
+    m.textContent = 'Openbare lobby zoeken…'
+    el.querySelectorAll('button').forEach((b) => (b.disabled = true))
+    on.quick()
+  })
   click('.mode.multi', () => {
     if (!named()) return
     sheet.classList.add('open')
@@ -223,6 +234,21 @@ export function showMenu(st: MenuState, on: MenuActions) {
   else if (!profile().name) setTimeout(() => name.focus(), 300)
 }
 
+/** Home: the live "players online" line on the quick play button. */
+export function setOnline(all: { players: number; running: boolean; open: boolean }[]) {
+  const el = document.querySelector('.qp-online span')
+  if (!el) return
+  const playing = all.filter((s) => s.running).reduce((n, s) => n + s.players, 0)
+  const waiting = all.filter((s) => !s.running).reduce((n, s) => n + s.players, 0)
+  const total = playing + waiting
+  el.parentElement!.classList.toggle('live', total > 0)
+  el.textContent = total === 0
+    ? 'niemand online: start er een!'
+    : waiting > 0
+      ? `${total} online · ${waiting} wacht${waiting === 1 ? '' : 'en'} op een potje`
+      : `${total} online aan het spelen`
+}
+
 // ---------------- Lobby ----------------
 
 export interface LobbyActions {
@@ -235,15 +261,11 @@ export interface LobbyActions {
 
 export function showLobby(room: Room, on: LobbyActions) {
   const el = screen()
+  const quick = room.quick
   const qr = qrcode(0, 'M')
   qr.addData(room.link)
   qr.make()
-  el.innerHTML = `
-    <div class="sel lobby">
-      <div class="sel-head">
-        <button class="sel-back" aria-label="Verlaten">◀</button>
-        <div class="sel-title"><small></small><b>Samen spelen</b></div>
-      </div>
+  const codeCard = `
       <div class="lb-code">
         ${room.isHost ? `<div class="lb-qr">${qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true })}</div>` : ''}
         <div class="lb-codetext">
@@ -252,49 +274,110 @@ export function showLobby(room: Room, on: LobbyActions) {
           <span>${room.isHost ? 'Laat vrienden deze code invoeren of de QR-code scannen' : 'Deel deze code met wie nog mee wil doen'}</span>
           <button class="ghost2 lb-share">Link delen ⤴</button>
         </div>
+      </div>`
+  const quickCard = `
+      <div class="qp-card">
+        <div class="qp-radar"><i></i><i></i><i></i><svg viewBox="0 0 100 100"><circle class="qp-ring-bg" cx="50" cy="50" r="44"/><circle class="qp-ring" cx="50" cy="50" r="44"/></svg><b class="qp-time">--</b></div>
+        <div class="qp-text"><small>OPENBARE LOBBY</small><b class="qp-title">Spelers zoeken…</b><span class="qp-sub"></span></div>
+      </div>`
+  el.innerHTML = `
+    <div class="sel lobby lb2 ${quick ? 'quick' : ''}">
+      <div class="sel-head">
+        <button class="sel-back" aria-label="Verlaten">◀</button>
+        <div class="sel-title"><small></small><b>${quick ? 'Snel spel' : 'Met vrienden'}</b></div>
       </div>
-      <div class="lb-choice"><div class="cp"></div></div>
-      <div class="lb-steps"></div>
-      <div class="lb-list"></div>
-      <div class="lb-chat">
-        <div class="lb-log"></div>
-        <div class="lb-quick">${QUICK_CHAT.map((q) => `<button>${q}</button>`).join('')}</div>
-        <form class="lb-say"><input maxlength="${CHAT_MAX}" placeholder="Typ een bericht…" autocomplete="off" enterkeyhint="send"><button type="submit">➤</button></form>
+      <div class="lb-pages">
+        <section class="lb-page on" data-page="lobby">
+          ${quick ? quickCard : codeCard}
+          ${quick ? '' : '<div class="lb-choice"><div class="cp"></div></div>'}
+          <div class="lb-steps"></div>
+          <div class="lb-list"></div>
+        </section>
+        <section class="lb-page lb-chat" data-page="chat">
+          <div class="lb-log"></div>
+          <div class="lb-quick">${QUICK_CHAT.map((q) => `<button>${q}</button>`).join('')}</div>
+          <form class="lb-say"><input maxlength="${CHAT_MAX}" placeholder="Typ een bericht…" autocomplete="off" enterkeyhint="send"><button type="submit">➤</button></form>
+        </section>
       </div>
-      <div class="sel-foot lb-foot">
-        <button class="ghost2 lb-team">Team kiezen</button>
+      <div class="lb-dock">
         <button class="cta lb-start"></button>
+        <nav class="lb-tabs">
+          <button data-tab="lobby" class="on"><i>👥</i><span>Lobby</span><b class="lb-count"></b></button>
+          <button data-tab="chat"><i>💬</i><span>Chat</span><b class="lb-unread hidden"></b></button>
+          <button data-tab="team"><i>🎒</i><span>Team</span></button>
+        </nav>
       </div>
+      <div class="lb-toast hidden"></div>
     </div>`
 
+  const root = el.querySelector('.lb2') as HTMLElement
   const list = el.querySelector('.lb-list') as HTMLElement
   const steps = el.querySelector('.lb-steps') as HTMLElement
   const start = el.querySelector('.lb-start') as HTMLButtonElement
   const head = el.querySelector('.sel-title small') as HTMLElement
   const log = el.querySelector('.lb-log') as HTMLElement
-  const picker = choicePicker(el.querySelector('.lb-choice .cp') as HTMLElement, () => room.choice, room.isHost ? (c) => on.choice(c) : null)
+  const count = el.querySelector('.lb-count') as HTMLElement
+  const unread = el.querySelector('.lb-unread') as HTMLElement
+  const picker = quick ? null : choicePicker(el.querySelector('.lb-choice .cp') as HTMLElement, () => room.choice, room.isHost ? (c) => on.choice(c) : null)
   const others = () => room.players.filter((p) => p.pid !== room.players[0]?.pid)
+  let page = 'lobby'
+  let unreadN = 0
+
+  // Quick play: the countdown ring and the "found so far" line
+  const paintQuick = () => {
+    if (!quick) return
+    const left = Math.max(0, room.quickEnds - performance.now()) / 1000
+    const n = room.players.length
+    const ring = el.querySelector('.qp-ring') as SVGCircleElement | null
+    if (!ring) return
+    const time = el.querySelector('.qp-time') as HTMLElement
+    time.textContent = room.running ? '▶' : `${Math.ceil(left)}`
+    ring.style.strokeDashoffset = `${276.5 * (1 - Math.min(1, left / 45))}`
+    const title = el.querySelector('.qp-title') as HTMLElement
+    const sub = el.querySelector('.qp-sub') as HTMLElement
+    title.textContent = room.running ? 'Potje is bezig' : n > 1 ? `${n} spelers gevonden!` : 'Spelers zoeken…'
+    sub.textContent = room.running
+      ? 'Je doet mee met het volgende potje'
+      : `${n} speler${n === 1 ? '' : 's'} + ${Math.max(0, SEATS - n)} bots · start over ${Math.ceil(left)} s`
+  }
+
   const refresh = () => {
     const bots = Math.max(0, SEATS - room.players.length)
     const me = room.players.find((p) => p.pid === room.me.pid) ?? room.me
-    head.textContent = `${room.isHost ? 'JOUW POTJE' : 'LOBBY'} · ${room.players.length}/${MAX_PLAYERS} SPELERS`
-    if (!room.isHost) picker.paint()
+    head.textContent = quick ? `OPENBARE LOBBY · ${room.players.length}/${QUICK_MAX}` : `${room.isHost ? 'JOUW POTJE' : 'LOBBY'} · ${room.players.length}/${MAX_PLAYERS} SPELERS`
+    count.textContent = `${room.players.length}`
+    if (picker && !room.isHost) picker.paint()
     const raid = room.choice.kind === 'raid'
     list.innerHTML = room.players.map((p, i) => {
       const tr = TRAINERS.find((t) => t.key === p.trainer) ?? TRAINERS[0]
       const isMe = p.pid === room.me.pid
-      const ready = i === 0 || p.ready
+      const ready = quick ? !!p.ready : i === 0 || p.ready
+      const state = quick ? (p.ready ? 'START ✓' : 'wacht') : i === 0 ? 'HOST' : p.ready ? 'KLAAR ✓' : 'kiest…'
       return `
         <div class="lb-p ${isMe ? 'lb-me' : ''} ${ready ? 'ready' : ''}" style="--d:${i * 60}ms">
           <img class="px lb-tr" src="${trainerSpriteUrl(tr.sprite)}" alt="">
-          <div class="lb-name"><b>${esc(p.name)}</b><span>${i === 0 ? '<em>HOST</em>' : ''}${isMe ? '<em class="you">JIJ</em>' : ''}${tr.name}${p.team[0] ? ` &amp; ${SPECIES[p.team[0]].name}` : ''}</span></div>
+          <div class="lb-name"><b>${esc(p.name)}</b><span>${!quick && i === 0 ? '<em>HOST</em>' : ''}${isMe ? '<em class="you">JIJ</em>' : ''}${tr.name}${p.team[0] ? ` &amp; ${SPECIES[p.team[0]].name}` : ''}</span></div>
           ${p.team[0] ? gif(p.team[0], 'lb-mon') : ''}
-          <span class="lb-state">${i === 0 ? 'HOST' : p.ready ? 'KLAAR ✓' : 'kiest…'}</span>
+          <span class="lb-state">${state}</span>
         </div>`
     }).join('') + (raid ? '<div class="lb-bots">Raid: samen tegen een willekeurige baas</div>' : `<div class="lb-bots">+ ${bots} bot${bots === 1 ? '' : 's'} vullen de arena aan</div>`)
 
-    const waiting = others().filter((p) => !p.ready)
-    if (room.isHost) {
+    if (quick) {
+      const n = room.players.length, votes = room.players.filter((p) => p.ready).length
+      steps.innerHTML = n < 2
+        ? '<b>Even wachten op andere spelers</b><span>Het potje begint vanzelf als de tijd om is; lege plekken worden bots. Geen zin om te wachten? Start meteen.</span>'
+        : `<b>${votes}/${n} wil${votes === 1 ? '' : 'len'} nu starten</b><span>Als iedereen op Start tikt, begint het meteen. Anders zodra de tijd om is.</span>`
+      start.disabled = room.running
+      start.classList.toggle('on', !!me.ready)
+      start.innerHTML = room.running
+        ? 'Potje is bezig…<small>je doet mee met het volgende</small>'
+        : n < 2
+          ? 'Start nu met bots ▶<small>niet wachten op anderen</small>'
+          : me.ready
+            ? `Klaar ✓<small>wachten op de rest · ${votes}/${n}</small>`
+            : `Start nu ▶<small>${votes}/${n} wil starten</small>`
+    } else if (room.isHost) {
+      const waiting = others().filter((p) => !p.ready)
       steps.innerHTML = room.players.length < 2
         ? '<b>Wacht op spelers</b><span>Deel de code of QR-code. Je kunt ook alleen starten tegen bots.</span>'
         : waiting.length
@@ -311,12 +394,13 @@ export function showLobby(room: Room, on: LobbyActions) {
     } else {
       steps.innerHTML = me.ready
         ? `<b>Je bent klaar ✓</b><span>Wachten tot ${esc(room.players[0]?.name ?? 'de host')} het potje start.</span>`
-        : '<ol><li><b>Kies je trainer &amp; Pokémon</b> met “Team kiezen”</li><li>Tik op <b>Klaar</b> zodra je team goed is</li></ol>'
+        : '<ol><li><b>Kies je trainer &amp; Pokémon</b> onder “Team”</li><li>Tik op <b>Klaar</b> zodra je team goed is</li></ol>'
       steps.classList.toggle('todo', !me.ready)
       start.disabled = room.running
       start.classList.toggle('on', !!me.ready)
       start.innerHTML = room.running ? 'Er loopt nog een potje…' : me.ready ? 'Klaar ✓<small>tik om te annuleren</small>' : 'Klaar ▶<small>ik heb mijn team</small>'
     }
+    paintQuick()
   }
 
   const addLine = (m: ChatLine) => {
@@ -324,35 +408,57 @@ export function showLobby(room: Room, on: LobbyActions) {
     d.className = m.pid === room.me.pid ? 'mine' : ''
     d.innerHTML = `<b>${esc(m.name)}</b> ${esc(m.text)}`
     log.append(d)
-    while (log.children.length > 40) log.firstChild!.remove()
+    while (log.children.length > 60) log.firstChild!.remove()
     log.scrollTop = log.scrollHeight
   }
   room.chatLog.forEach(addLine)
   refresh()
+  // The countdown ticks between lobby updates
+  const ticker = window.setInterval(() => (document.body.contains(root) ? paintQuick() : clearInterval(ticker)), 250)
 
+  const show = (p: string) => {
+    page = p
+    el.querySelectorAll<HTMLElement>('.lb-page').forEach((s) => s.classList.toggle('on', s.dataset.page === p))
+    el.querySelectorAll<HTMLElement>('.lb-tabs [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === p))
+    if (p === 'chat') {
+      unreadN = 0
+      unread.classList.add('hidden')
+      log.scrollTop = log.scrollHeight
+    }
+  }
+  el.querySelectorAll<HTMLElement>('.lb-tabs [data-tab]').forEach((b) =>
+    b.addEventListener('click', () => {
+      sfx.select()
+      if (b.dataset.tab === 'team') on.team()
+      else show(b.dataset.tab!)
+    }),
+  )
   el.querySelector('.sel-back')!.addEventListener('click', () => {
     sfx.select()
     on.leave()
   })
-  el.querySelector('.lb-team')!.addEventListener('click', () => {
-    sfx.select()
-    on.team()
-  })
   start.addEventListener('click', () => {
     if (room.running) return
     sfx.select()
-    if (room.isHost) on.start()
+    if (room.isHost && !quick) on.start()
     else on.ready(!room.me.ready)
   })
   const input = el.querySelector('.lb-say input') as HTMLInputElement
+  // While typing, the dock steps aside so the keyboard doesn't push everything up
+  input.addEventListener('focus', () => root.classList.add('typing'))
+  input.addEventListener('blur', () => root.classList.remove('typing'))
   el.querySelector('.lb-say')!.addEventListener('submit', (e) => {
     e.preventDefault()
+    if (input.value.trim()) sfx.blip()
     room.say(input.value)
     input.value = ''
   })
-  el.querySelectorAll<HTMLButtonElement>('.lb-quick button').forEach((b) => b.addEventListener('click', () => room.say(b.textContent!)))
-  const share = el.querySelector('.lb-share') as HTMLButtonElement
-  share.addEventListener('click', async () => {
+  el.querySelectorAll<HTMLButtonElement>('.lb-quick button').forEach((b) => b.addEventListener('click', () => {
+    sfx.blip()
+    room.say(b.textContent!)
+  }))
+  el.querySelector('.lb-share')?.addEventListener('click', async (e) => {
+    const share = e.currentTarget as HTMLButtonElement
     sfx.select()
     const data = { title: 'Stormbreak Royale', text: `Doe mee met mijn potje! Code ${room.code}`, url: room.link }
     try {
@@ -365,11 +471,26 @@ export function showLobby(room: Room, on: LobbyActions) {
       /* cancelled */
     }
   })
+  const toastEl = el.querySelector('.lb-toast') as HTMLElement
+  let toastT = 0
   return {
     refresh,
     chat: (m: ChatLine) => {
       addLine(m)
-      if (m.pid !== room.me.pid) sfx.blip()
+      if (m.pid !== room.me.pid) {
+        sfx.blip()
+        if (page !== 'chat') {
+          unreadN++
+          unread.textContent = `${unreadN}`
+          unread.classList.remove('hidden')
+        }
+      }
+    },
+    toast: (text: string) => {
+      toastEl.textContent = text
+      toastEl.classList.remove('hidden')
+      clearTimeout(toastT)
+      toastT = window.setTimeout(() => toastEl.classList.add('hidden'), 3500)
     },
   }
 }

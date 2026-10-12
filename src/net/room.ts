@@ -11,6 +11,28 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const PREFIX = 'battlemon-royale-v1-'
 export const MAX_PLAYERS = 12
 
+/**
+ * Quick play: public lobbies live at fixed peer ids (slot 0, 1, 2, ...). The first
+ * player to look claims slot 0 and hosts it; the next ones find it taken and join.
+ * A lobby that's full or already playing sends newcomers on to the next slot.
+ * Bump the version whenever the protocol changes so builds don't mix.
+ */
+const QUICK_PREFIX = 'stormbreak-quick-v1-'
+export const QUICK_SLOTS = 6
+/** Humans in a quick game before it starts right away. */
+export const QUICK_MAX = 8
+/** Seconds a fresh quick lobby waits for others. */
+export const QUICK_WAIT = 45
+const quickId = (slot: number) => QUICK_PREFIX + slot
+
+/** How one public lobby is doing (from a peek). */
+export interface QuickStatus {
+  slot: number
+  players: number
+  running: boolean
+  open: boolean
+}
+
 export const newCode = () => Array.from({ length: 4 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('')
 export const cleanCode = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)
 
@@ -50,6 +72,10 @@ export class Room {
   chatLog: ChatLine[] = []
   /** Host: a match is still being played. Guests get this through the lobby message. */
   running = false
+  /** Quick play: a public lobby that starts on a timer (slot number, or -1 for a private room). */
+  quickSlot = -1
+  /** Quick play: when the next match starts (performance.now ms; host decides, guests follow). */
+  quickEnds = 0
   private conns = new Map<string, DataConnection>()
   /** Host: when we last heard from each player (to notice phones that vanished). */
   private seen = new Map<DataConnection, number>()
@@ -80,23 +106,44 @@ export class Room {
     return this.role === 'host'
   }
 
+  get quick() {
+    return this.quickSlot >= 0
+  }
+
   /** Opens a new room and resolves with it once others can join. */
   static create(me: LobbyPlayer, on: RoomEvents): Promise<Room> {
+    return Room.host(me, on, -1)
+  }
+
+  /**
+   * Host a room: a private one with a fresh code, or public quick-play slot `slot`.
+   * A taken quick slot rejects with the message 'taken'.
+   */
+  private static host(me: LobbyPlayer, on: RoomEvents, slot: number): Promise<Room> {
     const room = new Room('host', me, on)
     room.players = [me]
+    room.quickSlot = slot
     return new Promise((resolve, reject) => {
       let tries = 0
       const open = () => {
-        room.code = newCode()
-        const peer = new Peer(PREFIX + room.code, peerOptions())
+        room.code = slot >= 0 ? `Q${slot}` : newCode()
+        const peer = new Peer(slot >= 0 ? quickId(slot) : PREFIX + room.code, peerOptions())
         room.peer = peer
-        peer.on('open', () => resolve(room))
+        peer.on('open', () => {
+          if (slot >= 0) room.quickEnds = performance.now() + QUICK_WAIT * 1000
+          resolve(room)
+        })
         peer.on('connection', (c) => room.accept(c))
         peer.on('error', (e) => {
-          if (e.type === 'unavailable-id' && tries++ < 5) {
+          if (e.type === 'unavailable-id' && slot >= 0) {
+            room.closed = true
+            peer.destroy()
+            reject(new Error('taken'))
+          } else if (e.type === 'unavailable-id' && tries++ < 5) {
             peer.destroy()
             open()
           } else if (!peer.open) {
+            room.closed = true
             peer.destroy()
             reject(new Error(friendlyError(e.type)))
           } else console.warn('[room]', e.type, e.message)
@@ -112,8 +159,13 @@ export class Room {
 
   /** Joins someone's room by code. */
   static join(code: string, me: LobbyPlayer, on: RoomEvents): Promise<Room> {
+    return Room.connect(PREFIX + code, code, me, on, 12000, -1)
+  }
+
+  private static connect(id: string, code: string, me: LobbyPlayer, on: RoomEvents, timeoutMs: number, slot: number): Promise<Room> {
     const room = new Room('guest', me, on)
     room.code = code
+    room.quickSlot = slot
     return new Promise((resolve, reject) => {
       const peer = new Peer(peerOptions())
       room.peer = peer
@@ -121,16 +173,18 @@ export class Room {
       const fail = (msg: string) => {
         if (settled) return
         settled = true
+        room.closed = true
+        clearInterval(room.beat)
         peer.destroy()
         reject(new Error(msg))
       }
-      const timer = setTimeout(() => fail('Geen verbinding. Zitten jullie allebei op internet?'), 12000)
+      const timer = setTimeout(() => fail('Geen verbinding. Zitten jullie allebei op internet?'), timeoutMs)
       peer.on('error', (e) => {
         if (!settled) fail(friendlyError(e.type, code))
         else console.warn('[room]', e.type, e.message)
       })
       peer.on('open', () => {
-        const c = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' })
+        const c = peer.connect(id, { reliable: true, serialization: 'json' })
         room.host = c
         c.on('open', () => c.send({ t: 'hello', p: me } satisfies GuestMsg))
         c.on('data', (d) => {
@@ -154,7 +208,40 @@ export class Room {
     })
   }
 
+  /**
+   * Quick play: join the first public lobby that has room, or host a new one.
+   * Each slot: try to claim it (instant if it's free); if it's taken, join it;
+   * if that lobby is full, playing, or doesn't answer, move on to the next slot.
+   * `skip` leaves out a slot (the one you just left).
+   */
+  static async quick(me: LobbyPlayer, on: RoomEvents, skip = -1): Promise<Room> {
+    for (let slot = 0; slot < QUICK_SLOTS; slot++) {
+      if (slot === skip) continue
+      try {
+        return await Room.host(me, on, slot)
+      } catch (e) {
+        if ((e as Error).message !== 'taken') throw e
+      }
+      try {
+        return await Room.connect(quickId(slot), `Q${slot}`, me, on, 4500, slot)
+      } catch {
+        /* full, playing or gone: next slot */
+      }
+    }
+    throw new Error('Alle openbare lobby’s zitten vol. Probeer het zo nog eens.')
+  }
+
+  /** Quick play: join one particular public lobby (moving over from your own empty one). */
+  static joinQuick(slot: number, me: LobbyPlayer, on: RoomEvents): Promise<Room> {
+    return Room.connect(quickId(slot), `Q${slot}`, me, on, 4500, slot)
+  }
+
   // ---------------- host ----------------
+
+  /** Quick play, host: can a newcomer get in right now? */
+  private get quickOpen() {
+    return !this.running && this.players.length < QUICK_MAX
+  }
 
   private accept(c: DataConnection) {
     let pid = ''
@@ -162,16 +249,28 @@ export class Room {
       const msg = d as GuestMsg
       this.seen.set(c, performance.now())
       if (msg.t === 'ping') return
+      if (msg.t === 'peek') {
+        c.send({ t: 'status', players: this.players.length, running: this.running, open: this.quick && this.quickOpen } satisfies HostMsg)
+        setTimeout(() => c.close(), 200)
+        return
+      }
       if (msg.t === 'chat') {
         const p = this.players.find((x) => x.pid === pid)
         if (p) this.addChat({ pid, name: p.name, text: msg.text })
         return
       }
       if (msg.t === 'hello') {
-        if (this.players.length >= MAX_PLAYERS && !this.players.some((p) => p.pid === msg.p.pid)) {
-          c.send({ t: 'bye', reason: 'Dit potje zit vol.' } satisfies HostMsg)
+        const known = this.players.some((p) => p.pid === msg.p.pid)
+        const turnAway = !known && (this.quick ? !this.quickOpen : this.players.length >= MAX_PLAYERS)
+        if (turnAway) {
+          c.send({ t: 'bye', reason: this.running ? 'Dit potje is al bezig.' : 'Dit potje zit vol.' } satisfies HostMsg)
           setTimeout(() => c.close(), 300)
           return
+        }
+        // Quick play: someone new joined, give others a moment longer to find us too
+        if (this.quick && !known) {
+          const now = performance.now()
+          this.quickEnds = this.players.length + 1 >= QUICK_MAX ? Math.min(this.quickEnds, now + 5000) : Math.max(this.quickEnds, now + 12000)
         }
         pid = msg.p.pid
         // Same player reconnecting on a new connection: drop the old one (not this one;
@@ -200,7 +299,10 @@ export class Room {
 
   broadcastLobby() {
     if (!this.isHost) return
-    const msg: HostMsg = { t: 'lobby', players: this.players, running: this.running, choice: this.choice }
+    const msg: HostMsg = {
+      t: 'lobby', players: this.players, running: this.running, choice: this.choice,
+      ...(this.quick ? { quick: { endsIn: Math.max(0, Math.round(this.quickEnds - performance.now())) } } : {}),
+    }
     for (const c of this.conns.values()) if (c.open) c.send(msg)
   }
 
@@ -229,6 +331,8 @@ export class Room {
 
   setRunning(running: boolean) {
     this.running = running
+    // Quick play: after a match, the next one starts on a fresh timer
+    if (!running && this.quick) this.quickEnds = performance.now() + QUICK_WAIT * 1000
     this.broadcastLobby()
     this.on.lobby()
   }
@@ -264,6 +368,7 @@ export class Room {
       this.players = msg.players
       this.running = msg.running
       if (msg.choice) this.choice = msg.choice
+      if (msg.quick) this.quickEnds = performance.now() + msg.quick.endsIn
       this.on.lobby()
     } else if (msg.t === 'bye') this.shut(msg.reason)
     else this.on.host?.(msg)
@@ -319,4 +424,53 @@ function friendlyError(type: string, code = '') {
     default:
       return 'Er ging iets mis met de verbinding.'
   }
+}
+
+/**
+ * Quick play: how busy are the public lobbies? Peeks at every slot at once from
+ * one shared connection to the PeerJS server (kept open while you're on the menu).
+ */
+let probePeer: Peer | null = null
+export function probeQuick(): Promise<QuickStatus[]> {
+  return new Promise((resolve) => {
+    const out: QuickStatus[] = []
+    let left = QUICK_SLOTS
+    const done = () => --left <= 0 && resolve(out.sort((a, b) => a.slot - b.slot))
+    const run = (peer: Peer) => {
+      for (let slot = 0; slot < QUICK_SLOTS; slot++) {
+        let finished = false
+        const finish = () => {
+          if (finished) return
+          finished = true
+          done()
+        }
+        const c = peer.connect(quickId(slot), { serialization: 'json' })
+        c.on('open', () => c.send({ t: 'peek' } satisfies GuestMsg))
+        c.on('data', (d) => {
+          const m = d as HostMsg
+          if (m.t !== 'status') return
+          out.push({ slot, players: m.players, running: m.running, open: m.open })
+          c.close()
+          finish()
+        })
+        c.on('close', finish)
+        c.on('error', finish)
+        setTimeout(finish, 6000)
+      }
+    }
+    if (probePeer && !probePeer.destroyed && probePeer.open) return run(probePeer)
+    probePeer?.destroy()
+    const peer = new Peer(peerOptions())
+    probePeer = peer
+    // An empty slot shows up here as 'peer-unavailable'; that slot's timer just runs out
+    peer.on('error', () => {})
+    peer.on('open', () => run(peer))
+    setTimeout(() => !peer.open && resolve(out), 6000)
+  })
+}
+
+/** Leaving the menu: drop the probe connection. */
+export function stopProbe() {
+  probePeer?.destroy()
+  probePeer = null
 }

@@ -16,14 +16,14 @@ import { showResults } from './ui/results'
 import { LiveBoard, showFinalBoard } from './ui/scoreboard'
 import { decided, scoreRows } from './game/score'
 import { showEvolution } from './ui/cutscene'
-import { showLobby, showMenu, type MenuState } from './ui/menu'
+import { setOnline, showLobby, showMenu, type MenuState } from './ui/menu'
 import { showLoading } from './ui/loading'
 import { wipe } from './ui/transition'
 import { currentMusic, playMusic, setTempo } from './music'
 import { sfx } from './audio'
 import { namePitch, playBoss, playItem, playMoveCast, playMoveCharge, playMoveHit, resetSfx } from './moveSfx'
-import { profile } from './profile'
-import { cleanCode, Room } from './net/room'
+import { profile, setName } from './profile'
+import { cleanCode, probeQuick, Room, stopProbe } from './net/room'
 import type { ChatLine, HostMsg, LobbyPlayer, MatchChoice } from './net/protocol'
 import { pickTheme, THEMES, type ThemeId } from './data/themes'
 import { applyEvents, applySnapshot, initClient, recordVfx, remoteViewer, runCommand, snapshot, type RemoteViewer } from './net/sync'
@@ -127,14 +127,16 @@ function toMenu(extra: Partial<MenuState> = {}) {
     },
     host: hostRoom,
     join: joinRoom,
+    quick: () => quickPlay(),
     team: () => wipe(() => pickTeam(() => wipe(() => toMenu()), () => wipe(() => toMenu()), 'Klaar ▶')),
     back: () => wipe(toTitle),
   })
+  watchOnline()
   // Opened a shared link and we already know your name: straight in.
   if (code && profile().name && !extra.error) {
     pendingJoin = ''
     const none = () => {}
-    showMenu({ trainer, team, choice, code, busy: `Verbinden met ${code}…` }, { solo: none, host: none, join: none, team: none, back: none })
+    showMenu({ trainer, team, choice, code, busy: `Verbinden met ${code}…` }, { solo: none, host: none, join: none, quick: none, team: none, back: none })
     joinRoom(code)
   }
 }
@@ -348,9 +350,16 @@ function roomEvents() {
       if (viewing) hud?.chatLine(m, m.pid === profile().id)
     },
     closed: (reason: string) => {
-      sfx.error()
+      const wasQuick = room?.quick && !game
       room = null
       remotes.clear()
+      // Quick play: the host left before the match started: just find another lobby
+      if (wasQuick) {
+        sfx.leave()
+        lobbyUi?.toast('De host is weg: we zoeken een nieuwe lobby…')
+        return quickPlay(true)
+      }
+      sfx.error()
       wipe(() => toMenu({ error: reason }))
     },
     host: (msg: HostMsg) => onHostMsg(msg),
@@ -437,6 +446,79 @@ function toLobby() {
 }
 
 /** Leave the multiplayer room (as host this closes it for everyone) and go to the main menu. */
+// ---------- Quick play ----------
+
+/** Find a public lobby (or host one). `again`: we're already on the lobby screen. */
+function quickPlay(again = false) {
+  stopProbe()
+  if (!profile().name) setName(`Trainer ${Math.floor(1000 + Math.random() * 9000)}`)
+  ready = false
+  Room.quick(me(), roomEvents())
+    .then((r) => {
+      room = r
+      if (!again) return wipe(toLobby)
+      toLobby()
+      lobbyUi?.toast(r.isHost ? 'De host is weg: jij bent nu de host van een nieuwe lobby' : 'De host is weg: je zit in een nieuwe lobby')
+    })
+    .catch((e: Error) => {
+      sfx.error()
+      wipe(() => toMenu({ error: e.message }))
+    })
+}
+
+/**
+ * Quick play, host: the timer. Starts the match when it runs out, when everyone
+ * tapped Start (straight away if you're on your own), or soon once it's full.
+ * A host who's alone moves over to a lobby where people are already waiting.
+ */
+let quickMerge = { at: 0, busy: false }
+window.setInterval(() => {
+  const r = room
+  if (!r?.quick || !r.isHost || r.running) return
+  const now = performance.now()
+  const all = r.players.length > 0 && r.players.every((p) => p.ready)
+  if (all && r.players.length === 1) return hostStart()
+  if (all && r.quickEnds - now > 3000) r.quickEnds = now + 3000
+  if (now >= r.quickEnds) return hostStart()
+  // Once a second: everyone's timer stays in step
+  if (Math.floor((r.quickEnds - now) / 1000) !== Math.floor((r.quickEnds - now - 250) / 1000)) {
+    r.broadcastLobby()
+    lobbyUi?.refresh()
+  }
+  if (r.players.length === 1 && !quickMerge.busy && now >= quickMerge.at && lobbyUi) {
+    quickMerge = { at: now + 8000, busy: true }
+    probeQuick()
+      .then((all) => {
+        const target = all.find((s) => s.slot !== r.quickSlot && s.open && s.players >= 1 && (s.players > 1 || s.slot < r.quickSlot))
+        if (!target || room !== r || r.players.length !== 1) return
+        return Room.joinQuick(target.slot, me(), roomEvents()).then((nr) => {
+          if (room !== r || r.players.length !== 1) return nr.leave()
+          r.leave()
+          room = nr
+          toLobby()
+        })
+      })
+      .catch(() => {})
+      .finally(() => (quickMerge.busy = false))
+  }
+}, 250)
+
+/** Home screen: how many people are playing or waiting online right now. */
+let onlineTimer = 0
+function watchOnline() {
+  clearInterval(onlineTimer)
+  const tick = () => {
+    if (!document.querySelector('.home') || room) {
+      clearInterval(onlineTimer)
+      stopProbe()
+      return
+    }
+    probeQuick().then((all) => setOnline(all))
+  }
+  tick()
+  onlineTimer = window.setInterval(tick, 15000)
+}
+
 function leaveRoom() {
   ready = false
   room?.leave()
@@ -467,6 +549,7 @@ function hostStart() {
   for (const v of remotes.values()) r.sendTo(v.tr.pid, { t: 'start', setup, roster, you: v.tr.id })
   // Everyone confirms again for the next match
   r.players.forEach((p) => (p.ready = false))
+  ready = false
   r.setRunning(true)
   lobbyUi = null
   loadingThen(setup, false, () => enterMatch(g))

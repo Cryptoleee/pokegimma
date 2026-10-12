@@ -56,11 +56,13 @@ export type NetEvent =
   | ['full', number, number, boolean]
 
 export type HostMsg =
-  | { t: 'lobby'; players: LobbyPlayer[]; running: boolean; choice?: MatchChoice }
+  | { t: 'lobby'; players: LobbyPlayer[]; running: boolean; choice?: MatchChoice; quick?: { endsIn: number } }
+  /** Answer to a peek: how a public lobby is doing (then the connection closes). */
+  | { t: 'status'; players: number; running: boolean; open: boolean }
   | { t: 'start'; setup: MatchSetup; roster: RosterEntry[]; you: number }
   | { t: 's'; s: unknown; e: NetEvent[] }
   | { t: 'bye'; reason: string }
   | { t: 'ping' }
   | { t: 'chat'; m: ChatLine }
 
-export type GuestMsg = { t: 'hello'; p: LobbyPlayer } | { t: 'cmd'; c: Command } | { t: 'ping' } | { t: 'chat'; text: string }
+export type GuestMsg = { t: 'hello'; p: LobbyPlayer } | { t: 'cmd'; c: Command } | { t: 'ping' } | { t: 'chat'; text: string } | { t: 'peek' }
