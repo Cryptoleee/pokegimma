@@ -602,11 +602,14 @@ export class Hud {
     this.legend.classList.add('hidden')
     this.bossBar.classList.toggle('hidden', !boss || g.introT > INTRO_TIME * 0.45)
     if (boss) {
-      if (this.bossKey !== def.id) {
-        this.bossKey = def.id
-        this.bossBar.style.setProperty('--c', def.color)
+      // The bar follows the boss into its next form (Black Kyurem, Mega Rayquaza, …)
+      const ph = g.raidView?.phase ?? 0
+      const key = `${def.id}:${ph}`
+      if (this.bossKey !== key) {
+        this.bossKey = key
+        this.bossBar.style.setProperty('--c', def.looks[ph].aura ?? def.color)
         this.bossBar.innerHTML = `
-          <div class="bb-top"><b>${def.name}</b><span class="bb-team"></span><span class="bb-time"></span></div>
+          <div class="bb-top"><b>${ph === 2 && def.finalName ? def.finalName : def.name}</b><span class="bb-team"></span><span class="bb-time"></span></div>
           <div class="bb-bar"><i class="bb-lag"></i><i class="bb-fill"></i>${def.phases.map((f) => `<em style="left:${f * 100}%"></em>`).join('')}</div>`
       }
       const k = Math.max(0, boss.hp / boss.maxHp)

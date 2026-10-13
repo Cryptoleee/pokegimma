@@ -2,7 +2,7 @@ import { TYPE_COLOR } from '../data/types'
 import type { Game } from './game'
 import { BUSH_SIGHT, INTRO_TIME, ITEM_SPRITE } from './game'
 import type { Mon, Trainer } from './entities'
-import { getSprite, itemUrl, monSprite } from './sprites'
+import { animSprite, frameAt, getSprite, itemUrl, monSprite } from './sprites'
 import { trainerSpriteUrl } from '../data/trainers'
 import { drawCharge, drawChargeCore, drawDashAura, drawIncoming, drawMelee, drawProjectile, pal } from './moveFx'
 import { drawGlow } from './vfx'
@@ -12,6 +12,9 @@ import type { Weather } from '../data/themes'
 import { drawEvents } from './events'
 import { drawHazards, drawHazardsSky } from './boss'
 import { L, tx } from '../i18n'
+import { BOSSES } from '../data/bosses'
+import { cinematic, drawPhaseScreen, phaseLook, shownPhase, updateCinematic } from './bossFx'
+import { ENRAGE_TIME } from './boss'
 
 const FONT = '"Pixelify Sans", monospace'
 
@@ -24,12 +27,18 @@ export function zoomFor(cw: number, ch: number, wide = false) {
 export const view = { ox: 0, oy: 0, Z: 1 }
 
 export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: number) {
+  cur = g
+  if (g.kind === 'raid') updateCinematic(g)
   // Drop-in: start high above the arena and swoop down to the player
   const ik = Math.max(0, g.introT / INTRO_TIME)
-  const Z = zoomFor(cw, ch, g.kind === 'raid') * (1 - 0.62 * ik * ik * (3 - 2 * ik))
+  // Raid phase change: the camera swings over to the boss and leans in
+  const cine = g.kind === 'raid' ? cinematic(g) : -1
+  const boss = cine >= 0 ? g.wilds.find((w) => w.boss) : undefined
+  const focus = boss ? Math.sin(Math.min(1, cine / 0.92) * Math.PI) * 0.8 : 0
+  const Z = zoomFor(cw, ch, g.kind === 'raid') * (1 - 0.62 * ik * ik * (3 - 2 * ik)) * (1 + 0.18 * focus)
   const vw = cw / Z, vh = ch / Z
-  let ox = g.camX * TILE - vw / 2
-  let oy = g.camY * TILE - vh / 2
+  let ox = (g.camX + (boss ? (boss.x - g.camX) * focus : 0)) * TILE - vw / 2
+  let oy = (g.camY + (boss ? (boss.y - 2.6 - g.camY) * focus : 0)) * TILE - vh / 2
   if (g.vfx.shake > 0) {
     ox += (Math.random() - 0.5) * g.vfx.shake
     oy += (Math.random() - 0.5) * g.vfx.shake
@@ -129,7 +138,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   if (g.kind === 'royale') drawStorm(g, ctx, ox, oy, vw, vh, time)
 
   // Weather and ambient particles
-  drawWeather(theme.weather, ctx, ox, oy, vw, vh, time)
+  drawWeather(theme.weather, ctx, ox, oy, vw, vh, time, phaseLook(g)?.weather ?? 1)
 
   // Brawl-style nameplates on top of everything
   for (const tr of g.trainers) {
@@ -169,6 +178,8 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // Cinematic vignette (heavier at night)
   ctx.drawImage(vignette(), 0, 0, cw, ch)
   if (theme.dark) ctx.drawImage(vignette(), -cw * 0.1, -ch * 0.1, cw * 1.2, ch * 1.2)
+  // Raid: each phase looks more dangerous; the phase change plays as a short cinematic
+  if (g.kind === 'raid') drawPhaseScreen(g, ctx, cw, ch)
   if (g.vfx.screenFlash > 0) {
     ctx.fillStyle = `rgba(${g.vfx.screenFlashCol},${Math.min(0.75, g.vfx.screenFlash * 0.6)})`
     ctx.fillRect(0, 0, cw, ch)
@@ -262,14 +273,38 @@ function drawTrainer(g: Game, ctx: CanvasRenderingContext2D, tr: Trainer, _time:
 }
 
 function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, fade = 1, rise = 0) {
-  const back = m.dir === 'up'
-  const s = monSprite(m.species.id, back, m.shiny)
+  // Raid bosses (and wild legendaries) play their animated sprite; bosses change form per phase
+  const form = m.legendary || m.boss ? bossForm(g, m) : m.species.id
+  let anim = m.legendary || m.boss ? animSprite(form) : null
+  // Phase change: the boss roars (its baked action animation if it has one) and rises up
+  const cine = m.boss ? cinematic(g) : -1
+  // (a boss that changes form has no roar sheet for its new form, so it stops on the flash)
+  const roar = cine >= 0 && cine < 0.92 ? animSprite(`${form}-roar`) : null
+  if (roar?.ready) anim = roar
+  const back = !anim && m.dir === 'up'
+  const s = anim ?? monSprite(m.species.id, back, m.shiny)
+  const [fx, fy] = roar?.ready ? frameAt(s, cine * ENRAGE_TIME, 0, true) : frameAt(s, time, m.bob * 1000)
   const px = m.x * TILE, py = m.y * TILE
   const sc = m.scale
   const dw = s.bw * sc, dh = s.bh * sc
   const moving = Math.abs(m.mvx) + Math.abs(m.mvy) > 0.001
   let bob = Math.sin(time * (moving ? 12 : 3) + m.bob) * (moving ? 1.2 : 0.6)
   if (m.state === 'weak') bob = 0
+  if (m.boss) {
+    // Flyers hover; walkers stomp with a heavier step
+    if (FLOATERS.has(form)) bob = Math.sin(time * 2.2 + m.bob) * 3.5 - 5
+    else if (moving) bob = -Math.abs(Math.sin(time * 5 + m.bob)) * 2.5
+    if (cine >= 0) rise += Math.sin(Math.min(1, cine / 0.9) * Math.PI) * 12
+  }
+  const look = m.boss ? phaseLook(g) : null
+  // Phase aura: the boss glows in its phase colour, harder in the final phase
+  if (look?.aura && (g.raidView?.phase ?? 0) > 0) {
+    const pulse = 0.5 + 0.5 * Math.sin(time * 5)
+    drawGlow(ctx, px, py - dh * 0.45 - rise, dw * (0.85 + 0.1 * pulse), look.aura, 0.18 + 0.12 * pulse + (shownPhase(g) >= 2 ? 0.12 : 0))
+  }
+
+  // Fast moves leave afterimages (dashes, swoops, teleports)
+  if (m.boss && s.ready) drawTrail(ctx, m, s, fx, fy, dw, dh, look?.aura ?? '#ffffff', rise)
 
   // Legendary aura
   if (m.legendary && !m.owner) {
@@ -297,7 +332,7 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
   if (m.catching) alpha = 0.5
   alpha *= fade
   ctx.globalAlpha = alpha
-  const flip = back ? m.dir === 'left' : m.dir === 'right'
+  const flip = back ? m.dir === 'left' : m.dir === 'right' || (anim != null && (m.dir === 'up' || m.dir === 'down') && m.aimX > 0.2)
   ctx.save()
   // Shaking with power while a big move charges; jolted when hit
   const ck = m.charging ? 1 - m.charging.t / m.charging.total : 0
@@ -313,7 +348,7 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
     const q = Math.min(1, m.flash / 0.12)
     ctx.scale(1 + q * 0.14, 1 - q * 0.12)
   }
-  ctx.drawImage(s.img, s.bx, s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
+  ctx.drawImage(s.img, fx + s.bx, fy + s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
   const glow = Math.max(
     m.flash > 0 ? 0.85 : 0,
     m.evolveFx > 0 ? 0.5 + 0.5 * Math.sin(time * 18) : 0,
@@ -322,14 +357,14 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
   )
   if (glow > 0 && s.white) {
     ctx.globalAlpha = glow * alpha
-    ctx.drawImage(s.white, s.bx, s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
+    ctx.drawImage(s.white, fx + s.bx, fy + s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
   }
   // Type-coloured tint after a hit (yellow crackle for electric, orange for fire, ...)
   if (m.tintT > 0 && m.flash <= 0) {
     const t = tinted(s, m.tintCol)
     if (t) {
       ctx.globalAlpha = alpha * Math.min(1, m.tintT / 0.35) * (0.45 + Math.random() * 0.25)
-      ctx.drawImage(t, s.bx, s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
+      ctx.drawImage(t, fx + s.bx, fy + s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
     }
   }
   ctx.restore()
@@ -357,6 +392,46 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
 const tintCache = new Map<string, HTMLCanvasElement>()
 
 /** The sprite's silhouette filled with a colour (cached per sprite + colour). */
+/** Bosses that float above the ground. */
+const FLOATERS = new Set([384, 10079, 150, 10044])
+
+/** Where each boss has been the last moment (for afterimages). */
+const trails = new WeakMap<Mon, { x: number; y: number; t: number }[]>()
+function drawTrail(ctx: CanvasRenderingContext2D, m: Mon, s: ReturnType<typeof monSprite>, fx: number, fy: number, dw: number, dh: number, col: string, rise: number) {
+  const now = performance.now() / 1000
+  let tr = trails.get(m)
+  if (!tr) trails.set(m, (tr = []))
+  tr.push({ x: m.x, y: m.y, t: now })
+  while (tr.length && now - tr[0].t > 0.3) tr.shift()
+  const first = tr[0], last = tr[tr.length - 1]
+  const speed = first && last.t > first.t ? Math.hypot(last.x - first.x, last.y - first.y) / (last.t - first.t) : 0
+  if (speed < 4.5) return
+  const tint = tinted(s, col)
+  if (!tint) return
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  for (let i = 0; i < 5; i++) {
+    const p = tr[Math.floor((i / 5) * (tr.length - 1))]
+    ctx.globalAlpha = 0.08 + i * 0.06
+    ctx.drawImage(tint, fx + s.bx, fy + s.by, s.bw, s.bh, p.x * TILE - dw / 2, p.y * TILE - dh + 2 - rise, dw, dh)
+  }
+  ctx.restore()
+}
+
+/** The match being drawn (for helpers that only get a Pokémon). */
+let cur: Game | null = null
+
+/** Which sprite a raid boss shows: some change form in later phases (Black Kyurem, Mega Rayquaza, …). */
+export function bossForm(g: Game, m: Mon) {
+  if (m.boss && g.kind === 'raid' && g.setup.boss) return BOSSES[g.setup.boss].forms?.[shownPhase(g)] ?? m.species.id
+  return m.species.id
+}
+
+/** The sprite drawn for a Pokémon (animated sheet for bosses and legendaries). */
+function spriteOf(g: Game, m: Mon) {
+  return (m.legendary || m.boss ? animSprite(bossForm(g, m)) : null) ?? monSprite(m.species.id, m.dir === 'up', m.shiny)
+}
+
 function tinted(s: ReturnType<typeof monSprite>, col: string): HTMLCanvasElement | null {
   if (!s.white) return null
   const key = s.img.src + col
@@ -452,7 +527,7 @@ const TEAM_COL: Record<Team, { bar: string; dark: string; name: string; ring: st
 }
 
 function spriteTop(m: Mon) {
-  const s = monSprite(m.species.id, m.dir === 'up', m.shiny)
+  const s = spriteOf(cur!, m)
   return m.y * TILE - (s.ready ? s.bh * m.scale : 16)
 }
 
@@ -531,7 +606,7 @@ function drawRings(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, y
 
 /** Corner brackets around the Pokémon you're attacking. */
 function drawReticle(ctx: CanvasRenderingContext2D, m: Mon, time: number) {
-  const s = monSprite(m.species.id, m.dir === 'up', m.shiny)
+  const s = spriteOf(cur!, m)
   const w = (s.ready ? s.bw * m.scale : 16) + 6
   const h = (s.ready ? s.bh * m.scale : 16) + 6
   const cx = m.x * TILE, cy = m.y * TILE - h / 2 + 3
@@ -889,8 +964,8 @@ function drawWater(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: numbe
 
 const motes: { x: number; y: number; s: number; ph: number; v: number }[] = []
 /** Ambient particles per world: pollen, rain, snow, sand, ash, embers or fireflies. */
-function drawWeather(w: Weather, ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number) {
-  const n = w === 'rain' ? 90 : w === 'snow' || w === 'sand' ? 70 : w === 'ash' || w === 'wind' ? 50 : w === 'psy' ? 45 : 30
+function drawWeather(w: Weather, ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number, more = 1) {
+  const n = Math.round((w === 'rain' ? 90 : w === 'snow' || w === 'sand' ? 70 : w === 'ash' || w === 'wind' ? 50 : w === 'psy' ? 45 : 30) * more)
   while (motes.length < n) motes.push({ x: ox + Math.random() * vw, y: oy + Math.random() * vh, s: 0.6 + Math.random(), ph: Math.random() * 6, v: 0.6 + Math.random() * 0.8 })
   motes.length = n
   for (const m of motes) {

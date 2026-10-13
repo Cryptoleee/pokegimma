@@ -8,7 +8,7 @@ import { drawCharge, onBeam, onImpact } from './moveFx'
 import { disc, drawGlow, drawShape, type DecalKind, type Shape } from './vfx'
 import { preloadMon } from './sprites'
 import { ARENA_C, ARENA_R, T, TILE, World } from './world'
-import { both, inBoth } from '../i18n'
+import { both, inBoth, L } from '../i18n'
 
 /**
  * Raid mode: a boss in the middle of an arena, everyone else against it.
@@ -62,6 +62,8 @@ export interface RaidState {
   moveT: number
   /** Phase change: briefly can't be hurt. */
   invulnT: number
+  /** Seconds until the phase banner shows (it lands with the form change). */
+  bannerT: number
   /** Raid time left. */
   timeLeft: number
   /** Raid result once decided. */
@@ -149,7 +151,7 @@ export function setupRaid(g: Game, id: keyof typeof BOSSES) {
   preloadMon(def.species)
   g.wilds.push(boss)
   g.raid = {
-    def, boss, phase: 0, nextT: 3, cds: {}, moveT: 2, invulnT: 0, timeLeft: RAID_TIME, result: null,
+    def, boss, phase: 0, nextT: 3, cds: {}, moveT: 2, invulnT: 0, bannerT: 0, timeLeft: RAID_TIME, result: null,
     goalX: boss.x, goalY: boss.y, envT: def.arena === 'crater' ? 6 : 7, potionT: 20,
     busyT: 0, air: null, wind: null, clones: [],
   }
@@ -178,6 +180,7 @@ export function updateRaid(g: Game, dt: number) {
   r.timeLeft -= dt
   const boss = r.boss
   r.invulnT = Math.max(0, r.invulnT - dt)
+  if (r.bannerT > 0 && (r.bannerT -= dt) <= 0) phaseBanner(g, r)
   r.busyT = Math.max(0, r.busyT - dt)
 
   // Lava burns, players come back after going down
@@ -331,6 +334,9 @@ export function updateRaid(g: Game, dt: number) {
   else if (r.timeLeft <= 0 || g.trainers.every((t) => !t.alive)) r.result = 'lost'
   if (r.result) endRaid(g, r)
 }
+
+/** Seconds the phase change takes (the roar and form change on screen). */
+export const ENRAGE_TIME = 2.6
 
 /** Seconds Rayquaza takes to fly out of sight, and to come back down. */
 const AIR_UP = 0.45, AIR_DOWN = 0.3
@@ -688,21 +694,35 @@ export function raidIntro(g: Game) {
   g.vfx.shakeBy(6)
 }
 
+function phaseBanner(g: Game, r: RaidState) {
+  const boss = r.boss
+  for (const v of g.viewers) {
+    const final = r.phase === 2
+    const name = final && r.def.finalName ? r.def.finalName : r.def.name
+    v.hooks.banner({
+      kind: 'legendary',
+      title: final && r.def.finalName ? both(`${r.def.name} becomes ${name}!`, `${r.def.name} wordt ${name}!`) : both(`${name} is enraged!`, `${name} wordt woedend!`),
+      sub: final ? inBoth(() => `${L('Final phase', 'Laatste fase')} · ${r.def.finalSub}`) : both('Phase 2 · new attacks', 'Fase 2 · nieuwe aanvallen'),
+      mon: r.def.forms?.[r.phase] ?? boss.species.id, color: r.def.looks[r.phase].aura ?? r.def.color, voice: r.phase === 1 ? 'enraged' : 'final_phase',
+    })
+  }
+}
+
 function enrage(g: Game, r: RaidState) {
   r.phase++
-  r.invulnT = 1.6
-  r.nextT = 2.2
+  // A short cinematic (roar, form change) plays on every screen: the boss holds still meanwhile
+  r.invulnT = ENRAGE_TIME
+  r.nextT = ENRAGE_TIME + 0.8
   const boss = r.boss
   boss.charging = null
-  for (const v of g.viewers) {
-    v.cry(boss.species.id, 0.5)
-    v.hooks.banner({ kind: 'legendary', title: both(`${r.def.name} is enraged!`, `${r.def.name} wordt woedend!`), sub: r.phase === 1 ? both('Phase 2 · new attacks', 'Fase 2 · nieuwe aanvallen') : both('Final phase · all or nothing!', 'Laatste fase · alles of niets!'), mon: boss.species.id, color: r.def.color, voice: r.phase === 1 ? 'enraged' : 'final_phase' })
-  }
+  for (const v of g.viewers) v.cry(boss.species.id, 0.5)
+  // The banner lands with the flash and the form change, not over the roar
+  r.bannerT = ENRAGE_TIME * 0.42
+  // Powering up (the big flash and the form change come a moment later: see bossFx)
   g.vfx.mark(boss.x, boss.y)
   g.vfx.ring(boss.x, boss.y, 4, r.def.color, 0.8, 8)
   g.vfx.glow(boss.x, boss.y - 0.8, 80, r.def.color, 0.6)
-  g.vfx.flash(0.6, '255,255,255')
-  g.vfx.shakeBy(10)
+  g.vfx.shakeBy(5)
   g.soundAt(boss.x, boss.y, 'boss', ['enrage', r.def.attacks[0].fx], { global: true })
   // Roar: shove everyone back
   for (const tr of g.trainers) {

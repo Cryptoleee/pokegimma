@@ -111,7 +111,10 @@ Een raid is PvE: jij (en tot 11 vrienden) tegen één legendarische baas, in een
 
 - **Jouw team:** je partner is in de raid volledig geëvolueerd en Lv 50 met alle vier de aanvallen (Pikachu wordt Raichu, Charmander Charizard, enzovoort). Je hebt 2 Potions en HP herstelt niet vanzelf. Er verschijnen wel geregeld Potions in de arena.
 - **Ontwijken:** elke grote aanval zie je eerst als rode vorm op de grond die langzaam volloopt: een cirkel, kegel, lijn of ring. Sta je erin als hij vol is, dan kost dat een groot deel van je HP. Elke waarschuwing is lang genoeg om eruit te lopen als je meteen reageert.
-- **Fases:** op 66% en 33% HP wordt de baas woedend. Hij brult iedereen weg, is even onkwetsbaar, krijgt nieuwe aanvallen en valt sneller aan, en er vallen Potions.
+- **Fases:** op 66% en 33% HP wordt de baas woedend. Dat is een korte cinematic: de camera zwenkt naar de baas, de wereld wordt donker, hij brult (een eigen animatie), en op een flits met schokgolf verschijnt zijn nieuwe vorm. Hij brult iedereen weg, krijgt nieuwe aanvallen en valt sneller aan, en er vallen Potions.
+- **Elke fase voelt anders:** een eigen kleur over het scherm, een pulserende rand (in de laatste fase op het ritme van een hartslag), meer weer en een arena die escaleert: hitte uit de vloer, sneeuwstormvlagen, onweer dat de lucht verlicht, windstrepen of een vervormende werkelijkheid. De baas gloeit in de kleur van zijn fase.
+- **Laatste fase, nieuwe vorm:** Kyurem wordt **Black Kyurem** (ijs + bliksem: Freeze Shock, Fusion Bolt), Rayquaza wordt **Mega Rayquaza** (Extreme Speed), Mewtwo wordt **Mega Mewtwo Y** (Aura Sphere). Reshiram gaat over op blauw vuur (Dragon Rush, Blauwe Vlammenstorm) en Zekrom op Teravolt (Teravolt-sprong: springt op en landt op je).
+- **Animatie:** de bazen spelen hun echte geanimeerde Black/White-sprites af, zweven (Rayquaza, Mewtwo) of stampen, en laten nabeelden achter bij een dash.
 - **Levens en tijd:** iedereen heeft 3 levens. Ga je neer, dan kom je na 4 seconden terug aan de rand. De raid mislukt als iedereen op is of na 4 minuten. Met meer spelers heeft de baas meer HP.
 - **Afloop:** "Raid geslaagd!" of "Raid mislukt" met je tijd, je aandeel in de schade en je levens.
 
@@ -123,7 +126,11 @@ Een raid is PvE: jij (en tot 11 vrienden) tegen één legendarische baas, in een
 | **Rayquaza** | Hemelpilaar | Het oude stenen dak van de toren, met mos, gebroken pilaren en open lucht als rand; wervelwinden trekken door de arena en doen schade zolang je erin staat | Dragon Ascent (vliegt op en landt op een speler), Outrage (drie lijnen), Draco Meteor, Hurricane (tornado's), en in fase 3 Delta Stream: harde wind die iedereen één kant op duwt |
 | **Mewtwo** | Psychisch lab | Het vloerraster laadt op: de helft van de vakken (dambordpatroon) slaat toe, dus ga op tijd naar een donker vak | Psystrike (kegel), Shadow Ball, Teleport (verschijnt naast je en slaat om zich heen), Psychische ring, en in fase 3 twee klonen die de aanvallen meedoen |
 
-Nieuwe bazen zijn vooral data: een rij in `src/data/bosses.ts` met hun aanvallen, plus eventueel een arena in `src/game/world.ts`.
+Nieuwe bazen zijn vooral data: een rij in `src/data/bosses.ts` met hun aanvallen, vormen en uiterlijk per fase, plus eventueel een arena in `src/game/world.ts`.
+
+**Sprites en animaties van de bazen**
+- `scripts/bake-boss-sprites.py` zet de geanimeerde BW-sprites (GIF) om in sprite sheets (`src/assets/boss/<id>.png`) met frametijden (`src/data/bossAnims.ts`). Nieuwe vorm erbij: zet het id in de lijst en draai het script opnieuw.
+- `scripts/bake-ai-anim.py` maakt van een AI-animatie een pixel-art actie (zoals de brul bij een fasewissel). Werkwijze: zet de sprite 6× vergroot op een effen greenscreen (#00b140; magenta #ff00ff voor groene Pokémon zoals Rayquaza), animeer die met MiniMax H3 (startframe = eindframe, vaste camera), en draai het script. Dat haalt de achtergrond weg, schaalt terug naar spritegrootte en zet elke pixel op het palet van de echte sprite. Resultaat: `src/assets/boss/<id>-<actie>.png` en `src/data/bossActions.ts`.
 
 ## Presentatie
 
