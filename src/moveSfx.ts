@@ -49,9 +49,60 @@ let noiseBuf: AudioBuffer | null = null
 let voices = 0
 const lastPlay = new Map<string, number>()
 
+// ---------------------------------------------------------------- samples
+
+/**
+ * Recorded effects per type (cast, hit, big) plus a shared swing, dash and charge.
+ * They load in the background on first use; until a sample is in, the synth plays.
+ */
+const SAMPLE_URLS = import.meta.glob('./assets/sfx/*.mp3', { query: '?url', import: 'default', eager: true }) as Record<string, string>
+const samples = new Map<string, AudioBuffer>()
+let loading: Promise<void> | null = null
+/** Overall level of the samples next to the synth layers. */
+const SAMPLE_GAIN = 0.9
+
+/** Start loading the samples (an AudioBuffer works in any context, offline ones included). */
+export function loadSfx(ctx: BaseAudioContext) {
+  loading ??= Promise.all(
+    Object.entries(SAMPLE_URLS).map(([path, url]) =>
+      fetch(url)
+        .then((r) => r.arrayBuffer())
+        .then((b) => ctx.decodeAudioData(b))
+        .then((buf) => void samples.set(path.slice(path.lastIndexOf('/') + 1, -4), buf))
+        .catch(() => {}),
+    ),
+  ).then(() => {})
+  return loading
+}
+
+/** Play a sample into a voice; false when it hasn't loaded (so the caller falls back to the synth). */
+function sample(x: Ctx, name: string, vol = 1, rate = 1, at = 0, max = 0) {
+  const buf = samples.get(name)
+  if (!buf) return false
+  const src = x.ctx.createBufferSource()
+  src.buffer = buf
+  src.playbackRate.value = Math.max(0.5, Math.min(2.5, rate))
+  const g = x.ctx.createGain()
+  const v = vol * SAMPLE_GAIN
+  g.gain.value = v
+  src.connect(g).connect(x.o)
+  const t = x.t + at
+  src.start(t)
+  if (max > 0 && max < buf.duration / rate) {
+    g.gain.setValueAtTime(v, t + max * 0.7)
+    g.gain.linearRampToValueAtTime(0, t + max)
+    src.stop(t + max + 0.02)
+  }
+  return true
+}
+
+/** Pitch for a sample: follows the synth pitch, but softer so it never turns into a chipmunk. */
+const rateOf = (p: number) => Math.pow(p, 0.6)
+
 function setup(ctx: AudioContext) {
   if (c === ctx && bus) return
   c = ctx
+  void loadSfx(ctx)
   // Bus: gentle tape-style saturation for weight, then a fast compressor as a limiter
   // (so everything can be louder and fuller without clipping when a lot goes off at once)
   const sat = ctx.createWaveShaper()
@@ -445,6 +496,7 @@ export function playMoveCast(ctx: AudioContext | null, muted: boolean, fx: MoveF
   const vol = (0.18 + k * 0.1) * gain * (LOUDER[fam] ?? 1)
   play(ctx, muted, 'c' + fx + shape, 45, pan, vol, 0.08 + k * 0.3, len, (o, t) => {
     const x: Ctx = { ctx: ctx!, o, t, p, k, len }
+    if (castSample(x, fam, shape)) return
     const T = TIMBRE[fam]
     launch(x, shape)
     switch (shape) {
@@ -477,6 +529,42 @@ export function playMoveCast(ctx: AudioContext | null, muted: boolean, fx: MoveF
   }, gain >= 1)
 }
 
+/** The recorded version of a cast; false when the samples aren't in yet. */
+function castSample(x: Ctx, fam: Fam, shape: Shape) {
+  const lift = 1 / (LOUDER[fam] ?? 1)
+  const rate = rateOf(x.p)
+  if (!samples.has(fam + '-cast')) return false
+  switch (shape) {
+    case 'melee':
+      // A swing with a taste of the type on top
+      sample(x, 'swing', lift * 1.1, rate * (0.95 + x.k * 0.1))
+      sample(x, fam + '-cast', lift * 0.55, rate * 1.05, 0.03, 0.4)
+      break
+    case 'dash':
+      sample(x, 'dash', lift, rate)
+      sample(x, fam + '-cast', lift * 0.6, rate, 0, 0.5)
+      break
+    case 'spread':
+      sample(x, fam + '-cast', lift, rate)
+      sample(x, fam + '-cast', lift * 0.45, rate * 1.08, 0.07, 0.4)
+      break
+    case 'burst':
+      // The blast happens right around the user: launch and impact at once
+      sample(x, fam + '-cast', lift * 0.8, rate)
+      sample(x, x.k >= 0.6 ? fam + '-big' : fam + '-hit', lift, rate)
+      if (x.k >= 0.6) sub(x, 0.5 + x.k * 0.3)
+      break
+    case 'beam':
+      // The strongest beams use the big recording, cut to the beam's length
+      if (x.k >= 0.99) sample(x, fam + '-big', lift * 0.85, rate, 0, Math.max(0.8, x.len * 2.5))
+      else sample(x, fam + '-cast', lift, rate * 0.95)
+      break
+    default:
+      sample(x, fam + '-cast', lift, rate)
+  }
+  return true
+}
+
 /** A move landing on a target: its type's impact, heavier for stronger moves. */
 export function playMoveHit(ctx: AudioContext | null, muted: boolean, fx: MoveFx, tier: number, pan = 0, gain = 1) {
   const m = MOVES[fx]
@@ -487,6 +575,13 @@ export function playMoveHit(ctx: AudioContext | null, muted: boolean, fx: MoveFx
   const vol = (0.17 + k * 0.13) * gain * (shape === 'nova' ? 1.25 : 1)
   play(ctx, muted, 'h' + fx, 55, pan, vol, 0.12 + k * 0.35, 0.8 + k, (o, t) => {
     const x: Ctx = { ctx: ctx!, o, t, p, k, len: 0.2 }
+    const big = shape === 'nova' || k >= 0.66
+    if (sample(x, fam + (big ? '-big' : '-hit'), 1 / (shape === 'nova' ? 1.25 : 1), rateOf(p), 0, big ? 0 : 0.9)) {
+      // A light thump under it for weight, a deep boom under the strongest
+      osc(x.ctx, o, t, { type: 'sine', f: 140, f2: 45, dur: 0.12 + k * 0.15, vol: 0.35 + k * 0.3 })
+      if (big) sub(x, 0.5 + k * 0.3)
+      return
+    }
     punch(x)
     TIMBRE[fam].hit(x)
     if (shape === 'nova' || k >= 0.66) sub(x, 0.7 + k * 0.3)
@@ -506,6 +601,9 @@ export function playMoveCharge(ctx: AudioContext | null, muted: boolean, fx: Mov
   if (!m) return
   const [, , pitch] = m
   play(ctx, muted, 'g' + fx, 100, pan, (0.06 + tier * 0.02) * gain, 0.2, dur, (o, t) => {
+    // Squeeze or stretch the recorded swell so it peaks as the move fires
+    const buf = samples.get('charge')
+    if (buf && sample({ ctx: ctx!, o, t, p: pitch, k: tier / 3, len: dur }, 'charge', 1.6, buf.duration / Math.max(0.3, dur), 0, dur + 0.08)) return
     osc(ctx!, o, t, { type: 'sine', f: 200 * pitch, f2: 1200 * pitch, dur: dur + 0.05, vol: 0.5, attack: dur * 0.8, lin: true, vib: [14, 20] })
     osc(ctx!, o, t, { type: 'triangle', f: 400 * pitch, f2: 2400 * pitch, dur: dur + 0.05, vol: 0.2, attack: dur * 0.8, lin: true })
     noise(ctx!, o, t, { dur: dur + 0.05, vol: 0.25, attack: dur * 0.9, filter: 'bandpass', f: 600, f2: 4000, q: 3 })

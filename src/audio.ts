@@ -1,12 +1,15 @@
-/** Tiny chiptune-ish sound effects with WebAudio; no audio files needed. */
+/** Sound effects with WebAudio: recorded move samples on top of a small synth. */
 import type { MoveFx } from './data/moves'
 import { moveByName } from './data/moves'
-import { namePitch, playBoss, playItem, playMoveCast, playMoveCharge, playMoveHit, type BossSound, type ItemSound } from './moveSfx'
+import { loadSfx, namePitch, playBoss, playItem, playMoveCast, playMoveCharge, playMoveHit, type BossSound, type ItemSound } from './moveSfx'
 let ctx: AudioContext | null = null
 let muted = false
 
 export function unlockAudio() {
-  if (!ctx) ctx = new AudioContext()
+  if (!ctx) {
+    ctx = new AudioContext()
+    void loadSfx(ctx)
+  }
   if (ctx.state === 'suspended') void ctx.resume()
 }
 

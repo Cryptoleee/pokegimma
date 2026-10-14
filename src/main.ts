@@ -21,7 +21,7 @@ import { showLoading } from './ui/loading'
 import { wipe } from './ui/transition'
 import { currentMusic, playMusic, setTempo } from './music'
 import { sfx } from './audio'
-import { namePitch, playBoss, playItem, playMoveCast, playMoveCharge, playMoveHit, resetSfx } from './moveSfx'
+import { loadSfx, namePitch, playBoss, playItem, playMoveCast, playMoveCharge, playMoveHit, resetSfx } from './moveSfx'
 import { profile, setName } from './profile'
 import { cleanCode, probeQuick, Room, stopProbe } from './net/room'
 import type { ChatLine, HostMsg, LobbyPlayer, MatchChoice } from './net/protocol'
@@ -963,6 +963,6 @@ ticker.onmessage = () => {
 }
 
 // Handy for debugging from the console.
-;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game }, get room() { return room }, get music() { return currentMusic() }, remotes, snapshot, voiceLog, sound: { move: moveByName, namePitch, cast: playMoveCast, hit: playMoveHit, charge: playMoveCharge, item: playItem, boss: playBoss, reset: resetSfx } }
+;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game }, get room() { return room }, get music() { return currentMusic() }, remotes, snapshot, voiceLog, sound: { move: moveByName, namePitch, cast: playMoveCast, hit: playMoveHit, charge: playMoveCharge, item: playItem, boss: playBoss, reset: resetSfx, ready: loadSfx } }
 
 toTitle()
