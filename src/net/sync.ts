@@ -18,7 +18,7 @@ import { BOSSES } from '../data/bosses'
 
 const DIRS: Dir[] = ['down', 'up', 'left', 'right']
 const STATES: WildState[] = ['roam', 'aggro', 'weak']
-const ITEMS: ItemKind[] = ['master', 'potion', 'candy', 'revive']
+const ITEMS: ItemKind[] = ['master', 'potion', 'candy', 'revive', 'evolve']
 const SHAPES: Hazard['shape'][] = ['circle', 'cone', 'line', 'ring', 'grid']
 const r2 = (v: number) => Math.round(v * 100) / 100
 const r1 = (v: number) => Math.round(v * 10) / 10

@@ -23,13 +23,14 @@ import type { ClientState } from '../net/sync'
 import type { VoiceLine } from '../voice'
 import { both, type Txt } from '../i18n'
 
-export type ItemKind = 'master' | 'potion' | 'candy' | 'revive'
-const PICKUP_SOUND: Record<ItemKind, ItemSound> = { master: 'pickupMaster', potion: 'pickupPotion', candy: 'pickupCandy', revive: 'pickupRevive' }
+/** 'evolve' = the Evolution Crystal: walk over it and your Pokémon is fully evolved with every move. */
+export type ItemKind = 'master' | 'potion' | 'candy' | 'revive' | 'evolve'
+const PICKUP_SOUND: Record<ItemKind, ItemSound> = { master: 'pickupMaster', potion: 'pickupPotion', candy: 'pickupCandy', revive: 'pickupRevive', evolve: 'pickupSurge' }
 export const ITEM_SPRITE: Record<ItemKind, string> = {
-  master: 'master-ball', potion: 'potion', candy: 'rare-candy', revive: 'revive',
+  master: 'master-ball', potion: 'potion', candy: 'rare-candy', revive: 'revive', evolve: 'shiny-stone',
 }
 export const ITEM_NL: Record<ItemKind, string> = {
-  master: 'Master Ball', potion: 'Potion', candy: 'Rare Candy', revive: 'Revive',
+  master: 'Master Ball', potion: 'Potion', candy: 'Rare Candy', revive: 'Revive', evolve: 'Evolution Crystal',
 }
 
 export interface GroundItem {
@@ -379,6 +380,8 @@ export class Game {
 
     this.scatterItems()
     this.legendTimes = [this.rng.range(60, 100), this.rng.range(190, 250)]
+    // The Evolution Crystal: one per match, early on (everyone races for it)
+    this.crystalAt = this.rng.range(28, 45)
     this.eventPlan = eventTimes(this)
     for (let i = 0; i < 22; i++) this.spawnWild(true)
     for (const tr of this.trainers) if (tr.human) tr.party.forEach((m) => preloadMon(m.species.id))
@@ -537,6 +540,7 @@ export class Game {
     if (this.raid) updateRaid(this, dt)
     else {
       this.spawnLoop(dt)
+      if (this.crystalAt > 0 && this.time >= this.crystalAt) this.spawnCrystal()
       if (this.eventPlan.length && this.time >= this.eventPlan[0].t) startEvent(this, this.eventPlan.shift()!.kind)
       updateEvents(this, dt)
     }
@@ -1624,6 +1628,73 @@ export class Game {
     }
   }
 
+  /** When the Evolution Crystal appears (0 = done). */
+  crystalAt = 0
+
+  /** The Evolution Crystal lands somewhere inside the zone, not right next to anyone; everyone hears about it. */
+  private spawnCrystal() {
+    this.crystalAt = 0
+    const z = this.zone
+    let at: [number, number] | null = null
+    for (let k = 0; k < 60 && !at; k++) {
+      const [x, y] = this.world.randomWalkable()
+      if (Math.hypot(x - z.x, y - z.y) > z.r * 0.7) continue
+      if (this.trainers.some((t) => t.alive && Math.hypot(t.x - x, t.y - y) < 12)) continue
+      at = [x, y]
+    }
+    if (!at) at = this.world.randomWalkable()
+    this.items.push({ x: at[0], y: at[1], kind: 'evolve', bob: 0 })
+    this.vfx.mark(at[0], at[1])
+    this.vfx.ring(at[0], at[1], 3, '#ffffff', 0.8, 6)
+    this.vfx.glow(at[0], at[1] - 1, 90, '#c8a0ff', 0.8)
+    this.soundAt(at[0], at[1], 'spawnChime', [], { global: true })
+    for (const v of this.viewers) {
+      v.hooks.banner({ kind: 'legendary', title: both('Evolution Crystal!', 'Evolutiekristal!'), sub: both('Walk over it: your Pokémon evolves fully, with every move', 'Loop erover: je Pokémon evolueert volledig, met alle aanvallen'), color: '#c8a0ff', voice: 'legendary' })
+      v.hooks.feed(both('✦ An Evolution Crystal has appeared! Follow the arrow', '✦ Er is een Evolutiekristal verschenen! Volg de pijl'))
+    }
+  }
+
+  /** Evolution Crystal: straight to the final form, the level that takes, and all four moves. */
+  private evolutionSurge(tr: Trainer) {
+    const m = tr.mon.fainted ? tr.party.find((x) => !x.fainted) : tr.mon
+    if (!m) return
+    const from = m.species
+    let sp = m.species
+    let lv = SLOT_UNLOCK[SLOT_UNLOCK.length - 1]
+    for (let i = 0; i < 4 && sp.evo?.length; i++) {
+      lv = Math.max(lv, sp.evoLevel ?? 0)
+      sp = SPECIES[this.rng.pick(sp.evo)]
+    }
+    m.level = Math.min(LEVEL_CAP, Math.max(m.level, lv))
+    m.xp = 0
+    m.species = sp
+    m.moves = movesetFor(sp.types)
+    m.hp = m.maxHp
+    m.evolveFx = 2.6
+    preloadMon(sp.id, m.shiny)
+    // A pillar of light, rainbow shockwaves and stars: everyone close by sees it
+    const cols = ['#ff6080', '#ffd040', '#60f0a0', '#60c0ff', '#c080ff']
+    this.vfx.glow(m.x, m.y - 1, 160, '#ffffff', 1)
+    cols.forEach((c, i) => this.vfx.ring(m.x, m.y, 2 + i * 1.6, c, 0.5 + i * 0.12, 7 - i))
+    this.vfx.burst(m.x, m.y - 1.2, { n: 60, speed: 11, cols, shape: 'star', add: true, s0: 7, s1: 1, life: 1.1 })
+    this.vfx.burst(m.x, m.y - 0.5, { n: 30, speed: 3, dir: -Math.PI / 2, spread: 0.35, cols: ['#ffffff', '#e0d0ff'], shape: 'streak', add: true, s0: 5, s1: 1, life: 1.4 })
+    this.vfx.shakeBy(12)
+    this.vfx.flash(0.8, '255,255,255')
+    this.soundAt(m.x, m.y, 'evolve', [], { range: 30 })
+    const v = this.vOf(tr)
+    const evolved = from.id !== sp.id
+    const sub = both(`${from.name} → ${sp.name} · Lv ${m.level} · all moves unlocked`, `${from.name} → ${sp.name} · Lv ${m.level} · alle aanvallen`)
+    if (v && this.mode === 'solo' && evolved) {
+      this.paused = true
+      v.hooks.evolve(from.id, sp.id, m.shiny, () => {
+        this.paused = false
+        v.hooks.banner({ kind: 'legendary', title: both('EVOLUTION SURGE!', 'EVOLUTIE-STOOT!'), sub, mon: sp.id, shiny: m.shiny, color: '#c8a0ff', voice: 'evolve' })
+      })
+    } else v?.hooks.banner({ kind: 'legendary', title: both('EVOLUTION SURGE!', 'EVOLUTIE-STOOT!'), sub, mon: sp.id, shiny: m.shiny, color: '#c8a0ff', voice: 'evolve' })
+    for (const o of this.viewers)
+      if (o !== v) o.hooks.feed(both(`✦ ${tr.name} grabbed the Evolution Crystal: ${sp.name} Lv ${m.level}!`, `✦ ${tr.name} pakte het Evolutiekristal: ${sp.name} Lv ${m.level}!`), { mon: sp.id })
+  }
+
   private updateItems() {
     for (const it of [...this.items]) {
       for (const tr of this.trainers) {
@@ -1650,6 +1721,9 @@ export class Game {
       case 'revive':
         tr.revives++
         v?.hooks.toast(both('Found a Revive', 'Revive gevonden'))
+        break
+      case 'evolve':
+        this.evolutionSurge(tr)
         break
       case 'candy': {
         const m = tr.mon.fainted ? tr.party.find((x) => !x.fainted) : tr.mon

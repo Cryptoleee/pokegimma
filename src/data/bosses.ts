@@ -184,7 +184,7 @@ export const BOSSES: Record<BossId, BossDef> = {
   },
   mewtwo: {
     id: 'mewtwo', species: 150, name: 'Mewtwo', get title() { return L('Clone from the Psychic Lab', 'Kloon uit het Psychische Lab') }, arena: 'lab',
-    level: 60, hp: 11, phases: [0.66, 0.33], color: '#c070ff', clonesFrom: 2,
+    level: 60, hp: 10.4, phases: [0.66, 0.33], color: '#c070ff', clonesFrom: 2,
     forms: [150, 150, 10044], finalName: 'Mega Mewtwo Y',
     get finalSub() { return L('Mega Evolution · reality bends!', 'Mega-evolutie · de werkelijkheid buigt!') },
     looks: [CALM, { grade: 'rgba(80,20,120,0.08)', edge: '#c070ff', aura: '#d090ff', weather: 2, fx: 'warp' }, { grade: 'rgba(40,0,70,0.18)', edge: '#ff60e0', aura: '#ff80f0', weather: 3, fx: 'warp' }],

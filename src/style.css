@@ -5629,6 +5629,17 @@ button:disabled {
 .legend.evt .lg-arrow {
   color: #fff;
 }
+.legend.evt.crystal {
+  background: linear-gradient(110deg, #ff9ab0, #ffe070, #8cf0b8, #8ad0ff, #d8a8ff, #ff9ab0);
+  background-size: 300% 100%;
+  animation: crystal-pill 2.4s linear infinite;
+  box-shadow: 0 4px 0 #1a1420, 0 0 26px rgba(220, 180, 255, 0.8);
+}
+@keyframes crystal-pill {
+  to {
+    background-position: 300% 0;
+  }
+}
 
 /* =====================================================================
    Raid HUD

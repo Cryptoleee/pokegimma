@@ -740,6 +740,10 @@ function drawItems(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, y
     const px = it.x * TILE, py = it.y * TILE
     const b = Math.sin(it.bob * 3) * 1.5
     shadow(ctx, px, py + 2, 8)
+    if (it.kind === 'evolve') {
+      drawCrystal(ctx, s, px, py, it.bob)
+      continue
+    }
     if (it.kind === 'master') {
       ctx.globalAlpha = 0.3 + Math.sin(it.bob * 4) * 0.15
       ctx.fillStyle = '#c070ff'
@@ -752,6 +756,49 @@ function drawItems(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, y
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(px + 4, py - 12 + b, 2, 2)
     }
+  }
+}
+
+const RAINBOW = ['#ff6080', '#ffd040', '#60f0a0', '#60c0ff', '#c080ff']
+
+/** The Evolution Crystal on the ground: a pillar of light you see from afar, a rainbow aura and sparkles. */
+function drawCrystal(ctx: CanvasRenderingContext2D, s: ReturnType<typeof getSprite>, px: number, py: number, t: number) {
+  const hue = (t * 90) % 360
+  ctx.save()
+  // Light pillar into the sky (coloured, so it shows on snow and sand too)
+  const beam = ctx.createLinearGradient(0, py - 240, 0, py)
+  beam.addColorStop(0, `hsla(${hue},100%,60%,0)`)
+  beam.addColorStop(0.6, `hsla(${hue},100%,60%,0.3)`)
+  beam.addColorStop(1, `hsla(${hue},100%,65%,0.55)`)
+  ctx.fillStyle = beam
+  const w = 7 + Math.sin(t * 6) * 1.5
+  ctx.fillRect(px - w, py - 240, w * 2, 238)
+  ctx.fillStyle = `hsla(${(hue + 40) % 360},100%,92%,0.75)`
+  ctx.fillRect(px - 1.5, py - 240, 3, 238)
+  ctx.globalCompositeOperation = 'lighter'
+  // Rainbow aura pulsing on the ground
+  for (let i = 0; i < 3; i++) {
+    const k = ((t * 0.9 + i / 3) % 1)
+    ctx.strokeStyle = `hsla(${(hue + i * 120) % 360},100%,70%,${0.7 * (1 - k)})`
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.ellipse(px, py + 1, 4 + k * 16, (4 + k * 16) * 0.42, 0, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+  drawGlow(ctx, px, py - 6, 26 + Math.sin(t * 5) * 4, RAINBOW[Math.floor(t * 1.5) % RAINBOW.length], 0.55)
+  // Sparkles orbiting it
+  for (let i = 0; i < 6; i++) {
+    const a = t * 2.4 + (i * Math.PI) / 3
+    const r = 10 + Math.sin(t * 3 + i) * 2
+    ctx.fillStyle = `hsla(${(hue + i * 60) % 360},100%,80%,0.9)`
+    ctx.fillRect(px + Math.cos(a) * r - 1, py - 8 + Math.sin(a) * r * 0.45 - Math.abs(Math.sin(t * 4 + i)) * 6 - 1, 2, 2)
+  }
+  ctx.restore()
+  // The crystal itself: bigger than other items, floating and glinting
+  if (s.ready) {
+    const b = Math.sin(t * 3) * 2.5 - 4
+    const sc = 1.6
+    ctx.drawImage(s.img, s.bx, s.by, s.bw, s.bh, px - (s.bw * sc) / 2, py - s.bh * sc - 1 + b, s.bw * sc, s.bh * sc)
   }
 }
 

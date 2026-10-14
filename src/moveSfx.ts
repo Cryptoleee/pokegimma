@@ -477,7 +477,7 @@ export function playMoveCharge(ctx: AudioContext | null, muted: boolean, fx: Mov
 
 // ---------------------------------------------------------------- items
 
-export type ItemSound = 'potion' | 'revive' | 'throw' | 'throwMaster' | 'shake' | 'breakOut' | 'pickupBall' | 'pickupPotion' | 'pickupCandy' | 'pickupRevive' | 'pickupMaster'
+export type ItemSound = 'potion' | 'revive' | 'throw' | 'throwMaster' | 'shake' | 'breakOut' | 'pickupBall' | 'pickupPotion' | 'pickupCandy' | 'pickupRevive' | 'pickupMaster' | 'pickupSurge'
 
 export function playItem(ctx: AudioContext | null, muted: boolean, name: ItemSound, pan = 0, gain = 1) {
   play(ctx, muted, 'i' + name, 40, pan, 0.2 * gain, 0.15, 1.2, (o, t) => {
@@ -522,6 +522,13 @@ export function playItem(ctx: AudioContext | null, muted: boolean, name: ItemSou
         break
       case 'pickupRevive':
         ;[880, 1319, 1760].forEach((f, i) => osc(x, o, t, { type: 'triangle', at: i * 0.06, f, dur: 0.18, vol: 0.3 }))
+        break
+      case 'pickupSurge':
+        // A rising rainbow arpeggio over a swelling shimmer, then a deep boom
+        ;[523, 659, 784, 1047, 1319, 1568, 2093].forEach((f, i) => osc(x, o, t, { type: 'square', at: i * 0.055, f, dur: 0.16, vol: 0.18 }))
+        osc(x, o, t, { type: 'sine', f: 220, f2: 880, dur: 0.6, vol: 0.3 })
+        noise(x, o, t, { dur: 0.9, vol: 0.25, attack: 0.3, filter: 'highpass', f: 5000 })
+        osc(x, o, t, { type: 'sine', at: 0.42, f: 120, f2: 40, dur: 0.6, vol: 0.6 })
         break
       case 'pickupMaster':
         ;[784, 988, 1175, 1568, 1976].forEach((f, i) => osc(x, o, t, { type: 'sine', at: i * 0.05, f, dur: 0.3, vol: 0.28 }))

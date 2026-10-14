@@ -649,11 +649,12 @@ export class Hud {
   private updateLegend() {
     const g = this.g, p = g.player
     const w: Mon | undefined = g.wilds.find((x) => x.legendary && !x.catching && !x.boss)
-    // No legendary around: point at a supply drop or swarm instead
+    // No legendary around: point at the Evolution Crystal, or else a supply drop or swarm
+    if (!w && p.alive && g.introT <= 0 && g.items.some((it) => it.kind === 'evolve')) return this.updateCrystalPill()
     if (!w && p.alive && g.introT <= 0 && g.events.length) return this.updateEventPill()
     const show = !!w && p.alive && g.introT <= 0
     this.legend.classList.toggle('hidden', !show)
-    this.legend.classList.remove('evt', 'drop', 'swarm')
+    this.legend.classList.remove('evt', 'drop', 'swarm', 'crystal')
     if (!show || !w) {
       this.legendId = -1
       return
@@ -675,6 +676,26 @@ export class Hud {
     this.legend.classList.toggle('near', d < 6)
   }
 
+  /** Tracker pill for the Evolution Crystal. */
+  private updateCrystalPill() {
+    const g = this.g, p = g.player
+    const it = g.items.find((x) => x.kind === 'evolve')!
+    this.legend.classList.remove('hidden', 'drop', 'swarm')
+    this.legend.classList.add('evt', 'crystal')
+    if (this.legendId !== -999) {
+      this.legendId = -999
+      this.legend.innerHTML = `<img class="px" src="${itemUrl('shiny-stone')}" alt=""><div class="lg-txt"><b>${L('✦ Evolution Crystal', '✦ Evolutiekristal')}</b><span></span></div><i class="lg-arrow">➤</i>`
+      this.legend.classList.remove('pop')
+      void this.legend.offsetWidth
+      this.legend.classList.add('pop')
+    }
+    const dx = it.x - p.x, dy = it.y - p.y
+    const d = Math.hypot(dx, dy)
+    ;(this.legend.querySelector('.lg-arrow') as HTMLElement).style.transform = `rotate(${Math.atan2(dy, dx)}rad)`
+    ;(this.legend.querySelector('span') as HTMLElement).textContent = `${Math.round(d)} m · ${L('full evolution + every move', 'volledig evolueren + alle aanvallen')}`
+    this.legend.classList.toggle('near', d < 6)
+  }
+
   /** Tracker pill for the nearest event (blue = supply drop, green = swarm). */
   private updateEventPill() {
     const g = this.g, p = g.player
@@ -683,7 +704,7 @@ export class Hud {
       const d = Math.hypot(x.x - p.x, x.y - p.y) - (x.kind === 'drop' ? 30 : 0)
       if (d < bd) { bd = d; e = x }
     }
-    this.legend.classList.remove('hidden')
+    this.legend.classList.remove('hidden', 'crystal')
     this.legend.classList.add('evt', e.kind)
     const key = -1000 - e.id
     if (this.legendId !== key) {
@@ -734,6 +755,18 @@ export class Hud {
       c.fillStyle = blink ? (e.kind === 'drop' ? '#58d0ff' : '#7ce07c') : '#282830'
       c.fillRect(e.x * s - 4, e.y * s - 4, 8, 8)
     }
+    // The Evolution Crystal: a big blinking rainbow diamond
+    for (const it of g.items)
+      if (it.kind === 'evolve') {
+        c.fillStyle = blink ? `hsl(${(performance.now() / 6) % 360},100%,70%)` : '#ffffff'
+        c.beginPath()
+        c.moveTo(it.x * s, it.y * s - 7)
+        c.lineTo(it.x * s + 5, it.y * s)
+        c.lineTo(it.x * s, it.y * s + 7)
+        c.lineTo(it.x * s - 5, it.y * s)
+        c.closePath()
+        c.fill()
+      }
     for (const w of g.wilds)
       if (w.legendary) {
         c.fillStyle = blink ? '#ffd040' : '#282830'
