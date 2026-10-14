@@ -235,7 +235,7 @@ export function updateRaid(g: Game, dt: number) {
       if (a) {
         castAttack(g, r, a, foes)
         r.cds[a.id] = a.cd
-        r.nextT = [4.3, 3.6, 2.9][r.phase] + a.warn + (a.sweep ? a.sweep.count * (a.stagger ?? 0) : 0)
+        r.nextT = [4.0, 3.4, 2.7][r.phase] + a.warn + (a.sweep ? a.sweep.count * (a.stagger ?? 0) : 0)
       } else r.nextT = 0.5
     }
     // The arena fights too: vents, lightning rods, tornados, the floor grid

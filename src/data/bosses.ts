@@ -114,7 +114,7 @@ const CALM: PhaseLook = { grade: '', edge: '', weather: 1 }
 export const BOSSES: Record<BossId, BossDef> = {
   reshiram: {
     id: 'reshiram', species: 643, name: 'Reshiram', get title() { return L('Ruler of the Volcano Crater', 'Heerser van de Vulkaankrater') }, arena: 'crater',
-    level: 60, hp: 8.5, phases: [0.66, 0.33], color: '#ff7a30',
+    level: 60, hp: 9, phases: [0.66, 0.33], color: '#ff7a30',
     get finalSub() { return L('Turboblaze · its fire burns blue!', 'Turboblaze · het vuur brandt blauw!') },
     looks: [CALM, { grade: 'rgba(255,80,20,0.07)', edge: '#ff5a1a', aura: '#ff7a30', weather: 1.8, fx: 'heat' }, { grade: 'rgba(40,120,255,0.10)', edge: '#3a9cff', aura: '#70d0ff', weather: 2.8, fx: 'heat' }],
     get blurb() { return L('White flames, meteors and a crater full of lava.', 'Witte vlammen, meteoren en een krater vol lava.') },
@@ -132,7 +132,7 @@ export const BOSSES: Record<BossId, BossDef> = {
   },
   kyurem: {
     id: 'kyurem', species: 646, name: 'Kyurem', get title() { return L('Frozen Dragon of the Ice Cave', 'Bevroren draak van de IJsgrot') }, arena: 'icecave',
-    level: 60, hp: 8, phases: [0.66, 0.33], color: '#7ac8ff',
+    level: 60, hp: 8.6, phases: [0.66, 0.33], color: '#7ac8ff',
     forms: [646, 646, 10022], finalName: 'Black Kyurem',
     get finalSub() { return L('Fused with Zekrom · ice meets lightning!', 'Versmolten met Zekrom · ijs en bliksem!') },
     looks: [CALM, { grade: 'rgba(160,220,255,0.08)', edge: '#9ad8ff', aura: '#a8e0ff', weather: 2.2, fx: 'whiteout' }, { grade: 'rgba(40,60,110,0.16)', edge: '#4ab0ff', aura: '#60b8ff', weather: 3, fx: 'storm' }],
@@ -151,7 +151,7 @@ export const BOSSES: Record<BossId, BossDef> = {
   },
   zekrom: {
     id: 'zekrom', species: 644, name: 'Zekrom', get title() { return L('Ruler of Storm Peak', 'Heerser van de Stormtop') }, arena: 'plateau',
-    level: 60, hp: 8.5, phases: [0.66, 0.33], color: '#5aa8ff',
+    level: 60, hp: 9.6, phases: [0.66, 0.33], color: '#5aa8ff',
     get finalSub() { return L('Teravolt · overcharged!', 'Teravolt · overladen!') },
     looks: [CALM, { grade: 'rgba(20,30,70,0.12)', edge: '#4a90ff', aura: '#5aa8ff', weather: 1.8, fx: 'storm' }, { grade: 'rgba(10,10,40,0.22)', edge: '#7ad0ff', aura: '#9ae0ff', weather: 2.8, fx: 'storm' }],
     get blurb() { return L('Lightning strikes, a raging Fusion Bolt and four lightning rods.', 'Blikseminslagen, een razende Fusion Bolt en vier bliksemafleiders.') },
@@ -167,7 +167,7 @@ export const BOSSES: Record<BossId, BossDef> = {
   },
   rayquaza: {
     id: 'rayquaza', species: 384, name: 'Rayquaza', get title() { return L('Ruler of the Sky Pillar', 'Heerser van de Hemelpilaar') }, arena: 'sky',
-    level: 60, hp: 8.5, phases: [0.66, 0.33], color: '#58d070',
+    level: 60, hp: 9.6, phases: [0.66, 0.33], color: '#58d070',
     forms: [384, 384, 10079], finalName: 'Mega Rayquaza',
     get finalSub() { return L('Mega Evolution · the sky splits open!', 'Mega-evolutie · de hemel scheurt open!') },
     looks: [CALM, { grade: 'rgba(20,60,40,0.10)', edge: '#58d070', aura: '#70e090', weather: 2, fx: 'gale' }, { grade: 'rgba(10,20,20,0.20)', edge: '#ffd040', aura: '#ffd860', weather: 3, fx: 'gale' }],
@@ -184,7 +184,7 @@ export const BOSSES: Record<BossId, BossDef> = {
   },
   mewtwo: {
     id: 'mewtwo', species: 150, name: 'Mewtwo', get title() { return L('Clone from the Psychic Lab', 'Kloon uit het Psychische Lab') }, arena: 'lab',
-    level: 60, hp: 10, phases: [0.66, 0.33], color: '#c070ff', clonesFrom: 2,
+    level: 60, hp: 11, phases: [0.66, 0.33], color: '#c070ff', clonesFrom: 2,
     forms: [150, 150, 10044], finalName: 'Mega Mewtwo Y',
     get finalSub() { return L('Mega Evolution · reality bends!', 'Mega-evolutie · de werkelijkheid buigt!') },
     looks: [CALM, { grade: 'rgba(80,20,120,0.08)', edge: '#c070ff', aura: '#d090ff', weather: 2, fx: 'warp' }, { grade: 'rgba(40,0,70,0.18)', edge: '#ff60e0', aura: '#ff80f0', weather: 3, fx: 'warp' }],
@@ -204,6 +204,6 @@ export const BOSS_LIST: BossId[] = ['reshiram', 'kyurem', 'zekrom', 'rayquaza', 
 
 /** Raid rules */
 export const RAID_LEVEL = 50
-export const RAID_LIVES = 3
+export const RAID_LIVES = 2
 export const RAID_TIME = 240
-export const RESPAWN_TIME = 4
+export const RESPAWN_TIME = 10

@@ -115,7 +115,7 @@ Een raid is PvE: jij (en tot 11 vrienden) tegen één legendarische baas, in een
 - **Elke fase voelt anders:** een eigen kleur over het scherm, een pulserende rand (in de laatste fase op het ritme van een hartslag), meer weer en een arena die escaleert: hitte uit de vloer, sneeuwstormvlagen, onweer dat de lucht verlicht, windstrepen of een vervormende werkelijkheid. De baas gloeit in de kleur van zijn fase.
 - **Laatste fase, nieuwe vorm:** Kyurem wordt **Black Kyurem** (ijs + bliksem: Freeze Shock, Fusion Bolt), Rayquaza wordt **Mega Rayquaza** (Extreme Speed), Mewtwo wordt **Mega Mewtwo Y** (Aura Sphere). Reshiram gaat over op blauw vuur (Dragon Rush, Blauwe Vlammenstorm) en Zekrom op Teravolt (Teravolt-sprong: springt op en landt op je).
 - **Animatie:** de bazen spelen hun echte geanimeerde Black/White-sprites af, zweven (Rayquaza, Mewtwo) of stampen, en laten nabeelden achter bij een dash.
-- **Levens en tijd:** iedereen heeft 3 levens. Ga je neer, dan kom je na 4 seconden terug aan de rand. De raid mislukt als iedereen op is of na 4 minuten. Met meer spelers heeft de baas meer HP.
+- **Levens en tijd:** iedereen heeft één revive: ga je neer, dan kom je na 10 seconden één keer terug aan de rand. De tweede keer kijk je mee. De raid mislukt als iedereen op is of na 4 minuten. Met meer spelers heeft de baas meer HP.
 - **Afloop:** "Raid geslaagd!" of "Raid mislukt" met je tijd, je aandeel in de schade en je levens.
 
 | Baas | Arena | Wat de omgeving doet | Signature-aanvallen |

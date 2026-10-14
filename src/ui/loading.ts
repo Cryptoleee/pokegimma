@@ -3,7 +3,7 @@ import { trainerSpriteUrl } from '../data/trainers'
 import { itemUrl } from '../game/sprites'
 import { sfx } from '../audio'
 import { esc } from './menu'
-import { BOSSES, type BossDef, type BossId } from '../data/bosses'
+import { BOSSES, RESPAWN_TIME, type BossDef, type BossId } from '../data/bosses'
 import { L, tx } from '../i18n'
 
 /**
@@ -35,7 +35,7 @@ function raidTips(boss: BossDef): Tip[] {
   return [
     { icon: '<i class="ld-warn">⚠</i>', title: L('Red on the ground = get out!', 'Rood op de grond = wegwezen!'), text: L("You see every big boss attack first as a red shape on the ground. Get out before it fills up.", 'Elke grote aanval van de baas zie je eerst als rode vorm op de grond. Loop eruit voordat hij volloopt.') },
     { icon: `<img class="px" src="${spriteUrl(boss.species)}" alt="">`, title: boss.name, text: tx(boss.envTip) },
-    { icon: '<i class="ld-heart">♥</i>', title: L('3 lives', '3 levens'), text: L("Go down and you're back after 4 seconds. After 3 times you watch. The raid fails when everyone is out or after 4 minutes.", 'Ga je neer, dan kom je na 4 seconden terug. Na 3 keer kijk je mee. De raid mislukt als iedereen op is of na 4 minuten.') },
+    { icon: '<i class="ld-heart">♥</i>', title: L('One revive', 'Eén revive'), text: L(`Go down and you're back after ${RESPAWN_TIME} seconds, once. The second time you watch. The raid fails when everyone is out or after 4 minutes.`, `Ga je neer, dan kom je na ${RESPAWN_TIME} seconden één keer terug. De tweede keer kijk je mee. De raid mislukt als iedereen op is of na 4 minuten.`) },
     { icon: '<i class="ld-up">▲</i>', title: L('Three phases', 'Drie fases'), text: L(`At 66% and 33% HP ${boss.name} gets furious: it roars you back, gets new attacks and drops Potions.`, `Op 66% en 33% HP wordt ${boss.name} woedend: hij brult je weg, krijgt nieuwe aanvallen en laat Potions vallen.`) },
     { icon: `<img class="px" src="${itemUrl('potion')}" alt="">`, title: L('No healing by itself', 'Geen herstel vanzelf'), text: L("In a raid your HP doesn't heal by itself. Grab the Potions that show up in the arena.", 'In een raid herstelt je HP niet vanzelf. Raap de Potions op die in de arena verschijnen.') },
     { icon: '<i class="ld-aim">◎</i>', title: L('Stronger together', 'Samen sterker'), text: L("With more players the boss has more HP, but it spreads its attacks. Don't all stand in one spot!", 'Met meer spelers heeft de baas meer HP, maar verdeelt hij zijn aanvallen. Blijf niet allemaal op één plek staan!') },

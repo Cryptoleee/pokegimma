@@ -12,7 +12,7 @@ import { MAP } from '../game/world'
 import type { Mon } from '../game/entities'
 import type { ChatLine } from '../net/protocol'
 import { esc, QUICK_CHAT } from './menu'
-import { BOSSES } from '../data/bosses'
+import { BOSSES, RAID_LIVES } from '../data/bosses'
 import { L, tx, type Txt } from '../i18n'
 
 const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = '') => {
@@ -629,7 +629,7 @@ export class Hud {
       // Lives: just your hearts solo; with friends a short name before each row of hearts
       // Your own hearts first, then the others
       const humans = g.trainers.filter((t) => t.human).sort((a, b) => (b === p ? 1 : 0) - (a === p ? 1 : 0))
-      const hearts = (t: typeof p) => '♥'.repeat(Math.max(0, t.lives)) + '♡'.repeat(Math.max(0, 3 - t.lives))
+      const hearts = (t: typeof p) => '♥'.repeat(Math.max(0, t.lives)) + '♡'.repeat(Math.max(0, RAID_LIVES - t.lives))
       const team = humans.length < 2
         ? `<span class="mine">${hearts(p)}</span>`
         : humans.map((t) => `<span class="${t === p ? 'mine' : ''} ${t.alive ? '' : 'out'}">${esc(t.name.slice(0, 6))} ${hearts(t)}</span>`).join('')

@@ -1,4 +1,5 @@
 import { spriteUrl } from '../data/pokemon'
+import { RAID_LIVES } from '../data/bosses'
 import { trainerSpriteUrl } from '../data/trainers'
 import { sfx } from '../audio'
 import type { Game } from '../game/game'
@@ -30,7 +31,7 @@ export function boardHtml(rows: ScoreRow[], raid: boolean, me: number) {
         <td><div class="sb-tr"><img class="px" src="${trainerSpriteUrl(r.sprite)}" alt=""><span>${r.name}</span>${tag}</div></td>
         <td><div class="sb-mon">${mon}</div></td>
         ${raid
-          ? `<td><b>${r.bossDmg}</b> <small class="sb-share">${r.share}%</small></td><td>${'♥'.repeat(Math.max(0, r.lives))}<span class="sb-lost">${'♥'.repeat(Math.max(0, 3 - r.lives))}</span></td>`
+          ? `<td><b>${r.bossDmg}</b> <small class="sb-share">${r.share}%</small></td><td>${'♥'.repeat(Math.max(0, r.lives))}<span class="sb-lost">${'♥'.repeat(Math.max(0, RAID_LIVES - r.lives))}</span></td>`
           : `<td><b>${r.kos}</b></td><td>${r.dmg}</td><td class="opt">${r.caught}</td><td class="opt">${time(r.time)}</td>`}
       </tr>`
     })
