@@ -3929,7 +3929,8 @@ kbd {
   display: none;
 }
 .desk #game {
-  cursor: crosshair;
+  /* A big two-tone crosshair: readable on grass, sand, snow and lava alike */
+  cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2732%27%20height%3D%2732%27%20viewBox%3D%270%200%2032%2032%27%3E%3Cg%20fill%3D%27none%27%20stroke-linecap%3D%27round%27%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2716%27%20r%3D%279%27%20stroke%3D%27%2314141c%27%20stroke-width%3D%275%27/%3E%3Cpath%20d%3D%27M16%202v8M16%2022v8M2%2016h8M22%2016h8%27%20stroke%3D%27%2314141c%27%20stroke-width%3D%275%27/%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2716%27%20r%3D%279%27%20stroke%3D%27%23fff%27%20stroke-width%3D%272.2%27/%3E%3Cpath%20d%3D%27M16%202v8M16%2022v8M2%2016h8M22%2016h8%27%20stroke%3D%27%23fff%27%20stroke-width%3D%272.2%27/%3E%3C/g%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2716%27%20r%3D%272.2%27%20fill%3D%27%23ff4060%27%20stroke%3D%27%2314141c%27%20stroke-width%3D%271%27/%3E%3C/svg%3E") 16 16, crosshair;
 }
 .mb kbd {
   position: absolute;
@@ -5628,17 +5629,6 @@ button:disabled {
 }
 .legend.evt .lg-arrow {
   color: #fff;
-}
-.legend.evt.crystal {
-  background: linear-gradient(110deg, #ff9ab0, #ffe070, #8cf0b8, #8ad0ff, #d8a8ff, #ff9ab0);
-  background-size: 300% 100%;
-  animation: crystal-pill 2.4s linear infinite;
-  box-shadow: 0 4px 0 #1a1420, 0 0 26px rgba(220, 180, 255, 0.8);
-}
-@keyframes crystal-pill {
-  to {
-    background-position: 300% 0;
-  }
 }
 
 /* =====================================================================

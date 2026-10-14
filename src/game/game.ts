@@ -1649,8 +1649,8 @@ export class Game {
     this.vfx.glow(at[0], at[1] - 1, 90, '#c8a0ff', 0.8)
     this.soundAt(at[0], at[1], 'spawnChime', [], { global: true })
     for (const v of this.viewers) {
-      v.hooks.banner({ kind: 'legendary', title: both('Evolution Crystal!', 'Evolutiekristal!'), sub: both('Walk over it: your Pokémon evolves fully, with every move', 'Loop erover: je Pokémon evolueert volledig, met alle aanvallen'), color: '#c8a0ff', voice: 'legendary' })
-      v.hooks.feed(both('✦ An Evolution Crystal has appeared! Follow the arrow', '✦ Er is een Evolutiekristal verschenen! Volg de pijl'))
+      v.hooks.banner({ kind: 'legendary', title: both('Evolution Crystal!', 'Evolutiekristal!'), sub: both('Somewhere in the zone. Find it first: your Pokémon evolves fully, with every move', 'Ergens in de zone. Vind hem als eerste: je Pokémon evolueert volledig, met alle aanvallen'), color: '#c8a0ff', voice: 'legendary' })
+      v.hooks.feed(both('✦ An Evolution Crystal has appeared somewhere! Look for the pillar of light', '✦ Er is ergens een Evolutiekristal verschenen! Zoek de lichtzuil'))
     }
   }
 

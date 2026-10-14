@@ -79,6 +79,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // Team rings on the ground + target reticle base + aim preview (under actors)
   drawRings(g, ctx, inView, time)
   drawAimPreview(g, ctx)
+  drawMouseTarget(g, ctx, time)
 
   // Entities, y-sorted
   type Ent = { y: number; draw: () => void }
@@ -630,6 +631,38 @@ function drawReticle(ctx: CanvasRenderingContext2D, m: Mon, time: number) {
   ctx.lineWidth = 1.5
   corners()
   ctx.stroke()
+}
+
+/** Desktop: a clear target on the ground where the mouse points (the cursor alone gets lost on busy pixel art). */
+function drawMouseTarget(g: Game, ctx: CanvasRenderingContext2D, time: number) {
+  const a = g.aimAt
+  if (!a || !document.body.classList.contains('desk') || g.introT > 0 || !g.player.alive) return
+  const m = g.player.mon
+  const mv = m.moves[0]
+  const inRange = !m.fainted && Math.hypot(a.x - m.x, a.y - m.y) <= mv.range + 0.5
+  const col = inRange ? TYPE_COLOR[mv.type] : '#ffffff'
+  const x = a.x * TILE, y = a.y * TILE
+  const r = 7 + Math.sin(time * 6) * 0.8
+  ctx.save()
+  ctx.lineCap = 'round'
+  for (const [w, c] of [[4, 'rgba(20,20,30,0.75)'], [2, col]] as const) {
+    ctx.strokeStyle = c
+    ctx.lineWidth = w
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.stroke()
+    // Four ticks pointing in
+    ctx.beginPath()
+    for (let i = 0; i < 4; i++) {
+      const t = (i * Math.PI) / 2 + time * 0.8
+      ctx.moveTo(x + Math.cos(t) * (r + 5), y + Math.sin(t) * (r + 5))
+      ctx.lineTo(x + Math.cos(t) * (r - 2), y + Math.sin(t) * (r - 2))
+    }
+    ctx.stroke()
+  }
+  ctx.fillStyle = col
+  ctx.fillRect(x - 1, y - 1, 2, 2)
+  ctx.restore()
 }
 
 /** Brawl Stars-style aim preview while dragging an attack button (or aiming with the mouse). */
