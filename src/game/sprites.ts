@@ -68,10 +68,11 @@ export function animSprite(id: number | string): Sprite | null {
   return s
 }
 
-/** Top-left of the frame to draw at `time` (seconds); plain sprites have one frame. */
+/** Top-left of the frame (cell) to draw at `time` (seconds); plain sprites have one frame at 0,0. */
 export function frameAt(s: Sprite, time: number, offset = 0, once = false): [number, number] {
   const a = s.anim
-  if (!a) return [s.bx, s.by]
+  // (callers add bx/by themselves: a plain sprite's single frame starts at 0,0)
+  if (!a) return [0, 0]
   // One-shot actions stop on their last frame; idles loop
   const t = once ? Math.min(a.total - 1, Math.max(0, time * 1000)) : ((time * 1000 + offset) % a.total + a.total) % a.total
   let i = 0
