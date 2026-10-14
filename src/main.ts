@@ -29,6 +29,8 @@ import { pickTheme, THEMES, type ThemeId } from './data/themes'
 import { applyEvents, applySnapshot, initClient, recordVfx, remoteViewer, runCommand, snapshot, type RemoteViewer } from './net/sync'
 import { L, onLangChange, tx } from './i18n'
 import { initStats, statsStateChanged, trackEnd, trackMatch } from './stats'
+import { accountState, accountStatus, initAccount, onAccount, onInvite, presenceChanged, type Invite, type Presence } from './account'
+import { hideInviteToast, showInviteToast } from './ui/friends'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
@@ -76,6 +78,72 @@ let pendingJoin = cleanCode(new URLSearchParams(location.search).get('join') ?? 
 const statsMode = () => (room ? (room.quick ? 'quick' : 'friends') : 'solo') as 'solo' | 'quick' | 'friends'
 initStats(() => (game && viewing && !game.over ? (game.kind === 'raid' ? 'raid' : 'br') : room ? 'lobby' : 'menu'))
 
+// ---------- Account (optional Discord login) ----------
+
+/** Back from the Discord login: ?login=ok|new|cancel|err|off. */
+const loginResult = new URLSearchParams(location.search).get('login') ?? ''
+if (loginResult) history.replaceState(null, '', location.pathname + location.search.replace(/[?&]login=[^&]*/, '').replace(/^&/, '?'))
+const inMatchNow = () => !!(game && viewing && !game.over)
+/** Where you are, for your friends' lists. */
+function presence(): Presence {
+  const name = profile().name || undefined
+  if (inMatchNow()) return { s: 'game', name, code: room?.code, q: room?.quickSlot ?? -1, n: room?.players.length ?? 1 }
+  if (room) return { s: 'lobby', code: room.code, q: room.quickSlot, n: room.players.length, run: room.running, name }
+  return { s: 'menu', name }
+}
+void initAccount(presence)
+onAccount(() => {
+  // Signed in without a name yet: use your Discord one
+  const s = accountState()
+  if (accountStatus() !== 'in' || !s || profile().name) return
+  setName(s.me.name)
+  const input = document.querySelector('#mm-name') as HTMLInputElement | null
+  if (input && !input.value) input.value = profile().name
+})
+/** An invite that came in mid-match waits until you're back on the home screen or in a lobby. */
+let heldInvite: Invite | null = null
+onInvite((inv) => {
+  if (room?.code === inv.code) return
+  if (inMatchNow()) heldInvite = inv
+  else showInviteToast(inv, () => acceptInvite(inv))
+})
+function showHeldInvite() {
+  const inv = heldInvite
+  heldInvite = null
+  if (inv && Date.now() - inv.at < 5 * 60_000 && room?.code !== inv.code) showInviteToast(inv, () => acceptInvite(inv))
+}
+function acceptInvite(inv: Invite) {
+  if (room?.code === inv.code) return
+  if (inMatchNow()) return
+  if (room) {
+    ready = false
+    if (guardActive) {
+      guardActive = false
+      history.back()
+    }
+    room.leave()
+    room = null
+    remotes.clear()
+    stopGame()
+  }
+  joinFriend(inv.code, inv.q)
+}
+/** Join a friend's lobby: a private room by code, or their quick play slot. */
+function joinFriend(code: string, q: number) {
+  if (!profile().name) setName(`Trainer ${Math.floor(1000 + Math.random() * 9000)}`)
+  if (q < 0) return joinRoom(code)
+  ready = false
+  Room.joinQuick(q, me(), roomEvents())
+    .then((r) => {
+      room = r
+      wipe(toLobby)
+    })
+    .catch((e: Error) => {
+      sfx.error()
+      toMenu({ error: e.message })
+    })
+}
+
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   canvas.width = Math.round(window.innerWidth * dpr)
@@ -117,7 +185,8 @@ function me(): LobbyPlayer {
 
 function toTitle() {
   stopGame()
-  showTitle(() => (pendingJoin ? toMenu() : showIntro(() => wipe(() => toMenu()))))
+  const logged = loginResult && loginResult !== 'off'
+  showTitle(() => (pendingJoin ? toMenu() : logged ? toMenu({ friends: true }) : showIntro(() => wipe(() => toMenu()))))
 }
 
 // A new language re-renders the home screen (the lobby and battle pick it up on their next update)
@@ -131,11 +200,14 @@ function toMenu(extra: Partial<MenuState> = {}) {
   playMusic('menu')
   const code = pendingJoin
   statsStateChanged()
+  presenceChanged()
+  showHeldInvite()
   showMenu({ trainer, team, choice, code: code || undefined, rejoin: rejoinCode(), ...extra }, {
     rejoin: (c) => {
       forgetRoom()
       joinRoom(c)
     },
+    joinFriend,
     solo: (c) => {
       choice = c
       store.set('choice', c)
@@ -152,7 +224,7 @@ function toMenu(extra: Partial<MenuState> = {}) {
   if (code && profile().name && !extra.error) {
     pendingJoin = ''
     const none = () => {}
-    showMenu({ trainer, team, choice, code, busy: L(`Connecting to ${code}…`, `Verbinden met ${code}…`) }, { solo: none, host: none, join: none, rejoin: none, quick: none, team: none, back: none })
+    showMenu({ trainer, team, choice, code, busy: L(`Connecting to ${code}…`, `Verbinden met ${code}…`) }, { solo: none, host: none, join: none, rejoin: none, joinFriend: none, quick: none, team: none, back: none })
     joinRoom(code)
   }
 }
@@ -191,6 +263,8 @@ function enterMatch(g: Game) {
   stopGame()
   game = g
   viewing = true
+  hideInviteToast()
+  presenceChanged()
   trackMatch({
     k: g.kind === 'raid' ? 'raid' : 'br',
     m: statsMode(),
@@ -452,6 +526,8 @@ function joinRoom(code: string) {
 function toLobby() {
   if (!room) return toMenu()
   statsStateChanged()
+  presenceChanged()
+  showHeldInvite()
   // Guests drop the match they were watching; the host keeps simulating until it's over.
   if (game?.mode !== 'host') stopGame()
   else {

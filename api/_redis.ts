@@ -6,7 +6,7 @@
 declare const process: { env: Record<string, string | undefined> }
 
 /** Pasted values often keep the quotes from a .env snippet, or a stray space. */
-const clean = (v: string | undefined) => v?.trim().replace(/^(['"])(.*)\1$/, '$2').trim() || undefined
+export const clean = (v: string | undefined) => v?.trim().replace(/^(['"])(.*)\1$/, '$2').trim() || undefined
 
 /** One matching pair (KV_* from the Vercel integration, else UPSTASH_REDIS_*), never a mix. */
 const env = () => {

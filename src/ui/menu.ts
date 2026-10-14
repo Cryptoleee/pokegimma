@@ -11,6 +11,8 @@ import { ROYALE_THEMES, THEMES } from '../data/themes'
 import { BOSS_LIST, BOSSES } from '../data/bosses'
 import { SEATS } from '../game/game'
 import { bindLangSwitch, L, langSwitch } from '../i18n'
+import { accountStatus, onAccount } from '../account'
+import { friendsCard, openFriends, openInvite, paintFriendsCard } from './friends'
 
 /**
  * Home menu (your team, name, solo or multiplayer) and the multiplayer lobby.
@@ -80,6 +82,8 @@ export interface MenuActions {
   join(code: string): void
   /** Back into the friends' lobby you just left. */
   rejoin(code: string): void
+  /** Join a friend's lobby (`q` ≥ 0: a quick play slot). */
+  joinFriend(code: string, q: number): void
   team(): void
   back(): void
 }
@@ -91,6 +95,8 @@ export interface MenuState {
   choice: MatchChoice
   /** A lobby you left a moment ago (shown as "Rejoin"). */
   rejoin?: string
+  /** Open the friends sheet straight away (just logged in). */
+  friends?: boolean
   /** Pre-filled join code (from a shared link). */
   code?: string
   error?: string
@@ -128,6 +134,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
         <button class="mode solo"><i>▶</i><b>Solo</b><small>${L('vs. bots', 'tegen bots')}</small></button>
         <button class="mode multi"><i>👥</i><b>${L('With friends', 'Met vrienden')}</b><small>${L('your own match with a code', 'eigen potje met code')}</small></button>
       </div>
+      ${friendsCard()}
       <div class="mm-msg ${st.error && !sheetOpen ? 'err' : ''}"></div>
 
       <div class="sheet solo-sheet">
@@ -254,8 +261,27 @@ export function showMenu(st: MenuState, on: MenuActions) {
     busy(L(`Connecting to ${c}…`, `Verbinden met ${c}…`))
     on.join(c)
   })
+  // Friends: the card follows the account state; tapping it opens the sheet
+  const fcard = el.querySelector('.home-friends') as HTMLElement
+  paintFriendsCard(fcard)
+  const offAcc = onAccount(() => (document.body.contains(fcard) ? paintFriendsCard(fcard) : offAcc()))
+  fcard.addEventListener('click', () => {
+    sfx.select()
+    setName(name.value)
+    openFriends(el.querySelector('.home') as HTMLElement, {
+      join: (c, q) => {
+        if (!named()) return
+        const m = el.querySelector('.home > .mm-msg') as HTMLElement
+        m.className = 'mm-msg busy'
+        m.textContent = L('Joining your friend…', 'Naar je vriend…')
+        el.querySelectorAll('button').forEach((b) => (b.disabled = true))
+        on.joinFriend(c, q)
+      },
+    })
+  })
+  if (st.friends) fcard.click()
   if (st.busy) busy(st.busy)
-  else if (!profile().name) setTimeout(() => name.focus(), 300)
+  else if (!profile().name && !st.friends) setTimeout(() => name.focus(), 300)
 }
 
 /** Home: the live "players online" line on the quick play button. */
@@ -337,12 +363,13 @@ export function showLobby(room: Room, on: LobbyActions) {
           <b>${room.code.split('').map((c) => `<i>${c}</i>`).join('')}</b>
           <span>${room.isHost ? L('Have friends enter this code or scan the QR code', 'Laat vrienden deze code invoeren of de QR-code scannen') : L('Share this code with anyone who wants to join', 'Deel deze code met wie nog mee wil doen')}</span>
           <button class="ghost2 lb-share">${L('Share link ⤴', 'Link delen ⤴')}</button>
+          ${accountStatus() === 'in' ? `<button class="ghost2 lb-invite">👥 ${L('Invite friends', 'Vrienden uitnodigen')}</button>` : ''}
         </div>
       </div>`
   const quickCard = `
       <div class="qp-card">
         <div class="qp-radar"><i></i><i></i><i></i><svg viewBox="0 0 100 100"><circle class="qp-ring-bg" cx="50" cy="50" r="44"/><circle class="qp-ring" cx="50" cy="50" r="44"/></svg><b class="qp-time">--</b></div>
-        <div class="qp-text"><small>${L('PUBLIC LOBBY', 'OPENBARE LOBBY')}</small><b class="qp-title">${L('Finding players…', 'Spelers zoeken…')}</b><span class="qp-sub"></span></div>
+        <div class="qp-text"><small>${L('PUBLIC LOBBY', 'OPENBARE LOBBY')}</small><b class="qp-title">${L('Finding players…', 'Spelers zoeken…')}</b><span class="qp-sub"></span>${accountStatus() === 'in' ? `<button class="ghost2 lb-invite">👥 ${L('Invite friends', 'Vrienden uitnodigen')}</button>` : ''}</div>
       </div>`
   el.innerHTML = `
     <div class="sel lobby lb2 ${quick ? 'quick' : ''}">
@@ -558,6 +585,10 @@ export function showLobby(room: Room, on: LobbyActions) {
     sfx.blip()
     room.say(b.textContent!)
   }))
+  el.querySelector('.lb-invite')?.addEventListener('click', () => {
+    sfx.select()
+    openInvite(room)
+  })
   el.querySelector('.lb-share')?.addEventListener('click', async (e) => {
     const share = e.currentTarget as HTMLButtonElement
     sfx.select()

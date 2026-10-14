@@ -143,6 +143,19 @@ Nieuwe bazen zijn vooral data: een rij in `src/data/bosses.ts` met hun aanvallen
 - **Cinematisch:** een titelscherm met Zekrom en Reshiram, Black/White-schermovergangen, keuzeschermen als podium, een drop-in met aftelling bij de start, een evolutie-cutscene, banners voor level-ups, nieuwe aanvallen, legendarische Pokémon en KO's, en een resultaatscherm met confetti.
 - **Wereld:** weer per wereld (sneeuw, zand, as, gloeiende vonken, vuurvliegjes), wolkschaduwen, golvend en glinsterend water, ritselend gras, stofwolkjes, zwevende pollen, een gloeiende stormmuur met bliksem en regen, en een vignet.
 
+## Vrienden (optioneel, Discord-login)
+
+- **Gast blijft standaard.** Inloggen met Discord is alleen nodig voor vrienden. Zonder login werkt alles zoals altijd.
+- **Vrienden toevoegen** met een vriendcode van 6 tekens. Bestaat er al een verzoek de andere kant op, dan zijn jullie meteen vrienden.
+- **Online status:** ingelogd meldt de game elke 30 s waar je bent (10 s met het vriendenpaneel open, 60 s in een potje, niets als het tabblad verborgen is). In de vriendenlijst zie je wie online is en in welke lobby. **Meedoen** werkt voor lobby's die niet vol zijn en waar geen potje loopt.
+- **Uitnodigen** vanuit de lobby. Je vriend krijgt een pop-up op het home-scherm of in de lobby. Midden in een potje wacht de uitnodiging tot het potje klaar is (max 5 min).
+- **Account verwijderen** kan onderaan het vriendenpaneel.
+- **Instellen (eenmalig):**
+  1. Maak een app in het [Discord Developer Portal](https://discord.com/developers/applications).
+  2. Zet onder OAuth2 als redirect `https://www.stormbreak.app/api/auth/callback`.
+  3. Zet in Vercel `DISCORD_CLIENT_ID` en `DISCORD_CLIENT_SECRET` en deploy opnieuw.
+  Het gebruikt dezelfde Upstash Redis als de stats. Zonder deze variabelen is de vriendenkaart onzichtbaar.
+
 ## Statistieken (voor de maker)
 
 `/stats` is een los paneel met anonieme tellingen: wie er nu online is (menu, lobby, battle royale of raid), spelers per dag en per maand, nieuwe spelers, potjes per modus, speeltijd, drukte per uur, populaire partners, bazen met hun winstpercentage, werelden, uitslagen, apparaat, taal en bronnen. Deel je link met `?via=naam` (bijv. `stormbreak.app/?via=tiktok`) en die bron telt apart.

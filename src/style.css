@@ -7068,3 +7068,365 @@ body:not(.desk) .lb2.typing .lb-dock {
   font-style: normal;
   font-weight: 800;
 }
+
+/* =====================================================================
+   Friends (optional Discord login): home card, sheet, lobby invites, toast
+   ===================================================================== */
+
+.dc {
+  width: 22px;
+  height: 22px;
+  vertical-align: -5px;
+}
+.home-friends {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 2px solid #8f98ff;
+  background: linear-gradient(#5865f2, #3c45c4);
+  color: #fff;
+  font-family: var(--font);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #262c80;
+}
+.home-friends.hidden {
+  display: none;
+}
+.home-friends > span {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.home-friends b {
+  font-size: 15px;
+}
+.home-friends small {
+  font-size: 11px;
+  opacity: 0.85;
+}
+.home-friends em {
+  font-style: normal;
+  font-weight: 800;
+}
+.hf-dc .dc {
+  width: 26px;
+  height: 26px;
+}
+.hf-me {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+}
+.hf-badge {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 11px;
+  background: #ff4a5a;
+  font-size: 13px !important;
+  text-align: center;
+}
+.home-friends .dot,
+.fr-avw i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #7a809a;
+}
+.home-friends .dot.on,
+.fr-row.on .fr-avw i {
+  background: #3ddc84;
+}
+
+.fr-sheet .sheet-card {
+  max-height: 88vh;
+  overflow-y: auto;
+}
+.fr-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fr-body .cta.fr-login {
+  background: linear-gradient(#6974ff, #4752e0);
+  border-color: #aab0ff;
+  color: #fff;
+  box-shadow: 0 5px 0 #262c80;
+}
+.fr-fine {
+  font-size: 11px;
+  color: #98a0c0;
+  text-align: center;
+}
+.fr-me,
+.fr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fr-me > span,
+.fr-row > span:not(.fr-avw) {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.fr-me b,
+.fr-row b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fr-me small,
+.fr-row small {
+  font-size: 11px;
+  color: #a8b0d0;
+}
+.fr-me .ghost2 {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.fr-av {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #2a3354;
+  flex: none;
+}
+.fr-avw {
+  position: relative;
+  flex: none;
+}
+.fr-avw i {
+  position: absolute;
+  right: -2px;
+  bottom: 0;
+  margin: 0;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #141a36;
+}
+.fr-code {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+}
+.fr-code small {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #a8b0d0;
+  width: 70px;
+  line-height: 1.1;
+}
+.fr-code b {
+  flex: 1;
+  font-size: 26px;
+  letter-spacing: 5px;
+  color: var(--hi);
+}
+.fr-code .ghost2 {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.fr-add {
+  display: flex;
+  gap: 8px;
+}
+.fr-add input {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 6px;
+  font-size: 20px;
+}
+.fr-add button,
+.fr-join {
+  font-family: var(--font);
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 2px solid #1a1420;
+  background: linear-gradient(#ffe680, #ffc820);
+  color: #1a1420;
+  box-shadow: 0 3px 0 #8a6410;
+  cursor: pointer;
+  flex: none;
+}
+.fr-join.sent {
+  background: #3a4470;
+  color: #b8c0e0;
+  border-color: transparent;
+  box-shadow: none;
+}
+.fr-msg {
+  min-height: 0;
+  font-size: 12px;
+  color: #8ce0a8;
+}
+.fr-msg:empty {
+  display: none;
+}
+.fr-msg.err {
+  color: #ff8a8a;
+}
+.fr-h {
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8890b0;
+}
+.fr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fr-row {
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.fr-row:not(.on) {
+  opacity: 0.6;
+}
+.fr-row.req {
+  opacity: 1;
+  background: rgba(88, 101, 242, 0.25);
+}
+.fr-yes,
+.fr-no,
+.fr-rm {
+  flex: none;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-family: var(--font);
+  cursor: pointer;
+}
+.fr-yes {
+  background: #2f9e5a;
+  border-color: #6fe09a;
+}
+.fr-rm {
+  opacity: 0.6;
+}
+.fr-rm.armed {
+  opacity: 1;
+  padding: 0 8px;
+  background: #c03040;
+  border-color: #ff8090;
+}
+.fr-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 13px;
+  color: #98a0c0;
+}
+.fr-del {
+  align-self: center;
+  margin-top: 6px;
+  border: none;
+  background: none;
+  color: #8890b0;
+  font-family: var(--font);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.fr-del.armed {
+  color: #ff8a8a;
+}
+
+/* Lobby: invite button and the friends list modal */
+.lb-invite {
+  margin-top: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-color: #8f98ff;
+  background: rgba(88, 101, 242, 0.3);
+}
+.qp-text .lb-invite {
+  align-self: flex-start;
+}
+#modal .panel.fr-invite {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  color: #fff;
+  border-color: #8f98ff;
+  background: linear-gradient(#1d2650, #10142a);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.4);
+}
+#modal .panel.fr-invite h2 {
+  text-align: center;
+}
+.fr-invite .fr-list {
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+/* Invite pop-up */
+.fr-toast {
+  position: fixed;
+  z-index: 70;
+  left: 50%;
+  top: calc(12px + var(--safe-t));
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 2px solid #8f98ff;
+  background: linear-gradient(#2a3380, #161c50);
+  color: #fff;
+  font-family: var(--font);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: frToastIn 0.4s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+.fr-toast > span {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.fr-toast small {
+  font-size: 11px;
+  color: #c0c8f0;
+}
+.fr-toast.out {
+  opacity: 0;
+  transform: translate(-50%, -20px);
+  transition: 0.3s;
+}
+@keyframes frToastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -30px);
+  }
+}
+/* Cards on the home column stay as wide as the column (desktop too) */
+.home > .home-rejoin,
+.home > .home-friends {
+  width: min(460px, 100%);
+}
