@@ -1699,6 +1699,8 @@ export class Game {
     for (const it of [...this.items]) {
       for (const tr of this.trainers) {
         if (!tr.alive || Math.hypot(tr.x - it.x, tr.y - it.y) > 0.8) continue
+        // The Evolution Crystal is for real players only
+        if (it.kind === 'evolve' && !tr.human) continue
         this.items.splice(this.items.indexOf(it), 1)
         this.applyItem(tr, it.kind)
         break

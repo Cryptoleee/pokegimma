@@ -50,11 +50,6 @@ export function showLeaveConfirm(onStay: () => void, onLeave: () => void, text =
         <button class="btn red" id="leave">${L('Leave', 'Verlaten')}</button>
       </div>
     </div>`
-  // New language: rebuild this panel (the screen behind it follows via onLangChange)
-  bindLangSwitch(modal, () => {
-    sfx.select()
-    showOptions()
-  })
   const close = () => {
     modal.classList.add('hidden')
     modal.innerHTML = ''

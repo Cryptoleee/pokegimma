@@ -790,6 +790,8 @@ img.px {
 #modal {
   position: absolute;
   inset: 0;
+  /* Above every screen (lobby cards use z-index of their own) */
+  z-index: 60;
   background: rgba(16, 16, 24, 0.7);
   display: flex;
   align-items: center;
@@ -6994,4 +6996,75 @@ button:disabled {
 .opt-lang .lang-sw button.on {
   background: var(--ink);
   color: #fff;
+}
+
+/* Chat while spectating: the feed sits under the spectator bar, top right */
+.spec-feed {
+  position: absolute;
+  z-index: 19;
+  right: calc(10px + var(--safe-r, 0px));
+  top: calc(70px + var(--safe-t));
+  pointer-events: none;
+}
+.spec-btns .chatbtn {
+  position: relative;
+}
+
+/* Lobby: leaving is a deliberate button (with a confirm), not a back arrow */
+.lb2 .sel-head {
+  justify-content: space-between;
+}
+.lb-leave {
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 120, 120, 0.45);
+  background: rgba(255, 80, 80, 0.12);
+  color: #ffb8b8;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.lb-leave:hover {
+  background: rgba(255, 80, 80, 0.25);
+}
+
+/* Home: hop back into the lobby you just left */
+.home-rejoin {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 2px solid #ffd040;
+  background: linear-gradient(#fff4c0, #ffd040);
+  color: #2a2010;
+  font-family: var(--font);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #8a6410;
+}
+.home-rejoin i {
+  font-style: normal;
+  font-size: 22px;
+}
+.home-rejoin span {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.home-rejoin b {
+  font-size: 15px;
+}
+.home-rejoin small {
+  font-size: 11px;
+  opacity: 0.75;
+}
+.home-rejoin em {
+  font-style: normal;
+  font-weight: 800;
 }

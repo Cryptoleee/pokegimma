@@ -86,8 +86,9 @@ function decide(g: Game, tr: Trainer) {
     } else {
       let bestItem = null, bd = 10
       for (const it of g.items) {
-        // The Evolution Crystal is worth a detour: bots race for it too
-        const d = Math.hypot(it.x - tr.x, it.y - tr.y) - (it.kind === 'evolve' ? 14 : 0)
+        // (the Evolution Crystal is for real players only)
+        if (it.kind === 'evolve') continue
+        const d = Math.hypot(it.x - tr.x, it.y - tr.y)
         if (d < bd && Math.hypot(it.x - z.nx, it.y - z.ny) < z.r) { bd = d; bestItem = it }
       }
       if (bestItem) {

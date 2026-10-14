@@ -52,14 +52,27 @@ const lastPlay = new Map<string, number>()
 function setup(ctx: AudioContext) {
   if (c === ctx && bus) return
   c = ctx
+  // Bus: gentle tape-style saturation for weight, then a fast compressor as a limiter
+  // (so everything can be louder and fuller without clipping when a lot goes off at once)
+  const sat = ctx.createWaveShaper()
+  const curve = new Float32Array(1024)
+  for (let i = 0; i < 1024; i++) {
+    const x = (i / 512) - 1
+    curve[i] = Math.tanh(x * 1.6) / Math.tanh(1.6)
+  }
+  sat.curve = curve
+  sat.oversample = '2x'
   const comp = ctx.createDynamicsCompressor()
-  comp.threshold.value = -16
-  comp.ratio.value = 5
-  comp.attack.value = 0.003
-  comp.release.value = 0.15
+  comp.threshold.value = -14
+  comp.knee.value = 6
+  comp.ratio.value = 8
+  comp.attack.value = 0.002
+  comp.release.value = 0.12
+  const makeup = ctx.createGain()
+  makeup.gain.value = 1.25
   bus = ctx.createGain()
-  bus.gain.value = 0.9
-  bus.connect(comp).connect(ctx.destination)
+  bus.gain.value = 1
+  bus.connect(sat).connect(comp).connect(makeup).connect(ctx.destination)
   // Short room reverb for the big ones
   const len = Math.floor(ctx.sampleRate * 1.4)
   const ir = ctx.createBuffer(2, len, ctx.sampleRate)
@@ -372,6 +385,21 @@ function swish(x: Ctx, dur: number) {
 function sub(x: Ctx, vol: number) {
   osc(x.ctx, x.o, x.t, { type: 'sine', f: 65, f2: 28, dur: 0.5 + x.k * 0.5, vol })
 }
+/** The body of every impact: a sharp click and a low thump that get heavier with the move's strength. */
+function punch(x: Ctx) {
+  noise(x.ctx, x.o, x.t, { dur: 0.018, vol: 0.75, filter: 'highpass', f: 1800 })
+  osc(x.ctx, x.o, x.t, { type: 'sine', f: 150 * Math.min(1.2, x.p), f2: 48, dur: 0.1 + x.k * 0.18, vol: 0.55 + x.k * 0.45 })
+  if (x.k >= 0.33) noise(x.ctx, x.o, x.t, { dur: 0.12 + x.k * 0.2, vol: 0.35 + x.k * 0.25, filter: 'lowpass', f: 900, f2: 120 })
+}
+/** A short launch transient so a move "fires": a pitch-dropping thwip. */
+function launch(x: Ctx, shape: Shape) {
+  if (shape === 'melee' || shape === 'dash' || shape === 'burst') return
+  const f = shape === 'zap' ? 2400 : shape === 'beam' ? 700 : 1400
+  osc(x.ctx, x.o, x.t, { type: 'triangle', f: f * x.p, f2: f * 0.3 * x.p, dur: 0.07 + x.k * 0.05, vol: 0.3 + x.k * 0.2 })
+  noise(x.ctx, x.o, x.t, { dur: 0.03, vol: 0.4, filter: 'bandpass', f: 2500 * x.p, q: 1.5 })
+  // Beams also hold a low hum under the timbre
+  if (shape === 'beam') osc(x.ctx, x.o, x.t, { type: 'sawtooth', f: 80 * x.p, f2: 70 * x.p, dur: x.len, vol: 0.18 + x.k * 0.14, attack: 0.04, dist: true })
+}
 
 // ---------------------------------------------------------------- public API
 
@@ -414,10 +442,11 @@ export function playMoveCast(ctx: AudioContext | null, muted: boolean, fx: MoveF
   const k = tier / 3
   const p = pitch * pitchMul * r(0.96, 1.04)
   const len = { melee: 0.14, bolt: 0.16, spread: 0.1, dash: 0.24, beam: 0.35, burst: 0.3, nova: 0.18, zap: 0.13 }[shape] * (1 + k * 0.9)
-  const vol = (0.12 + k * 0.06) * gain * (LOUDER[fam] ?? 1)
-  play(ctx, muted, 'c' + fx + shape, 45, pan, vol, 0.05 + k * 0.25, len, (o, t) => {
+  const vol = (0.18 + k * 0.1) * gain * (LOUDER[fam] ?? 1)
+  play(ctx, muted, 'c' + fx + shape, 45, pan, vol, 0.08 + k * 0.3, len, (o, t) => {
     const x: Ctx = { ctx: ctx!, o, t, p, k, len }
     const T = TIMBRE[fam]
+    launch(x, shape)
     switch (shape) {
       case 'melee':
         // Swing plus a quick taste of the type (a lick slurps, a bite snaps, ...)
@@ -455,11 +484,19 @@ export function playMoveHit(ctx: AudioContext | null, muted: boolean, fx: MoveFx
   const [fam, shape, pitch] = m
   const k = tier / 3
   const p = pitch * r(0.95, 1.05)
-  const vol = (0.1 + k * 0.08) * gain * (shape === 'nova' ? 1.25 : 1)
-  play(ctx, muted, 'h' + fx, 55, pan, vol, 0.08 + k * 0.3, 0.6 + k, (o, t) => {
+  const vol = (0.17 + k * 0.13) * gain * (shape === 'nova' ? 1.25 : 1)
+  play(ctx, muted, 'h' + fx, 55, pan, vol, 0.12 + k * 0.35, 0.8 + k, (o, t) => {
     const x: Ctx = { ctx: ctx!, o, t, p, k, len: 0.2 }
+    punch(x)
     TIMBRE[fam].hit(x)
-    if (shape === 'nova' || k >= 0.99) sub(x, 0.7 + k * 0.3)
+    if (shape === 'nova' || k >= 0.66) sub(x, 0.7 + k * 0.3)
+    // The strongest moves ring out: a quieter echo of the impact a beat later
+    if (k >= 0.66) {
+      const e = ctx!.createGain()
+      e.gain.value = 0.32
+      e.connect(o)
+      TIMBRE[fam].hit({ ...x, o: e, t: t + 0.12, p: p * 0.97 })
+    }
   }, gain >= 1)
 }
 

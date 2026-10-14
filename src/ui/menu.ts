@@ -78,6 +78,8 @@ export interface MenuActions {
   quick(): void
   host(): void
   join(code: string): void
+  /** Back into the friends' lobby you just left. */
+  rejoin(code: string): void
   team(): void
   back(): void
 }
@@ -87,6 +89,8 @@ export interface MenuState {
   team: number[]
   /** Last solo choice (mode + world/boss). */
   choice: MatchChoice
+  /** A lobby you left a moment ago (shown as "Rejoin"). */
+  rejoin?: string
   /** Pre-filled join code (from a shared link). */
   code?: string
   error?: string
@@ -118,6 +122,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
         <label for="mm-name">${L('Your name', 'Jouw naam')}</label>
         <input id="mm-name" maxlength="${NAME_MAX}" autocomplete="nickname" spellcheck="false" placeholder="${L('Enter your name', 'Typ je naam')}" value="${esc(profile().name)}">
       </div>
+      ${st.rejoin ? `<button class="home-rejoin"><i>↩</i><span><b>${L('Rejoin lobby', 'Terug naar de lobby')} ${esc(st.rejoin)}</b><small>${L('you left it a moment ago', 'je ging er net uit')}</small></span><em>▶</em></button>` : ''}
       <div class="home-modes">
         <button class="mode quick"><i>⚡</i><b>${L('Quick play', 'Snel spel')}</b><small>${L('online with random players', 'online met willekeurige spelers')}</small><span class="qp-online"><em></em><span>${L('checking who\'s online…', 'online zoeken…')}</span></span></button>
         <button class="mode solo"><i>▶</i><b>Solo</b><small>${L('vs. bots', 'tegen bots')}</small></button>
@@ -199,6 +204,10 @@ export function showMenu(st: MenuState, on: MenuActions) {
   click('.home-opts', showOptions)
   // The whole home re-renders on a language change (main listens to onLangChange)
   bindLangSwitch(el.querySelector('.home-top')!, () => sfx.select())
+  el.querySelector('.home-rejoin')?.addEventListener('click', () => {
+    sfx.select()
+    if (named()) on.rejoin(st.rejoin!)
+  })
   click('.hs-edit', () => {
     setName(name.value)
     on.team()
@@ -274,6 +283,46 @@ export interface LobbyActions {
   leave(): void
 }
 
+/** Are you sure? Shown before leaving a lobby (button or the phone's back gesture). */
+export function confirmLeaveLobby(room: Room, leave: () => void) {
+  const modal = document.getElementById('modal')!
+  const others = room.players.length - 1
+  const text = room.quick
+    ? L('You leave this public lobby. You can always find a new one with Quick play.', 'Je verlaat deze openbare lobby. Met Snel spel vind je altijd een nieuwe.')
+    : room.isHost
+      ? others > 0
+        ? L(`You're the host: leaving closes the lobby for everyone (${others} other player${others === 1 ? '' : 's'}).`, `Jij bent de host: als je weggaat, sluit de lobby voor iedereen (${others} andere speler${others === 1 ? '' : 's'}).`)
+        : L('You\'re the host: leaving closes this lobby and its code.', 'Jij bent de host: als je weggaat, sluit deze lobby en vervalt de code.')
+      : L(`You can come back with code ${room.code}, or from the home screen.`, `Je kunt terugkomen met code ${room.code}, of via het home-scherm.`)
+  modal.classList.remove('hidden')
+  modal.innerHTML = `
+    <div class="panel">
+      <h2>${room.isHost && !room.quick ? L('Close the lobby?', 'Lobby sluiten?') : L('Leave the lobby?', 'Lobby verlaten?')}</h2>
+      <p>${esc(text)}</p>
+      <div class="actions">
+        <button class="btn" id="stay">${L('Stay', 'Blijven')}</button>
+        <button class="btn red" id="leave">${room.isHost && !room.quick ? L('Close lobby', 'Lobby sluiten') : L('Leave', 'Verlaten')}</button>
+      </div>
+    </div>`
+  const close = () => {
+    modal.classList.add('hidden')
+    modal.innerHTML = ''
+    modal.onclick = null
+  }
+  modal.querySelector('#stay')!.addEventListener('click', () => {
+    sfx.select()
+    close()
+  })
+  modal.querySelector('#leave')!.addEventListener('click', () => {
+    sfx.select()
+    close()
+    leave()
+  })
+  modal.onclick = (e) => {
+    if (e.target === modal) close()
+  }
+}
+
 export function showLobby(room: Room, on: LobbyActions) {
   const el = screen()
   const quick = room.quick
@@ -298,8 +347,8 @@ export function showLobby(room: Room, on: LobbyActions) {
   el.innerHTML = `
     <div class="sel lobby lb2 ${quick ? 'quick' : ''}">
       <div class="sel-head">
-        <button class="sel-back" aria-label="${L('Leave', 'Verlaten')}">◀</button>
         <div class="sel-title"><small></small><b>${quick ? L('Quick play', 'Snel spel') : L('With friends', 'Met vrienden')}</b></div>
+        <button class="lb-leave">${L('Leave', 'Verlaten')}</button>
       </div>
       <div class="lb-pages">
         <section class="lb-page on" data-page="lobby">
@@ -484,9 +533,10 @@ export function showLobby(room: Room, on: LobbyActions) {
       else show(b.dataset.tab!)
     }),
   )
-  el.querySelector('.sel-back')!.addEventListener('click', () => {
+  // Leaving needs a second tap (as host it closes the lobby for everyone)
+  el.querySelector('.lb-leave')!.addEventListener('click', () => {
     sfx.select()
-    on.leave()
+    confirmLeaveLobby(room, on.leave)
   })
   start.addEventListener('click', () => {
     if (room.running) return

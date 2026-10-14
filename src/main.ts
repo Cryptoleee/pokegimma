@@ -7,7 +7,7 @@ import { TRAINERS, type TrainerDef } from './data/trainers'
 import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
 import { render, view } from './game/render'
 import { TILE } from './game/world'
-import { Hud } from './ui/hud'
+import { chatWidget, Hud } from './ui/hud'
 import { clearScreen, showLeaveConfirm, showPartyFull } from './ui/screens'
 import { showIntro } from './ui/intro'
 import { showTitle } from './ui/title'
@@ -16,7 +16,7 @@ import { showResults } from './ui/results'
 import { LiveBoard, showFinalBoard } from './ui/scoreboard'
 import { decided, scoreRows } from './game/score'
 import { showEvolution } from './ui/cutscene'
-import { setOnline, showLobby, showMenu, type MenuState } from './ui/menu'
+import { confirmLeaveLobby, setOnline, showLobby, showMenu, type MenuState } from './ui/menu'
 import { showLoading } from './ui/loading'
 import { wipe } from './ui/transition'
 import { currentMusic, playMusic, setTempo } from './music'
@@ -131,7 +131,11 @@ function toMenu(extra: Partial<MenuState> = {}) {
   playMusic('menu')
   const code = pendingJoin
   statsStateChanged()
-  showMenu({ trainer, team, choice, code: code || undefined, ...extra }, {
+  showMenu({ trainer, team, choice, code: code || undefined, rejoin: rejoinCode(), ...extra }, {
+    rejoin: (c) => {
+      forgetRoom()
+      joinRoom(c)
+    },
     solo: (c) => {
       choice = c
       store.set('choice', c)
@@ -148,7 +152,7 @@ function toMenu(extra: Partial<MenuState> = {}) {
   if (code && profile().name && !extra.error) {
     pendingJoin = ''
     const none = () => {}
-    showMenu({ trainer, team, choice, code, busy: L(`Connecting to ${code}…`, `Verbinden met ${code}…`) }, { solo: none, host: none, join: none, quick: none, team: none, back: none })
+    showMenu({ trainer, team, choice, code, busy: L(`Connecting to ${code}…`, `Verbinden met ${code}…`) }, { solo: none, host: none, join: none, rejoin: none, quick: none, team: none, back: none })
     joinRoom(code)
   }
 }
@@ -199,7 +203,7 @@ function enterMatch(g: Game) {
   if (g.mode !== 'client') hud = makeHud(g)
   if (desktop) setTimeout(() => game === g && hud?.toast(L('WASD move · click = attack · Q E R = moves · Esc pause', 'WASD lopen · klik = aanval · Q E R = krachten · Esc pauze')), INTRO_TIME * 1000 + 600)
   // Extra history entry so the phone's back button asks before leaving.
-  history.pushState({ battlemon: 'game' }, '')
+  if (!guardActive) history.pushState({ battlemon: 'game' }, '')
   guardActive = true
 }
 
@@ -258,6 +262,9 @@ function onEnd(r: GameResult) {
 let spec: { g: Game; board: LiveBoard; speed: number; name: string; endT: number } | null = null
 
 /** Watch the rest of the match after you're out. */
+/** Chat while spectating (multiplayer only). */
+let specChat: (ReturnType<typeof chatWidget> & { feed: HTMLElement }) | null = null
+
 function spectate() {
   const g = game
   if (!g) return
@@ -278,6 +285,16 @@ function spectate() {
       </div>
     </div>`
   const board = new LiveBoard(hudRoot, g, () => g.player.id)
+  // Out of the match, still in the conversation
+  specChat = null
+  if (room) {
+    const c = chatWidget((t) => room?.say(t))
+    const feed = document.createElement('div')
+    feed.className = 'feed spec-feed'
+    hudRoot.querySelector('.spec-btns')!.prepend(c.btn)
+    hudRoot.append(c.bar, feed)
+    specChat = { ...c, feed }
+  }
   spec = { g, board, speed: 1, name: '', endT: -1 }
   const cycle = (d: number) => {
     const alive = g.trainers.filter((t) => t.alive)
@@ -369,9 +386,11 @@ function roomEvents() {
     chat: (m: ChatLine) => {
       lobbyUi?.chat(m)
       if (viewing) hud?.chatLine(m, m.pid === profile().id)
+      if (spec && specChat) specChat.line(specChat.feed, m, m.pid === profile().id)
     },
     closed: (reason: string) => {
       const wasQuick = room?.quick && !game
+      rememberRoom()
       room = null
       remotes.clear()
       // Quick play: the host left before the match started: just find another lobby
@@ -443,7 +462,11 @@ function toLobby() {
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.clearRect(0, 0, canvas.width, canvas.height)
   }
-  guardActive = false
+  // In a lobby the phone's back gesture asks first too
+  if (!guardActive) {
+    history.pushState({ battlemon: 'lobby' }, '')
+    guardActive = true
+  }
   playMusic('menu')
   lobbyUi = showLobby(room, {
     start: hostStart,
@@ -545,6 +568,11 @@ function watchOnline() {
 
 function leaveRoom() {
   ready = false
+  rememberRoom()
+  if (guardActive) {
+    guardActive = false
+    history.back()
+  }
   room?.leave()
   room = null
   remotes.clear()
@@ -669,8 +697,38 @@ window.addEventListener('popstate', () => {
     // Swallow the back press and ask first.
     history.pushState({ battlemon: 'game' }, '')
     confirmLeave()
+  } else if (room) {
+    history.pushState({ battlemon: 'lobby' }, '')
+    if (!document.querySelector('#modal:not(.hidden)')) confirmLeaveLobby(room, leaveRoom)
   } else guardActive = false
 })
+
+/** The friends' lobby you were last in (guests), so you can hop back in from the home screen. */
+const REJOIN_KEY = 'battlemon:rejoin'
+function rememberRoom() {
+  if (!room || room.quick || room.isHost) return
+  try {
+    sessionStorage.setItem(REJOIN_KEY, JSON.stringify({ code: room.code, at: Date.now() }))
+  } catch {
+    /* private mode */
+  }
+}
+function rejoinCode(): string | undefined {
+  try {
+    const r = JSON.parse(sessionStorage.getItem(REJOIN_KEY) ?? 'null') as { code: string; at: number } | null
+    if (r && Date.now() - r.at < 15 * 60_000) return r.code
+  } catch {
+    /* nothing saved */
+  }
+  return undefined
+}
+function forgetRoom() {
+  try {
+    sessionStorage.removeItem(REJOIN_KEY)
+  } catch {
+    /* private mode */
+  }
+}
 
 window.addEventListener('beforeunload', (e) => {
   if (inMatch() || room) {
@@ -710,6 +768,10 @@ window.addEventListener('keydown', (e) => {
   keys.add(k)
   if (e.key === 'Escape') return confirmLeave()
   if (e.key === 'Enter' && viewing && hud?.openChat()) return e.preventDefault()
+  if (e.key === 'Enter' && spec && specChat) {
+    specChat.open()
+    return e.preventDefault()
+  }
   if (e.key === 'Tab' && viewing && (hud || spec)) {
     e.preventDefault()
     if (!e.repeat) (spec?.board ?? hud?.board)?.toggle()
@@ -875,6 +937,30 @@ function frame(now: number) {
   requestAnimationFrame(frame)
 }
 requestAnimationFrame(frame)
+
+/**
+ * A hidden tab gets no animation frames, which would freeze the match for everyone
+ * when the host alt-tabs. While hidden, a worker's timer (not throttled like the page's)
+ * keeps the simulation and the network going; drawing waits until you're back.
+ */
+let bgLast = 0
+const ticker = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 33)'], { type: 'text/javascript' })))
+ticker.onmessage = () => {
+  const g = game
+  const now = performance.now()
+  const dt = Math.min(0.1, (now - (bgLast || now)) / 1000)
+  bgLast = now
+  if (!document.hidden || !g || g.mode === 'client') {
+    bgLast = 0
+    return
+  }
+  // Solo matches may pause in the background; anything with other players keeps running
+  if (g.mode !== 'host') return
+  // Same step size as the visible loop
+  for (let t = dt; t > 0; t -= 0.05) g.update(Math.min(0.05, t))
+  hostNet(g, dt)
+  last = now
+}
 
 // Handy for debugging from the console.
 ;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game }, get room() { return room }, get music() { return currentMusic() }, remotes, snapshot, voiceLog, sound: { move: moveByName, namePitch, cast: playMoveCast, hit: playMoveHit, charge: playMoveCharge, item: playItem, boss: playBoss, reset: resetSfx } }

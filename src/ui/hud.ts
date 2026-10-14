@@ -136,44 +136,11 @@ export class Hud {
 
     // Multiplayer chat: a button opens quick phrases and a text field
     if (opts.chat) {
-      const say = opts.chat
-      const btn = h('button', 'sysbtn chatbtn', '💬') as HTMLButtonElement
-      btn.setAttribute('aria-label', 'Chat')
-      const bar = h('form', 'chatbar hidden', `
-        <div class="cb-quick">${QUICK_CHAT.map((q) => `<button type="button">${tx(q)}</button>`).join('')}</div>
-        <div class="cb-row"><input maxlength="80" placeholder="${L('Message…', 'Bericht…')}" autocomplete="off" enterkeyhint="send"><button type="submit">➤</button></div>`)
-      const input = bar.querySelector('input') as HTMLInputElement
-      const close = () => {
-        bar.classList.add('hidden')
-        input.blur()
-      }
-      btn.onclick = () => {
-        sfx.select()
-        btn.classList.remove('unread')
-        if (bar.classList.toggle('hidden')) input.blur()
-      }
-      bar.addEventListener('submit', (e) => {
-        e.preventDefault()
-        if (input.value.trim()) sfx.blip()
-        say(input.value)
-        input.value = ''
-        close()
-      })
-      input.addEventListener('keydown', (e) => {
-        e.stopPropagation()
-        if (e.key === 'Escape') close()
-      })
-      bar.querySelectorAll<HTMLButtonElement>('.cb-quick button').forEach((b) =>
-        b.addEventListener('click', () => {
-          sfx.blip()
-          say(b.textContent!)
-          close()
-        }),
-      )
-      sys.append(btn)
-      root.append(bar)
-      this.chatBar = bar
-      this.chatBtn = btn
+      const c = chatWidget(opts.chat)
+      sys.append(c.btn)
+      root.append(c.bar)
+      this.chatBar = c.bar
+      this.chatBtn = c.btn
     }
 
     // Items
@@ -768,5 +735,65 @@ export class Hud {
     this.root.innerHTML = ''
     this.root.classList.add('hidden')
     this.root.classList.remove('intro-mode')
+  }
+}
+
+/**
+ * The chat button and its bar (quick phrases + a text field). Used in the match HUD and
+ * while spectating, so you can keep talking after you're out.
+ */
+export function chatWidget(say: (text: string) => void) {
+  const btn = h('button', 'sysbtn chatbtn', '💬') as HTMLButtonElement
+  btn.setAttribute('aria-label', 'Chat')
+  const bar = h('form', 'chatbar hidden', `
+    <div class="cb-quick">${QUICK_CHAT.map((q) => `<button type="button">${tx(q)}</button>`).join('')}</div>
+    <div class="cb-row"><input maxlength="80" placeholder="${L('Message…', 'Bericht…')}" autocomplete="off" enterkeyhint="send"><button type="submit">➤</button></div>`)
+  const input = bar.querySelector('input') as HTMLInputElement
+  const close = () => {
+    bar.classList.add('hidden')
+    input.blur()
+  }
+  btn.onclick = () => {
+    sfx.select()
+    btn.classList.remove('unread')
+    if (bar.classList.toggle('hidden')) input.blur()
+  }
+  bar.addEventListener('submit', (e) => {
+    e.preventDefault()
+    if (input.value.trim()) sfx.blip()
+    say(input.value)
+    input.value = ''
+    close()
+  })
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation()
+    if (e.key === 'Escape') close()
+  })
+  bar.querySelectorAll<HTMLButtonElement>('.cb-quick button').forEach((b) =>
+    b.addEventListener('click', () => {
+      sfx.blip()
+      say(b.textContent!)
+      close()
+    }),
+  )
+  return {
+    btn,
+    bar,
+    open() {
+      bar.classList.remove('hidden')
+      btn.classList.remove('unread')
+      input.focus()
+    },
+    /** A line in the given feed; marks the button unread when the bar is closed. */
+    line(feed: HTMLElement, m: ChatLine, mine: boolean) {
+      const d = h('div', 'chatline', `<b>${esc(m.name)}</b> ${esc(m.text)}`)
+      feed.append(d)
+      while (feed.children.length > 5) feed.firstChild!.remove()
+      setTimeout(() => d.remove(), 8000)
+      if (!mine) {
+        sfx.blip()
+        if (bar.classList.contains('hidden')) btn.classList.add('unread')
+      }
+    },
   }
 }
