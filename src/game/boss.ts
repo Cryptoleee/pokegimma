@@ -666,7 +666,7 @@ function resolveHazard(g: Game, h: Hazard) {
         v.burst(pl.x + 1, pl.y, { n: 30, speed: 8, cols: ['#ffffff', '#c8ecff', '#8cc4f0'], shape: 'shard', s0: 4, s1: 1, life: 0.9, grav: 10 })
         v.shakeBy(6)
         g.world.breakPillar(i)
-        for (const vw of g.viewers) vw.hooks.feed(both('🧊 An ice pillar shattered!', '🧊 Een ijspilaar is versplinterd!'))
+        for (const vw of g.viewers) vw.hooks.feed(both('🧊 An ice pillar shattered!', '🧊 Een ijspilaar is versplinterd!'), { kind: 'boss' })
       }
     })
   // Damage everyone inside (behind a pillar is safe from cover attacks)
@@ -705,6 +705,9 @@ function phaseBanner(g: Game, r: RaidState) {
       sub: final ? inBoth(() => `${L('Final phase', 'Laatste fase')} · ${r.def.finalSub}`) : both('Phase 2 · new attacks', 'Fase 2 · nieuwe aanvallen'),
       mon: r.def.forms?.[r.phase] ?? boss.species.id, color: r.def.looks[r.phase].aura ?? r.def.color, voice: r.phase === 1 ? 'enraged' : 'final_phase',
     })
+    v.hooks.feed(final
+      ? both(`🔥 Final phase: ${name} unleashes everything`, `🔥 Laatste fase: ${name} gooit alles in de strijd`)
+      : both(`🔥 Phase 2: ${name} is enraged`, `🔥 Fase 2: ${name} is woedend`), { mon: r.def.forms?.[r.phase] ?? boss.species.id, kind: 'boss' })
   }
 }
 
@@ -770,6 +773,7 @@ export function raidDown(g: Game, tr: Trainer) {
   const v = g.vOf(tr)
   if (tr.lives > 0) {
     tr.respawnT = RESPAWN_TIME
+    for (const o of g.viewers) if (o !== v) o.hooks.feed(both(`💥 ${tr.name}'s ${tr.mon.name} fainted · back in ${RESPAWN_TIME} s`, `💥 ${tr.mon.name} van ${tr.name} is verslagen · terug over ${RESPAWN_TIME} s`), { mon: tr.mon.species.id, kind: 'ko' })
     v?.hooks.banner({ kind: 'fainted', title: both(`${tr.mon.name} fainted!`, `${tr.mon.name} is verslagen!`), sub: both(`Back in ${RESPAWN_TIME} s · ${tr.lives} ${tr.lives === 1 ? 'life' : 'lives'} left`, `Terug over ${RESPAWN_TIME} s · nog ${tr.lives} ${tr.lives === 1 ? 'leven' : 'levens'}`), mon: tr.mon.species.id })
     return
   }

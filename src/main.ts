@@ -7,7 +7,7 @@ import { TRAINERS, type TrainerDef } from './data/trainers'
 import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
 import { render, view } from './game/render'
 import { TILE } from './game/world'
-import { chatWidget, Hud } from './ui/hud'
+import { chatWidget, feedLine, Hud } from './ui/hud'
 import { clearScreen, showLeaveConfirm, showPartyFull } from './ui/screens'
 import { showIntro } from './ui/intro'
 import { showTitle } from './ui/title'
@@ -250,7 +250,7 @@ function pickTeam(done: () => void, back: () => void, cta: string) {
 function hooks(): GameHooks {
   return {
     toast: (t, c) => hud?.toast(tx(t), c),
-    feed: (t, icon) => hud?.feed(tx(t), icon),
+    feed: (t, icon) => (hud ? hud.feed(tx(t), icon) : spec && specFeed && document.body.contains(specFeed) && feedLine(specFeed, tx(t), icon)),
     banner: (b) => hud?.banner(b),
     evolve: (from, to, shiny, done) => showEvolution(from, to, shiny, done),
     partyFull: (mon, choose) => showPartyFull(mon, game!.player.party, choose),
@@ -338,6 +338,7 @@ let spec: { g: Game; board: LiveBoard; speed: number; name: string; endT: number
 /** Watch the rest of the match after you're out. */
 /** Chat while spectating (multiplayer only). */
 let specChat: (ReturnType<typeof chatWidget> & { feed: HTMLElement }) | null = null
+let specFeed: HTMLElement | null = null
 
 function spectate() {
   const g = game
@@ -361,13 +362,15 @@ function spectate() {
   const board = new LiveBoard(hudRoot, g, () => g.player.id)
   // Out of the match, still in the conversation
   specChat = null
+  // The announcements (kills, spawns, drops) keep coming while you watch
+  specFeed = document.createElement('div')
+  specFeed.className = 'feed spec-feed'
+  hudRoot.append(specFeed)
   if (room) {
     const c = chatWidget((t) => room?.say(t))
-    const feed = document.createElement('div')
-    feed.className = 'feed spec-feed'
     hudRoot.querySelector('.spec-btns')!.prepend(c.btn)
-    hudRoot.append(c.bar, feed)
-    specChat = { ...c, feed }
+    hudRoot.append(c.bar)
+    specChat = { ...c, feed: specFeed }
   }
   spec = { g, board, speed: 1, name: '', endT: -1 }
   const cycle = (d: number) => {

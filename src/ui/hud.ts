@@ -6,7 +6,7 @@ import { TYPE_COLOR, TYPE_NL } from '../data/types'
 import { isMuted, setMuted, sfx } from '../audio'
 import { say, type VoiceLine } from '../voice'
 import { xpNeeded } from '../game/entities'
-import { INTRO_TIME, type Banner, type Game } from '../game/game'
+import { INTRO_TIME, type Banner, type FeedIcon, type Game } from '../game/game'
 import { itemUrl } from '../game/sprites'
 import { MAP } from '../game/world'
 import type { Mon } from '../game/entities'
@@ -293,7 +293,7 @@ export class Hud {
   chatLine(m: ChatLine, mine: boolean) {
     const d = h('div', 'chatline', `<b>${esc(m.name)}</b> ${esc(m.text)}`)
     this.feedEl.append(d)
-    while (this.feedEl.children.length > 5) this.feedEl.firstChild!.remove()
+    trimChat(this.feedEl)
     setTimeout(() => d.remove(), 8000)
     if (!mine) {
       sfx.blip()
@@ -359,14 +359,8 @@ export class Hud {
     setTimeout(() => d.remove(), 2700)
   }
 
-  feed(text: Txt, icon?: { mon?: number; trainer?: string }) {
-    const d = h('div')
-    if (icon?.mon) d.innerHTML = `<img class="px" src="${spriteUrl(icon.mon)}" alt="">`
-    else if (icon?.trainer) d.innerHTML = `<img class="px tr" src="${trainerSpriteUrl(icon.trainer)}" alt="">`
-    d.append(document.createTextNode(tx(text)))
-    this.feedEl.append(d)
-    while (this.feedEl.children.length > 4) this.feedEl.firstChild!.remove()
-    setTimeout(() => d.remove(), 6200)
+  feed(text: Txt, icon?: FeedIcon) {
+    feedLine(this.feedEl, tx(text), icon)
   }
 
   /** Big centre-screen moments: GO!, level ups, new moves, legendaries, KOs. */
@@ -788,7 +782,7 @@ export function chatWidget(say: (text: string) => void) {
     line(feed: HTMLElement, m: ChatLine, mine: boolean) {
       const d = h('div', 'chatline', `<b>${esc(m.name)}</b> ${esc(m.text)}`)
       feed.append(d)
-      while (feed.children.length > 5) feed.firstChild!.remove()
+      trimChat(feed)
       setTimeout(() => d.remove(), 8000)
       if (!mine) {
         sfx.blip()
@@ -796,4 +790,25 @@ export function chatWidget(say: (text: string) => void) {
       }
     },
   }
+}
+
+/** Chat lines share the feed with announcements; only the chat gets trimmed here. */
+function trimChat(feed: HTMLElement) {
+  const lines = feed.querySelectorAll('.chatline')
+  for (let i = 0; i < lines.length - 3; i++) lines[i].remove()
+}
+
+/** How many announcements stay in view (they dim after a few seconds instead of vanishing). */
+const FEED_KEEP = 5
+
+/** An announcement in a feed: kills, spawns, drops, storm and boss moments. */
+export function feedLine(feed: HTMLElement, text: string, icon?: FeedIcon) {
+  const d = h('div', `ev ev-${icon?.kind ?? 'info'}`)
+  if (icon?.mon) d.innerHTML = `<img class="px" src="${spriteUrl(icon.mon)}" alt="">`
+  else if (icon?.trainer) d.innerHTML = `<img class="px tr" src="${trainerSpriteUrl(icon.trainer)}" alt="">`
+  d.append(document.createTextNode(text))
+  feed.append(d)
+  const all = feed.querySelectorAll('.ev')
+  for (let i = 0; i < all.length - FEED_KEEP; i++) all[i].remove()
+  setTimeout(() => d.classList.add('old'), 7000)
 }

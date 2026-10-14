@@ -153,9 +153,17 @@ export interface Banner {
   color?: string
 }
 
+/** What a feed line is about (its colour and icon) and who's in it. */
+export type FeedKind = 'ko' | 'spawn' | 'drop' | 'storm' | 'boss' | 'info'
+export interface FeedIcon {
+  mon?: number
+  trainer?: string
+  kind?: FeedKind
+}
+
 export interface GameHooks {
   toast(text: Txt, color?: string): void
-  feed(text: Txt, icon?: { mon?: number; trainer?: string }): void
+  feed(text: Txt, icon?: FeedIcon): void
   banner(b: Banner): void
   evolve(from: number, to: number, shiny: boolean, done: () => void): void
   partyFull(mon: Mon, choose: (idx: number) => void): void
@@ -1327,7 +1335,7 @@ export class Game {
     if (!tr.alive) return
     tr.alive = false
     tr.diedAt = this.time
-    for (const v of this.viewers) v.hooks.feed(both(`${tr === v.tr ? 'You are' : `${tr.name} is`} out of lives`, `${tr === v.tr ? 'Jij bent' : `${tr.name} is`} door je levens heen`), { trainer: tr.def.sprite })
+    for (const v of this.viewers) v.hooks.feed(both(`${tr === v.tr ? 'You are' : `${tr.name} is`} out of lives`, `${tr === v.tr ? 'Jij bent' : `${tr.name} is`} door je levens heen`), { trainer: tr.def.sprite, kind: 'ko' })
     const v = this.vOf(tr)
     if (v) {
       v.hooks.banner({ kind: 'fainted', title: both('Out of lives', 'Geen levens meer'), sub: both('You can watch until the raid is over', 'Je kijkt mee tot de raid voorbij is'), mon: tr.mon.species.id, voice: 'lose' })
@@ -1379,9 +1387,9 @@ export class Game {
       const who = (t: Trainer, me: string) => (t === v.tr ? me : t.name)
       v.hooks.feed(
         by && by !== tr
-          ? both(`${who(by, 'You')} knocked ${who(tr, 'you')} out`, `${who(by, 'Jij')} schakelde ${who(tr, 'jou')} uit`)
-          : both(`${who(tr, 'You')} got wrecked by the storm`, `${who(tr, 'Jij')} werd gesloopt door de storm`),
-        { trainer: tr.def.sprite },
+          ? both(`⚔ ${who(by, 'You')} knocked ${who(tr, 'you')} out · ${this.alive.length} left`, `⚔ ${who(by, 'Jij')} schakelde ${who(tr, 'jou')} uit · nog ${this.alive.length} over`)
+          : both(`🌀 ${who(tr, 'You')} got wrecked by the storm · ${this.alive.length} left`, `🌀 ${who(tr, 'Jij')} werd gesloopt door de storm · nog ${this.alive.length} over`),
+        { trainer: tr.def.sprite, kind: 'ko' },
       )
     }
     if (by && by !== tr) this.vOf(by)?.hooks.banner({ kind: 'ko', title: both('Trainer knocked out!', 'Trainer uitgeschakeld!'), sub: both(`${tr.name} · ${this.alive.length} left`, `${tr.name} · nog ${this.alive.length} over`), trainer: tr.def.sprite, voice: 'ko' })
@@ -1394,7 +1402,15 @@ export class Game {
       const a = (i / Math.max(1, drops.length)) * Math.PI * 2
       this.items.push({ x: tr.x + Math.cos(a) * 0.9, y: tr.y + Math.sin(a) * 0.9, kind, bob: Math.random() * 6 })
     })
-    if (drops.length) this.soundAt(tr.x, tr.y, 'loot', [], { range: 12 })
+    if (drops.length) {
+      this.soundAt(tr.x, tr.y, 'loot', [], { range: 12 })
+      const count = (k: ItemKind) => drops.filter((d) => d === k).length
+      const list = (en: boolean) => ([['master', 'Master Ball'], ['potion', 'Potion'], ['revive', 'Revive']] as const)
+        .filter(([k]) => count(k))
+        .map(([k, n]) => `${count(k) > 1 ? `${count(k)}× ` : ''}${n}${en && count(k) > 1 ? 's' : ''}`)
+        .join(', ')
+      for (const v of this.viewers) v.hooks.feed(both(`🎁 ${tr.name} dropped ${list(true)}`, `🎁 ${tr.name} liet ${list(false)} vallen`), { kind: 'drop' })
+    }
     tr.masterBalls = tr.potions = tr.revives = 0
     const v = this.vOf(tr)
     if (v) {
@@ -1650,7 +1666,7 @@ export class Game {
     this.soundAt(at[0], at[1], 'spawnChime', [], { global: true })
     for (const v of this.viewers) {
       v.hooks.banner({ kind: 'legendary', title: both('Evolution Crystal!', 'Evolutiekristal!'), sub: both('Somewhere in the zone. Find it first: your Pokémon evolves fully, with every move', 'Ergens in de zone. Vind hem als eerste: je Pokémon evolueert volledig, met alle aanvallen'), color: '#c8a0ff', voice: 'legendary' })
-      v.hooks.feed(both('✦ An Evolution Crystal has appeared somewhere! Look for the pillar of light', '✦ Er is ergens een Evolutiekristal verschenen! Zoek de lichtzuil'))
+      v.hooks.feed(both('✦ An Evolution Crystal has appeared somewhere! Look for the pillar of light', '✦ Er is ergens een Evolutiekristal verschenen! Zoek de lichtzuil'), { kind: 'spawn' })
     }
   }
 
@@ -1692,7 +1708,9 @@ export class Game {
       })
     } else v?.hooks.banner({ kind: 'legendary', title: both('EVOLUTION SURGE!', 'EVOLUTIE-STOOT!'), sub, mon: sp.id, shiny: m.shiny, color: '#c8a0ff', voice: 'evolve' })
     for (const o of this.viewers)
-      if (o !== v) o.hooks.feed(both(`✦ ${tr.name} grabbed the Evolution Crystal: ${sp.name} Lv ${m.level}!`, `✦ ${tr.name} pakte het Evolutiekristal: ${sp.name} Lv ${m.level}!`), { mon: sp.id })
+      o.hooks.feed(o === v
+        ? both(`✦ You grabbed the Evolution Crystal: ${sp.name} Lv ${m.level}!`, `✦ Jij pakte het Evolutiekristal: ${sp.name} Lv ${m.level}!`)
+        : both(`✦ ${tr.name} grabbed the Evolution Crystal: ${sp.name} Lv ${m.level}!`, `✦ ${tr.name} pakte het Evolutiekristal: ${sp.name} Lv ${m.level}!`), { mon: sp.id, kind: 'spawn' })
   }
 
   private updateItems() {
@@ -1809,7 +1827,7 @@ export class Game {
       v.sfx('legendary')
       v.cry(id, 0.3)
       v.hooks.banner({ kind: 'legendary', title: both(`${m.name} appears!`, `${m.name} verschijnt!`), sub: both(`Lv ${m.level} · follow the golden arrow · Master Ball = instant catch`, `Lv ${m.level} · volg de gouden pijl · Master Ball = direct vangen`), mon: id, shiny: m.shiny, color: '#ffd040', voice: 'legendary' })
-      v.hooks.feed(both(`★ ${m.name} (Lv ${m.level}) has appeared! Catch it with a Master Ball`, `★ ${m.name} (Lv ${m.level}) is verschenen! Vang hem met een Master Ball`), { mon: id })
+      v.hooks.feed(both(`★ ${m.name} (Lv ${m.level}) has appeared! Catch it with a Master Ball`, `★ ${m.name} (Lv ${m.level}) is verschenen! Vang hem met een Master Ball`), { mon: id, kind: 'spawn' })
     }
   }
 
@@ -2038,7 +2056,10 @@ export class Game {
         z.fromX = z.x
         z.fromY = z.y
         z.fromR = z.r
-        for (const v of this.viewers) v.hooks.banner({ kind: 'storm', title: both('The storm is coming!', 'De storm komt!'), sub: both(`Phase ${z.phase + 1} of 6 · get into the white circle`, `Fase ${z.phase + 1} van 6 · ga naar de witte cirkel`), color: '#c080ff', voice: z.phase + 1 >= 6 ? 'final_circle' : 'storm' })
+        for (const v of this.viewers) {
+          v.hooks.banner({ kind: 'storm', title: both('The storm is coming!', 'De storm komt!'), sub: both(`Phase ${z.phase + 1} of 6 · get into the white circle`, `Fase ${z.phase + 1} van 6 · ga naar de witte cirkel`), color: '#c080ff', voice: z.phase + 1 >= 6 ? 'final_circle' : 'storm' })
+          v.hooks.feed(both(`🌀 Storm phase ${z.phase + 1}/6: the circle is closing · ${this.alive.length} left`, `🌀 Stormfase ${z.phase + 1}/6: de cirkel krimpt · nog ${this.alive.length} over`), { kind: 'storm' })
+        }
       }
     } else {
       const k = Math.min(1, z.t / ph.shrink)

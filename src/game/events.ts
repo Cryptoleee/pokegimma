@@ -42,7 +42,7 @@ export function startEvent(g: Game, kind: WorldEvent['kind']) {
     g.events.push({ id: nextId++, kind, x, y, t: DROP_TIME, total: DROP_TIME })
     for (const v of g.viewers) {
       v.hooks.banner({ kind: 'storm', title: both('Supply drop!', 'Bevoorrading!'), sub: both('A crate is falling from the sky · follow the arrow', 'Een kist valt uit de lucht · volg de pijl'), color: '#58d0ff', voice: 'supply' })
-      v.hooks.feed(both('📦 Supply drop incoming: Master Ball, Potions and Rare Candy', '📦 Bevoorrading onderweg: Master Ball, Potions en Rare Candy'))
+      v.hooks.feed(both('📦 Supply drop incoming: Master Ball, Potions and Rare Candy', '📦 Bevoorrading onderweg: Master Ball, Potions en Rare Candy'), { kind: 'drop' })
     }
     return
   }
@@ -67,7 +67,7 @@ export function startEvent(g: Game, kind: WorldEvent['kind']) {
   for (const v of g.viewers) {
     v.cry(species, 0.3)
     v.hooks.banner({ kind: 'storm', title: both('A swarm!', 'Een zwerm!'), sub: both('Six wild Pokémon in the grass · follow the arrow', 'Zes wilde Pokémon in het gras · volg de pijl'), mon: species, color: '#7ce07c', voice: 'swarm' })
-    v.hooks.feed(both('🐾 A swarm of wild Pokémon has been spotted', '🐾 Er is een zwerm wilde Pokémon gespot'), { mon: species })
+    v.hooks.feed(both('🐾 A swarm of wild Pokémon has been spotted', '🐾 Er is een zwerm wilde Pokémon gespot'), { mon: species, kind: 'spawn' })
   }
 }
 
@@ -92,6 +92,7 @@ export function updateEvents(g: Game, dt: number) {
     g.vfx.burst(e.x, e.y - 0.4, { n: 26, speed: 7, cols: ['#ffffff', '#a0e8ff', '#58d0ff'], shape: 'star', add: true, s0: 3, s1: 0.5, life: 0.8, vr: 10 })
     g.vfx.shakeBy(5)
     g.soundAt(e.x, e.y, 'crate', [], { range: 22 })
+    for (const v of g.viewers) v.hooks.feed(both('📦 The supply crate has landed: grab the loot!', '📦 De bevoorradingskist is geland: pak de buit!'), { kind: 'drop' })
   }
 }
 
