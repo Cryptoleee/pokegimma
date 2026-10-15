@@ -24,6 +24,7 @@ import { sfx } from './audio'
 import { loadSfx, namePitch, playBoss, playItem, playMoveCast, playMoveCharge, playMoveHit, resetSfx } from './moveSfx'
 import { profile, setName } from './profile'
 import { cleanCode, probeQuick, Room, stopProbe } from './net/room'
+import { loadIce } from './net/ice'
 import type { ChatLine, HostMsg, LobbyPlayer, MatchChoice } from './net/protocol'
 import { pickTheme, THEMES, type ThemeId } from './data/themes'
 import { applyEvents, applySnapshot, initClient, recordVfx, remoteViewer, runCommand, snapshot, type RemoteViewer } from './net/sync'
@@ -92,6 +93,8 @@ function presence(): Presence {
   return { s: 'menu', name }
 }
 void initAccount(presence)
+// Fetch the connection (TURN) servers early, so creating or joining a match doesn't wait
+void loadIce()
 onAccount(() => {
   // Signed in without a name yet: use your Discord one
   const s = accountState()
