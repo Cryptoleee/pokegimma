@@ -143,13 +143,6 @@ Nieuwe bazen zijn vooral data: een rij in `src/data/bosses.ts` met hun aanvallen
 - **Cinematisch:** een titelscherm met Zekrom en Reshiram, Black/White-schermovergangen, keuzeschermen als podium, een drop-in met aftelling bij de start, een evolutie-cutscene, banners voor level-ups, nieuwe aanvallen, legendarische Pokémon en KO's, en een resultaatscherm met confetti.
 - **Wereld:** weer per wereld (sneeuw, zand, as, gloeiende vonken, vuurvliegjes), wolkschaduwen, golvend en glinsterend water, ritselend gras, stofwolkjes, zwevende pollen, een gloeiende stormmuur met bliksem en regen, en een vignet.
 
-## Verbinding tussen spelers (TURN)
-
-Spelers verbinden rechtstreeks met de host (WebRTC). Op mobiele data en achter strenge routers lukt dat alleen via een doorgeefserver (TURN). De gratis TURN-servers van PeerJS bestaan niet meer, dus de game haalt ze op via `/api/ice`:
-- **Cloudflare (aanbevolen, gratis tot 1000 GB/maand):** Cloudflare-dashboard → Realtime → TURN Server → Create. Zet `CF_TURN_KEY_ID` (Turn Token ID) en `CF_TURN_API_TOKEN` (API Token) in Vercel.
-- **Of een andere TURN-dienst:** `TURN_URLS` (komma-gescheiden), `TURN_USERNAME`, `TURN_CREDENTIAL`.
-- Zonder deze instellingen alleen STUN: dat werkt op de meeste wifi-netwerken, maar niet altijd op 4G/5G.
-
 ## Vrienden (optioneel, Discord-login)
 
 - **Gast blijft standaard.** Inloggen met Discord is alleen nodig voor vrienden. Zonder login werkt alles zoals altijd.

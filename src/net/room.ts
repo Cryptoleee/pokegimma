@@ -1,7 +1,6 @@
 import { Peer, type DataConnection, type PeerOptions } from 'peerjs'
 import type { ChatLine, Command, GuestMsg, HostMsg, LobbyPlayer, MatchChoice } from './protocol'
 import { L, tx } from '../i18n'
-import { iceReady, iceServers } from './ice'
 
 /**
  * A multiplayer room: one phone hosts, the others join with a 4-letter code.
@@ -55,10 +54,9 @@ export const cleanCode = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, ''
 /** `?peer=host:port` points at a self-hosted PeerJS server (handy for testing). */
 function peerOptions(): PeerOptions {
   const custom = new URLSearchParams(location.search).get('peer')
-  const config = { iceServers: iceServers() }
-  if (!custom) return { debug: 0, config }
+  if (!custom) return { debug: 0 }
   const [host, port] = custom.split(':')
-  return { debug: 0, host, port: Number(port || 9000), path: '/', secure: location.protocol === 'https:', config }
+  return { debug: 0, host, port: Number(port || 9000), path: '/', secure: location.protocol === 'https:' }
 }
 
 export interface RoomEvents {
@@ -140,7 +138,7 @@ export class Room {
     const room = new Room('host', me, on)
     room.players = [me]
     room.quickSlot = slot
-    return iceReady().then(() => new Promise<Room>((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       let tries = 0
       const open = () => {
         room.code = slot >= 0 ? `Q${slot}` : newCode()
@@ -171,7 +169,7 @@ export class Room {
         })
       }
       open()
-    }))
+    })
   }
 
   /** Joins someone's room by code. */
@@ -183,7 +181,7 @@ export class Room {
     const room = new Room('guest', me, on)
     room.code = code
     room.quickSlot = slot
-    return iceReady().then(() => new Promise<Room>((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const peer = new Peer(peerOptions())
       room.peer = peer
       let settled = false
@@ -195,8 +193,7 @@ export class Room {
         peer.destroy()
         reject(new Error(msg))
       }
-      // The match was found but no direct line came up (often mobile data or a strict router)
-      const timer = setTimeout(() => fail(L('Couldn’t connect to this match. Try again, or switch to Wi-Fi.', 'Kon geen verbinding maken met dit potje. Probeer het opnieuw, of ga op wifi.')), timeoutMs)
+      const timer = setTimeout(() => fail(L('No connection. Are you both online?', 'Geen verbinding. Zitten jullie allebei op internet?')), timeoutMs)
       peer.on('error', (e) => {
         if (!settled) fail(friendlyError(e.type, code))
         else console.warn('[room]', e.type, e.message)
@@ -223,7 +220,7 @@ export class Room {
         })
         c.on('error', () => fail(L('The connection was lost.', 'De verbinding werd verbroken.')))
       })
-    }))
+    })
   }
 
   /**
@@ -251,7 +248,7 @@ export class Room {
 
   /** Quick play: join one particular public lobby (moving over from your own empty one). */
   static joinQuick(slot: number, me: LobbyPlayer, on: RoomEvents): Promise<Room> {
-    return Room.connect(quickId(slot), `Q${slot}`, me, on, 6000, slot)
+    return Room.connect(quickId(slot), `Q${slot}`, me, on, 4500, slot)
   }
 
   // ---------------- host ----------------
