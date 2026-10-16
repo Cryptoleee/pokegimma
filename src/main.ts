@@ -531,9 +531,18 @@ function toLobby() {
   statsStateChanged()
   presenceChanged()
   showHeldInvite()
-  // Guests drop the match they were watching; the host keeps simulating until it's over.
-  if (game?.mode !== 'host') stopGame()
-  else {
+  // Guests drop the match they were watching. The host keeps simulating while
+  // another player is still in it (silently); once every player is out, it stops.
+  const g = game
+  if (g?.mode !== 'host') stopGame()
+  else if (g.allDone) {
+    stopGame()
+    if (room.running) room.setRunning(false)
+  } else {
+    g.watch = false
+    g.silent = true
+    spec?.board.destroy()
+    spec = null
     viewing = false
     hud?.destroy()
     hud = null

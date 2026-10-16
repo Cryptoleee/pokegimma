@@ -316,6 +316,8 @@ export class Game {
   raid: RaidState | null = null
   /** Someone keeps watching after their own match ended: the world plays on. */
   watch = false
+  /** This screen doesn't show the match (the host is back in the lobby): no sound here. */
+  silent = false
   /** Spectating: the trainer the camera follows (picked by the viewer). */
   follow: Trainer | null = null
   /** Raid HUD info, on the host and on clients: time left, boss phase, pillars standing. */
@@ -412,8 +414,8 @@ export class Game {
       get camX() { return g.camX },
       get camY() { return g.camY },
       hooks: this.hooks,
-      sfx: (name, ...args) => (sfx[name] as (...a: unknown[]) => void)(...args),
-      cry: (id, vol) => cry(id, vol),
+      sfx: (name, ...args) => !g.silent && (sfx[name] as (...a: unknown[]) => void)(...args),
+      cry: (id, vol) => !g.silent && cry(id, vol),
       fx: (f) => this.fx.push(f),
     }
   }
