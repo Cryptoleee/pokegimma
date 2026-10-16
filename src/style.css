@@ -7508,3 +7508,31 @@ body:not(.desk) .spec-feed {
 .feed div.ev.old {
   opacity: 0.68;
 }
+
+/* Codes (lobby codes, friend codes): a clear monospace instead of the pixel font,
+   so S/5, Z/2, B/8 and G/6 can't be mixed up */
+:root {
+  --code-font: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+.lb-codetext b,
+.lb-codetext b i,
+.mm-code input,
+.fr-code b,
+.fr-add input,
+.cd {
+  font-family: var(--code-font) !important;
+  font-weight: 800;
+  font-variant-ligatures: none;
+}
+.mm-code input::placeholder,
+.fr-add input::placeholder {
+  font-family: var(--font);
+  font-weight: 400;
+}
+.fr-code b {
+  letter-spacing: 4px;
+}
+.lb-codetext b i {
+  font-size: 28px;
+  line-height: 1.5;
+}

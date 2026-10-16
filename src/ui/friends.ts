@@ -22,7 +22,7 @@ function statusLine(f: Friend) {
   if (p.s === 'lobby') {
     const quick = (p.q ?? -1) >= 0
     const max = quick ? QUICK_MAX : MAX_PLAYERS
-    const where = quick ? L('Quick play lobby', 'Snel spel-lobby') : L(`Lobby ${p.code}`, `Lobby ${p.code}`)
+    const where = quick ? L('Quick play lobby', 'Snel spel-lobby') : `Lobby <span class="cd">${p.code}</span>`
     return `${where} · ${p.n ?? 1}/${max}${(p.n ?? 0) >= max ? L(' · full', ' · vol') : ''}`
   }
   return L('Online · on the home screen', 'Online · op het home-scherm')

@@ -128,7 +128,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
         <label for="mm-name">${L('Your name', 'Jouw naam')}</label>
         <input id="mm-name" maxlength="${NAME_MAX}" autocomplete="nickname" spellcheck="false" placeholder="${L('Enter your name', 'Typ je naam')}" value="${esc(profile().name)}">
       </div>
-      ${st.rejoin ? `<button class="home-rejoin"><i>↩</i><span><b>${L('Rejoin lobby', 'Terug naar de lobby')} ${esc(st.rejoin)}</b><small>${L('you left it a moment ago', 'je ging er net uit')}</small></span><em>▶</em></button>` : ''}
+      ${st.rejoin ? `<button class="home-rejoin"><i>↩</i><span><b>${L('Rejoin lobby', 'Terug naar de lobby')} <span class="cd">${esc(st.rejoin)}</span></b><small>${L('you left it a moment ago', 'je ging er net uit')}</small></span><em>▶</em></button>` : ''}
       <div class="home-modes">
         <button class="mode quick"><i>⚡</i><b>${L('Quick play', 'Snel spel')}</b><small>${L('online with random players', 'online met willekeurige spelers')}</small><span class="qp-online"><em></em><span>${L('checking who\'s online…', 'online zoeken…')}</span></span></button>
         <button class="mode solo"><i>▶</i><b>Solo</b><small>${L('vs. bots', 'tegen bots')}</small></button>
