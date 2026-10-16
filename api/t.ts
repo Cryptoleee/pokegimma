@@ -6,7 +6,7 @@ import { clock, configured, ONLINE_MS, pipeline, TTL, type Cmd } from './_redis.
  *
  *   visit  {dev, lang, fresh, ref}       once per page load
  *   ping   {s, dt}                       every 90 s while the tab is visible ('off' on leave)
- *   match  {k, m, mon, w?, boss?, h}     a match starts for this player
+ *   match  {k, m, mon, w?, boss?, h, src?}  a match starts for this player (src: first match of a ?via= visitor)
  *   end    {k, m, r, boss?}              this player's match ended
  */
 
@@ -92,6 +92,8 @@ export function commandFor(b: Record<string, unknown>, now = Date.now()): Cmd | 
       const boss = word(b.boss), w = word(b.w)
       if (k === 'raid' && boss) a.push(3, `${boss}:play`)
       if (k === 'br' && w) a.push(4, w)
+      const src = typeof b.src === 'string' && /^[a-z0-9-]{1,20}$/.test(b.src) ? b.src : null
+      if (src) a.push(1, `pv:${src}`)
       return ['EVAL', BUMP, 4, d, 'mon', 'boss', 'world', ...a]
     }
     case 'end': {

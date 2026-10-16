@@ -551,7 +551,10 @@ function draw() {
     return a
   }, {}))
   const sources = card('Bronnen', `Waar bezoekers vandaan komen · ${range} dagen · ?via=naam in je link telt ook`, 'c4')
-  sources.append(barList([...refs.map(([n, v]) => ({ name: n, value: v })), { name: 'Direct / onbekend', value: Math.max(0, visits - refs.reduce((t, [, v]) => t + v, 0)) }], 8))
+  sources.append(barList([...refs.map(([n, v]) => {
+    const played = sum(days, (f) => f === `pv:${n}`)
+    return { name: n, value: v, note: played ? `${fmt(played)} gespeeld` : undefined }
+  }), { name: 'Direct / onbekend', value: Math.max(0, visits - refs.reduce((t, [, v]) => t + v, 0)) }], 8))
   const devices = card('Apparaat', `Bezoeken · ${range} dagen`, 'c4')
   devices.append(barList([
     { name: '📱 Mobiel', value: sum(days, (f) => f === 'dev:mobile') },

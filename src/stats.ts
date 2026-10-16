@@ -12,6 +12,8 @@ type Event = Record<string, string | number | undefined>
 const ID_KEY = 'sb:sid'
 export const OPT_OUT_KEY = 'sb:nostats'
 const PING_MS = 90_000
+const VIA_KEY = 'sb:via'
+const VIA_PLAYED_KEY = 'sb:viaPlayed'
 
 const local = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])|\.local$/.test(location.hostname)
 const forced = new URLSearchParams(location.search).get('stats') === 'force'
@@ -71,7 +73,15 @@ export function initStats(state: () => PlayState) {
   id = makeId()
   const ref = (() => {
     const via = new URLSearchParams(location.search).get('via')
-    if (via && /^[a-z0-9-]{1,20}$/i.test(via)) return via.toLowerCase()
+    if (via && /^[a-z0-9-]{1,20}$/i.test(via)) {
+      // Remember where this device first came from, to count who went on to play
+      try {
+        if (!localStorage.getItem(VIA_KEY)) localStorage.setItem(VIA_KEY, via.toLowerCase())
+      } catch {
+        /* private mode */
+      }
+      return via.toLowerCase()
+    }
     try {
       const h = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, '') : ''
       return h && h !== location.hostname ? h.slice(0, 40) : undefined
@@ -100,7 +110,18 @@ export function statsStateChanged() {
 }
 
 export function trackMatch(e: { k: 'br' | 'raid'; m: 'solo' | 'quick' | 'friends'; mon?: number; w?: string; boss?: string; h: number }) {
-  send({ e: 'match', ...e })
+  // The first match of a device that came in via a ?via= link counts as "played" for that source
+  let src: string | undefined
+  try {
+    const via = localStorage.getItem(VIA_KEY)
+    if (via && !localStorage.getItem(VIA_PLAYED_KEY)) {
+      localStorage.setItem(VIA_PLAYED_KEY, '1')
+      src = via
+    }
+  } catch {
+    /* private mode */
+  }
+  send({ e: 'match', ...e, src })
   statsStateChanged()
 }
 
