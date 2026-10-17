@@ -32,6 +32,7 @@ import { initStats, statsStateChanged, trackEnd, trackMatch } from './stats'
 import { accountState, accountStatus, initAccount, onAccount, onInvite, presenceChanged, type Invite, type Presence } from './account'
 import { hideInviteToast, showInviteToast } from './ui/friends'
 import { initProgress, matchEnded, matchStarted } from './progress'
+import { showProfile } from './ui/profile'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
@@ -210,6 +211,7 @@ function toMenu(extra: Partial<MenuState> = {}) {
       joinRoom(c)
     },
     joinFriend,
+    profile: () => wipe(() => showProfile({ trainerSprite: trainer.sprite, name: profile().name || trainer.name, back: () => wipe(() => toMenu()) })),
     solo: (c) => {
       choice = c
       store.set('choice', c)
@@ -226,7 +228,7 @@ function toMenu(extra: Partial<MenuState> = {}) {
   if (code && profile().name && !extra.error) {
     pendingJoin = ''
     const none = () => {}
-    showMenu({ trainer, team, choice, code, busy: L(`Connecting to ${code}…`, `Verbinden met ${code}…`) }, { solo: none, host: none, join: none, rejoin: none, joinFriend: none, quick: none, team: none, back: none })
+    showMenu({ trainer, team, choice, code, busy: L(`Connecting to ${code}…`, `Verbinden met ${code}…`) }, { solo: none, host: none, join: none, rejoin: none, joinFriend: none, profile: none, quick: none, team: none, back: none })
     joinRoom(code)
   }
 }

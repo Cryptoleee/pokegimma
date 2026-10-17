@@ -13,6 +13,8 @@ import { SEATS } from '../game/game'
 import { bindLangSwitch, L, langSwitch } from '../i18n'
 import { accountStatus, onAccount } from '../account'
 import { friendsCard, openFriends, openInvite, paintFriendsCard } from './friends'
+import { homeBadge } from './profile'
+import { onProgress } from '../progress'
 
 /**
  * Home menu (your team, name, solo or multiplayer) and the multiplayer lobby.
@@ -84,6 +86,8 @@ export interface MenuActions {
   rejoin(code: string): void
   /** Join a friend's lobby (`q` ≥ 0: a quick play slot). */
   joinFriend(code: string, q: number): void
+  /** Your trainer profile: level, quests, mastery, achievements, rankings. */
+  profile(): void
   team(): void
   back(): void
 }
@@ -123,6 +127,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
         ${mon ? gif(mon, 'hs-mon') : ''}
         <div class="hs-tag"><small>${L('YOUR TEAM', 'JOUW TEAM')}</small><b>${st.trainer.name}${mon ? ` &amp; ${SPECIES[mon].name}` : ''}</b></div>
         <button class="hs-edit">✎ ${L('Pick trainer &amp; Pokémon', 'Kies trainer &amp; Pokémon')}</button>
+        ${homeBadge()}
       </div>
       <div class="home-name">
         <label for="mm-name">${L('Your name', 'Jouw naam')}</label>
@@ -261,6 +266,20 @@ export function showMenu(st: MenuState, on: MenuActions) {
     busy(L(`Connecting to ${c}…`, `Verbinden met ${c}…`))
     on.join(c)
   })
+  // Level badge: follows your progress (e.g. after logging in); opens the profile
+  const bindBadge = () => el.querySelector('.hs-prog')?.addEventListener('click', () => {
+    sfx.select()
+    setName(name.value)
+    on.profile()
+  })
+  bindBadge()
+  const offProg = onProgress(() => {
+    const b = el.querySelector('.hs-prog')
+    if (!b || !document.body.contains(b)) return offProg()
+    b.outerHTML = homeBadge()
+    bindBadge()
+  })
+
   // Friends: the card follows the account state; tapping it opens the sheet
   const fcard = el.querySelector('.home-friends') as HTMLElement
   paintFriendsCard(fcard)

@@ -168,10 +168,11 @@ export function titlesOf(p: Progress): string[] {
   return out
 }
 
-/** The title shown next to your name. */
+/** The title shown next to your name: the one you picked, else your level title. */
 export function titleOf(p: Progress) {
-  const all = titlesOf(p)
-  return p.title && all.includes(p.title) ? p.title : all[all.length - 1]
+  if (p.title && titlesOf(p).includes(p.title)) return p.title
+  const lv = levelOf(p.xp).lv
+  return LEVEL_TITLES.filter(([l]) => lv >= l).pop()![1]
 }
 
 // ---------------------------------------------------------------- achievements

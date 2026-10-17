@@ -76,7 +76,7 @@ const QUEST_INFO: Record<string, (n: number) => T> = {
   kos5: (n) => [`Knock out ${n} trainers`, `Schakel ${n} trainers uit`],
   catch10: (n) => [`Catch ${n} Pokémon`, `Vang ${n} Pokémon`],
   raid1: () => ['Clear a raid', 'Haal een raid'],
-  top3x2: (n) => [`Finish in the top 3 ${n} times`, `Eindig ${n} keer in de top 3`],
+  top3x2: (n) => [`Finish top 3 (${n}×)`, `Eindig in de top 3 (${n}×)`],
   survive4: () => ['Survive 4 minutes in one match', 'Overleef 4 minuten in één potje'],
   friends1: () => ['Play a match with other people', 'Speel een potje met andere mensen'],
   evolve2: (n) => [`Evolve your Pokémon ${n} times`, `Laat je Pokémon ${n} keer evolueren`],
