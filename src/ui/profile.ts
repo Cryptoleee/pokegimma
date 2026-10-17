@@ -4,7 +4,10 @@ import { ROSTER, SPECIES, spriteUrl } from '../data/pokemon'
 import { trainerSpriteUrl } from '../data/trainers'
 import { accountState, accountStatus, login } from '../account'
 import { progress, onProgress, setCosmetics, signedIn, today } from '../progress'
-import { ACHIEVEMENTS, BOSS_IDS, dailyOf, emblemOf, levelOf, masteryOf, MAX_MASTERY, SHINY_AT, titleOf, titlesOf, type Progress } from '../../api/_progress'
+import { ACHIEVEMENTS, BOSS_IDS, dailyOf, emblemOf, levelOf, masteryOf, MAX_MASTERY, prevDay, SHINY_AT, titleOf, titlesOf, type Progress } from '../../api/_progress'
+
+/** Days in a row, still alive when you last played yesterday. */
+const liveStreak = (p: Progress) => (p.day === today() || p.day === prevDay(today()) ? p.streak : 0)
 import { achDesc, achName, ACH_INFO, questText, titleName } from '../data/rewards'
 import { esc } from './menu'
 
@@ -59,7 +62,7 @@ function meTab(p: Progress, trainerSprite: string, name: string) {
           ${bar(q.p / q.target)}
         </div>`).join('')}
       <div class="pf-bonus">
-        <span>🔥 ${L(`${p.day === today() ? p.streak : 0}-day streak`, `${p.day === today() ? p.streak : 0} dagen op rij`)} <small>(${L('best', 'record')} ${p.bestStreak})</small></span>
+        <span>🔥 ${L(`${liveStreak(p)}-day streak`, `${liveStreak(p)} dagen op rij`)} <small>(${L('best', 'record')} ${p.bestStreak})</small></span>
         <span>${p.daily.day === today() && p.daily.firstWin ? `✅ ${L('First win today', 'Eerste winst vandaag')}` : `🏆 ${L('First win today: +100 XP', 'Eerste winst vandaag: +100 XP')}`}</span>
       </div>
     </div>
@@ -259,6 +262,6 @@ export function homeBadge() {
   return `
     <button class="hs-prog">
       <span class="hs-lv"><small>LV</small><b>${lv.lv}</b></span>
-      <span class="hs-pinfo"><em>${esc(titleName(titleOf(p)))}</em>${bar(lv.k)}<small>📜 ${done}/${q.length}${p.day === today() && p.streak > 1 ? ` · 🔥${p.streak}` : ''}</small></span>
+      <span class="hs-pinfo"><em>${esc(titleName(titleOf(p)))}</em>${bar(lv.k)}<small>📜 ${done}/${q.length}${liveStreak(p) > 1 ? ` · 🔥${liveStreak(p)}` : ''}</small></span>
     </button>`
 }

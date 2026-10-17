@@ -20,7 +20,7 @@ import { applyMatch, levelOf, mergeGuest, normalize, sanitize, SHINY_AT, mastery
  * real elapsed time, hard caps), not cheat-proof.
  */
 
-const MATCHES_PER_HOUR = 40
+const MATCHES_PER_HOUR = 100
 const WEEK_TTL = 70 * 86400
 
 async function load(uid: string): Promise<Progress> {
