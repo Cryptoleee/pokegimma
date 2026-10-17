@@ -35,8 +35,57 @@ export interface Report {
   crystal?: boolean
 }
 
-/** The 24 partners you can pick (same list as ROSTER in src/data/pokemon.ts). */
-export const PARTNERS = [25, 4, 7, 1, 133, 495, 498, 501, 447, 443, 570, 610, 92, 66, 63, 147, 246, 446, 374, 123, 258, 255, 403, 633]
+/** The 24 free partners (same list as ROSTER in src/data/pokemon.ts). */
+export const BASE_PARTNERS = [25, 4, 7, 1, 133, 495, 498, 501, 447, 443, 570, 610, 92, 66, 63, 147, 246, 446, 374, 123, 258, 255, 403, 633]
+
+/**
+ * The reward road: every few trainer levels a new partner or trainer. Existing
+ * partners and trainers stay free; these come on top.
+ */
+export const REWARD_ROAD: { lv: number; kind: 'partner' | 'trainer'; id: string }[] = [
+  { lv: 2, kind: 'trainer', id: 'elesa' },
+  { lv: 3, kind: 'partner', id: '129' },
+  { lv: 4, kind: 'trainer', id: 'hugh' },
+  { lv: 5, kind: 'partner', id: '280' },
+  { lv: 6, kind: 'trainer', id: 'skyla' },
+  { lv: 7, kind: 'partner', id: '252' },
+  { lv: 8, kind: 'trainer', id: 'roxie' },
+  { lv: 9, kind: 'partner', id: '390' },
+  { lv: 10, kind: 'trainer', id: 'burgh' },
+  { lv: 11, kind: 'partner', id: '393' },
+  { lv: 12, kind: 'trainer', id: 'shauntal' },
+  { lv: 13, kind: 'partner', id: '361' },
+  { lv: 14, kind: 'trainer', id: 'colress' },
+  { lv: 15, kind: 'partner', id: '387' },
+  { lv: 16, kind: 'trainer', id: 'drayden' },
+  { lv: 18, kind: 'partner', id: '607' },
+  { lv: 20, kind: 'trainer', id: 'grimsley' },
+  { lv: 22, kind: 'partner', id: '624' },
+  { lv: 24, kind: 'trainer', id: 'steven' },
+  { lv: 26, kind: 'partner', id: '371' },
+  { lv: 28, kind: 'trainer', id: 'lance' },
+  { lv: 30, kind: 'partner', id: '636' },
+  { lv: 33, kind: 'trainer', id: 'cynthia' },
+  { lv: 36, kind: 'trainer', id: 'ghetsis' },
+  { lv: 40, kind: 'trainer', id: 'red' },
+]
+
+/** Every partner you can pick: the free ones and those on the reward road. */
+export const PARTNERS = [...BASE_PARTNERS, ...REWARD_ROAD.filter((r) => r.kind === 'partner').map((r) => Number(r.id))]
+
+/** Trainer level that unlocks a partner or trainer (1 = free from the start). */
+export function unlockLevel(kind: 'partner' | 'trainer', id: string | number) {
+  return REWARD_ROAD.find((r) => r.kind === kind && r.id === String(id))?.lv ?? 1
+}
+
+/** Can you play with this partner or trainer yet? */
+export const isUnlocked = (p: Progress, kind: 'partner' | 'trainer', id: string | number) => levelOf(p.xp).lv >= unlockLevel(kind, id)
+
+/** The next thing on the reward road for you (null when you have everything). */
+export function nextUnlock(p: Progress) {
+  const lv = levelOf(p.xp).lv
+  return REWARD_ROAD.find((r) => r.lv > lv) ?? null
+}
 export const BOSS_IDS = ['reshiram', 'kyurem', 'zekrom', 'rayquaza', 'mewtwo']
 export const RAID_LIVES = 2
 
@@ -210,7 +259,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'mp_first', xp: 100, test: (p) => p.stats.mp >= 1 },
   { id: 'mp_win', xp: 300, title: 'duelist', test: (p) => p.stats.mpw >= 1 },
   { id: 'partners_5', xp: 150, test: (p) => p.stats.used.length >= 5 },
-  { id: 'partners_all', xp: 500, title: 'allrounder', test: (p) => PARTNERS.every((id) => p.stats.used.includes(id)) },
+  { id: 'partners_all', xp: 500, title: 'allrounder', test: (p) => BASE_PARTNERS.every((id) => p.stats.used.includes(id)) },
   { id: 'mastery_5', xp: 200, test: (p) => bestMastery(p) >= SHINY_AT },
   { id: 'mastery_10', xp: 500, test: (p) => bestMastery(p) >= MAX_MASTERY },
   { id: 'level_10', xp: 200, test: (p) => lvOf(p) >= 10 },
@@ -414,7 +463,8 @@ export function applyMatch(p: Progress, r: Report, day: string): Outcome {
     }
   })
 
-  // Partner mastery: the match XP goes to the partner you started with
+  // Partner mastery: the match XP goes to the partner you started with (if it's yours to play)
+  if (r.partner && !isUnlocked(p, 'partner', r.partner)) r.partner = 0
   const pk = String(r.partner)
   const xpFrom = r.partner ? p.partners[pk] ?? 0 : 0
   if (r.partner) p.partners[pk] = xpFrom + base
@@ -450,6 +500,8 @@ export function applyMatch(p: Progress, r: Report, day: string): Outcome {
     if (mFrom < SHINY_AT && mTo >= SHINY_AT && !p.shiny.includes(r.partner)) p.shiny.push(r.partner)
   }
   for (const t of titlesOf(p)) if (!before.titles.has(t)) unlocks.push(`title:${t}`)
+  const lvNow = levelOf(p.xp).lv
+  for (const u of REWARD_ROAD) if (u.lv > before.lv && u.lv <= lvNow) unlocks.push(`${u.kind}:${u.id}`)
 
   return {
     lines, quests, ach,

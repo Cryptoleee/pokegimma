@@ -1,10 +1,15 @@
 import { movesetFor, SLOT_UNLOCK } from '../data/moves'
-import { animatedUrl, PARTY_MAX, ROSTER, SPECIES, spriteUrl, TEAM_SIZE, type Species } from '../data/pokemon'
+import { ALL_PARTNERS, animatedUrl, PARTY_MAX, SPECIES, spriteUrl, TEAM_SIZE, type Species } from '../data/pokemon'
 import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
 import { TYPE_COLOR, TYPE_NL } from '../data/types'
 import { cry, sfx } from '../audio'
 import { ROLES, roleOf, STYLES, styleOf, type Role, type Style } from '../data/roles'
 import { L } from '../i18n'
+import { progress } from '../progress'
+import { isUnlocked, unlockLevel } from '../../api/_progress'
+
+const owned = (kind: 'partner' | 'trainer', id: string | number) => isUnlocked(progress(), kind, id)
+const lockChip = (kind: 'partner' | 'trainer', id: string | number) => owned(kind, id) ? '' : `<em class="lock">🔒 Lv ${unlockLevel(kind, id)}</em>`
 
 /**
  * Selection screens built like a character-select in a fighting game: a big
@@ -23,6 +28,20 @@ const TRAINER_INFO: Record<string, { tag: () => string; accent: string; quote: (
   bianca: { tag: () => L('Unpredictable and cheerful', 'Onvoorspelbaar en vrolijk'), accent: '#58b048', quote: () => L('Wait for me!', 'Wacht op mij!') },
   n: { tag: () => L('Speaks the language of Pokémon', 'Spreekt de taal van Pokémon'), accent: '#78c890', quote: () => L('Can you hear them too?', 'Hoor je ze ook?') },
   iris: { tag: () => L('Dragon master of Opelucid', 'Drakenmeester van Opelucid'), accent: '#9058c8', quote: () => L('Dragon power!', 'Drakenkracht!') },
+  elesa: { tag: () => L('Shining supermodel', 'Stralend supermodel'), accent: '#f0d030', quote: () => L('Shall we make this electrifying?', 'Zullen we het elektrisch maken?') },
+  hugh: { tag: () => L('Hot-headed rival', 'Heethoofdige rivaal'), accent: '#3858a8', quote: () => L('I won’t lose this time!', 'Deze keer verlies ik niet!') },
+  skyla: { tag: () => L('Ace pilot of Mistralton', 'Toppiloot van Mistralton'), accent: '#58b0e8', quote: () => L('Ready for takeoff!', 'Klaar voor vertrek!') },
+  roxie: { tag: () => L('Poison punk rocker', 'Giftige punkrocker'), accent: '#a050c0', quote: () => L('Let’s get loud!', 'Zet hem harder!') },
+  burgh: { tag: () => L('Dreamy bug artist', 'Dromerige insectenkunstenaar'), accent: '#78b040', quote: () => L('Battling is art.', 'Vechten is kunst.') },
+  shauntal: { tag: () => L('Ghostly novelist', 'Spookachtige schrijfster'), accent: '#7050a0', quote: () => L('This will make a fine story.', 'Dit wordt een mooi verhaal.') },
+  colress: { tag: () => L('Curious scientist', 'Nieuwsgierige wetenschapper'), accent: '#48a0d0', quote: () => L('Show me your true strength.', 'Laat me je ware kracht zien.') },
+  drayden: { tag: () => L('Dragon-taming mayor', 'Drakentemmende burgemeester'), accent: '#608050', quote: () => L('Fight with all you have.', 'Vecht met alles wat je hebt.') },
+  grimsley: { tag: () => L('Elite gambler', 'Elite-gokker'), accent: '#405080', quote: () => L('Let’s roll the dice.', 'Laten we de dobbelsteen gooien.') },
+  steven: { tag: () => L('Stone-collecting champion', 'Stenenverzamelende kampioen'), accent: '#8090b0', quote: () => L('Rocks never lie.', 'Stenen liegen nooit.') },
+  lance: { tag: () => L('Legendary dragon tamer', 'Legendarische drakentemmer'), accent: '#c03040', quote: () => L('Dragons, to me!', 'Draken, kom!') },
+  cynthia: { tag: () => L('Unbeatable champion', 'Onverslaanbare kampioen'), accent: '#303040', quote: () => L('Shall we begin?', 'Zullen we beginnen?') },
+  ghetsis: { tag: () => L('Scheming mastermind', 'Sluwe meesterbrein'), accent: '#4a5a40', quote: () => L('Everything goes as planned.', 'Alles gaat volgens plan.') },
+  red: { tag: () => L('The silent legend', 'De zwijgende legende'), accent: '#e03030', quote: () => '…' },
 }
 
 export function typeChips(sp: Species) {
@@ -49,7 +68,7 @@ function shell(step: string, title: string, body: string, cta: string) {
 
 export function showTrainerSelect(current: string | null, onBack: () => void, onPick: (t: TrainerDef) => void) {
   const el = screen()
-  let sel = TRAINERS.find((t) => t.key === current) ?? TRAINERS[0]
+  let sel = TRAINERS.find((t) => t.key === current && owned('trainer', t.key)) ?? TRAINERS[0]
   el.innerHTML = shell(L('STEP 1 / 2', 'STAP 1 / 2'), L('Pick your trainer', 'Kies je trainer'), `
     <div class="hero trainer-hero">
       <div class="hero-bg"></div>
@@ -60,7 +79,7 @@ export function showTrainerSelect(current: string | null, onBack: () => void, on
       <div class="quote"></div>
     </div>
     <div class="strip">
-      ${TRAINERS.map((t) => `<button class="thumb" data-k="${t.key}"><img class="px" src="${trainerSpriteUrl(t.sprite)}" alt=""><span>${t.name}</span></button>`).join('')}
+      ${TRAINERS.map((t) => `<button class="thumb ${owned('trainer', t.key) ? '' : 'locked'}" data-k="${t.key}"><img class="px" src="${trainerSpriteUrl(t.sprite)}" alt=""><span>${t.name}</span>${lockChip('trainer', t.key)}</button>`).join('')}
     </div>`, L('Next ▶', 'Verder ▶'))
 
   const hero = el.querySelector('.hero') as HTMLElement
@@ -72,6 +91,12 @@ export function showTrainerSelect(current: string | null, onBack: () => void, on
     el.querySelector('.plate span')!.textContent = info.tag()
     el.querySelector('.quote')!.textContent = `“${info.quote()}”`
     el.querySelectorAll<HTMLElement>('.thumb').forEach((b) => b.classList.toggle('on', b.dataset.k === sel.key))
+    // Not yet unlocked: you can look, but not pick
+    const ok = owned('trainer', sel.key)
+    hero.classList.toggle('locked', !ok)
+    const cta = el.querySelector('.cta') as HTMLButtonElement
+    cta.disabled = !ok
+    cta.innerHTML = ok ? L('Next ▶', 'Verder ▶') : L(`🔒 Unlocks at trainer level ${unlockLevel('trainer', sel.key)}`, `🔒 Vrij bij trainerlevel ${unlockLevel('trainer', sel.key)}`)
     if (animate) {
       hero.classList.remove('swap')
       void hero.offsetWidth
@@ -91,6 +116,7 @@ export function showTrainerSelect(current: string | null, onBack: () => void, on
     onBack()
   })
   el.querySelector('.cta')!.addEventListener('click', () => {
+    if (!owned('trainer', sel.key)) return
     sfx.select()
     onPick(sel)
   })
@@ -101,7 +127,7 @@ export function showTrainerSelect(current: string | null, onBack: () => void, on
 
 export function showRoster(initial: number[], onBack: () => void, onGo: (team: number[]) => void, cta = L('Start the battle ▶', 'Start de battle ▶')) {
   const el = screen()
-  let pick = initial.find((id) => ROSTER.includes(id)) ?? ROSTER[0]
+  let pick = initial.find((id) => ALL_PARTNERS.includes(id) && owned('partner', id)) ?? ALL_PARTNERS[0]
   el.innerHTML = shell(L('STEP 2 / 2', 'STAP 2 / 2'), L('Pick your partner', 'Kies je partner'), `
     <div class="hero mon-hero">
       <div class="hero-bg"></div>
@@ -128,15 +154,16 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
       </div>
     </div>
     <div class="mon-grid">
-      ${ROSTER.map((id) => {
+      ${[...ALL_PARTNERS].sort((a, b) => Number(owned('partner', b)) - Number(owned('partner', a)) || unlockLevel('partner', a) - unlockLevel('partner', b)).map((id) => {
         const r = ROLES[roleOf(id)]
-        return `<button class="tile" data-id="${id}" data-role="${roleOf(id)}" data-style="${styleOf(id)}" style="--tc:${TYPE_COLOR[SPECIES[id].types[0]]};--rc:${r.color}"><i class="rl" title="${r.name}">${r.icon}</i><img class="px" src="${spriteUrl(id)}" alt=""><span>${SPECIES[id].name}</span></button>`
+        return `<button class="tile ${owned('partner', id) ? '' : 'locked'}" data-id="${id}" data-role="${roleOf(id)}" data-style="${styleOf(id)}" style="--tc:${TYPE_COLOR[SPECIES[id].types[0]]};--rc:${r.color}"><i class="rl" title="${r.name}">${r.icon}</i><img class="px" src="${spriteUrl(id)}" alt=""><span>${SPECIES[id].name}</span>${lockChip('partner', id)}</button>`
       }).join('')}
       <div class="mf-empty hidden">${L('No partners match these filters', 'Geen partners met deze filters')}</div>
     </div>
     <div class="sel-note">${L(`You start with 1 partner. Catch ${PARTY_MAX - TEAM_SIZE} more out in the world.`, `Je start met 1 partner. In de wereld vang je er nog ${PARTY_MAX - TEAM_SIZE} bij.`)}</div>`, cta)
 
   const hero = el.querySelector('.hero') as HTMLElement
+  ;(el.querySelector('.cta') as HTMLElement).dataset.label = cta
   const paint = (animate: boolean) => {
     const sp = SPECIES[pick]
     const c1 = TYPE_COLOR[sp.types[0]]
@@ -166,6 +193,11 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
     }
     el.querySelector('.evo')!.innerHTML = line.length > 1 ? line.join('') : `<span class="arrow">${L('Doesn\'t evolve', 'Evolueert niet')}</span>`
     el.querySelectorAll<HTMLElement>('.tile').forEach((b) => b.classList.toggle('on', Number(b.dataset.id) === pick))
+    const ok = owned('partner', pick)
+    hero.classList.toggle('locked', !ok)
+    const cta = el.querySelector('.cta') as HTMLButtonElement
+    cta.disabled = !ok
+    cta.innerHTML = ok ? cta.dataset.label! : L(`🔒 Unlocks at trainer level ${unlockLevel('partner', pick)}`, `🔒 Vrij bij trainerlevel ${unlockLevel('partner', pick)}`)
     if (animate) {
       hero.classList.remove('swap')
       void hero.offsetWidth
@@ -181,7 +213,7 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
       t.classList.toggle('hidden', !ok)
       if (ok) n++
     })
-    el.querySelector('.mf-count')!.textContent = L(`${n} of ${ROSTER.length}`, `${n} van ${ROSTER.length}`)
+    el.querySelector('.mf-count')!.textContent = L(`${n} of ${ALL_PARTNERS.length}`, `${n} van ${ALL_PARTNERS.length}`)
     el.querySelector('.mf-empty')!.classList.toggle('hidden', n > 0)
     el.querySelectorAll<HTMLElement>('[data-role].mf').forEach((b) => b.classList.toggle('on', b.dataset.role === fRole))
     el.querySelectorAll<HTMLElement>('[data-style].mf').forEach((b) => b.classList.toggle('on', b.dataset.style === fStyle))
@@ -210,6 +242,7 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
     onBack()
   })
   el.querySelector('.cta')!.addEventListener('click', () => {
+    if (!owned('partner', pick)) return
     sfx.select()
     cry(pick, 0.3)
     onGo([pick])

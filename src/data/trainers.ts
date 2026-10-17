@@ -15,6 +15,21 @@ export const TRAINERS: TrainerDef[] = [
   { key: 'bianca', name: 'Bianca', sprite: 'bianca' },
   { key: 'n', name: 'N', sprite: 'n' },
   { key: 'iris', name: 'Iris', sprite: 'iris' },
+  // Unlocked on the reward road (trainer level)
+  { key: 'elesa', name: 'Elesa', sprite: 'elesa' },
+  { key: 'hugh', name: 'Hugh', sprite: 'hugh' },
+  { key: 'skyla', name: 'Skyla', sprite: 'skyla' },
+  { key: 'roxie', name: 'Roxie', sprite: 'roxie' },
+  { key: 'burgh', name: 'Burgh', sprite: 'burgh' },
+  { key: 'shauntal', name: 'Shauntal', sprite: 'shauntal' },
+  { key: 'colress', name: 'Colress', sprite: 'colress' },
+  { key: 'drayden', name: 'Drayden', sprite: 'drayden' },
+  { key: 'grimsley', name: 'Grimsley', sprite: 'grimsley' },
+  { key: 'steven', name: 'Steven', sprite: 'steven' },
+  { key: 'lance', name: 'Lance', sprite: 'lance' },
+  { key: 'cynthia', name: 'Cynthia', sprite: 'cynthia' },
+  { key: 'ghetsis', name: 'Ghetsis', sprite: 'ghetsis' },
+  { key: 'red', name: 'Red', sprite: 'red' },
 ]
 
 /** Rival trainer classes; the sprite matches the class in the name. */

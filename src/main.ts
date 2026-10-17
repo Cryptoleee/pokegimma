@@ -1,7 +1,7 @@
 import { moveByName } from './data/moves'
 import { preloadVoice, voiceLog } from './voice'
 import './style.css'
-import { ROSTER, TEAM_SIZE } from './data/pokemon'
+import { ALL_PARTNERS, ROSTER, TEAM_SIZE } from './data/pokemon'
 import { BOSS_LIST, type BossId } from './data/bosses'
 import { TRAINERS, type TrainerDef } from './data/trainers'
 import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
@@ -31,8 +31,8 @@ import { L, onLangChange, tx } from './i18n'
 import { initStats, statsStateChanged, trackEnd, trackMatch } from './stats'
 import { accountState, accountStatus, initAccount, onAccount, onInvite, presenceChanged, type Invite, type Presence } from './account'
 import { hideInviteToast, showInviteToast } from './ui/friends'
-import { initProgress, matchEnded, matchStarted, progress } from './progress'
-import { levelOf, titleOf } from '../api/_progress'
+import { initProgress, matchEnded, matchStarted, onProgress, progress } from './progress'
+import { isUnlocked, levelOf, titleOf } from '../api/_progress'
 import { showProfile } from './ui/profile'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
@@ -61,8 +61,27 @@ const store = {
 }
 
 let trainer: TrainerDef = TRAINERS.find((t) => t.key === store.get('trainer', '')) ?? TRAINERS[0]
-let team: number[] = store.get<number[]>('team', []).filter((id) => ROSTER.includes(id))
+let team: number[] = store.get<number[]>('team', []).filter((id) => ALL_PARTNERS.includes(id))
 if (team.length !== TEAM_SIZE) team = [ROSTER[0]]
+
+/**
+ * Only play with what you've unlocked (after logging out, or a different account).
+ * Starts from your saved picks each time, so they come back once your account has loaded.
+ */
+function ownedPicks() {
+  const p = progress()
+  const want = TRAINERS.find((t) => t.key === store.get('trainer', '')) ?? trainer
+  trainer = isUnlocked(p, 'trainer', want.key) ? want : TRAINERS[0]
+  const saved = store.get<number[]>('team', []).filter((id) => ALL_PARTNERS.includes(id))
+  const wantTeam = saved.length === TEAM_SIZE ? saved : team
+  team = wantTeam.every((id) => isUnlocked(p, 'partner', id)) ? wantTeam : [ROSTER[0]]
+}
+// Account progress arrives a moment after start: the home screen follows
+onProgress(() => {
+  const before = trainer.key + team.join()
+  ownedPicks()
+  if (trainer.key + team.join() !== before && document.querySelector('#screen > .home')) toMenu()
+})
 let game: Game | null = null
 let hud: Hud | null = null
 /** The match is on screen (false while the host sits in the lobby and the match runs on). */
@@ -200,6 +219,7 @@ onLangChange(() => {
 })
 
 function toMenu(extra: Partial<MenuState> = {}) {
+  ownedPicks()
   stopGame()
   lobbyUi = null
   playMusic('menu')

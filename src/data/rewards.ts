@@ -1,5 +1,8 @@
 import { L } from '../i18n'
 import { SPECIES } from './pokemon'
+import { TRAINERS } from './trainers'
+
+export const trainerName = (key: string) => TRAINERS.find((t) => t.key === key)?.name ?? key
 import { QUESTS } from '../../api/_progress'
 
 /** Names and descriptions for everything in api/_progress.ts (which only knows ids). */
@@ -115,6 +118,8 @@ export function unlockText(u: string) {
   const [kind, a, b] = u.split(':')
   const name = SPECIES[Number(a)]?.name ?? '?'
   if (kind === 'shiny') return { icon: '✨', text: L(`Shiny ${name} unlocked!`, `Shiny ${name} vrijgespeeld!`) }
+  if (kind === 'partner') return { icon: '🎁', text: L(`New partner: ${name}!`, `Nieuwe partner: ${name}!`) }
+  if (kind === 'trainer') return { icon: '🧢', text: L(`New trainer: ${trainerName(a)}!`, `Nieuwe trainer: ${trainerName(a)}!`) }
   if (kind === 'emblem') {
     const col: Record<string, T> = { bronze: ['Bronze', 'Bronzen'], silver: ['Silver', 'Zilveren'], gold: ['Gold', 'Gouden'] }
     return { icon: b === 'gold' ? '🥇' : b === 'silver' ? '🥈' : '🥉', text: L(`${t(col[b] ?? ['', ''])} ${name} emblem`, `${t(col[b] ?? ['', ''])} ${name}-embleem`) }

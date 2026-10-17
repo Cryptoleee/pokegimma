@@ -1,4 +1,4 @@
-import { PARTY_MAX, rarityOf, ROSTER, SPECIES, TEAM_SIZE, WILD, type Rarity } from '../data/pokemon'
+import { ALL_PARTNERS, PARTY_MAX, rarityOf, SPECIES, TEAM_SIZE, WILD, type Rarity } from '../data/pokemon'
 import { eventTimes, startEvent, updateEvents, type WorldEvent } from './events'
 import { roleInfo } from '../data/roles'
 import { decided, scoreRows, type ScoreRow } from './score'
@@ -369,7 +369,8 @@ export class Game {
     for (let i = 0; this.trainers.length < SEATS; i++) {
       const def = bots[i % bots.length]
       const bot = new Trainer(def, def.name, false)
-      const pool = [...ROSTER].sort(() => this.rng.next() - 0.5)
+      // Bots also play the unlockable partners: a taste of what's to come
+      const pool = [...ALL_PARTNERS].sort(() => this.rng.next() - 0.5)
       bot.party = pool.slice(0, TEAM_SIZE).map((id) => this.ownMon(new Mon(id, 5), bot))
       this.giveBrain(bot)
       this.trainers.push(bot)

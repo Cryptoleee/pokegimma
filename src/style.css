@@ -8280,3 +8280,134 @@ body:not(.desk) .spec-feed {
   color: var(--hi);
   line-height: 1.1;
 }
+
+/* =====================================================================
+   Unlocks: locked picks, the reward road, next unlock on the home badge
+   ===================================================================== */
+
+.thumb.locked img,
+.tile.locked img {
+  filter: grayscale(1) brightness(0.55);
+}
+.thumb.locked span,
+.tile.locked span {
+  opacity: 0.6;
+}
+.thumb,
+.tile {
+  position: relative;
+}
+em.lock {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(10, 12, 26, 0.85);
+  border: 1px solid rgba(255, 216, 74, 0.6);
+  color: var(--hi);
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.hero.locked .hero-fig img {
+  filter: brightness(0.15) drop-shadow(0 0 10px rgba(255, 216, 74, 0.5));
+}
+.sel-foot .cta:disabled {
+  opacity: 1;
+  filter: grayscale(0.4);
+  font-size: 15px;
+}
+.pf-mon.locked img {
+  filter: brightness(0.12);
+}
+.pf-mon.locked b {
+  color: #8890b0;
+}
+.pf-road {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pf-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.pf-step img {
+  width: 52px;
+  height: 52px;
+  margin: -6px 0;
+  image-rendering: pixelated;
+  filter: brightness(0.12);
+}
+.pf-step.done img,
+.pf-step.next img {
+  filter: none;
+}
+.pf-step.next img {
+  filter: brightness(0.12) drop-shadow(0 0 6px rgba(255, 216, 74, 0.8));
+}
+.pf-step.done {
+  background: rgba(60, 200, 120, 0.1);
+  border-color: rgba(60, 200, 120, 0.3);
+}
+.pf-step.next {
+  background: rgba(255, 216, 74, 0.12);
+  border-color: rgba(255, 216, 74, 0.6);
+}
+.pf-steplv {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 36px;
+  line-height: 0.9;
+}
+.pf-steplv small {
+  font-size: 9px;
+  color: #a8b0d0;
+}
+.pf-steplv b {
+  font-size: 18px;
+}
+.pf-step.done .pf-steplv b {
+  color: #6fe09a;
+}
+.pf-step.next .pf-steplv b {
+  color: var(--hi);
+}
+.pf-stepname {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pf-stepname small {
+  font-size: 11px;
+  color: #a8b0d0;
+}
+.pf-stepname .rw-track {
+  height: 6px;
+  flex: none;
+}
+.pf-step em {
+  font-style: normal;
+}
+.hs-next {
+  width: 40px;
+  height: 40px;
+  margin: -6px -6px -6px -2px;
+  image-rendering: pixelated;
+  filter: brightness(0.15) drop-shadow(0 0 4px rgba(255, 216, 74, 0.9));
+}
+.pf-tabs button {
+  font-size: 12px;
+  padding: 8px 2px;
+}

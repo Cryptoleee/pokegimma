@@ -1,14 +1,14 @@
 import { sfx } from '../audio'
 import { L } from '../i18n'
-import { ROSTER, SPECIES, spriteUrl } from '../data/pokemon'
-import { trainerSpriteUrl } from '../data/trainers'
+import { ALL_PARTNERS, SPECIES, spriteUrl } from '../data/pokemon'
+import { TRAINERS, trainerSpriteUrl } from '../data/trainers'
 import { accountState, accountStatus, login } from '../account'
 import { progress, onProgress, setCosmetics, signedIn, today } from '../progress'
-import { ACHIEVEMENTS, BOSS_IDS, dailyOf, emblemOf, levelOf, masteryOf, MAX_MASTERY, prevDay, SHINY_AT, titleOf, titlesOf, type Progress } from '../../api/_progress'
+import { ACHIEVEMENTS, BOSS_IDS, dailyOf, isUnlocked, levelCost, nextUnlock, REWARD_ROAD, unlockLevel, emblemOf, levelOf, masteryOf, MAX_MASTERY, prevDay, SHINY_AT, titleOf, titlesOf, type Progress } from '../../api/_progress'
 
 /** Days in a row, still alive when you last played yesterday. */
 const liveStreak = (p: Progress) => (p.day === today() || p.day === prevDay(today()) ? p.streak : 0)
-import { achDesc, achName, ACH_INFO, questText, titleName } from '../data/rewards'
+import { achDesc, achName, ACH_INFO, questText, titleName, trainerName } from '../data/rewards'
 import { esc } from './menu'
 
 /**
@@ -17,7 +17,7 @@ import { esc } from './menu'
  * rankings.
  */
 
-type Tab = 'me' | 'mons' | 'ach' | 'rank'
+type Tab = 'me' | 'road' | 'mons' | 'ach' | 'rank'
 
 const screen = () => document.getElementById('screen')!
 
@@ -81,7 +81,13 @@ function meTab(p: Progress, trainerSprite: string, name: string) {
 function monsTab(p: Progress) {
   return `
     <p class="pf-intro">${L(`Every match gives your partner mastery XP. ★${SHINY_AT} unlocks its shiny form, ★3/★7/★10 a bronze, silver and gold emblem.`, `Elk potje geeft je partner mastery-XP. ★${SHINY_AT} speelt de shiny vorm vrij, ★3/★7/★10 een bronzen, zilveren en gouden embleem.`)}</p>
-    <div class="pf-mons">${ROSTER.map((id) => {
+    <div class="pf-mons">${ALL_PARTNERS.map((id) => {
+      if (!isUnlocked(p, 'partner', id)) return `
+        <div class="pf-mon locked">
+          <img class="px" src="${spriteUrl(id)}" alt="" loading="lazy">
+          <b>${SPECIES[id].name}</b>
+          <small>🔒 ${L(`Trainer Lv ${unlockLevel('partner', id)}`, `Trainerlevel ${unlockLevel('partner', id)}`)}</small>
+        </div>`
       const xp = p.partners[id] ?? 0
       const m = masteryOf(xp)
       const shinyOk = m.lv >= SHINY_AT
@@ -96,6 +102,35 @@ function monsTab(p: Progress) {
           ${shinyOk
             ? `<button class="pf-shiny ${shiny ? 'on' : ''}" data-id="${id}">✨ ${shiny ? L('Shiny on', 'Shiny aan') : L('Shiny off', 'Shiny uit')}</button>`
             : `<small>✨ ${L(`at ★${SHINY_AT}`, `bij ★${SHINY_AT}`)}</small>`}
+        </div>`
+    }).join('')}</div>`
+}
+
+/** XP still needed from where you are to a trainer level. */
+function toGo(at: { lv: number; into: number }, lv: number) {
+  let n = -at.into
+  for (let l = at.lv; l < lv; l++) n += levelCost(l)
+  return Math.max(0, n)
+}
+
+/** The reward road: a new partner or trainer every few trainer levels. */
+function roadTab(p: Progress) {
+  const lv = levelOf(p.xp).lv
+  const next = nextUnlock(p)
+  const got = REWARD_ROAD.filter((r) => r.lv <= lv).length
+  return `
+    <p class="pf-intro">${L(`Level up to unlock new partners and trainers. ${got} of ${REWARD_ROAD.length} unlocked.`, `Stijg in level voor nieuwe partners en trainers. ${got} van de ${REWARD_ROAD.length} vrijgespeeld.`)}</p>
+    <div class="pf-road">${REWARD_ROAD.map((r) => {
+      const done = r.lv <= lv, isNext = next === r
+      const img = r.kind === 'partner' ? spriteUrl(Number(r.id)) : trainerSpriteUrl(TRAINERS.find((t) => t.key === r.id)?.sprite ?? r.id)
+      const name = r.kind === 'partner' ? SPECIES[Number(r.id)]?.name : trainerName(r.id)
+      const left = isNext ? levelOf(p.xp) : null
+      return `
+        <div class="pf-step ${done ? 'done' : ''} ${isNext ? 'next' : ''} ${r.kind}">
+          <span class="pf-steplv"><small>LV</small><b>${r.lv}</b></span>
+          <img class="px" src="${img}" alt="" loading="lazy">
+          <span class="pf-stepname"><b>${esc(name ?? r.id)}</b><small>${r.kind === 'partner' ? L('Partner Pokémon', 'Partner-Pokémon') : L('Trainer', 'Trainer')}${isNext && left ? ` · ${L(`${toGo(left, r.lv)} XP to go`, `nog ${toGo(left, r.lv)} XP`)}` : ''}</small>${isNext && left && left.lv === r.lv - 1 ? bar(left.k) : ''}</span>
+          <em>${done ? '✓' : '🔒'}</em>
         </div>`
     }).join('')}</div>`
 }
@@ -173,7 +208,7 @@ export function showProfile(o: { trainerSprite: string; name: string; tab?: Tab;
   let board = 'pvp', period = 'week'
   const paint = () => {
     const p = progress()
-    const tabs: [Tab, string][] = [['me', L('Profile', 'Profiel')], ['mons', 'Pokémon'], ['ach', L('Awards', 'Prestaties')], ['rank', L('Rankings', 'Ranglijst')]]
+    const tabs: [Tab, string][] = [['me', L('Profile', 'Profiel')], ['road', L('Unlocks', 'Vrijspelen')], ['mons', 'Pokémon'], ['ach', L('Awards', 'Prestaties')], ['rank', L('Rankings', 'Ranglijst')]]
     const scroll = (el.querySelector('.pf-body') as HTMLElement | null)?.scrollTop ?? 0
     el.innerHTML = `
       <div class="sel pf">
@@ -182,7 +217,7 @@ export function showProfile(o: { trainerSprite: string; name: string; tab?: Tab;
           <div class="sel-title"><small>${signedIn() ? `${L('ACCOUNT', 'ACCOUNT')} · ${esc(accountState()?.me.dname ?? '')}` : L('GUEST · THIS DEVICE', 'GAST · DIT APPARAAT')}</small><b>${L('Trainer profile', 'Trainerprofiel')}</b></div>
         </div>
         <nav class="pf-tabs">${tabs.map(([k, t]) => `<button data-tab="${k}" class="${k === tab ? 'on' : ''}">${t}</button>`).join('')}</nav>
-        <div class="pf-body">${tab === 'me' ? meTab(p, o.trainerSprite, o.name) : tab === 'mons' ? monsTab(p) : tab === 'ach' ? achTab(p) : rankTab(board, period)}</div>
+        <div class="pf-body">${tab === 'me' ? meTab(p, o.trainerSprite, o.name) : tab === 'road' ? roadTab(p) : tab === 'mons' ? monsTab(p) : tab === 'ach' ? achTab(p) : rankTab(board, period)}</div>
       </div>`
     const body = el.querySelector('.pf-body') as HTMLElement
     body.scrollTop = scroll
@@ -259,9 +294,11 @@ export function homeBadge() {
   const lv = levelOf(p.xp)
   const q = dailyOf(p, today())
   const done = q.filter((x) => x.p >= x.target).length
+  const next = nextUnlock(p)
   return `
     <button class="hs-prog">
       <span class="hs-lv"><small>LV</small><b>${lv.lv}</b></span>
-      <span class="hs-pinfo"><em>${esc(titleName(titleOf(p)))}</em>${bar(lv.k)}<small>📜 ${done}/${q.length}${liveStreak(p) > 1 ? ` · 🔥${liveStreak(p)}` : ''}</small></span>
+      <span class="hs-pinfo"><em>${esc(titleName(titleOf(p)))}</em>${bar(lv.k)}<small>📜 ${done}/${q.length}${liveStreak(p) > 1 ? ` · 🔥${liveStreak(p)}` : ''}${next ? ` · 🔓 Lv ${next.lv}` : ''}</small></span>
+      ${next ? `<img class="px hs-next" src="${next.kind === 'partner' ? spriteUrl(Number(next.id)) : trainerSpriteUrl(TRAINERS.find((t) => t.key === next.id)?.sprite ?? next.id)}" alt="">` : ''}
     </button>`
 }

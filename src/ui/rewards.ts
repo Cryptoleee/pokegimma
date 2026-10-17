@@ -6,6 +6,9 @@ import { levelOf, masteryOf, MAX_MASTERY, SHINY_AT, type Outcome } from '../../a
 import { achDesc, achName, ACH_INFO, questText, unlockText, xpLabel } from '../data/rewards'
 import type { Reward } from '../progress'
 import { esc } from './menu'
+import { TRAINERS, trainerSpriteUrl } from '../data/trainers'
+import { nextUnlock } from '../../api/_progress'
+import { trainerName } from '../data/rewards'
 
 /**
  * Rewards on the results screen: XP gained, the trainer level and partner
@@ -130,7 +133,9 @@ export async function runRewards(el: HTMLElement, reward: Promise<Reward | null>
   foot.innerHTML = `<button class="rw-more">${L('Details', 'Details')} ▸</button>`
     + (!saved && accountStatus() === 'guest'
       ? `<button class="rw-login">💾 ${L('Log in to save & rank', 'Log in om op te slaan')}</button>`
-      : shinyLeft && o.mastery.partner
+      : nextUnlock(p)
+        ? `<span class="rw-hint">🔓 ${L('Next', 'Volgende')}: ${esc(nextUnlock(p)!.kind === 'partner' ? SPECIES[Number(nextUnlock(p)!.id)]?.name ?? '' : trainerName(nextUnlock(p)!.id))} · Lv ${nextUnlock(p)!.lv}</span>`
+        : shinyLeft && o.mastery.partner
         ? `<span class="rw-hint">✨ ${L(`Shiny ${SPECIES[o.mastery.partner]?.name} at mastery ${SHINY_AT}`, `Shiny ${SPECIES[o.mastery.partner]?.name} bij mastery ${SHINY_AT}`)}</span>`
         : '')
   foot.querySelector('.rw-more')!.addEventListener('click', () => {
@@ -181,7 +186,12 @@ export async function runRewards(el: HTMLElement, reward: Promise<Reward | null>
   for (const u of o.unlocks) {
     const x = unlockText(u)
     const [kind, id] = u.split(':')
-    pops.push({ icon: x.icon, title: x.text, sub: kind === 'shiny' ? L('Switch it on or off in your profile', 'Aan of uit te zetten in je profiel') : L('Unlocked', 'Vrijgespeeld'), img: kind === 'shiny' ? spriteUrl(Number(id), { shiny: true }) : undefined })
+    const img = kind === 'shiny' ? spriteUrl(Number(id), { shiny: true }) : kind === 'partner' ? spriteUrl(Number(id)) : kind === 'trainer' ? trainerSpriteUrl(TRAINERS.find((t) => t.key === id)?.sprite ?? id) : undefined
+    const sub = kind === 'shiny' ? L('Switch it on or off in your profile', 'Aan of uit te zetten in je profiel')
+      : kind === 'partner' ? L('Pick it under “Pick trainer & Pokémon”', 'Kies hem onder “Kies trainer & Pokémon”')
+      : kind === 'trainer' ? L('Pick them under “Pick trainer & Pokémon”', 'Kies je nieuwe trainer onder “Kies trainer & Pokémon”')
+      : L('Unlocked', 'Vrijgespeeld')
+    pops.push({ icon: x.icon, title: x.text, sub, img })
   }
   for (const a of o.ach) pops.push({ icon: ACH_INFO[a.id]?.icon ?? '🏆', title: achName(a.id), sub: `${L('Achievement', 'Prestatie')} · +${a.xp} XP` })
   for (const q of o.quests) pops.push({ icon: '📜', title: L('Quest complete!', 'Opdracht voltooid!'), sub: `${questText(q.id, o.daily.find((d) => d.id === q.id)?.target ?? 1)} · +${q.xp} XP` })

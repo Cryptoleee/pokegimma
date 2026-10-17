@@ -22,6 +22,31 @@ type Row = [number, string, string, number, number, number, number, (number | nu
 
 // id, name, types, hp, atk, def, spe, evolves-into, at level
 const ROWS: Row[] = [
+  // Unlockable partner lines (reward road); evolution levels squeezed to a match's pace
+  [280, 'Ralts', 'psychic', 28, 35, 30, 40, 281, 20],
+  [281, 'Kirlia', 'psychic', 38, 50, 45, 50, 282, 30],
+  [282, 'Gardevoir', 'psychic', 68, 95, 90, 80],
+  [252, 'Treecko', 'grass', 40, 55, 45, 70, 253, 16],
+  [253, 'Grovyle', 'grass', 50, 75, 55, 95, 254, 36],
+  [254, 'Sceptile', 'grass', 70, 95, 75, 120],
+  [390, 'Chimchar', 'fire', 44, 58, 44, 61, 391, 14],
+  [391, 'Monferno', 'fire/fighting', 64, 78, 52, 81, 392, 36],
+  [392, 'Infernape', 'fire/fighting', 76, 104, 71, 108],
+  [393, 'Piplup', 'water', 53, 56, 55, 40, 394, 16],
+  [394, 'Prinplup', 'water', 64, 74, 72, 50, 395, 36],
+  [395, 'Empoleon', 'water/steel', 84, 99, 95, 60],
+  [361, 'Snorunt', 'ice', 50, 50, 50, 50, [362, 478], 26],
+  [362, 'Glalie', 'ice', 80, 80, 80, 80],
+  [478, 'Froslass', 'ice/ghost', 70, 80, 70, 110],
+  [387, 'Turtwig', 'grass', 55, 57, 60, 31, 388, 18],
+  [388, 'Grotle', 'grass', 75, 72, 75, 36, 389, 32],
+  [389, 'Torterra', 'grass/ground', 95, 92, 95, 56],
+  [608, 'Lampent', 'ghost/fire', 60, 68, 60, 55, 609, 34],
+  [624, 'Pawniard', 'dark/steel', 45, 63, 55, 60, 625, 32],
+  [625, 'Bisharp', 'dark/steel', 65, 93, 85, 70],
+  [371, 'Bagon', 'dragon', 45, 58, 45, 50, 372, 26],
+  [372, 'Shelgon', 'dragon', 65, 78, 75, 50, 373, 38],
+  [373, 'Salamence', 'dragon/flying', 95, 123, 80, 100],
   // Roster lines
   [1, 'Bulbasaur', 'grass/poison', 45, 57, 57, 45, 2, 16],
   [2, 'Ivysaur', 'grass/poison', 60, 71, 72, 60, 3, 32],
@@ -109,13 +134,13 @@ const ROWS: Row[] = [
   [551, 'Sandile', 'ground/dark', 50, 54, 35, 65],
   [554, 'Darumaka', 'fire', 70, 53, 45, 50],
   [595, 'Joltik', 'bug/electric', 50, 52, 50, 65, 596, 36],
-  [607, 'Litwick', 'ghost/fire', 50, 48, 55, 20],
+  [607, 'Litwick', 'ghost/fire', 50, 48, 55, 20, 608, 22],
   [597, 'Ferroseed', 'grass/steel', 44, 37, 89, 10],
   [585, 'Deerling', 'normal/grass', 60, 50, 50, 75],
   [587, 'Emolga', 'electric/flying', 55, 75, 60, 103],
   [559, 'Scraggy', 'dark/fighting', 50, 55, 70, 48],
   [147, 'Dratini', 'dragon', 41, 57, 48, 50, 148, 30],
-  [636, 'Larvesta', 'bug/fire', 55, 68, 55, 60, 637, 40],
+  [636, 'Larvesta', 'bug/fire', 55, 68, 55, 60, 637, 34],
 
   // Wild: rare
   [94, 'Gengar', 'ghost/poison', 60, 98, 68, 110],
@@ -160,6 +185,10 @@ for (const [id, name, types, hp, atk, def, spe, evo, evoLevel] of ROWS) {
 
 /** The 24 Pokémon you pick your starting partner from. */
 export const ROSTER = [25, 4, 7, 1, 133, 495, 498, 501, 447, 443, 570, 610, 92, 66, 63, 147, 246, 446, 374, 123, 258, 255, 403, 633]
+/** Extra partners you unlock on the reward road (trainer level). */
+export const UNLOCK_PARTNERS = [129, 280, 252, 390, 393, 361, 387, 607, 624, 371, 636]
+/** Everything you can pick: the free roster plus the unlockable ones. */
+export const ALL_PARTNERS = [...ROSTER, ...UNLOCK_PARTNERS]
 /** You start with one partner and can catch more in the world, up to PARTY_MAX. */
 export const TEAM_SIZE = 1
 export const PARTY_MAX = 3
