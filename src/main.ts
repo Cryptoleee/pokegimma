@@ -31,6 +31,7 @@ import { L, onLangChange, tx } from './i18n'
 import { initStats, statsStateChanged, trackEnd, trackMatch } from './stats'
 import { accountState, accountStatus, initAccount, onAccount, onInvite, presenceChanged, type Invite, type Presence } from './account'
 import { hideInviteToast, showInviteToast } from './ui/friends'
+import { initProgress, matchEnded, matchStarted } from './progress'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
@@ -92,6 +93,7 @@ function presence(): Presence {
   return { s: 'menu', name }
 }
 void initAccount(presence)
+initProgress()
 onAccount(() => {
   // Signed in without a name yet: use your Discord one
   const s = accountState()
@@ -265,6 +267,7 @@ function enterMatch(g: Game) {
   viewing = true
   hideInviteToast()
   presenceChanged()
+  matchStarted(g.kind === 'raid' ? 'raid' : 'br', statsMode(), g.setup.humans.length)
   trackMatch({
     k: g.kind === 'raid' ? 'raid' : 'br',
     m: statsMode(),
@@ -314,6 +317,13 @@ function onEnd(r: GameResult) {
   if (game) trackEnd({ k: game.kind === 'raid' ? 'raid' : 'br', m: statsMode(), r: r.raid ? (r.won ? 'clear' : 'fail') : r.won ? 'win' : 'lose', boss: r.raid?.boss })
   hud?.destroy()
   hud = null
+  // XP, mastery, quests and achievements for this match (on the server when signed in)
+  const reward = game ? matchEnded({
+    kind: game.kind === 'raid' ? 'raid' : 'br', mode: statsMode(), humans: r.extra?.humans ?? 1,
+    won: r.won, place: r.place, total: r.total, time: r.time, kos: r.kos, caught: r.caught, partner: team[0],
+    boss: r.raid?.boss, share: r.raid?.share, lives: r.raid?.lives,
+    legend: r.extra?.legend, evolved: r.extra?.evolved, crystal: r.extra?.crystal,
+  }) : undefined
   // The match goes on without you (bots or other players still in it): you can watch
   const watch = r.final ? [] : [{ label: L('Keep watching 👁', 'Kijk verder 👁'), run: () => spectate() }]
   if (!room) {
@@ -321,13 +331,13 @@ function onEnd(r: GameResult) {
       ...watch,
       { label: L('Other team', 'Ander team'), run: soloOtherTeam },
       { label: L('Main menu', 'Hoofdmenu'), run: () => wipe(() => toMenu()) },
-    ])
+    ], reward)
     return
   }
   // Online the match usually goes on for your friends: watching is the main option, the lobby can wait
   const lobby = { label: L('To the lobby', 'Naar de lobby'), run: () => wipe(toLobby) }
-  if (watch.length) showResults(r, trainer.sprite, { label: L('Keep watching 👁', 'Kijk verder 👁'), run: () => spectate() }, [lobby, { label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }])
-  else showResults(r, trainer.sprite, { ...lobby, label: L('To the lobby ▶', 'Naar de lobby ▶') }, [{ label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }])
+  if (watch.length) showResults(r, trainer.sprite, { label: L('Keep watching 👁', 'Kijk verder 👁'), run: () => spectate() }, [lobby, { label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }], reward)
+  else showResults(r, trainer.sprite, { ...lobby, label: L('To the lobby ▶', 'Naar de lobby ▶') }, [{ label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }], reward)
 }
 
 // ---------- Watching after you're out ----------

@@ -7536,3 +7536,327 @@ body:not(.desk) .spec-feed {
   font-size: 28px;
   line-height: 1.5;
 }
+
+/* =====================================================================
+   Rewards on the results screen: XP, level + mastery bars, details, unlocks
+   ===================================================================== */
+
+.res.has-rw {
+  overflow-y: auto;
+  align-items: safe center;
+}
+.res.has-rw .res-stage {
+  height: 104px;
+}
+.res.has-rw .res-stats {
+  margin: 8px 0;
+}
+.rw {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 216, 74, 0.3);
+}
+.rw-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rw-xp {
+  font-size: 24px;
+  color: var(--hi);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+.rw-note {
+  font-size: 11px;
+  color: #a8b0d0;
+  text-align: right;
+}
+.rw.loading .rw-xp {
+  opacity: 0.5;
+}
+.rw.loading .rw-note::after {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.rw-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.rw-bar.hidden {
+  display: none;
+}
+.rw-bar img {
+  width: 30px;
+  height: 30px;
+  margin: -6px -2px;
+  image-rendering: pixelated;
+}
+.rw-a {
+  min-width: 40px;
+  font-weight: 700;
+  color: #fff;
+}
+.rw-mas .rw-a {
+  min-width: 26px;
+  color: var(--hi);
+}
+.rw-b {
+  min-width: 62px;
+  text-align: right;
+  font-size: 10px;
+  color: #a8b0d0;
+}
+.rw-track {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.rw-track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #ffc820, #fff080);
+  box-shadow: 0 0 10px rgba(255, 216, 74, 0.6);
+}
+.rw-mas .rw-track i {
+  background: linear-gradient(90deg, #58a8ff, #a8e0ff);
+  box-shadow: 0 0 10px rgba(88, 168, 255, 0.6);
+}
+.rw-track.flash {
+  animation: rwFlash 0.5s;
+}
+@keyframes rwFlash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0);
+  }
+}
+.rw-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 0;
+}
+.rw-foot:empty {
+  display: none;
+}
+.rw-more,
+.rw-login {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+}
+.rw-login {
+  border-color: #8f98ff;
+  background: linear-gradient(#6974ff, #4752e0);
+}
+.rw-hint {
+  font-size: 11px;
+  color: #c8d0f0;
+  text-align: right;
+}
+
+/* Details tab */
+.res-rw {
+  width: 100%;
+  max-height: min(56vh, 460px);
+  overflow-y: auto;
+  margin-bottom: 12px;
+  padding-right: 2px;
+}
+.res-rw.hidden {
+  display: none;
+}
+.res-rw h4 {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 10px 0 6px;
+  font-size: 14px;
+}
+.res-rw h4:first-child {
+  margin-top: 0;
+}
+.res-rw h4 small {
+  font-size: 12px;
+  color: var(--hi);
+}
+.rwd-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rwd-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.rwd-line b {
+  color: var(--hi);
+}
+.rwd-line.pts b {
+  color: #8ce0ff;
+}
+.rwd-q {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 8px;
+  margin-bottom: 6px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.rwd-q em {
+  font-style: normal;
+  color: #a8b0d0;
+}
+.rwd-q .rw-track {
+  grid-column: 1 / -1;
+  height: 6px;
+}
+.rwd-q.done {
+  background: rgba(60, 200, 120, 0.15);
+}
+.rwd-ach {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255, 216, 74, 0.1);
+  border: 1px solid rgba(255, 216, 74, 0.25);
+}
+.rwd-ach i {
+  font-style: normal;
+  font-size: 20px;
+}
+.rwd-ach span {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+}
+.rwd-ach small {
+  color: #c8d0f0;
+  font-size: 11px;
+}
+.rwd-ach em {
+  font-style: normal;
+  color: var(--hi);
+  font-size: 12px;
+}
+.rwd-ach.unl {
+  background: rgba(140, 120, 255, 0.15);
+  border-color: rgba(170, 150, 255, 0.35);
+}
+
+/* Unlock celebration */
+.rw-pop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 6, 14, 0.55);
+  animation: rwPopIn 0.25s;
+  cursor: pointer;
+}
+.rw-pop.out {
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.rw-pop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(300px, 86vw);
+  padding: 22px 18px;
+  border-radius: 22px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(180deg, #2a3380, #141a44);
+  border: 2px solid #ffd84a;
+  box-shadow: 0 0 60px rgba(255, 216, 74, 0.35), 0 20px 50px rgba(0, 0, 0, 0.5);
+  animation: rwCard 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.rw-pop-card i {
+  font-style: normal;
+  font-size: 54px;
+  line-height: 1;
+}
+.rw-pop-card img {
+  width: 110px;
+  height: 110px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 16px rgba(255, 240, 160, 0.8));
+}
+.rw-pop-card b {
+  font-size: 20px;
+  color: var(--hi);
+}
+.rw-pop-card span {
+  font-size: 13px;
+  color: #c8d0f0;
+}
+@keyframes rwPopIn {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rwCard {
+  from {
+    transform: scale(0.6) rotate(-4deg);
+    opacity: 0;
+  }
+}
+/* With the rewards strip: a smaller stage so everything fits on a phone */
+.res.has-rw .res-tr {
+  height: 96px;
+  bottom: 8px;
+}
+.res.has-rw .res-mon {
+  height: 72px;
+  bottom: 8px;
+}

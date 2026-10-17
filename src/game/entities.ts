@@ -167,6 +167,10 @@ export class Trainer {
   revives = 0
   kos = 0
   caught = 0
+  /** Progress counters: legendaries caught, evolutions, grabbed the Evolution Crystal. */
+  legends = 0
+  evolutions = 0
+  crystal = false
   place = 0
   diedAt = 0
   swapCd = 0

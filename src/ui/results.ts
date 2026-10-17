@@ -6,6 +6,8 @@ import type { GameResult } from '../game/game'
 import { BOSSES } from '../data/bosses'
 import { boardHtml } from './scoreboard'
 import { L } from '../i18n'
+import type { Reward } from '../progress'
+import { rewardsHtml, runRewards } from './rewards'
 
 /** End-of-match screen: placement badge, your trainer and best Pokémon, counted stats. */
 export interface ResultAction {
@@ -14,16 +16,17 @@ export interface ResultAction {
 }
 
 /** `main` is the big button; `more` are the smaller ones below it (e.g. other team, main menu). */
-export function showResults(r: GameResult, trainerSprite: string, main: ResultAction, more: ResultAction[]) {
+export function showResults(r: GameResult, trainerSprite: string, main: ResultAction, more: ResultAction[], reward?: Promise<Reward | null>) {
   const el = document.getElementById('screen')!
   const tier = r.won ? 'gold' : r.place <= 3 ? 'silver' : 'bronze'
   const boss = r.raid ? BOSSES[r.raid.boss] : null
   el.innerHTML = `
-    <div class="res ${r.won ? 'won' : ''}">
+    <div class="res ${r.won ? 'won' : ''} ${reward ? 'has-rw' : ''}">
       <canvas class="confetti"></canvas>
       <div class="res-glow"></div>
       <div class="res-card">
-        <div class="res-tabs"><button class="on" data-tab="mine">${L('Your match', 'Jouw potje')}</button><button data-tab="board">${L('Scoreboard', 'Scorebord')}</button></div>
+        <div class="res-tabs"><button class="on" data-tab="mine">${L('Your match', 'Jouw potje')}</button>${reward ? `<button data-tab="rw">${L('Rewards', 'Beloningen')}</button>` : ''}<button data-tab="board">${L('Scoreboard', 'Scorebord')}</button></div>
+        <div class="res-rw hidden"></div>
         <div class="res-board hidden">
           <div class="res-sub">${r.final ? L('Final standings', 'Eindstand') : L('Standings: the match is still going', 'Tussenstand: het potje loopt nog')}</div>
           <div class="sb-scroll">${boardHtml(r.board, !!r.raid, r.me)}</div>
@@ -50,6 +53,7 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
           <div><b data-n="${r.kos}">0</b><span>${L("Trainers K.O.'d", 'Trainers K.O.')}</span></div>
           <div><b data-n="${r.caught}">0</b><span>${L('Caught', 'Gevangen')}</span></div>`}
         </div>
+        ${reward ? rewardsHtml() : ''}
         </div>
         <div class="res-actions">
           <button class="cta" data-a="0">${main.label}</button>
@@ -120,13 +124,16 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
   el.querySelectorAll<HTMLElement>('.res-tabs button').forEach((b) =>
     b.addEventListener('click', () => {
       sfx.select()
-      const board = b.dataset.tab === 'board'
+      const tab = b.dataset.tab
       el.querySelectorAll('.res-tabs button').forEach((o) => o.classList.toggle('on', o === b))
-      el.querySelector('.res-board')!.classList.toggle('hidden', !board)
-      el.querySelector('.res-mine')!.classList.toggle('hidden', board)
-      el.querySelector('.res-card')!.classList.toggle('wide', board)
+      el.querySelector('.res-board')!.classList.toggle('hidden', tab !== 'board')
+      el.querySelector('.res-rw')?.classList.toggle('hidden', tab !== 'rw')
+      el.querySelector('.res-mine')!.classList.toggle('hidden', tab !== 'mine')
+      el.querySelector('.res-card')!.classList.toggle('wide', tab === 'board')
     }),
   )
+
+  if (reward) runRewards(el, reward, () => (el.querySelector('.res-tabs [data-tab="rw"]') as HTMLElement | null)?.click())
 
   const actions = [main, ...more]
   el.querySelectorAll<HTMLElement>('.res-actions [data-a]').forEach((b) =>

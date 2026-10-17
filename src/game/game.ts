@@ -194,6 +194,8 @@ export interface GameResult {
   raid?: { boss: BossId; dmg: number; share: number; lives: number }
   /** Every trainer's stats when your match ended. */
   board: ScoreRow[]
+  /** For progress: legendaries caught, evolutions, the Evolution Crystal, people in the match. */
+  extra: { legend: number; evolved: number; crystal: boolean; humans: number }
   /** The match was over for everyone (otherwise it's the standing so far). */
   final: boolean
   /** Your trainer id (to highlight your row). */
@@ -1442,6 +1444,7 @@ export class Game {
       best: { name: b.name, level: b.level, shiny: b.shiny, species: { id: b.species.id } },
       raid: r ? { boss: r.def.id, dmg: Math.round(p.bossDmg), share: Math.round((p.bossDmg / r.boss.maxHp) * 100), lives: p.lives } : undefined,
       board: scoreRows(this), final: decided(this), me: p.id,
+      extra: { legend: p.legends, evolved: p.evolutions, crystal: p.crystal, humans: this.setup.humans.length },
     })
     if (v.local) this.over = true
     if (this.viewers.every((o) => o.done)) this.allDone = true
@@ -1481,6 +1484,7 @@ export class Game {
       m.moves = movesetFor(m.species.types)
       m.hp = Math.max(1, Math.round(ratio * m.maxHp))
       m.evolveFx = 1.4
+      if (m.owner) m.owner.evolutions++
       preloadMon(m.species.id, m.shiny)
       if (mine && this.mode === 'solo') {
         // Cutscene: pause the match while the evolution plays out
@@ -1566,6 +1570,7 @@ export class Game {
     w.x = tr.x
     w.y = tr.y + 0.4
     tr.caught++
+    if (w.legendary) tr.legends++
     preloadMon(w.species.id, w.shiny)
     const v = this.vOf(tr)
     if (v) {
@@ -1676,6 +1681,7 @@ export class Game {
   private evolutionSurge(tr: Trainer) {
     const m = tr.mon.fainted ? tr.party.find((x) => !x.fainted) : tr.mon
     if (!m) return
+    tr.crystal = true
     const from = m.species
     let sp = m.species
     let lv = SLOT_UNLOCK[SLOT_UNLOCK.length - 1]
