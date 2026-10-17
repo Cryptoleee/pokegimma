@@ -43,10 +43,10 @@ const LINE_ROLE: Record<number, Role> = {
   7: 'defender', 246: 'defender', 446: 'defender', 258: 'defender',
   495: 'speedster', 447: 'speedster', 570: 'speedster', 123: 'speedster', 255: 'speedster',
   // Unlockable lines
-  129: 'attacker', 280: 'attacker', 607: 'attacker', 371: 'attacker', 636: 'attacker',
-  361: 'allrounder', 624: 'allrounder',
-  393: 'defender', 387: 'defender',
-  252: 'speedster', 390: 'speedster',
+  81: 'attacker', 359: 'attacker', 280: 'attacker', 607: 'attacker', 371: 'attacker', 636: 'attacker', 146: 'attacker',
+  220: 'allrounder', 382: 'allrounder', 151: 'allrounder',
+  138: 'defender', 111: 'defender', 144: 'defender', 383: 'defender',
+  390: 'speedster', 142: 'speedster', 145: 'speedster',
 }
 
 // Pre-evolution map, so evolutions inherit their line's role

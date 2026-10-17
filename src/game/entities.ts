@@ -3,6 +3,12 @@ import { movesetFor, SLOT_UNLOCK, type Move } from '../data/moves'
 import type { TrainerDef } from '../data/trainers'
 import { roleInfo } from '../data/roles'
 
+/** Awakening caps: legendaries end at about a pseudo-legendary's strength, the others at their own. */
+export const AWAKEN_LEGEND = 0.85
+export const AWAKEN_PLAIN = 1
+/** Partners that awaken instead of evolving (species id → cap). */
+export const AWAKENS: Record<number, number> = { 144: AWAKEN_LEGEND, 145: AWAKEN_LEGEND, 146: AWAKEN_LEGEND, 382: AWAKEN_LEGEND, 383: AWAKEN_LEGEND, 151: AWAKEN_LEGEND, 359: AWAKEN_PLAIN, 142: AWAKEN_PLAIN }
+
 export type Dir = 'down' | 'up' | 'left' | 'right'
 
 export const LEVEL_CAP = 60
@@ -92,6 +98,11 @@ export class Mon {
   thinkT = 0
   aggressive = false
   legendary = false
+  /**
+   * Partners that don't evolve (legendaries, Absol, Aerodactyl) "awaken": they start
+   * weaker and grow into their power with level, up to this share of it (0 = off).
+   */
+  awaken = 0
   /** Raid boss: huge, can't be caught, HP scaled by bossMul. */
   boss = false
   bossMul = 1
@@ -105,23 +116,27 @@ export class Mon {
     this.species = SPECIES[id]
     this.level = level
     this.shiny = shiny
-    this.moves = movesetFor(this.species.types)
+    this.moves = movesetFor(this.species.types, id)
     this.hp = this.maxHp
     this.rarity = rarityOf(id)
     this.legendary = this.rarity === 'legendary'
   }
 
+  /** Awakening partners: 45% of their power at the start, all of it (up to the cap) by about Lv 24–33. */
+  get power() {
+    return this.awaken ? Math.min(this.awaken, 0.45 + this.level / 60) : 1
+  }
   get maxHp() {
     if (this.boss) return statHp(this.species, this.level) * this.bossMul
     if (this.legendary && !this.owner) return statHp(this.species, this.level) * 2.2
     // Defenders and all-rounders get a little extra HP
-    return Math.round(statHp(this.species, this.level) * roleInfo(this.species.id).hp)
+    return Math.round(statHp(this.species, this.level) * roleInfo(this.species.id).hp * this.power)
   }
   get atk() {
-    return stat(this.species.atk, this.level)
+    return stat(this.species.atk, this.level) * this.power
   }
   get def() {
-    return stat(this.species.def, this.level)
+    return stat(this.species.def, this.level) * this.power
   }
   get fainted() {
     return this.hp <= 0
@@ -134,7 +149,7 @@ export class Mon {
   }
   /** Scale in world px per sprite px. */
   get scale() {
-    return this.boss ? 1.3 : this.legendary ? 0.68 : 0.55
+    return this.boss ? 1.3 : this.legendary || this.awaken === AWAKEN_LEGEND ? 0.68 : 0.55
   }
 }
 

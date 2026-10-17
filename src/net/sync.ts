@@ -92,7 +92,7 @@ export function recordVfx(g: Game) {
 
 /** Bare minimum for things far off-screen: who it is and roughly where. */
 function farMon(m: Mon) {
-  return { i: m.id, s: m.species.id, l: m.level, hp: r1(m.hp), x: r1(m.x), y: r1(m.y), ...(m.shiny ? { sh: 1 } : {}) }
+  return { i: m.id, s: m.species.id, l: m.level, hp: r1(m.hp), x: r1(m.x), y: r1(m.y), ...(m.shiny ? { sh: 1 } : {}), ...(m.awaken ? { aw: m.awaken } : {}) }
 }
 
 function monState(m: Mon, own: boolean) {
@@ -101,6 +101,7 @@ function monState(m: Mon, own: boolean) {
     ax: r2(m.aimX), ay: r2(m.aimY), at: r2(m.aimT), rv: r2(m.revealT), st: STATES.indexOf(m.state),
   }
   if (m.shiny) o.sh = 1
+  if (m.awaken) o.aw = m.awaken
   if (m.castT > 0) o.ct = r2(m.castT)
   if (m.flash > 0) o.fl = r2(m.flash)
   if (m.evolveFx > 0) o.ev = r2(m.evolveFx)
@@ -270,11 +271,14 @@ function getMon(cs: ClientState, o: Record<string, number & string & unknown[]>,
   }
   if (m.species.id !== o.s) {
     m.species = SPECIES[o.s]
-    m.moves = movesetFor(m.species.types)
+    m.moves = movesetFor(m.species.types, m.species.id)
     preloadMon(o.s, m.shiny)
   }
   m.owner = owner
   m.level = o.l
+  // Awakening partners: same max HP (and HP bar) as on the host
+  m.awaken = Number(o.aw) || 0
+  if (m.awaken) m.legendary = false
   m.hp = o.hp
   m.dir = DIRS[o.d] ?? m.dir
   m.aimX = o.ax ?? m.aimX

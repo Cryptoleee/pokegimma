@@ -126,6 +126,8 @@ export function setupRaid(g: Game, id: keyof typeof BOSSES) {
     tr.party = tr.party.slice(0, 1).map((m) => {
       const mon = new Mon(finalForm(m.species.id), RAID_LEVEL, m.shiny)
       mon.owner = tr
+      mon.awaken = m.awaken
+      if (mon.awaken) mon.legendary = false
       mon.hp = mon.maxHp
       preloadMon(mon.species.id, mon.shiny)
       return mon

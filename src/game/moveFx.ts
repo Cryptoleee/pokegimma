@@ -101,6 +101,53 @@ function shockwave(v: Vfx, fx: MoveFx, x: number, y: number, r: number, big = fa
   if (big) v.ring(x, y, r * 0.6, '#ffffff', 0.35, 3)
 }
 
+// ---------------- Unlockable partners: flashier moves ----------------
+
+const hexRgb = (h: string) => {
+  const n = parseInt(h.slice(1), 16)
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`
+}
+
+/** Casting: an accent sparkle; a signature ultimate gets a pillar of light, rings and a flash. */
+function eliteCast(v: Vfx, mv: Move, m: Mon) {
+  const c = mv.elite
+  if (!c) return
+  if (!mv.sig) {
+    v.burst(m.x, m.y - 0.45, { n: 6 + mv.tier * 3, speed: 3.5, cols: [c, '#ffffff'], shape: 'star', add: true, s0: 2.2, s1: 0.4, life: 0.45 })
+    return
+  }
+  v.pillar(m.x, m.y + 0.2, 10, 1.6, c, '#ffffff', 0.9)
+  v.ring(m.x, m.y, 3.4, c, 0.6, 8)
+  v.ring(m.x, m.y, 1.9, '#ffffff', 0.45, 4)
+  v.glow(m.x, m.y - 0.6, 96, c, 0.6)
+  v.burst(m.x, m.y - 0.5, { n: 40, speed: 7.5, cols: [c, '#ffffff'], shape: 'star', add: true, s0: 3.6, s1: 0.4, life: 0.75, drag: 1.5 })
+  v.burst(m.x, m.y + 0.2, { n: 16, speed: 5, cols: [c], shape: 'smoke', s0: 3, s1: 8, life: 0.6, flat: 0.45, drag: 3 })
+  v.flash(0.22, hexRgb(c))
+  v.shakeBy(6)
+}
+
+/** Landing: accent stars and a ring; a signature ultimate gets triple shockwaves, a burst of stars and lingering sparkles. */
+function eliteHit(v: Vfx, mv: Move, x: number, y: number, r: number) {
+  const c = mv.elite
+  if (!c) return
+  if (!mv.sig) {
+    v.burst(x, y - 0.3, { n: 6 + mv.tier * 3, speed: 4.5, cols: [c, '#ffffff'], shape: 'star', add: true, s0: 2.4, s1: 0.4, life: 0.45 })
+    if (mv.tier >= 2) v.ring(x, y, r * 0.9 + 0.6, c, 0.35, 3)
+    return
+  }
+  for (let i = 0; i < 3; i++) v.ring(x, y, r * (1.1 + i * 0.55) + 0.8, i === 1 ? '#ffffff' : c, 0.5 + i * 0.12, 9 - i * 2)
+  v.glow(x, y - 0.3, 110, c, 0.75)
+  v.flare(x, y - 0.4, 120, c, 0.5)
+  v.burst(x, y - 0.3, { n: 48, speed: 10, cols: [c, '#ffffff', c], shape: 'star', add: true, s0: 4, s1: 0.5, life: 0.8, drag: 2 })
+  v.burst(x, y - 0.3, { n: 20, speed: 6, cols: [c, '#ffffff'], shape: 'streak', add: true, s0: 3, s1: 0.5, life: 0.5 })
+  v.decal(x, y + 0.2, r * 1.1 + 0.6, 'scorch', 6)
+  v.flash(0.32, hexRgb(c))
+  v.shakeBy(10)
+  v.emitter(1.1, (dt) => {
+    if (Math.random() < dt * 28) v.burst(x + rnd(-r, r), y + rnd(-r, r) * 0.6, { n: 1, speed: 1.5, cols: [c, '#ffffff'], shape: 'star', add: true, s0: 2.6, s1: 0.3, life: 0.6, grav: -3 })
+  })
+}
+
 // ---------------- Cast / charge ----------------
 
 export function onCast(v: Vfx, mv: Move, m: Mon, near: boolean) {
@@ -116,11 +163,17 @@ export function onCast(v: Vfx, mv: Move, m: Mon, near: boolean) {
     v.flare(mx, my, 18 + mv.tier * 8, p.glow, 0.2)
     v.ring(m.x, m.y, 0.8 + mv.tier * 0.25, p.glow, 0.3, 2 + mv.tier)
   }
+  eliteCast(v, mv, m)
 }
 
 /** Called every frame while a big move charges up (k: 0→1). Local only: drawCharge does the rest. */
 export function chargeTick(v: Vfx, mv: Move, x: number, y: number, k: number) {
   const p = pal(mv.fx)
+  // Signature: accent stars spiral in as well
+  if (mv.sig && mv.elite && Math.random() < 0.6) {
+    const a = rnd(0, Math.PI * 2), d = rnd(1.8, 2.8)
+    v.burst(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.8, { n: 1, dir: a + Math.PI + 0.5, spread: 0.05, speed: d * 3.5, cols: [mv.elite, '#ffffff'], shape: 'star', add: true, s0: 3, s1: 0.8, life: 0.4, drag: 0 })
+  }
   if (Math.random() < 0.5 + k * 0.5) {
     const a = rnd(0, Math.PI * 2)
     const d = rnd(1.4, 2.2)
@@ -242,12 +295,13 @@ export function onZap(v: Vfx, mv: Move, x1: number, y1: number, x2: number, y2: 
   }
   // Static crackle around the caster
   v.burst(x1, y1, { n: big ? 6 : 3, speed: 3, cols: P.electric.cols, shape: 'streak', add: true, s0: 1.5, s1: 0.4, life: 0.2 })
-  void mv
+  if (!chain) eliteHit(v, mv, x2, y2, 0.8)
 }
 
 // ---------------- Beams ----------------
 
 export function onBeam(v: Vfx, mv: Move, x1: number, y1: number, x2: number, y2: number, origin: () => [number, number]) {
+  eliteHit(v, mv, x2, y2, 1.2)
   const p = pal(mv.fx)
   const a = Math.atan2(y2 - y1, x2 - x1)
   const len = Math.hypot(x2 - x1, y2 - y1)
@@ -348,6 +402,7 @@ export function onBeam(v: Vfx, mv: Move, x1: number, y1: number, x2: number, y2:
 // ---------------- Bursts around the caster ----------------
 
 export function onBurst(v: Vfx, mv: Move, x: number, y: number, r: number) {
+  eliteHit(v, mv, x, y, r)
   const big = mv.tier >= 3
   const p = pal(mv.fx)
   v.flare(x, y - 0.3, 26 + r * 12 + (big ? 16 : 0), p.glow, big ? 0.34 : 0.24)
@@ -441,6 +496,7 @@ export function onBurst(v: Vfx, mv: Move, x: number, y: number, r: number) {
 // ---------------- Targeted (nova) impacts ----------------
 
 export function onImpact(v: Vfx, mv: Move, x: number, y: number, r: number) {
+  eliteHit(v, mv, x, y, r)
   const big = mv.tier >= 3
   v.flare(x, y - 0.4, 30 + r * 16 + (big ? 20 : 0), pal(mv.fx).glow, big ? 0.38 : 0.28)
   switch (mv.fx) {
@@ -556,6 +612,7 @@ export function onImpact(v: Vfx, mv: Move, x: number, y: number, r: number) {
 // ---------------- Melee ----------------
 
 export function onMelee(v: Vfx, mv: Move, x: number, y: number, ax: number, ay: number, hit: boolean) {
+  if (hit) eliteHit(v, mv, x, y, 0.7)
   const p = pal(mv.fx)
   const a = Math.atan2(ay, ax)
   v.glow(x, y, hit ? 18 : 10, p.glow, 0.2)
@@ -629,7 +686,10 @@ export function onHit(v: Vfx, mv: Move, tgt: Mon, eff: number, near: boolean) {
   tgt.tintT = 0.35
   tgt.joltT = mv.tier >= 2 || eff > 1 ? 0.22 : 0.12
   if (mv.fx === 'psychic' || mv.fx === 'psyshock' || mv.fx === 'psybeam') tgt.liftT = 0.5
+  if (mv.elite) tgt.tintCol = mv.elite
   if (!near) return
+  // Signature dashes (Flare Blitz, Night Slash, Sky Attack) explode on whoever they hit
+  if (mv.sig && mv.kind === 'dash') eliteHit(v, mv, tgt.x, tgt.y, 1.1)
   const x = tgt.x, y = tgt.y - 0.5
   // Power 0 (a jab) … 1.3 (a super-effective ultimate)
   const pw = mv.tier / 3 + (eff > 1 ? 0.3 : 0)

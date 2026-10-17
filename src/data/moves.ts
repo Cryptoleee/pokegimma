@@ -35,6 +35,10 @@ export interface Move {
   tier: number
   /** Wind-up before the move fires (s). */
   charge: number
+  /** Unlockable partners: their moves look extra flashy (accent colour). */
+  elite?: string
+  /** Their own signature ultimate: a name of its own and a much bigger show. */
+  sig?: boolean
 }
 
 /** Level a move slot unlocks at. Survive longer, unlock more. */
@@ -78,10 +82,49 @@ function make(type: PType, tier: number): Move {
   return { name, type, kind, fx, power: Math.round(TIER_POWER[tier] * (CHARGE[fx] ? CHARGE_POWER : 1)), cooldown: TIER_CD[tier], range: RANGE[kind], tier, charge: CHARGE[fx] ?? 0 }
 }
 
-/** Four move slots derived from a species' types. Slot 3 borrows the secondary type. */
-export function movesetFor(types: PType[]): Move[] {
+/**
+ * Signature ultimates for the unlockable partners (whole evolution line), with
+ * an accent colour. Same power as a normal ultimate: the difference is the show.
+ */
+const SIGNATURE: { ids: number[]; name: string; kind: MoveKind; fx: MoveFx; type: PType; color: string }[] = [
+  { ids: [81, 82, 462], name: 'Zap Cannon', kind: 'nova', fx: 'thunder', type: 'electric', color: '#f8e048' },
+  { ids: [390, 391, 392], name: 'Flare Blitz', kind: 'dash', fx: 'flamewheel', type: 'fire', color: '#ff7a20' },
+  { ids: [138, 139], name: 'Ancient Power', kind: 'nova', fx: 'stoneedge', type: 'rock', color: '#e0b060' },
+  { ids: [220, 221, 473], name: 'Avalanche', kind: 'burst', fx: 'blizzard', type: 'ice', color: '#a8e8ff' },
+  { ids: [359], name: 'Night Slash', kind: 'dash', fx: 'shadowsneak', type: 'dark', color: '#e04070' },
+  { ids: [111, 112, 464], name: 'Rock Wrecker', kind: 'nova', fx: 'rocktomb', type: 'rock', color: '#e09050' },
+  { ids: [280, 281, 282], name: 'Future Sight', kind: 'nova', fx: 'psyshock', type: 'psychic', color: '#ff70c8' },
+  { ids: [607, 608, 609], name: 'Inferno', kind: 'nova', fx: 'fireblast', type: 'fire', color: '#a060ff' },
+  { ids: [371, 372, 373], name: 'Outrage', kind: 'nova', fx: 'dracometeor', type: 'dragon', color: '#5878ff' },
+  { ids: [142], name: 'Sky Attack', kind: 'dash', fx: 'aerialace', type: 'flying', color: '#f0d080' },
+  { ids: [636, 637], name: 'Fiery Dance', kind: 'nova', fx: 'fireblast', type: 'fire', color: '#ffa030' },
+  { ids: [144], name: 'Sheer Cold', kind: 'burst', fx: 'blizzard', type: 'ice', color: '#80d8ff' },
+  { ids: [145], name: 'Thunder Cage', kind: 'nova', fx: 'thunder', type: 'electric', color: '#fff060' },
+  { ids: [146], name: 'Heat Wave', kind: 'beam', fx: 'flamethrower', type: 'fire', color: '#ff5020' },
+  { ids: [382], name: 'Origin Pulse', kind: 'beam', fx: 'hydropump', type: 'water', color: '#3888ff' },
+  { ids: [383], name: 'Precipice Blades', kind: 'burst', fx: 'quake', type: 'ground', color: '#ff4020' },
+  { ids: [151], name: 'Psystrike', kind: 'nova', fx: 'psyshock', type: 'psychic', color: '#ff90e0' },
+]
+const SIG_OF = new Map<number, (typeof SIGNATURE)[number]>()
+for (const sg of SIGNATURE) for (const id of sg.ids) SIG_OF.set(id, sg)
+
+/** The accent colour of an unlockable partner's line (undefined for everyone else). */
+export const eliteColor = (id: number) => SIG_OF.get(id)?.color
+
+function signature(sg: (typeof SIGNATURE)[number]): Move {
+  return { name: sg.name, type: sg.type, kind: sg.kind, fx: sg.fx, power: Math.round(TIER_POWER[3] * (CHARGE[sg.fx] ? CHARGE_POWER : 1)), cooldown: TIER_CD[3], range: RANGE[sg.kind], tier: 3, charge: CHARGE[sg.fx] ?? 0, elite: sg.color, sig: true }
+}
+
+/**
+ * Four move slots derived from a species' types. Slot 3 borrows the secondary type.
+ * Unlockable partners (by species id) get their signature ultimate and flashier moves.
+ */
+export function movesetFor(types: PType[], id = 0): Move[] {
   const [a, b] = types
-  return [make(a, 0), make(a, 1), make(b ?? a, 2), make(a, 3)]
+  const moves = [make(a, 0), make(a, 1), make(b ?? a, 2), make(a, 3)]
+  const sg = SIG_OF.get(id)
+  if (!sg) return moves
+  return [...moves.slice(0, 3).map((m) => ({ ...m, elite: sg.color })), signature(sg)]
 }
 
 const BY_NAME = new Map<string, Move>()
@@ -89,6 +132,8 @@ for (const type of Object.keys(TABLE) as PType[]) for (let i = 0; i < 4; i++) {
   const m = make(type, i)
   if (!BY_NAME.has(m.name)) BY_NAME.set(m.name, m)
 }
+
+for (const sg of SIGNATURE) if (!BY_NAME.has(sg.name)) BY_NAME.set(sg.name, signature(sg))
 
 /** Looks a move up by name (used to send moves over the network). */
 export function moveByName(name: string): Move {

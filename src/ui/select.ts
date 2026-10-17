@@ -5,6 +5,7 @@ import { TYPE_COLOR, TYPE_NL } from '../data/types'
 import { cry, sfx } from '../audio'
 import { ROLES, roleOf, STYLES, styleOf, type Role, type Style } from '../data/roles'
 import { L } from '../i18n'
+import { AWAKENS } from '../game/entities'
 import { progress } from '../progress'
 import { isUnlocked, unlockLevel } from '../../api/_progress'
 
@@ -179,8 +180,8 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
     const stat = (label: string, v: number) =>
       `<div class="st"><span>${label}</span><i><em style="--w:${Math.min(100, (v / 120) * 100)}%"></em></i><b>${v}</b></div>`
     el.querySelector('.stats')!.innerHTML = stat('HP', sp.hp) + stat('ATK', sp.atk) + stat('DEF', sp.def) + stat('SPE', sp.spe)
-    el.querySelector('.moves2')!.innerHTML = movesetFor(sp.types)
-      .map((m, i) => `<div class="mv2" style="--tc:${TYPE_COLOR[m.type]}"><span>${m.name}</span><small>${i === 0 ? 'Start' : `Lv ${SLOT_UNLOCK[i]}`}</small></div>`)
+    el.querySelector('.moves2')!.innerHTML = movesetFor(sp.types, sp.id)
+      .map((m, i) => `<div class="mv2 ${m.sig ? 'sig' : ''}" style="--tc:${m.sig && m.elite ? m.elite : TYPE_COLOR[m.type]}"><span>${m.sig ? '★ ' : ''}${m.name}</span><small>${m.sig ? L('Signature · ', 'Signature · ') : ''}${i === 0 ? 'Start' : `Lv ${SLOT_UNLOCK[i]}`}</small></div>`)
       .join('')
     // Evolution line
     const line: string[] = [`<img class="px" src="${spriteUrl(sp.id)}" alt="">`]
@@ -191,7 +192,9 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
       line.push(cur.evo.length > 1 ? `<span class="multi">${cur.evo.map((e) => `<img class="px" src="${spriteUrl(e)}" alt="">`).join('')}</span>` : `<img class="px" src="${spriteUrl(next.id)}" alt="">`)
       cur = cur.evo.length === 1 ? next : undefined
     }
-    el.querySelector('.evo')!.innerHTML = line.length > 1 ? line.join('') : `<span class="arrow">${L('Doesn\'t evolve', 'Evolueert niet')}</span>`
+    el.querySelector('.evo')!.innerHTML = line.length > 1 ? line.join('')
+      : AWAKENS[sp.id] ? `<span class="arrow awaken">✨ ${L('Awakens: starts weaker, grows into its full power with level', 'Ontwaakt: begint zwakker, groeit met elk level naar zijn volle kracht')}</span>`
+      : `<span class="arrow">${L('Doesn\'t evolve', 'Evolueert niet')}</span>`
     el.querySelectorAll<HTMLElement>('.tile').forEach((b) => b.classList.toggle('on', Number(b.dataset.id) === pick))
     const ok = owned('partner', pick)
     hero.classList.toggle('locked', !ok)

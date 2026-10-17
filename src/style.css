@@ -8411,3 +8411,17 @@ em.lock {
   font-size: 12px;
   padding: 8px 2px;
 }
+
+/* Signature move in the partner picker */
+.mv2.sig {
+  box-shadow: 0 0 0 1px var(--tc), 0 0 12px var(--tc);
+}
+.mv2.sig span {
+  color: #fff;
+}
+.evo .arrow.awaken {
+  max-width: 220px;
+  color: var(--hi);
+  white-space: normal;
+  text-align: left;
+}

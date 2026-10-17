@@ -149,11 +149,16 @@ Gasten en accounts gebruiken dezelfde regels (`api/_progress.ts`). Een gast bewa
 
 - **Trainerlevel (1–50):** XP per potje voor meedoen, overleven, uitschakelen, vangen, plaats of raid, evoluties, het kristal en legendarische Pokémon. Met andere spelers krijg je +20%. Je eerste winst van de dag geeft +100 XP.
 - **Partner-mastery (★1–10):** de XP van een potje gaat ook naar de partner waarmee je begon. Bij ★3, ★7 en ★10 krijg je een bronzen, zilveren en gouden embleem. **★5 speelt de shiny vorm vrij**, die anderen ook in de lobby en het potje zien. Bij ★10 krijg je de titel "<Pokémon>-meester".
-- **Reward road (vrijspelen):** elke 1–3 trainerlevels een nieuwe partner of trainer, van Lv 2 tot Lv 40. Bestaande partners en trainers blijven gratis; dit komt erbij. Bots spelen de nieuwe partners al wel, als voorproefje.
-  - **11 partners:** Magikarp, Ralts, Treecko, Chimchar, Piplup, Snorunt, Turtwig, Litwick, Pawniard, Bagon en Larvesta. Hun evolutielevels zijn ingekort tot het tempo van een potje.
-  - **14 trainers:** Elesa, Hugh, Skyla, Roxie, Burgh, Shauntal, Colress, Drayden, Grimsley, Steven, Lance, Cynthia, Ghetsis en Red.
-  - Op slot zie je ze als silhouet met het level waarop ze vrijkomen. Het profiel heeft een tabblad "Vrijspelen" met de hele road.
-  - De volgorde staat in `REWARD_ROAD` in `api/_progress.ts`.
+- **Reward road (vrijspelen):** elke 1–3 trainerlevels een nieuwe partner of trainer, van Lv 2 tot Lv 50. Bestaande partners en trainers blijven gratis; dit komt erbij. Bots spelen de nieuwe partners al wel, als voorproefje.
+  - **Partners:** Magnemite→Magnezone, Chimchar→Infernape, Omanyte→Omastar, Swinub→Mamoswine, Absol, Rhyhorn→Rhyperior, Ralts→Gardevoir, Litwick→Chandelure, Bagon→Salamence, Aerodactyl en Larvesta→Volcarona.
+  - **Legendarisch:** Articuno, Zapdos, Moltres, Kyogre, Groudon en Mew (Lv 50).
+  - **Trainers:** Elesa, Hugh, Skyla, Roxie, Burgh, Shauntal, Colress, Drayden, Grimsley, Steven, Lance, Cynthia, Ghetsis en Red.
+  - **Signature-ultimates:** elke nieuwe lijn heeft een eigen ultimate met een eigen kleur, zoals Flare Blitz, Zap Cannon, Avalanche, Origin Pulse, Precipice Blades en Psystrike.
+    - Even sterk als een normale ultimate, maar met een lichtzuil bij het afvuren, drie schokgolven en een sterrenregen bij de inslag.
+    - Hun gewone aanvallen hebben accentvonken, en in het veld hebben ze een aura.
+  - **Ontwaken:** Pokémon die niet evolueren (legendarisch, Absol, Aerodactyl) beginnen op 45% van hun kracht en groeien met elk level. Legendarisch eindigt rond Lv 24 op het niveau van een Garchomp. Zo blijft PvP eerlijk.
+  - Op slot zie je ze met het level waarop ze vrijkomen. Het profiel heeft een tabblad "Vrijspelen" met de hele road.
+  - De volgorde staat in `REWARD_ROAD` in `api/_progress.ts`; de signature-aanvallen in `SIGNATURE` in `src/data/moves.ts`.
 - **Titels:** per level (Beginner → Stormbreker), via prestaties en via mastery. Je kiest zelf welke titel je laat zien in je profiel. Je level en titel staan in de lobby.
 - **27 prestaties**, elk met bonus-XP en soms een titel.
 - **Dagopdrachten:** elke dag dezelfde 3 voor iedereen (om middernacht, Nederlandse tijd), plus een teller voor dagen op rij.

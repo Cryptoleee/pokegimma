@@ -44,30 +44,36 @@ export const BASE_PARTNERS = [25, 4, 7, 1, 133, 495, 498, 501, 447, 443, 570, 61
  */
 export const REWARD_ROAD: { lv: number; kind: 'partner' | 'trainer'; id: string }[] = [
   { lv: 2, kind: 'trainer', id: 'elesa' },
-  { lv: 3, kind: 'partner', id: '129' },
+  { lv: 3, kind: 'partner', id: '81' }, // Magnemite → Magnezone
   { lv: 4, kind: 'trainer', id: 'hugh' },
-  { lv: 5, kind: 'partner', id: '280' },
+  { lv: 5, kind: 'partner', id: '390' }, // Chimchar → Infernape
   { lv: 6, kind: 'trainer', id: 'skyla' },
-  { lv: 7, kind: 'partner', id: '252' },
+  { lv: 7, kind: 'partner', id: '138' }, // Omanyte → Omastar
   { lv: 8, kind: 'trainer', id: 'roxie' },
-  { lv: 9, kind: 'partner', id: '390' },
+  { lv: 9, kind: 'partner', id: '220' }, // Swinub → Mamoswine
   { lv: 10, kind: 'trainer', id: 'burgh' },
-  { lv: 11, kind: 'partner', id: '393' },
+  { lv: 11, kind: 'partner', id: '359' }, // Absol
   { lv: 12, kind: 'trainer', id: 'shauntal' },
-  { lv: 13, kind: 'partner', id: '361' },
+  { lv: 13, kind: 'partner', id: '111' }, // Rhyhorn → Rhyperior
   { lv: 14, kind: 'trainer', id: 'colress' },
-  { lv: 15, kind: 'partner', id: '387' },
+  { lv: 15, kind: 'partner', id: '280' }, // Ralts → Gardevoir
   { lv: 16, kind: 'trainer', id: 'drayden' },
-  { lv: 18, kind: 'partner', id: '607' },
-  { lv: 20, kind: 'trainer', id: 'grimsley' },
-  { lv: 22, kind: 'partner', id: '624' },
-  { lv: 24, kind: 'trainer', id: 'steven' },
-  { lv: 26, kind: 'partner', id: '371' },
-  { lv: 28, kind: 'trainer', id: 'lance' },
-  { lv: 30, kind: 'partner', id: '636' },
-  { lv: 33, kind: 'trainer', id: 'cynthia' },
-  { lv: 36, kind: 'trainer', id: 'ghetsis' },
-  { lv: 40, kind: 'trainer', id: 'red' },
+  { lv: 18, kind: 'partner', id: '607' }, // Litwick → Chandelure
+  { lv: 20, kind: 'partner', id: '371' }, // Bagon → Salamence
+  { lv: 21, kind: 'trainer', id: 'grimsley' },
+  { lv: 23, kind: 'partner', id: '142' }, // Aerodactyl
+  { lv: 25, kind: 'partner', id: '636' }, // Larvesta → Volcarona
+  { lv: 26, kind: 'trainer', id: 'steven' },
+  { lv: 28, kind: 'partner', id: '144' }, // Articuno
+  { lv: 30, kind: 'trainer', id: 'lance' },
+  { lv: 32, kind: 'partner', id: '145' }, // Zapdos
+  { lv: 34, kind: 'trainer', id: 'cynthia' },
+  { lv: 36, kind: 'partner', id: '146' }, // Moltres
+  { lv: 38, kind: 'trainer', id: 'ghetsis' },
+  { lv: 41, kind: 'partner', id: '382' }, // Kyogre
+  { lv: 44, kind: 'partner', id: '383' }, // Groudon
+  { lv: 47, kind: 'trainer', id: 'red' },
+  { lv: 50, kind: 'partner', id: '151' }, // Mew
 ]
 
 /** Every partner you can pick: the free ones and those on the reward road. */

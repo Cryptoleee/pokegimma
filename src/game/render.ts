@@ -1,3 +1,4 @@
+import { eliteColor } from '../data/moves'
 import { TYPE_COLOR } from '../data/types'
 import type { Game } from './game'
 import { BUSH_SIGHT, INTRO_TIME, ITEM_SPRITE } from './game'
@@ -306,6 +307,21 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
 
   // Fast moves leave afterimages (dashes, swoops, teleports)
   if (m.boss && s.ready) drawTrail(ctx, m, s, fx, fy, dw, dh, look?.aura ?? '#ffffff', rise)
+
+  // Unlockable partners: a soft glow in their accent colour with two sparks circling them
+  const elite = m.owner && !m.boss ? eliteColor(m.species.id) : undefined
+  if (elite && !m.fainted) {
+    const pulse = 0.5 + 0.5 * Math.sin(time * 3 + m.bob)
+    drawGlow(ctx, px, py - dh * 0.3 - rise, dw * (0.55 + 0.08 * pulse), elite, 0.14 + 0.08 * pulse)
+    ctx.fillStyle = elite
+    for (let i = 0; i < 2; i++) {
+      const a = time * 2.4 + m.bob + i * Math.PI
+      const ox = Math.cos(a) * dw * 0.42, oy = Math.sin(a) * dw * 0.14
+      ctx.globalAlpha = 0.55 + 0.45 * Math.sin(a)
+      ctx.fillRect(Math.round(px + ox) - 1, Math.round(py - dh * 0.25 + oy - rise) - 1, 3, 3)
+    }
+    ctx.globalAlpha = 1
+  }
 
   // Legendary aura
   if (m.legendary && !m.owner) {

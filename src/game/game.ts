@@ -10,7 +10,7 @@ import { BOT_TRAINERS, TRAINERS } from '../data/trainers'
 import { effectiveness, TYPE_COLOR } from '../data/types'
 import { cry, sfx } from '../audio'
 import type { ItemSound } from '../moveSfx'
-import { LEVEL_CAP, Mon, Trainer, xpNeeded, type AimDir } from './entities'
+import { LEVEL_CAP, Mon, Trainer, xpNeeded, type AimDir, AWAKENS } from './entities'
 import { Rng } from './rng'
 import { preloadMon } from './sprites'
 import { MAP, T, World } from './world'
@@ -483,6 +483,9 @@ export class Game {
 
   private ownMon(m: Mon, tr: Trainer) {
     m.owner = tr
+    // Legendary and other non-evolving partners awaken with level (and aren't treated as wild legendaries)
+    m.awaken = AWAKENS[m.species.id] ?? 0
+    if (m.awaken) m.legendary = false
     m.hp = m.maxHp
     return m
   }
@@ -936,7 +939,7 @@ export class Game {
       return true
     }
     if (mv.tier >= 1)
-      this.addFx({ kind: 'callout', x: m.x, y: m.y - 1.9, t: 0, life: 1, color: TYPE_COLOR[mv.type], text: mv.name, big: mv.tier >= 3 })
+      this.addFx({ kind: 'callout', x: m.x, y: m.y - 1.9, t: 0, life: mv.sig ? 1.4 : 1, color: mv.sig && mv.elite ? mv.elite : TYPE_COLOR[mv.type], text: mv.sig ? `★ ${mv.name}! ★` : mv.name, big: mv.tier >= 3 })
     this.aim(m, tgt, dir)
     if (mv.charge > 0) {
       this.soundAt(m.x, m.y, 'moveCharge', [mv.fx, mv.tier, mv.charge], { owners: [m.owner], skipRemote: m.owner })
@@ -1484,7 +1487,7 @@ export class Game {
       const ratio = m.hp / m.maxHp
       const old = sp.name
       m.species = SPECIES[this.rng.pick(sp.evo)]
-      m.moves = movesetFor(m.species.types)
+      m.moves = movesetFor(m.species.types, m.species.id)
       m.hp = Math.max(1, Math.round(ratio * m.maxHp))
       m.evolveFx = 1.4
       if (m.owner) m.owner.evolutions++
@@ -1695,7 +1698,7 @@ export class Game {
     m.level = Math.min(LEVEL_CAP, Math.max(m.level, lv))
     m.xp = 0
     m.species = sp
-    m.moves = movesetFor(sp.types)
+    m.moves = movesetFor(sp.types, sp.id)
     m.hp = m.maxHp
     m.evolveFx = 2.6
     preloadMon(sp.id, m.shiny)
