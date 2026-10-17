@@ -209,6 +209,8 @@ export interface HumanSetup {
   name: string
   trainer: string
   team: number[]
+  /** Partner in its shiny form (unlocked with mastery). */
+  shiny?: boolean
 }
 
 /** Battle royale (last trainer standing) or raid (everyone against a boss). */
@@ -346,7 +348,7 @@ export class Game {
       const tr = new Trainer(def, h.name || def.name, i === me)
       tr.human = true
       tr.pid = h.pid
-      tr.party = h.team.slice(0, TEAM_SIZE).map((id) => this.ownMon(new Mon(id, 5), tr))
+      tr.party = h.team.slice(0, TEAM_SIZE).map((id, j) => this.ownMon(new Mon(id, 5, !!h.shiny && j === 0), tr))
       this.trainers.push(tr)
       if (i === me) {
         this.player = tr

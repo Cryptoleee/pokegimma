@@ -200,6 +200,6 @@ export function spriteUrl(id: number, opts: { back?: boolean; shiny?: boolean } 
   return `${SPRITE_BASE}/${opts.back ? 'back/' : ''}${opts.shiny ? 'shiny/' : ''}${id}.png`
 }
 
-export function animatedUrl(id: number): string {
-  return `${SPRITE_BASE}/animated/${id}.gif`
+export function animatedUrl(id: number, shiny = false): string {
+  return `${SPRITE_BASE}/animated/${shiny ? 'shiny/' : ''}${id}.gif`
 }

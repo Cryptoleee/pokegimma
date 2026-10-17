@@ -14,7 +14,15 @@ import { bindLangSwitch, L, langSwitch } from '../i18n'
 import { accountStatus, onAccount } from '../account'
 import { friendsCard, openFriends, openInvite, paintFriendsCard } from './friends'
 import { homeBadge } from './profile'
-import { onProgress } from '../progress'
+import { onProgress, progress } from '../progress'
+import { titleName } from '../data/rewards'
+import { masteryOf, SHINY_AT } from '../../api/_progress'
+
+/** Your partner is shown shiny (unlocked with mastery and switched on). */
+export function shinyPartner(id: number) {
+  const p = progress()
+  return p.shiny.includes(id) && masteryOf(p.partners[id] ?? 0).lv >= SHINY_AT
+}
 
 /**
  * Home menu (your team, name, solo or multiplayer) and the multiplayer lobby.
@@ -23,8 +31,8 @@ import { onProgress } from '../progress'
 const screen = () => document.getElementById('screen')!
 export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
-function gif(id: number, cls = '') {
-  return `<img class="px ${cls}" src="${animatedUrl(id)}" onerror="this.onerror=null;this.src='${spriteUrl(id)}'" alt="">`
+function gif(id: number, cls = '', shiny = false) {
+  return `<img class="px ${cls}" src="${animatedUrl(id, shiny)}" onerror="this.onerror=null;this.src='${spriteUrl(id, { shiny })}'" alt="">`
 }
 
 /** Quick chat phrases: one tap on a phone (in the current language). */
@@ -124,7 +132,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
         <div class="hs-beam"></div>
         <div class="hs-plat"></div>
         <img class="px hs-tr" src="${trainerSpriteUrl(st.trainer.sprite)}" alt="">
-        ${mon ? gif(mon, 'hs-mon') : ''}
+        ${mon ? gif(mon, 'hs-mon', shinyPartner(mon)) : ''}
         <div class="hs-tag"><small>${L('YOUR TEAM', 'JOUW TEAM')}</small><b>${st.trainer.name}${mon ? ` &amp; ${SPECIES[mon].name}` : ''}</b></div>
         <button class="hs-edit">✎ ${L('Pick trainer &amp; Pokémon', 'Kies trainer &amp; Pokémon')}</button>
         ${homeBadge()}
@@ -473,8 +481,8 @@ export function showLobby(room: Room, on: LobbyActions) {
       return `
         <div class="lb-p ${isMe ? 'lb-me' : ''} ${ready ? 'ready' : ''}" style="--d:${i * 60}ms">
           <img class="px lb-tr" src="${trainerSpriteUrl(tr.sprite)}" alt="">
-          <div class="lb-name"><b>${esc(p.name)}</b><span>${!quick && i === 0 ? '<em>HOST</em>' : ''}${isMe ? `<em class="you">${L('YOU', 'JIJ')}</em>` : ''}${tr.name}${p.team[0] ? ` &amp; ${SPECIES[p.team[0]].name}` : ''}</span></div>
-          ${p.team[0] ? gif(p.team[0], 'lb-mon') : ''}
+          <div class="lb-name"><b>${p.lv ? `<em class="lb-lv">${Math.max(1, Math.min(99, Number(p.lv) || 1))}</em>` : ''}${esc(p.name)}</b>${p.title ? `<small class="lb-title">${esc(titleName(String(p.title)))}</small>` : ''}<span>${!quick && i === 0 ? '<em>HOST</em>' : ''}${isMe ? `<em class="you">${L('YOU', 'JIJ')}</em>` : ''}${tr.name}${p.team[0] ? ` &amp; ${SPECIES[p.team[0]].name}` : ''}</span></div>
+          ${p.team[0] ? gif(p.team[0], 'lb-mon', !!p.shiny) : ''}
           <span class="lb-state">${state}</span>
         </div>`
     }).join('') + (raid

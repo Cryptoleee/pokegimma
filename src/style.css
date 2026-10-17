@@ -8266,3 +8266,17 @@ body:not(.desk) .spec-feed {
   height: 84px;
   margin: -10px 0 -8px;
 }
+/* Lobby: level chip and title under the name */
+.lb-name em.lb-lv {
+  margin-right: 5px;
+  background: linear-gradient(#fff3a0, #ffc820);
+}
+.lb-name em.lb-lv::before {
+  content: 'LV ';
+  font-size: 8px;
+}
+.lb-title {
+  font-size: 11px;
+  color: var(--hi);
+  line-height: 1.1;
+}

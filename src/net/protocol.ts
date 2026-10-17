@@ -10,6 +10,10 @@ export interface LobbyPlayer {
   team: number[]
   /** Picked a team and tapped "Klaar". */
   ready?: boolean
+  /** Progress cosmetics: partner shown shiny, trainer level, title id. */
+  shiny?: boolean
+  lv?: number
+  title?: string
 }
 
 /** What the next match will be: chosen by the host (or you, solo). */

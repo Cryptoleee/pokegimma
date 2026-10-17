@@ -16,7 +16,7 @@ import { showResults } from './ui/results'
 import { LiveBoard, showFinalBoard } from './ui/scoreboard'
 import { decided, scoreRows } from './game/score'
 import { showEvolution } from './ui/cutscene'
-import { confirmLeaveLobby, setOnline, showLobby, showMenu, type MenuState } from './ui/menu'
+import { confirmLeaveLobby, setOnline, shinyPartner, showLobby, showMenu, type MenuState } from './ui/menu'
 import { showLoading } from './ui/loading'
 import { wipe } from './ui/transition'
 import { currentMusic, playMusic, setTempo } from './music'
@@ -31,7 +31,8 @@ import { L, onLangChange, tx } from './i18n'
 import { initStats, statsStateChanged, trackEnd, trackMatch } from './stats'
 import { accountState, accountStatus, initAccount, onAccount, onInvite, presenceChanged, type Invite, type Presence } from './account'
 import { hideInviteToast, showInviteToast } from './ui/friends'
-import { initProgress, matchEnded, matchStarted } from './progress'
+import { initProgress, matchEnded, matchStarted, progress } from './progress'
+import { levelOf, titleOf } from '../api/_progress'
 import { showProfile } from './ui/profile'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
@@ -181,7 +182,8 @@ function setupFor(c: MatchChoice, humans: LobbyPlayer[]): MatchSetup {
 let ready = false
 
 function me(): LobbyPlayer {
-  return { pid: profile().id, name: profile().name || trainer.name, trainer: trainer.key, team, ready }
+  const p = progress()
+  return { pid: profile().id, name: profile().name || trainer.name, trainer: trainer.key, team, ready, shiny: !!team[0] && shinyPartner(team[0]), lv: levelOf(p.xp).lv, title: titleOf(p) }
 }
 
 // ---------- Menus ----------

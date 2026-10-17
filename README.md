@@ -143,6 +143,25 @@ Nieuwe bazen zijn vooral data: een rij in `src/data/bosses.ts` met hun aanvallen
 - **Cinematisch:** een titelscherm met Zekrom en Reshiram, Black/White-schermovergangen, keuzeschermen als podium, een drop-in met aftelling bij de start, een evolutie-cutscene, banners voor level-ups, nieuwe aanvallen, legendarische Pokémon en KO's, en een resultaatscherm met confetti.
 - **Wereld:** weer per wereld (sneeuw, zand, as, gloeiende vonken, vuurvliegjes), wolkschaduwen, golvend en glinsterend water, ritselend gras, stofwolkjes, zwevende pollen, een gloeiende stormmuur met bliksem en regen, en een vignet.
 
+## Progressie en beloningen
+
+Gasten en accounts gebruiken dezelfde regels (`api/_progress.ts`). Een gast bewaart zijn voortgang in de browser. Bij de eerste Discord-login wordt die eenmalig (met limieten) overgezet naar het account. Alleen accounts komen in de ranglijst.
+
+- **Trainerlevel (1–50):** XP per potje voor meedoen, overleven, uitschakelen, vangen, plaats of raid, evoluties, het kristal en legendarische Pokémon. Met andere spelers krijg je +20%. Je eerste winst van de dag geeft +100 XP.
+- **Partner-mastery (★1–10):** de XP van een potje gaat ook naar de partner waarmee je begon. Bij ★3, ★7 en ★10 krijg je een bronzen, zilveren en gouden embleem. **★5 speelt de shiny vorm vrij**, die anderen ook in de lobby en het potje zien. Bij ★10 krijg je de titel "<Pokémon>-meester".
+- **Titels:** per level (Beginner → Stormbreker), via prestaties en via mastery. Je kiest zelf welke titel je laat zien in je profiel. Je level en titel staan in de lobby.
+- **27 prestaties**, elk met bonus-XP en soms een titel.
+- **Dagopdrachten:** elke dag dezelfde 3 voor iedereen (om middernacht, Nederlandse tijd), plus een teller voor dagen op rij.
+- **Ranglijsten (week en altijd):**
+  - **PvP:** battle royale met andere mensen. Je krijgt punten voor je plaats en +4 per uitgeschakelde trainer.
+  - **PvE:** raids (gehaald plus baasschade) en battle royale tegen bots.
+- **Alles is cosmetisch:** progressie maakt je nooit sterker.
+- **Valsspelen:** de uitslag komt uit het spel van de speler zelf. Het is daarom lastig te faken, niet onmogelijk.
+  - De server geeft bij de start een ticket dat maar één keer bruikbaar is.
+  - De server controleert de echte verstreken tijd.
+  - Er zijn harde limieten, zoals maximaal 1 KO per 20 seconden en geen winst binnen 90 seconden.
+- **Waar het staat:** `api/match.ts` (start/einde/titel/shiny) en `api/rank.ts` (ranglijst). Alles staat in dezelfde Upstash Redis.
+
 ## Vrienden (optioneel, Discord-login)
 
 - **Gast blijft standaard.** Inloggen met Discord is alleen nodig voor vrienden. Zonder login werkt alles zoals altijd.
