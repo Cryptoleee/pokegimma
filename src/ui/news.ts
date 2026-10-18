@@ -53,18 +53,19 @@ const fmtDate = (id: string) => {
 /** Which video fits this screen: 9:16 on an upright phone, 16:9 otherwise (or whichever exists). */
 function pickVideo(v: NonNullable<NewsEntry['video']>) {
   const upright = matchMedia('(orientation: portrait)').matches
-  if (upright && v.tall) return { src: v.tall, tall: true }
-  if (v.wide) return { src: v.wide, tall: false }
-  return v.tall ? { src: v.tall, tall: true } : null
+  const tall = upright ? !!v.tall : !v.wide
+  const src = tall ? v.tall : v.wide
+  return src ? { src, tall, poster: tall ? v.poster?.tall : v.poster?.wide } : null
 }
 
-function entryHtml(e: NewsEntry, first: boolean) {
+/** `open`: shown in full (new to you); otherwise it sits under "Earlier updates" and loads nothing. */
+function entryHtml(e: NewsEntry, open: boolean) {
   const vid = e.video ? pickVideo(e.video) : null
   return `
-    <article class="nw-entry ${first ? 'first' : ''}">
+    <article class="nw-entry">
       <small class="nw-date">${fmtDate(e.id)}</small>
       <h3>${esc(tx(e.title))}</h3>
-      ${vid ? `<div class="nw-video ${vid.tall ? 'tall' : 'wide'}"><video src="${esc(vid.src)}" ${e.video?.poster ? `poster="${esc(e.video.poster)}"` : ''} controls playsinline preload="${first ? 'metadata' : 'none'}"></video></div>` : ''}
+      ${vid ? `<div class="nw-video ${vid.tall ? 'tall' : 'wide'}"><video src="${esc(vid.src)}" ${vid.poster ? `poster="${esc(vid.poster)}"` : ''} controls playsinline preload="${open ? 'metadata' : 'none'}"></video></div>` : ''}
       ${e.intro ? `<p class="nw-intro">${esc(tx(e.intro))}</p>` : ''}
       <ul class="nw-items">${e.items.map((it) => `<li><i>${it.icon}</i><span>${esc(tx(it.text))}</span></li>`).join('')}</ul>
     </article>`
@@ -73,14 +74,17 @@ function entryHtml(e: NewsEntry, first: boolean) {
 /** Open the update notes. */
 export function showNews(onClose?: () => void) {
   const modal = document.getElementById('modal')!
-  const [first, ...older] = NEWS
+  // Everything you haven't seen yet is open (at least the newest); the rest folds away
+  const seen = seenId()
+  const fresh = NEWS.filter((e, i) => i === 0 || e.id > seen)
+  const older = NEWS.slice(fresh.length)
   modal.classList.remove('hidden')
   modal.innerHTML = `
     <div class="panel nw">
       <button class="sheet-x nw-x" aria-label="${L('Close', 'Sluiten')}">✕</button>
       <div class="nw-head"><span>📰</span><b>${L('What’s new', 'Wat is er nieuw')}</b></div>
       <div class="nw-scroll">
-        ${entryHtml(first, true)}
+        ${fresh.map((e) => entryHtml(e, true)).join('')}
         ${older.length ? `<details class="nw-older"><summary>${L('Earlier updates', 'Eerdere updates')}</summary>${older.map((e) => entryHtml(e, false)).join('')}</details>` : ''}
       </div>
       <button class="btn nw-ok">${L('Let’s play!', 'Spelen maar!')}</button>

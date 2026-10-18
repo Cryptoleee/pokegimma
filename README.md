@@ -193,7 +193,7 @@ Gasten en accounts gebruiken dezelfde regels (`api/_progress.ts`). Een gast bewa
   - een titel en eventueel een intro, allebei als `['English', 'Nederlands']`;
   - een lijstje `items` met elk een icoon en een tekst.
 
-  Oudere updates blijven inklapbaar onder "Eerdere updates".
+  Alles wat je nog niet zag staat open (de nieuwste altijd). Wat je al zag, is ingeklapt onder "Eerdere updates".
 - **Video (optioneel, alleen bij grote updates):**
   1. Zet de bestanden in `public/news/`.
   2. Verwijs ernaar in het blok: `video: { wide: '/news/naam-16x9.mp4', tall: '/news/naam-9x16.mp4' }`.
@@ -203,7 +203,7 @@ Gasten en accounts gebruiken dezelfde regels (`api/_progress.ts`). Een gast bewa
   - **16:9** op desktop en liggend.
 
   Eén van de twee is ook genoeg. Gebruik MP4 (H.264 + AAC) van ongeveer 10 tot 20 MB.
-  - Een stilstaand beeld als voorvertoning kan met `poster: '/news/naam.jpg'`.
+  - Een stilstaand beeld als voorvertoning, één per formaat: `poster: { wide: '/news/naam-16x9.jpg', tall: '/news/naam-9x16.jpg' }`.
   - Speelt de video, dan gaat de muziek uit. Na het sluiten gaat die weer aan.
 
 ## Statistieken (voor de maker)

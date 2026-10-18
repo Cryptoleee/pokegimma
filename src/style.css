@@ -8632,3 +8632,9 @@ em.lock {
     gap: 8px;
   }
 }
+/* Two or more new updates at once: a clear break between them */
+.nw-scroll > .nw-entry + .nw-entry {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 2px solid rgba(255, 255, 255, 0.12);
+}
