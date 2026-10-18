@@ -28,6 +28,11 @@ export const NEWS: NewsEntry[] = [
       'Every match now counts. Level up, unlock new partners and trainers, and climb the world rankings.',
       'Elk potje telt nu. Stijg in level, speel nieuwe partners en trainers vrij en klim in de wereldranglijst.',
     ],
+    video: {
+      wide: '/news/progression-16x9.mp4',
+      tall: '/news/progression-9x16.mp4',
+      poster: { wide: '/news/progression-16x9.jpg', tall: '/news/progression-9x16.jpg' },
+    },
     items: [
       { icon: '⬆️', text: ['Trainer levels 1–50: XP for every match, with a breakdown on the results screen', 'Trainerlevels 1–50: XP voor elk potje, met een overzicht op het resultaatscherm'] },
       { icon: '🎁', text: ['Reward road: unlock 17 new partners like Infernape, Magnezone, Mamoswine and Salamence, and 14 trainers like Cynthia and Red', 'Reward road: speel 17 nieuwe partners vrij zoals Infernape, Magnezone, Mamoswine en Salamence, en 14 trainers zoals Cynthia en Red'] },
