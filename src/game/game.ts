@@ -224,6 +224,8 @@ export interface MatchSetup {
   theme?: ThemeId
   /** Raid boss. */
   boss?: BossId
+  /** Recording mode (solo only): your Pokémon starts fully evolved with every move. */
+  boost?: boolean
 }
 
 /** solo = everything local; host = simulates for remote players too; client = renders the host's state. */
@@ -349,6 +351,7 @@ export class Game {
       tr.human = true
       tr.pid = h.pid
       tr.party = h.team.slice(0, TEAM_SIZE).map((id, j) => this.ownMon(new Mon(id, 5, !!h.shiny && j === 0), tr))
+      if (setup.boost && mode === 'solo') tr.party.forEach((m) => this.fullyEvolve(m))
       this.trainers.push(tr)
       if (i === me) {
         this.player = tr
@@ -1683,12 +1686,8 @@ export class Game {
     }
   }
 
-  /** Evolution Crystal: straight to the final form, the level that takes, and all four moves. */
-  private evolutionSurge(tr: Trainer) {
-    const m = tr.mon.fainted ? tr.party.find((x) => !x.fainted) : tr.mon
-    if (!m) return
-    tr.crystal = true
-    const from = m.species
+  /** Straight to the final form, the level that takes (at least the last move's), and all four moves. */
+  private fullyEvolve(m: Mon) {
     let sp = m.species
     let lv = SLOT_UNLOCK[SLOT_UNLOCK.length - 1]
     for (let i = 0; i < 4 && sp.evo?.length; i++) {
@@ -1700,8 +1699,18 @@ export class Game {
     m.species = sp
     m.moves = movesetFor(sp.types, sp.id)
     m.hp = m.maxHp
-    m.evolveFx = 2.6
     preloadMon(sp.id, m.shiny)
+  }
+
+  /** Evolution Crystal: straight to the final form, the level that takes, and all four moves. */
+  private evolutionSurge(tr: Trainer) {
+    const m = tr.mon.fainted ? tr.party.find((x) => !x.fainted) : tr.mon
+    if (!m) return
+    tr.crystal = true
+    const from = m.species
+    this.fullyEvolve(m)
+    const sp = m.species
+    m.evolveFx = 2.6
     // A pillar of light, rainbow shockwaves and stars: everyone close by sees it
     const cols = ['#ff6080', '#ffd040', '#60f0a0', '#60c0ff', '#c080ff']
     this.vfx.glow(m.x, m.y - 1, 160, '#ffffff', 1)

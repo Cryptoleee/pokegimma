@@ -125,13 +125,13 @@ export async function runRewards(el: HTMLElement, reward: Promise<Reward | null>
     tabBtn?.classList.add('hidden')
     return
   }
-  const { outcome: o, progress: p, saved } = res
-  detail.innerHTML = detailHtml(o, saved)
+  const { outcome: o, progress: p, saved, showcase } = res
+  detail.innerHTML = detailHtml(o, saved || !!showcase)
 
   // Footer: what's next, or (guests) why to log in
   const shinyLeft = o.mastery.partner && masteryOf(o.mastery.xpTo).lv < SHINY_AT ? SHINY_AT - masteryOf(o.mastery.xpTo).lv : 0
   foot.innerHTML = `<button class="rw-more">${L('Details', 'Details')} ▸</button>`
-    + (!saved && accountStatus() === 'guest'
+    + (!saved && !showcase && accountStatus() === 'guest'
       ? `<button class="rw-login">💾 ${L('Log in to save & rank', 'Log in om op te slaan')}</button>`
       : nextUnlock(p)
         ? `<span class="rw-hint">🔓 ${L('Next', 'Volgende')}: ${esc(nextUnlock(p)!.kind === 'partner' ? SPECIES[Number(nextUnlock(p)!.id)]?.name ?? '' : trainerName(nextUnlock(p)!.id))} · Lv ${nextUnlock(p)!.lv}</span>`
@@ -146,7 +146,7 @@ export async function runRewards(el: HTMLElement, reward: Promise<Reward | null>
     sfx.select()
     login()
   })
-  note.textContent = saved ? L('Saved to your account', 'Opgeslagen in je account') : L('Saved on this device', 'Opgeslagen op dit apparaat')
+  note.textContent = showcase ? '' : saved ? L('Saved to your account', 'Opgeslagen in je account') : L('Saved on this device', 'Opgeslagen op dit apparaat')
 
   // XP counts up, then the bars fill
   countUp(box.querySelector('.rw-xp') as HTMLElement, o.total, (n) => `+${n} XP`)

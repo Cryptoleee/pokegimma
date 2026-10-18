@@ -206,6 +206,17 @@ Gasten en accounts gebruiken dezelfde regels (`api/_progress.ts`). Een gast bewa
   - Een stilstaand beeld als voorvertoning, één per formaat: `poster: { wide: '/news/naam-16x9.jpg', tall: '/news/naam-9x16.jpg' }`.
   - Speelt de video, dan gaat de muziek uit. Na het sluiten gaat die weer aan.
 
+## Opnamemodus (voor de maker)
+
+Voor trailers en update-video's: een tijdelijk profiel dat alleen in dat tabblad bestaat. Er wordt niets opgeslagen, er gaat niets naar de server en het telt niet mee voor de ranglijst.
+
+- **Opties:**
+  - `?showcase`: alles vrij (level 50, alle prestaties, shiny voor elke partner).
+  - `?showcase=boost`: hetzelfde, en in solo-potjes (battle royale en raid) start je Pokémon meteen volledig geëvolueerd op Lv 25 met alle vier de aanvallen. Handig voor legendaries en signature-ultimates.
+  - `?showcase=12` (elk level 1–49): je bent level 12, net onder 13. Je volgende potje geeft een level-up, en de bijbehorende unlock als dat level er een heeft. Bijvoorbeeld `?showcase=43` → Groudon.
+  - `?showcase=off`, of het tabblad sluiten: terug naar normaal.
+- **Alleen voor jou:** het werkt alleen op een apparaat waar je eens bent ingelogd op `/stats`. Het wachtwoord wordt één keer per tabblad bij de server gecontroleerd.
+
 ## Statistieken (voor de maker)
 
 `/stats` is een los paneel met anonieme tellingen: wie er nu online is (menu, lobby, battle royale of raid), spelers per dag en per maand, nieuwe spelers, potjes per modus, speeltijd, drukte per uur, populaire partners, bazen met hun winstpercentage, werelden, uitslagen, apparaat, taal en bronnen. Deel je link met `?via=naam` (bijv. `stormbreak.app/?via=tiktok`) en die bron telt apart.

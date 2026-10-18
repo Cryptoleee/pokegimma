@@ -31,7 +31,7 @@ import { L, onLangChange, tx } from './i18n'
 import { initStats, statsStateChanged, trackEnd, trackMatch } from './stats'
 import { accountState, accountStatus, initAccount, onAccount, onInvite, presenceChanged, type Invite, type Presence } from './account'
 import { hideInviteToast, showInviteToast } from './ui/friends'
-import { initProgress, matchEnded, matchStarted, onProgress, progress } from './progress'
+import { initProgress, matchEnded, matchStarted, onProgress, progress, showcaseBoost } from './progress'
 import { isUnlocked, levelOf, titleOf } from '../api/_progress'
 import { showProfile } from './ui/profile'
 
@@ -330,6 +330,7 @@ function loadingThen(setup: MatchSetup, skippable: boolean, start: () => void) {
 function startSolo() {
   if (team.length !== TEAM_SIZE) return toMenu()
   const setup = setupFor(choice, [me()])
+  if (showcaseBoost()) setup.boost = true
   const g = new Game(setup, 0, hooks(), 'solo')
   loadingThen(setup, true, () => enterMatch(g))
 }

@@ -3,7 +3,7 @@ import { L } from '../i18n'
 import { ALL_PARTNERS, SPECIES, spriteUrl } from '../data/pokemon'
 import { TRAINERS, trainerSpriteUrl } from '../data/trainers'
 import { accountState, accountStatus, login } from '../account'
-import { progress, onProgress, setCosmetics, signedIn, today } from '../progress'
+import { inShowcase, progress, onProgress, setCosmetics, signedIn, today } from '../progress'
 import { ACHIEVEMENTS, BOSS_IDS, dailyOf, isUnlocked, levelCost, nextUnlock, REWARD_ROAD, unlockLevel, emblemOf, levelOf, masteryOf, MAX_MASTERY, prevDay, SHINY_AT, titleOf, titlesOf, type Progress } from '../../api/_progress'
 
 /** Days in a row, still alive when you last played yesterday. */
@@ -42,7 +42,7 @@ function meTab(p: Progress, trainerSprite: string, name: string) {
   const lv = levelOf(p.xp)
   const s = p.stats
   const quests = dailyOf(p, today())
-  const guest = accountStatus() === 'guest'
+  const guest = accountStatus() === 'guest' && !inShowcase()
   return `
     <div class="pf-card pf-head">
       <img class="px pf-tr" src="${trainerSpriteUrl(trainerSprite)}" alt="">
@@ -193,7 +193,7 @@ async function fillRank(el: HTMLElement, board: string, period: string) {
   const meIn = d.me && d.top.some((r: RankRow) => r.id === d.me!.id)
   box.innerHTML = (d.top.length ? d.top.map((r: RankRow) => rankRow(r, r.id === d.me?.id)).join('') : `<div class="pf-empty">${L('Nobody yet. Be the first!', 'Nog niemand. Wees de eerste!')}</div>`)
     + (d.me && !meIn ? `<div class="pf-rank-sep">⋯</div>${rankRow(d.me, true)}` : '')
-    + (!signedIn() && accountStatus() === 'guest' ? `<div class="pf-guest pf-card"><span>🏆 ${L('Log in to appear in the rankings.', 'Log in om in de ranglijst te komen.')}</span><button class="rw-login pf-login">${L('Log in', 'Inloggen')}</button></div>` : '')
+    + (!signedIn() && accountStatus() === 'guest' && !inShowcase() ? `<div class="pf-guest pf-card"><span>🏆 ${L('Log in to appear in the rankings.', 'Log in om in de ranglijst te komen.')}</span><button class="rw-login pf-login">${L('Log in', 'Inloggen')}</button></div>` : '')
   box.querySelector('.pf-login')?.addEventListener('click', () => {
     sfx.select()
     login()
