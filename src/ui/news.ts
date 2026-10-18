@@ -98,7 +98,12 @@ export function showNews(onClose?: () => void) {
       if (!musicOff) playMusic(null)
       musicOff = true
     })
+  // Leaving home underneath (joining a friend, quick play found a lobby) closes the notes too
+  const scr = document.getElementById('screen')!
+  const leave = new MutationObserver(() => !scr.querySelector('.home') && close())
+  leave.observe(scr, { childList: true })
   const close = () => {
+    leave.disconnect()
     for (const v of videos) v.pause()
     if (musicOff) playMusic('menu')
     modal.classList.add('hidden')
@@ -133,7 +138,7 @@ export function maybeShowNews() {
   shownThisSession = true
   setTimeout(() => {
     // Only on a quiet home screen (no sheet or dialog open)
-    if (!document.querySelector('#screen > .home') || !document.getElementById('modal')!.classList.contains('hidden') || document.querySelector('.sheet.open')) return
+    if (!document.querySelector('#screen > .home') || !document.getElementById('modal')!.classList.contains('hidden') || document.querySelector('.sheet.open, #screen .home button:disabled')) return
     sfx.banner()
     showNews()
   }, 700)
