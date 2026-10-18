@@ -8425,3 +8425,210 @@ em.lock {
   white-space: normal;
   text-align: left;
 }
+
+/* ---------- What's new ---------- */
+.home-news {
+  position: relative;
+  font-size: 18px;
+}
+.home-news + .home-opts {
+  margin-left: 0;
+}
+.home-news.dot::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff4d5e;
+  border: 2px solid #1a1420;
+  box-shadow: 0 0 8px rgba(255, 77, 94, 0.8);
+  animation: nwDot 1.6s ease-in-out infinite;
+}
+@keyframes nwDot {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+}
+#modal .panel.nw {
+  position: relative;
+  width: min(480px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  color: #fff;
+  border-color: #ffd84a;
+  background: linear-gradient(#2a1d48, #120e22);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.4), 0 0 40px rgba(255, 216, 74, 0.15);
+}
+#modal .panel.nw.wide {
+  width: min(640px, 100%);
+}
+.nw-x {
+  top: 10px;
+  right: 10px;
+}
+.nw-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding-right: 44px;
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #ffd84a;
+}
+.nw-head span {
+  font-size: 20px;
+  letter-spacing: 0;
+}
+.nw-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.nw-date {
+  font-size: 11px;
+  letter-spacing: 1px;
+  opacity: 0.6;
+}
+.nw-entry h3 {
+  margin: 2px 0 10px;
+  font-size: 22px;
+  line-height: 1.15;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+}
+.nw-video {
+  margin: 0 auto 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+.nw-video video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+/* The video gets the screen height minus the rest of the panel (header, title, button) */
+#modal .panel.nw {
+  --nw-room: calc(100vh - 300px);
+  --nw-room: calc(100dvh - 300px);
+}
+/* 16:9: full width, but never taller than that room */
+.nw-video.wide {
+  aspect-ratio: 16 / 9;
+  width: min(100%, calc(var(--nw-room) * 16 / 9));
+}
+/* 9:16 (phones held upright): as tall as fits, centred */
+.nw-video.tall {
+  aspect-ratio: 9 / 16;
+  height: min(var(--nw-room), 560px);
+  width: calc(min(var(--nw-room), 560px) * 9 / 16);
+  max-width: 100%;
+}
+/* Landscape phones: a tighter panel so the video stays in view */
+@media (max-height: 500px) {
+  #modal .panel.nw {
+    gap: 6px;
+    padding: 10px 14px;
+    --nw-room: calc(100vh - 190px);
+    --nw-room: calc(100dvh - 190px);
+  }
+  .nw-head {
+    min-height: 30px;
+  }
+  .nw-x {
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+  }
+  .nw-entry h3 {
+    font-size: 18px;
+    margin-bottom: 6px;
+  }
+  .nw-video {
+    margin-bottom: 8px;
+  }
+  .nw-ok {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    font-size: 15px;
+  }
+}
+#modal p.nw-intro {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+.nw-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.nw-items li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 14px;
+  line-height: 1.35;
+}
+.nw-items i {
+  flex: none;
+  width: 24px;
+  font-style: normal;
+  font-size: 18px;
+  line-height: 1.1;
+  text-align: center;
+}
+.nw-older {
+  margin-top: 12px;
+}
+.nw-older summary {
+  cursor: pointer;
+  padding: 6px 0;
+  font-weight: 700;
+  opacity: 0.8;
+}
+.nw-older .nw-entry {
+  margin-top: 10px;
+  opacity: 0.85;
+}
+.nw-ok {
+  flex: none;
+  width: 100%;
+}
+/* Four buttons in the home bar: on narrow phones the logo gives way, not the buttons */
+.home-top > .sel-back,
+.home-top > .lang-sw {
+  flex: none;
+}
+.home-top .home-logo {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.home-top .home-logo img {
+  height: auto;
+  max-height: 30px;
+  max-width: 100%;
+}
+@media (max-width: 400px) {
+  .home-top {
+    gap: 8px;
+  }
+}

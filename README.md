@@ -185,6 +185,27 @@ Gasten en accounts gebruiken dezelfde regels (`api/_progress.ts`). Een gast bewa
   3. Zet in Vercel `DISCORD_CLIENT_ID` en `DISCORD_CLIENT_SECRET` en deploy opnieuw.
   Het gebruikt dezelfde Upstash Redis als de stats. Zonder deze variabelen is de vriendenkaart onzichtbaar.
 
+## Wat is er nieuw (update notes)
+
+- **Voor spelers:** op het home-scherm staat een 📰-knop, met een rode stip zolang er een update is die je nog niet zag. Terugkerende spelers krijgen een nieuwe update één keer vanzelf te zien. Nieuwe spelers niet: voor hen telt de huidige update als gezien.
+- **Een update toevoegen:** zet bovenaan `NEWS` in `src/data/news.ts` een nieuw blok. Het blok krijgt:
+  - een `id` die hoger is dan de vorige (de datum werkt prima, zoals `2026-11-02`);
+  - een titel en eventueel een intro, allebei als `['English', 'Nederlands']`;
+  - een lijstje `items` met elk een icoon en een tekst.
+
+  Oudere updates blijven inklapbaar onder "Eerdere updates".
+- **Video (optioneel, alleen bij grote updates):**
+  1. Zet de bestanden in `public/news/`.
+  2. Verwijs ernaar in het blok: `video: { wide: '/news/naam-16x9.mp4', tall: '/news/naam-9x16.mp4' }`.
+
+  De game kiest zelf:
+  - **9:16** op een rechtop gehouden telefoon;
+  - **16:9** op desktop en liggend.
+
+  Eén van de twee is ook genoeg. Gebruik MP4 (H.264 + AAC) van ongeveer 10 tot 20 MB.
+  - Een stilstaand beeld als voorvertoning kan met `poster: '/news/naam.jpg'`.
+  - Speelt de video, dan gaat de muziek uit. Na het sluiten gaat die weer aan.
+
 ## Statistieken (voor de maker)
 
 `/stats` is een los paneel met anonieme tellingen: wie er nu online is (menu, lobby, battle royale of raid), spelers per dag en per maand, nieuwe spelers, potjes per modus, speeltijd, drukte per uur, populaire partners, bazen met hun winstpercentage, werelden, uitslagen, apparaat, taal en bronnen. Deel je link met `?via=naam` (bijv. `stormbreak.app/?via=tiktok`) en die bron telt apart.

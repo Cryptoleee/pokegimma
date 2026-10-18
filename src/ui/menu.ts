@@ -14,6 +14,7 @@ import { bindLangSwitch, L, langSwitch } from '../i18n'
 import { accountStatus, onAccount } from '../account'
 import { friendsCard, openFriends, openInvite, paintFriendsCard } from './friends'
 import { homeBadge } from './profile'
+import { maybeShowNews, newsButton, showNews } from './news'
 import { onProgress, progress } from '../progress'
 import { titleName } from '../data/rewards'
 import { masteryOf, SHINY_AT } from '../../api/_progress'
@@ -125,6 +126,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
         <button class="sel-back" aria-label="${L('Back to the title screen', 'Terug naar het titelscherm')}">◀</button>
         <div class="home-logo"><img src="${logoSmall}" alt="Stormbreak Royale"></div>
         ${langSwitch('home-lang')}
+        ${newsButton()}
         <button class="sel-back home-opts" aria-label="${L('Options', 'Opties')}">⚙️</button>
       </div>
       <div class="home-stage">
@@ -220,8 +222,9 @@ export function showMenu(st: MenuState, on: MenuActions) {
       fn()
     })
 
-  click('.sel-back:not(.home-opts)', on.back)
+  click('.sel-back:not(.home-opts):not(.home-news)', on.back)
   click('.home-opts', showOptions)
+  click('.home-news', () => showNews())
   // The whole home re-renders on a language change (main listens to onLangChange)
   bindLangSwitch(el.querySelector('.home-top')!, () => sfx.select())
   el.querySelector('.home-rejoin')?.addEventListener('click', () => {
@@ -309,6 +312,8 @@ export function showMenu(st: MenuState, on: MenuActions) {
   if (st.friends) fcard.click()
   if (st.busy) busy(st.busy)
   else if (!profile().name && !st.friends) setTimeout(() => name.focus(), 300)
+  // A new update: shown once to returning players (only on a quiet home)
+  if (!sheetOpen && !st.friends) maybeShowNews()
 }
 
 /** Home: the live "players online" line on the quick play button. */
