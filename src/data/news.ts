@@ -12,7 +12,7 @@
 type T = [en: string, nl: string]
 
 export interface NewsEntry {
-  /** Unique and increasing (the date works fine), used to remember what you've seen. */
+  /** Unique and increasing (the date works fine), used to remember what you've seen. Add a letter to show a post to everyone again ('2026-10-18b'). */
   id: string
   title: T
   intro?: T
@@ -22,7 +22,7 @@ export interface NewsEntry {
 
 export const NEWS: NewsEntry[] = [
   {
-    id: '2026-10-18',
+    id: '2026-10-18b',
     title: ['The Progression Update', 'De progressie-update'],
     intro: [
       'Every match now counts. Level up, unlock new partners and trainers, and climb the world rankings.',
