@@ -197,7 +197,7 @@ Gasten en accounts gebruiken dezelfde regels (`api/_progress.ts`). Een gast bewa
   - **Signature-ultimates:** elke nieuwe lijn heeft een eigen ultimate met een eigen kleur, zoals Flare Blitz, Zap Cannon, Avalanche, Origin Pulse, Precipice Blades en Psystrike.
     - Even sterk als een normale ultimate, maar met een lichtzuil bij het afvuren, drie schokgolven en een sterrenregen bij de inslag.
     - Hun gewone aanvallen hebben accentvonken, en in het veld hebben ze een aura.
-  - **Ontwaken:** Pokémon die niet evolueren (legendarisch, Absol, Aerodactyl) beginnen op 45% van hun kracht en groeien met elk level. Legendarisch eindigt rond Lv 24 op het niveau van een Garchomp. Zo blijft PvP eerlijk.
+  - **Ontwaken:** Pokémon die niet evolueren groeien met elk level naar hun kracht. Legendarisch begint op 43% en eindigt rond Lv 27 op 85% (het niveau van een Garchomp); Absol en Aerodactyl beginnen op 65% en zijn op Lv 21 op volle kracht. Een gevangen wilde legendary ontwaakt net zo, en komt in je team één level onder je sterkste Pokémon. Zo blijft PvP eerlijk.
   - Op slot zie je ze met het level waarop ze vrijkomen. Het profiel heeft een tabblad "Vrijspelen" met de hele road.
   - De volgorde staat in `REWARD_ROAD` in `api/_progress.ts`; de signature-aanvallen in `SIGNATURE` in `src/data/moves.ts`.
 - **Titels:** per level (Beginner → Stormbreker), via prestaties en via mastery. Je kiest zelf welke titel je laat zien in je profiel. Je level en titel staan in de lobby.

@@ -12,7 +12,7 @@ import { BOT_TRAINERS, TRAINERS } from '../data/trainers'
 import { effectiveness, TYPE_COLOR } from '../data/types'
 import { cry, sfx } from '../audio'
 import type { ItemSound } from '../moveSfx'
-import { LEVEL_CAP, Mon, Trainer, xpNeeded, type AimDir, AWAKENS } from './entities'
+import { LEVEL_CAP, Mon, Trainer, xpNeeded, type AimDir, AWAKENS, AWAKEN_LEGEND } from './entities'
 import { Rng } from './rng'
 import { preloadMon } from './sprites'
 import { MAP, T, World } from './world'
@@ -264,6 +264,8 @@ export interface Viewer {
 }
 
 const RARITY_XP: Record<Rarity, number> = { common: 1, uncommon: 1.4, rare: 2.5, legendary: 5 }
+/** KO XP by level difference: 8% per level, between 40% and 160%. */
+const levelGap = (victim: number, killer: number) => Math.max(0.4, Math.min(1.6, 1 + (victim - killer) * 0.08))
 /** Seconds out of combat before HP starts regenerating, and regen rates (fraction of max HP / s). */
 const REGEN_DELAY = 3
 const REGEN_ACTIVE = 0.12
@@ -1366,7 +1368,8 @@ export class Game {
     if (m.boss) return
     if (this.raid && m.owner) return raidDown(this, m.owner)
     if (this.duel && m.owner) return duelDown(this, m.owner)
-    const koXp = (8 + m.level * 1.8) * RARITY_XP[m.rarity]
+    // Knocking out something weaker than you is worth less, something stronger more (no runaway snowball)
+    const koXp = (8 + m.level * 1.8) * RARITY_XP[m.rarity] * (by ? levelGap(m.level, by.level) : 1)
     if (!m.owner) {
       m.state = 'weak'
       m.weakT = m.legendary ? 15 : 9
@@ -1623,19 +1626,28 @@ export class Game {
     w.owner = tr
     w.state = 'roam'
     w.aggro = null
+    // A caught legendary awakens like a legendary partner: about three quarters of its
+    // power when it joins, growing to the same cap (a prize, not an instant win)
+    // It also joins just below your level (the wild one is tougher than you, to make the catch a fight)
+    if (w.legendary) {
+      tr.legends++
+      w.awaken = AWAKEN_LEGEND
+      w.legendary = false
+      w.level = Math.min(w.level, Math.max(...tr.party.map((m) => m.level)) - 1)
+      w.xp = 0
+    }
     w.hp = w.maxHp
     w.cds = [0, 0, 0, 0]
     w.x = tr.x
     w.y = tr.y + 0.4
     tr.caught++
-    if (w.legendary) tr.legends++
     preloadMon(w.species.id, w.shiny)
     const v = this.vOf(tr)
     if (v) {
       v.sfx('catch')
       v.cry(w.species.id, 0.3)
     }
-    if (w.legendary || w.rarity === 'rare')
+    if (w.rarity === 'legendary' || w.rarity === 'rare')
       for (const o of this.viewers) o.hooks.feed(both(`${tr === o.tr ? 'You' : tr.name} caught ${w.shiny ? '✦' : ''}${w.name}!`, `${tr === o.tr ? 'Jij' : tr.name} ving ${w.shiny ? '✦' : ''}${w.name}!`))
     if (tr.party.length < PARTY_MAX) {
       tr.party.push(w)

@@ -122,9 +122,12 @@ export class Mon {
     this.legendary = this.rarity === 'legendary'
   }
 
-  /** Awakening partners: 45% of their power at the start, all of it (up to the cap) by about Lv 24–33. */
+  /**
+   * Awakening partners grow into their power: legendaries from 43% (their cap by about
+   * Lv 27), the others from 65% (all of it by Lv 21), so they keep up early on.
+   */
   get power() {
-    return this.awaken ? Math.min(this.awaken, 0.45 + this.level / 60) : 1
+    return this.awaken ? Math.min(this.awaken, this.awaken === AWAKEN_LEGEND ? 0.43 + this.level / 65 : 0.65 + this.level / 60) : 1
   }
   get maxHp() {
     if (this.boss) return statHp(this.species, this.level) * this.bossMul
