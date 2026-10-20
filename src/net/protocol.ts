@@ -1,3 +1,4 @@
+import type { StadiumId } from '../data/stadiums'
 import type { AimDir, Dir } from '../game/entities'
 import type { MatchKind, MatchSetup } from '../game/game'
 import type { ThemeId } from '../data/themes'
@@ -20,6 +21,8 @@ export interface LobbyPlayer {
 export interface MatchChoice {
   kind: MatchKind
   theme: ThemeId | 'random'
+  /** 1 vs 1 stadium. */
+  stadium?: StadiumId | 'random'
 }
 
 /** A chat line (lobby and in-game). */

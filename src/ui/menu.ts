@@ -15,6 +15,7 @@ import { accountStatus, onAccount } from '../account'
 import { friendsCard, openFriends, openInvite, paintFriendsCard } from './friends'
 import { homeBadge } from './profile'
 import { maybeShowNews, newsButton, showNews } from './news'
+import { STADIUM_LIST, STADIUMS } from '../data/stadiums'
 import { onProgress, progress } from '../progress'
 import { titleName } from '../data/rewards'
 import { masteryOf, SHINY_AT } from '../../api/_progress'
@@ -64,7 +65,13 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
         <button data-kind="duel" class="${c.kind === 'duel' ? 'on' : ''}" ${ro ? 'disabled' : ''}><b>1 vs 1</b><small>${L('duel · best of 3', 'duel · best of 3')}</small></button>
         <button data-kind="raid" class="${c.kind === 'raid' ? 'on' : ''}" ${ro ? 'disabled' : ''}><b>Raid</b><small>${L('team up against a boss', 'samen tegen een eindbaas')}</small></button>
       </div>
-      ${c.kind !== 'raid'
+      ${c.kind === 'duel'
+        ? `<div class="cp-worlds">${(['random', ...STADIUM_LIST] as const).map((id) => {
+            const st = id === 'random' ? null : STADIUMS[id]
+            const th = st ? THEMES[st.theme] : null
+            return `<button data-stadium="${id}" class="${(c.stadium ?? 'random') === id ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${th ? th.grass[0] : '#5a6a9a'};--c2:${th ? th.tall[0] : '#3a4470'}"><i>${st ? st.icon : '🎲'}</i>${st ? st.name : L('Random', 'Willekeurig')}</button>`
+          }).join('')}</div>`
+        : c.kind !== 'raid'
         ? `<div class="cp-worlds">${(['random', ...ROYALE_THEMES] as const).map((t) => {
             const th = t === 'random' ? null : THEMES[t]
             return `<button data-theme="${t}" class="${c.theme === t ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${th ? th.grass[0] : '#5a6a9a'};--c2:${th ? th.tall[0] : '#3a4470'}"><i>${th ? th.icon : '🎲'}</i>${th ? th.name : L('Random', 'Willekeurig')}</button>`
@@ -77,6 +84,7 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
         const c = { ...get() }
         if (b.dataset.kind) c.kind = b.dataset.kind as MatchChoice['kind']
         if (b.dataset.theme) c.theme = b.dataset.theme as MatchChoice['theme']
+        if (b.dataset.stadium) c.stadium = b.dataset.stadium as MatchChoice['stadium']
         set(c)
         paint()
       }),

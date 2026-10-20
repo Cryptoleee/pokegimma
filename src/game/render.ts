@@ -7,7 +7,7 @@ import { animSprite, frameAt, getSprite, itemUrl, monSprite } from './sprites'
 import { trainerSpriteUrl } from '../data/trainers'
 import { drawCharge, drawChargeCore, drawDashAura, drawIncoming, drawMelee, drawProjectile, pal } from './moveFx'
 import { drawGlow } from './vfx'
-import { T, TILE } from './world'
+import { ARENA_C, SKIN, standCell, standPerson, T, TILE } from './world'
 import { FLOWER_FRAMES, hash, TALL_FRAMES, TALL_TOP, tileArt, WATER_FRAMES } from './tiles'
 import type { Weather } from '../data/themes'
 import { drawEvents } from './events'
@@ -63,6 +63,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   const sw = Math.min(g.world.ground.width - sx, Math.ceil(vw) + 3)
   const sh = Math.min(g.world.ground.height - sy, Math.ceil(vh) + 3)
   ctx.drawImage(g.world.ground, sx, sy, sw, sh, sx, sy, sw, sh)
+  if (g.world.stadium) drawCrowd(g, ctx, sx, sy, sw, sh, performance.now() / 1000)
 
   const inView = (x: number, y: number, m = 3) =>
     x * TILE > ox - m * TILE && x * TILE < ox + vw + m * TILE && y * TILE > oy - m * TILE && y * TILE < oy + vh + m * TILE
@@ -135,10 +136,10 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   for (const tr of g.trainers) if (tr.throwFx) drawThrow(ctx, tr.throwFx)
 
   // Cloud shadows drift across the land (not in caves and craters)
-  if (!g.world.arena) drawClouds(ctx, ox, oy, vw, vh, time)
+  if (!g.world.arena && !g.world.stadium) drawClouds(ctx, ox, oy, vw, vh, time)
 
   // Storm: tinted, rain-swept outside, a crackling energy wall on the edge
-  if (g.kind === 'royale' || g.kind === 'duel') drawStorm(g, ctx, ox, oy, vw, vh, time)
+  if (g.kind === 'royale') drawStorm(g, ctx, ox, oy, vw, vh, time)
 
   // Weather and ambient particles
   drawWeather(theme.weather, ctx, ox, oy, vw, vh, time, phaseLook(g)?.weather ?? 1)
@@ -808,6 +809,41 @@ function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number
   ctx.strokeText(text, x, y)
   ctx.fillStyle = col
   ctx.fillText(text, x, y)
+}
+
+/**
+ * 1 vs 1: the crowd comes alive. A wave runs round the stadium, people jump up
+ * now and then, and the whole place cheers when a round is decided.
+ */
+function drawCrowd(g: Game, ctx: CanvasRenderingContext2D, sx: number, sy: number, sw: number, sh: number, now: number) {
+  const s = g.world.stadium!
+  const ph = g.duelView?.phase
+  const cheer = ph === 'break' || ph === 'over'
+  const wave = (now * 0.9) % (Math.PI * 2)
+  const t0x = Math.floor(sx / TILE), t0y = Math.floor(sy / TILE)
+  for (let ty = t0y; ty <= t0y + Math.ceil(sh / TILE); ty++)
+    for (let tx = t0x; tx <= t0x + Math.ceil(sw / TILE); tx++) {
+      if (g.world.at(tx, ty) !== T.STAND) continue
+      const cell = standCell(tx, ty, s)
+      if (cell.row < 1 || cell.row > 8) continue
+      // How close this spot is to the wave going round
+      let da = Math.atan2(ty + 0.5 - ARENA_C, tx + 0.5 - ARENA_C) - wave
+      da = Math.abs(Math.atan2(Math.sin(da), Math.cos(da)))
+      for (let k = 0; k < 4; k++) {
+        const p = standPerson(tx, ty, k, cell.vertical)
+        if (!p) continue
+        const [dx, dy, h] = p
+        const up = cheer ? Math.sin(now * 14 + h * 40) > -0.2 : da < 0.22 || Math.sin(now * 3 + h * 90) > 0.97
+        if (!up) continue
+        // Up on their feet: head a pixel higher, both hands in the air
+        const x = tx * TILE + dx, y = ty * TILE + dy
+        const skin = SKIN[Math.floor(hash(tx, ty, 80 + k) * SKIN.length)]
+        ctx.fillStyle = skin
+        ctx.fillRect(x + 1, y - 1, 2, 3)
+        ctx.fillRect(x - 1, y - 1, 1, 3)
+        ctx.fillRect(x + 4, y - 1, 1, 3)
+      }
+    }
 }
 
 /** 1 vs 1: the power-up pads, with a ring that fills up until the next power-up. */

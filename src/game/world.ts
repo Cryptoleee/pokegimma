@@ -1,5 +1,6 @@
 import { Rng } from './rng'
 import { THEMES, type ThemeId, type WorldTheme } from '../data/themes'
+import { STADIUMS, type StadiumDef, type StadiumId } from '../data/stadiums'
 import { hash, mix, paintGrass, shade, tallBed, tileArt, tone } from './tiles'
 
 export const TILE = 16
@@ -15,6 +16,8 @@ export enum T {
   PILLAR,
   /** Arena only (Stormtop): a lightning rod, blocks movement. */
   ROD,
+  /** 1 vs 1 stadium: the stands around the field (blocks movement). */
+  STAND,
 }
 
 export interface House {
@@ -40,15 +43,16 @@ export type ArenaKind = 'crater' | 'icecave' | 'plateau' | 'sky' | 'lab'
 export interface WorldOpts {
   theme?: ThemeId
   arena?: ArenaKind
-  /** 1 vs 1: a small clearing in the theme's own style. */
-  duel?: boolean
+  /** 1 vs 1 stadium (instead of the clearing). */
+  stadium?: StadiumId
 }
 
 /** Arena centre and radius (tiles). */
 export const ARENA_C = MAP / 2
 export const ARENA_R = 15
-/** 1 vs 1 arena radius (tiles), around ARENA_C. */
-export const DUEL_R = 12
+/** 1 vs 1 stadium field: half its width and height (tiles), around ARENA_C. */
+export const FIELD_W = 10
+export const FIELD_H = 13
 
 export class World {
   tiles = new Uint8Array(MAP * MAP)
@@ -74,12 +78,15 @@ export class World {
   /** 1 vs 1: power-up pads (centre first) and the two spawn spots. */
   pads: { x: number; y: number }[] = []
   spawns: [number, number][] = []
+  /** 1 vs 1 stadium this world is (null elsewhere). */
+  stadium: StadiumDef | null = null
 
   constructor(public rng: Rng, opts: WorldOpts = {}) {
-    this.theme = THEMES[opts.theme ?? (opts.arena ?? 'forest')]
+    const st = opts.stadium ? STADIUMS[opts.stadium] : null
+    this.theme = st ? { ...THEMES[st.theme], weather: st.weather } : THEMES[opts.theme ?? (opts.arena ?? 'forest')]
     this.arena = opts.arena ?? null
     if (this.arena) this.generateArena(this.arena)
-    else if (opts.duel) this.generateDuel()
+    else if (st) this.generateStadium(st)
     else this.generate()
     this.render()
   }
@@ -96,7 +103,7 @@ export class World {
 
   blockedTile(tx: number, ty: number): boolean {
     const t = this.at(tx, ty)
-    return t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR || t === T.ROD
+    return t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR || t === T.ROD || t === T.STAND
   }
 
   /** World coords are in tiles (floats). */
@@ -159,7 +166,7 @@ export class World {
     this.tall = []
     for (let i = 0; i < MAP * MAP; i++) {
       const t = this.tiles[i]
-      const walk = !(t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR || t === T.ROD)
+      const walk = !(t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR || t === T.ROD || t === T.STAND)
       if (walk && !seen[i]) this.tiles[i] = T.TREE
       else if (walk) {
         this.walkable.push(i)
@@ -169,45 +176,73 @@ export class World {
   }
 
   /**
-   * 1 vs 1: a round clearing in the woods. Everything is mirrored through the
-   * centre, so both spawns see the same grass, rocks and power-up pads.
+   * 1 vs 1 stadium: a rectangular battle field with stands all around. Every
+   * layout is mirrored through the centre, so both trainers get the same field.
    */
-  private generateDuel() {
-    const rng = this.rng
-    const c = ARENA_C, R = DUEL_R
-    this.tiles.fill(T.TREE)
-    for (let y = 0; y < MAP; y++)
-      for (let x = 0; x < MAP; x++) {
-        const dx = x + 0.5 - c, dy = y + 0.5 - c
-        const d = Math.hypot(dx, dy)
-        if (d > R + Math.cos(Math.atan2(dy, dx) * 6) * 0.6) continue
-        // The stadium circle in the middle
-        this.set(x, y, d > 2.6 && d < 3.4 ? T.PATH : T.GRASS)
-      }
-    // Tile (x, y) and its mirror image through the centre
-    const both = (x: number, y: number, t: T) => {
-      this.set(x, y, t)
-      this.set(2 * c - 1 - x, 2 * c - 1 - y, t)
+  private generateStadium(def: StadiumDef) {
+    const c = ARENA_C, W = FIELD_W, H = FIELD_H
+    this.stadium = def
+    this.tiles.fill(T.STAND)
+    const floor = def.id === 'desert' || def.id === 'volcano' || def.id === 'water' ? T.SAND : T.GRASS
+    for (let y = c - H; y < c + H; y++) for (let x = c - W; x < c + W; x++) this.set(x, y, floor)
+    // (dx, dy) from the centre, plus its mirror image
+    const both = (dx: number, dy: number, t: T) => {
+      this.set(c + dx, c + dy, t)
+      this.set(c - 1 - dx, c - 1 - dy, t)
     }
-    const blob = (cx: number, cy: number, r: number, t: T) => {
-      for (let y = Math.floor(c + cy - r); y <= c + cy + r; y++)
-        for (let x = Math.floor(c + cx - r); x <= c + cx + r; x++)
-          if (Math.hypot(x + 0.5 - c - cx, y + 0.5 - c - cy) <= r && this.at(x, y) === T.GRASS) both(x, y, t)
+    const rect = (dx: number, dy: number, w: number, h: number, t: T) => {
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) both(dx + i, dy + j, t)
     }
-    // Tall grass to hide in: a big patch on each flank, a small one by each spawn
-    blob(-7.5, -3, 2.4, T.TALL)
-    blob(-4.5, 6.5, 1.7, T.TALL)
-    // Boulders for cover: two by the middle, one beside each spawn
-    both(Math.floor(c - 3), Math.floor(c - 2), T.ROCK)
-    both(Math.floor(c + 5.5), Math.floor(c + 7.5), T.ROCK)
-    // Flowers here and there
-    for (let y = c - R; y < c; y++)
-      for (let x = c - R; x < c + R; x++)
-        if (this.at(x, y) === T.GRASS && Math.hypot(x + 0.5 - c, y + 0.5 - c) > 4 && rng.next() < 0.035) both(x, y, T.FLOWER)
-    this.pads = [{ x: c, y: c }, { x: c - 8, y: c + 3.5 }, { x: c + 8, y: c - 3.5 }]
-    this.spawns = [[c, c + 9], [c, c - 9]]
-    for (const p of this.pads) this.set(Math.floor(p.x), Math.floor(p.y), this.at(Math.floor(p.x), Math.floor(p.y)) === T.PATH ? T.PATH : T.GRASS)
-    this.collect(c, c)
+    switch (def.id) {
+      case 'classic':
+        // Hedges along the side walls, statues beside the centre circle
+        rect(-10, -8, 2, 4, T.TALL)
+        rect(-10, 4, 2, 4, T.TALL)
+        both(-5, -1, T.ROCK)
+        both(-4, -7, T.ROCK)
+        break
+      case 'desert':
+        // Boulder clusters and dry grass
+        rect(-7, -2, 2, 1, T.ROCK)
+        both(-7, -1, T.ROCK)
+        rect(2, -8, 2, 1, T.ROCK)
+        rect(-9, 5, 3, 2, T.TALL)
+        rect(4, 1, 2, 2, T.TALL)
+        break
+      case 'ice':
+        // A rink in the middle (slippery), snow around it; snowy bushes in the corners
+        for (let y = c - 9; y < c + 9; y++) for (let x = c - 7; x < c + 7; x++) this.set(x, y, T.ICE)
+        rect(-10, -13, 3, 2, T.TALL)
+        rect(8, -13, 2, 3, T.TALL)
+        both(-8, -2, T.ROCK)
+        both(-3, -6, T.ROCK)
+        break
+      case 'water':
+        // Two pools split the field, a bridge over each, reeds along the sides
+        rect(-8, -4, 6, 8, T.WATER)
+        rect(-8, -1, 6, 1, T.BRIDGE)
+        rect(-10, -4, 1, 8, T.TALL)
+        both(-5, -9, T.ROCK)
+        break
+      case 'volcano':
+        // Lava pools (block the way, not attacks) and obsidian rocks
+        rect(-10, -6, 6, 2, T.WATER)
+        rect(-4, -6, 1, 1, T.WATER)
+        rect(-2, -2, 1, 1, T.ROCK)
+        rect(-9, 2, 2, 3, T.TALL)
+        both(-7, -10, T.ROCK)
+        break
+    }
+    this.pads = [{ x: c, y: c }, { x: c - 6.5, y: c + 4.5 }, { x: c + 6.5, y: c - 4.5 }]
+    if (def.id === 'water') this.pads = [{ x: c, y: c }, { x: c - 8.5, y: c + 6.5 }, { x: c + 8.5, y: c - 6.5 }]
+    this.spawns = [[c, c + 10.5], [c, c - 10.5]]
+    // Pads and spawns always stand on open floor
+    for (const p of [...this.pads, ...this.spawns.map(([x, y]) => ({ x, y }))]) {
+      const tx = Math.floor(p.x), ty = Math.floor(p.y)
+      const t = this.at(tx, ty)
+      if (t !== T.ICE && t !== T.BRIDGE) this.set(tx, ty, floor)
+    }
+    this.collect(c, c + 10)
   }
 
   /** A round raid arena in the middle of a walled-off map. */
@@ -419,9 +454,13 @@ export class World {
       for (let tx = 0; tx < MAP; tx++) {
         const t = this.at(tx, ty)
         const x = tx * TILE, y = ty * TILE
+        if (t === T.STAND) {
+          paintStand(g, x, y, tx, ty, this.stadium!)
+          continue
+        }
         // Open-world maps get the detailed BW tiles; raid arenas keep their own floors
         const fancy = !this.arena
-        if (t === T.ICE || t === T.PILLAR) drawIce(g, x, y, th, tx, ty)
+        if (t === T.ICE || t === T.PILLAR) drawIce(g, x, y, this.stadium ? RINK : th, tx, ty)
         else if (this.arena === 'lab' && t !== T.TREE) drawLabFloor(g, x, y, th, tx, ty)
         else if (this.arena === 'sky' && t !== T.TREE) drawSkyStone(g, x, y, th, tx, ty, t === T.SAND)
         else if (fancy) paintGrass(g, x, y, tx, ty, th)
@@ -457,6 +496,7 @@ export class World {
           o.drawImage(c, tx * TILE - ax + jx, ty * TILE + TILE - c.height + (th.decor === 'oak' ? -4 : th.decor === 'pine' ? -5 : th.decor === 'dead' ? -1 : 0) + jy)
         }
     }
+    if (this.stadium) paintField(g, this)
     for (const h of this.houses) (this.arena ? drawHouse : paintHouse)(g, o, h)
     for (const p of this.pillars) if (p.hp > 0) drawPillar(g, o, p.x * TILE, p.y * TILE)
     for (const v of this.vents) drawVent(g, v.x * TILE, v.y * TILE)
@@ -469,7 +509,7 @@ export class World {
     const col: Record<number, string> = {
       [T.GRASS]: mc.grass, [T.TALL]: mc.tall, [T.PATH]: mc.path, [T.SAND]: mc.sand, [T.WATER]: mc.water,
       [T.TREE]: mc.tree, [T.ROCK]: '#909098', [T.HOUSE]: '#e05848', [T.FLOWER]: mc.grass, [T.BRIDGE]: '#c09060',
-      [T.LAVA]: '#ff7020', [T.ICE]: '#cce8f8', [T.PILLAR]: '#ffffff', [T.ROD]: '#ffe060',
+      [T.LAVA]: '#ff7020', [T.ICE]: '#cce8f8', [T.PILLAR]: '#ffffff', [T.ROD]: '#ffe060', [T.STAND]: '#303040',
     }
     for (let ty = 0; ty < MAP; ty++)
       for (let tx = 0; tx < MAP; tx++) {
@@ -477,6 +517,176 @@ export class World {
         m.fillRect(tx, ty, 1, 1)
       }
   }
+}
+
+// ---------- 1 vs 1 stadium ----------
+
+/** The ice rink in a stadium: blue-white, so it stands out from the snow around it. */
+const RINK = { ...THEMES.snow, grass: ['#cce6f8', '#9ccaee', '#f0f9ff'] as [string, string, string] }
+export const SKIN = ['#f8d0b0', '#e8b088', '#c08860', '#8a5a3a', '#f0c8a0']
+const SHIRTS = ['#e84848', '#4878e8', '#f8d040', '#58c058', '#f0f0f0', '#a058d8', '#f08838', '#40c8c8', '#303040']
+
+/**
+ * The stands: the wall with ad boards right at the field, then rows of seats
+ * full of people (your side's colour at the bottom, theirs at the top), then
+ * the dark back of the stadium.
+ */
+export function standCell(tx: number, ty: number, s: StadiumDef) {
+  const c = ARENA_C
+  const ox = Math.abs(tx + 0.5 - c) - FIELD_W, oy = Math.abs(ty + 0.5 - c) - FIELD_H
+  const vertical = ox > oy
+  return { row: Math.floor(Math.max(ox, oy)), vertical, seat: vertical ? s.seats[2] : ty < c ? s.seats[1] : s.seats[0] }
+}
+
+/** Where the k-th person (0-3) of a stand tile sits, if anyone does (same in the baked stands and the live crowd). */
+export function standPerson(tx: number, ty: number, k: number, vertical: boolean): [number, number, number] | null {
+  const h = hash(tx, ty, 60 + k)
+  if (h > 0.66) return null
+  const a = (k % 2) * 8 + 2, b = Math.floor(k / 2) * 8 + 1
+  return [vertical ? b + 1 : a, vertical ? a : b, h]
+}
+
+function paintStand(g: CanvasRenderingContext2D, x: number, y: number, tx: number, ty: number, s: StadiumDef) {
+  const { row, vertical, seat } = standCell(tx, ty, s)
+  if (row === 0) {
+    // The wall: ad boards in turn, white lettering, a shadow on the field side
+    const along = vertical ? ty : tx
+    const board = Math.floor(along / 3) % 3
+    const col = [seat, '#f8f8f8', '#283048'][board]
+    g.fillStyle = '#20202c'
+    g.fillRect(x, y, TILE, TILE)
+    g.fillStyle = col
+    if (vertical) g.fillRect(x + 3, y, 10, TILE)
+    else g.fillRect(x, y + 3, TILE, 10)
+    g.fillStyle = board === 1 ? seat : '#ffffff'
+    const k = hash(tx, ty, 41)
+    for (let i = 0; i < 3; i++) {
+      const len = 2 + Math.floor(hash(tx, ty, 42 + i) * 3)
+      if (vertical) g.fillRect(x + 6 + (i % 2) * 3, y + 2 + i * 4 + Math.floor(k * 2), 2, len)
+      else g.fillRect(x + 2 + i * 5 + Math.floor(k * 2), y + 6 + (i % 2) * 3, len, 2)
+    }
+    return
+  }
+  if (row > 8) {
+    // The back of the stadium: dark, with a lamp here and there
+    g.fillStyle = row > 9 ? '#12121c' : '#1c1c28'
+    g.fillRect(x, y, TILE, TILE)
+    if (row === 10 && hash(tx, ty, 50) < 0.12) {
+      g.fillStyle = '#fff8d0'
+      g.fillRect(x + 4, y + 5, 8, 6)
+    }
+    return
+  }
+  // Seats: two rows per tile, a step line between rows, higher rows a little lighter
+  const lift = Math.min(0.3, row * 0.035)
+  const base = mix('#14141c', seat, 0.3 + lift), chair = mix('#14141c', seat, 0.55 + lift), step = mix('#0c0c12', seat, 0.15)
+  g.fillStyle = base
+  g.fillRect(x, y, TILE, TILE)
+  for (let k = 0; k < 2; k++) {
+    g.fillStyle = step
+    if (vertical) g.fillRect(x + k * 8 + 7, y, 1, TILE)
+    else g.fillRect(x, y + k * 8 + 7, TILE, 1)
+    g.fillStyle = chair
+    // Two chairs per row
+    for (let j = 0; j < 2; j++) {
+      if (vertical) g.fillRect(x + k * 8 + 2, y + j * 8 + 1, 4, 6)
+      else g.fillRect(x + j * 8 + 1, y + k * 8 + 2, 6, 4)
+    }
+  }
+  // People: about two thirds of the chairs, mostly in their side's colour
+  for (let k = 0; k < 4; k++) {
+    const p = standPerson(tx, ty, k, vertical)
+    if (!p) continue
+    const [dx, dy, h] = p
+    const px = x + dx, py = y + dy
+    const shirt = h < 0.36 ? seat : h < 0.46 ? '#f4f4f4' : SHIRTS[Math.floor(hash(tx, ty, 70 + k) * SHIRTS.length)]
+    g.fillStyle = shirt
+    g.fillRect(px, py + 3, 4, 3)
+    g.fillStyle = SKIN[Math.floor(hash(tx, ty, 80 + k) * SKIN.length)]
+    g.fillRect(px + 1, py, 2, 3)
+    // Now and then a flag
+    if (h < 0.04) {
+      g.fillStyle = '#ffffff'
+      g.fillRect(px + 4, py - 2, 1, 5)
+      g.fillStyle = seat
+      g.fillRect(px + 5, py - 2, 3, 2)
+    }
+  }
+}
+
+/**
+ * The battle field's markings: mown stripes (grass), the outer line, the centre
+ * line and circle, the Poké Ball in the middle and a trainer box at each end.
+ */
+function paintField(g: CanvasRenderingContext2D, w: World) {
+  const s = w.stadium!
+  const c = ARENA_C, W = FIELD_W, H = FIELD_H
+  const X0 = (c - W) * TILE, Y0 = (c - H) * TILE, X1 = (c + W) * TILE, Y1 = (c + H) * TILE
+  const open = (t: T) => t === T.GRASS || t === T.SAND || t === T.ICE
+  // Mown stripes on grass
+  if (s.id === 'classic')
+    for (let ty = c - H; ty < c + H; ty++)
+      for (let tx = c - W; tx < c + W; tx++)
+        if (Math.floor((ty - (c - H)) / 2) % 2 === 0 && w.at(tx, ty) === T.GRASS) {
+          g.fillStyle = 'rgba(255,255,255,0.07)'
+          g.fillRect(tx * TILE, ty * TILE, TILE, TILE)
+        }
+  g.save()
+  g.strokeStyle = s.lines
+  g.lineWidth = 2
+  // Outer line, centre line, centre circle
+  g.strokeRect(X0 + 8, Y0 + 8, X1 - X0 - 16, Y1 - Y0 - 16)
+  g.beginPath()
+  g.moveTo(X0 + 8, c * TILE)
+  g.lineTo(X1 - 8, c * TILE)
+  g.stroke()
+  g.beginPath()
+  g.arc(c * TILE, c * TILE, 3 * TILE, 0, Math.PI * 2)
+  g.stroke()
+  // Trainer boxes at both ends
+  for (const dir of [1, -1]) {
+    const yEdge = c * TILE + dir * (H * TILE - 8)
+    g.strokeRect(c * TILE - 2.5 * TILE, dir > 0 ? yEdge - 4.5 * TILE : yEdge, 5 * TILE, 4.5 * TILE)
+  }
+  // The Poké Ball in the middle
+  const R = 1.7 * TILE
+  g.globalAlpha = 0.55
+  g.fillStyle = '#e83838'
+  g.beginPath()
+  g.arc(c * TILE, c * TILE, R, Math.PI, 0)
+  g.fill()
+  g.fillStyle = '#f4f4f4'
+  g.beginPath()
+  g.arc(c * TILE, c * TILE, R, 0, Math.PI)
+  g.fill()
+  g.globalAlpha = 0.7
+  g.fillStyle = '#202028'
+  g.fillRect(c * TILE - R, c * TILE - 2, R * 2, 4)
+  g.beginPath()
+  g.arc(c * TILE, c * TILE, 7, 0, Math.PI * 2)
+  g.fill()
+  g.fillStyle = '#f4f4f4'
+  g.beginPath()
+  g.arc(c * TILE, c * TILE, 4, 0, Math.PI * 2)
+  g.fill()
+  g.restore()
+  // Whatever stands on the lines goes back on top (rocks, water, bridges)
+  const th = w.theme
+  for (let ty = c - H; ty < c + H; ty++)
+    for (let tx = c - W; tx < c + W; tx++) {
+      const t = w.at(tx, ty)
+      if (open(t) || t === T.TALL || t === T.FLOWER) continue
+      const x = tx * TILE, y = ty * TILE
+      if (t === T.ROCK) {
+        paintGrass(g, x, y, tx, ty, th)
+        if (s.id !== 'classic' && s.id !== 'ice') paintSand(g, x, y, tx, ty, th, w)
+        paintRock(g, x, y, tx, ty, th)
+      } else if (t === T.WATER) th.liquid === 'lava' ? paintLava(g, x, y, w, tx, ty, th) : paintWater(g, x, y, w, tx, ty, th)
+      else if (t === T.BRIDGE) {
+        paintWater(g, x, y, w, tx, ty, th)
+        drawBridge(g, x, y, th)
+      }
+    }
 }
 
 function canvas(w: number, h: number) {

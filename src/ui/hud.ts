@@ -13,7 +13,7 @@ import type { Mon } from '../game/entities'
 import type { ChatLine } from '../net/protocol'
 import { esc, QUICK_CHAT } from './menu'
 import { BOSSES, RAID_LIVES } from '../data/bosses'
-import { DUEL_WINS, RING_AT } from '../game/duel'
+import { DUEL_WINS, ROUND_TIME } from '../game/duel'
 import { L, tx, type Txt } from '../i18n'
 
 const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = '') => {
@@ -636,8 +636,9 @@ export class Hud {
     }
     set('.db-pips.me', pips(p.kos))
     set('.db-pips.them', pips(opp.kos))
-    const ringIn = Math.max(0, Math.ceil(RING_AT - dv.roundT))
-    set('.db-mid', `${L('R', 'R')}${dv.round}${dv.phase === 'fight' ? ` · ${ringIn > 0 ? `⏱ ${ringIn}` : `⚡ ${L('RING', 'RING')}`}` : ''}`)
+    // Round and the time left in it (red in the last ten seconds)
+    const left = Math.max(0, Math.ceil(ROUND_TIME - dv.roundT))
+    set('.db-mid', `${L('R', 'R')}${dv.round}${dv.phase === 'fight' ? ` · <span class="${left <= 10 ? 'low' : ''}">⏱ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}</span>` : ''}`)
     const hp = (m: Mon | undefined) => (m ? Math.max(0, m.hp / m.maxHp) : 0)
     ;(this.duelBar.querySelector('.db-hp.me i') as HTMLElement).style.width = `${hp(p.mon) * 100}%`
     ;(this.duelBar.querySelector('.db-hp.them i') as HTMLElement).style.width = `${hp(opp.mon) * 100}%`

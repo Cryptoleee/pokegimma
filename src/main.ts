@@ -5,6 +5,7 @@ import { ALL_PARTNERS, ROSTER, TEAM_SIZE } from './data/pokemon'
 import { BOSS_LIST, type BossId } from './data/bosses'
 import { TRAINERS, type TrainerDef } from './data/trainers'
 import { finalForm } from './game/boss'
+import { pickStadium, STADIUMS, type StadiumId } from './data/stadiums'
 import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
 import { render, view } from './game/render'
 import { TILE } from './game/world'
@@ -188,6 +189,11 @@ function setupFor(c: MatchChoice, humans: LobbyPlayer[]): MatchSetup {
   const seed = Date.now() % 1e9
   // Dev/testing: ?theme=<id> fixes the world
   const forcedTheme = new URLSearchParams(location.search).get('theme') as ThemeId | null
+  if (c.kind === 'duel') {
+    // Dev/testing: ?stadium=<id> fixes the stadium
+    const forced = new URLSearchParams(location.search).get('stadium') as StadiumId | null
+    return { seed, humans, kind: 'duel', stadium: forced && forced in STADIUMS ? forced : pickStadium(c.stadium, seed) }
+  }
   if (c.kind !== 'raid') return { seed, humans, kind: c.kind, theme: forcedTheme && forcedTheme in THEMES ? forcedTheme : pickTheme(c.theme, seed) }
   const last = store.get<BossId | ''>('lastBoss', '')
   const pool = BOSS_LIST.filter((b) => b !== last)
@@ -333,7 +339,7 @@ function loadingThen(setup: MatchSetup, skippable: boolean, start: () => void, g
       sprite: (TRAINERS.find((t) => t.key === h.trainer) ?? TRAINERS[0]).sprite,
       mon: duel ? finalForm(h.team[0]) : h.team[0],
     }))
-  showLoading({ seconds: LOADING_TIME, players, skippable, bots: duel ? 0 : Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined, duel }, start)
+  showLoading({ seconds: LOADING_TIME, players, skippable, bots: duel ? 0 : Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined, duel, stadium: setup.stadium }, start)
 }
 
 function startSolo() {

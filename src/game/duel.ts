@@ -3,24 +3,21 @@ import { Mon, type Trainer } from './entities'
 import type { Game, ItemKind } from './game'
 import { finalForm } from './boss'
 import { preloadMon } from './sprites'
-import { ARENA_C, DUEL_R } from './world'
+import { ARENA_C } from './world'
 
 /**
- * 1 vs 1: two trainers in a small arena, best of three rounds. Both partners
- * are fully evolved at Lv 50 with every move, so it's down to skill and the
+ * 1 vs 1: two trainers in a stadium, best of three rounds. Both partners are
+ * fully evolved at Lv 50 with every move, so it's down to skill and the
  * match-up. Power-ups on three pads give a short edge; tall grass hides you;
- * after a while a ring closes in so nobody can hide forever.
+ * a round has a time limit (then the one with more HP wins it), so nobody can
+ * hide forever.
  */
 
 export const DUEL_LEVEL = 50
 /** Rounds to win the match. */
 export const DUEL_WINS = 2
-/** Seconds into a round before the ring starts closing, and how long that takes. */
-export const RING_AT = 40
-const RING_SHRINK = 25
-const RING_MIN = 2.5
-/** Share of max HP per second outside the ring. */
-const RING_DPS = 0.09
+/** Seconds per round; when time runs out the one with more HP (as a share) wins it. */
+export const ROUND_TIME = 75
 /** Pause after a knockout, and the countdown before the next round. */
 const BREAK_TIME = 3
 export const COUNT_TIME = 3
@@ -86,21 +83,14 @@ export function setupDuel(g: Game) {
   })
   g.total = 2
   g.duel = { round: 1, phase: 'intro', t: 0, roundT: 0, pads: w.pads.map(() => PAD_FIRST), lastWin: 0, endAt: 0 }
-  resetRing(g)
-}
-
-/** No ring at the start of a round: it only appears (at the arena's edge) once it starts closing. */
-function resetRing(g: Game) {
+  // No storm in a stadium: park the zone far outside it
   const z = g.zone
   z.x = z.nx = z.fromX = ARENA_C
   z.y = z.ny = z.fromY = ARENA_C
-  z.r = z.fromR = z.nr = RING_OFF
-  z.phase = 0
-  z.t = 0
-  z.shrinking = false
+  z.r = z.fromR = z.nr = 999
+  // A CPU that gets stuck (behind a pool or the lava) finds its way via the middle
+  g.flow = w.flowTo(ARENA_C, ARENA_C)
 }
-/** Far outside the arena: the ring is out of sight. */
-const RING_OFF = 60
 
 /** Frozen in place: between rounds and during the countdown. */
 export const duelFrozen = (g: Game) => !!g.duel && g.duel.phase !== 'fight'
@@ -138,7 +128,10 @@ export function updateDuel(g: Game, dt: number) {
     tr.spdT = Math.max(0, tr.spdT - dt)
     tr.defT = Math.max(0, tr.defT - dt)
   }
-  updateRing(g, d, dt)
+  if (d.roundT >= ROUND_TIME) return timeUp(g, d)
+  // The last ten seconds tick away
+  const left = Math.ceil(ROUND_TIME - d.roundT)
+  if (left <= 10 && left !== Math.ceil(ROUND_TIME - d.roundT + dt)) for (const v of g.viewers) v.sfx('warn')
   // Power-up pads
   g.world.pads.forEach((p, i) => {
     if (d.pads[i] <= 0) return
@@ -155,38 +148,24 @@ export function updateDuel(g: Game, dt: number) {
   })
 }
 
-function updateRing(g: Game, d: DuelState, dt: number) {
-  const z = g.zone
-  if (d.roundT < RING_AT) {
-    z.t = d.roundT
+/** Time's up: more HP (as a share of max) takes the round; the same share is a draw and the round is played again. */
+function timeUp(g: Game, d: DuelState) {
+  const [a, b] = g.trainers
+  const ka = a.mon.hp / a.mon.maxHp, kb = b.mon.hp / b.mon.maxHp
+  if (Math.abs(ka - kb) < 0.01) {
+    d.phase = 'break'
+    d.t = BREAK_TIME
+    d.round--
+    for (const v of g.viewers) v.hooks.banner({ kind: 'storm', title: both("TIME! It's a draw", 'TIJD! Gelijkspel'), sub: both('The round is played again', 'De ronde wordt opnieuw gespeeld'), color: '#c0c0d0' })
     return
   }
-  if (!z.shrinking && z.phase === 0) {
-    z.shrinking = true
-    z.t = 0
-    z.r = z.fromR = DUEL_R + 0.5
-    z.nr = RING_MIN
-    for (const v of g.viewers) {
-      v.hooks.banner({ kind: 'storm', title: both('The ring is closing!', 'De ring trekt samen!'), sub: both('Stay inside the white circle', 'Blijf binnen de witte cirkel'), color: '#c080ff', voice: 'storm' })
-      v.hooks.feed(both('🌀 The ring is closing in! Stay inside', '🌀 De ring trekt samen! Blijf binnen'), { kind: 'storm' })
-    }
-  }
-  if (z.shrinking) {
-    z.t += dt
-    const k = Math.min(1, z.t / RING_SHRINK)
-    z.r = z.fromR + (RING_MIN - z.fromR) * k
-    if (k >= 1) {
-      z.shrinking = false
-      z.phase = 1
-    }
-  }
+  const lose = ka < kb ? a : b
+  for (const v of g.viewers) v.hooks.feed(both('⏱ Time! The one with more HP takes the round', '⏱ Tijd! Wie meer HP heeft wint de ronde'), { kind: 'info' })
+  duelDown(g, lose, true)
 }
 
-/** Ring damage per second (share of max HP). */
-export const ringDps = () => RING_DPS
-
-/** Host and solo: a partner fainted. The other trainer takes the round. */
-export function duelDown(g: Game, tr: Trainer) {
+/** Host and solo: a partner fainted (or ran out of time with less HP). The other trainer takes the round. */
+export function duelDown(g: Game, tr: Trainer, time = false) {
   const d = g.duel!
   // A double knockout in the same moment: the first one counts
   if (d.phase !== 'fight') return
@@ -203,7 +182,7 @@ export function duelDown(g: Game, tr: Trainer) {
     const mine = v.tr === win
     v.hooks.banner(mine
       ? { kind: 'ko', title: both(`Round ${d.round}: yours!`, `Ronde ${d.round}: voor jou!`), sub: score(g, v.tr), trainer: tr.def.sprite, voice: 'ko' }
-      : { kind: 'fainted', title: both(`${tr.mon.name} fainted!`, `${tr.mon.name} is verslagen!`), sub: score(g, v.tr), mon: tr.mon.species.id })
+      : { kind: 'fainted', title: time ? both('TIME! Round lost', 'TIJD! Ronde verloren') : both(`${tr.mon.name} fainted!`, `${tr.mon.name} is verslagen!`), sub: score(g, v.tr), mon: tr.mon.species.id })
   }
   g.soundAt(tr.x, tr.y, 'ko', [], { owners: [tr, win], range: 30 })
 }
@@ -256,7 +235,6 @@ function resetRound(g: Game, d: DuelState) {
     g.sendOut(tr, tr.active)
     g.vfx.ring(m.x, m.y - 0.2, 1.6, '#ffffff', 0.5, 6)
   })
-  resetRing(g)
 }
 
 function endDuel(g: Game, win: Trainer, lose: Trainer) {

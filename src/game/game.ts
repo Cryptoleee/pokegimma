@@ -3,7 +3,8 @@ import { eventTimes, startEvent, updateEvents, type WorldEvent } from './events'
 import { roleInfo } from '../data/roles'
 import { decided, scoreRows, type ScoreRow } from './score'
 import { raidDown, raidIntro, setupRaid, updateRaid, type Hazard, type RaidState, type RaidView } from './boss'
-import { applyPowerUp, BUFF, buffDamage, DUEL_DMG, duelDown, duelFrozen, duelView, ringDps, setupDuel, updateDuel, type DuelState, type DuelView } from './duel'
+import { applyPowerUp, BUFF, buffDamage, DUEL_DMG, duelDown, duelFrozen, duelView, setupDuel, updateDuel, type DuelState, type DuelView } from './duel'
+import type { StadiumId } from '../data/stadiums'
 import { movesetFor, SLOT_UNLOCK, type Move, type MoveFx } from '../data/moves'
 import { Vfx } from './vfx'
 import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpact, onMelee, onRelease, onZap, pal, projectileEnd, projectileTick } from './moveFx'
@@ -235,6 +236,8 @@ export interface MatchSetup {
   boss?: BossId
   /** Recording mode (solo only): your Pokémon starts fully evolved with every move. */
   boost?: boolean
+  /** 1 vs 1 stadium (already resolved from "random"). */
+  stadium?: StadiumId
 }
 
 /** solo = everything local; host = simulates for remote players too; client = renders the host's state. */
@@ -353,7 +356,7 @@ export class Game {
   constructor(public setup: MatchSetup, me: number, public hooks: GameHooks, public mode: GameMode = 'solo') {
     this.kind = setup.kind ?? 'royale'
     this.rng = new Rng(setup.seed)
-    this.world = new World(this.rng, this.kind === 'raid' ? { arena: BOSSES[setup.boss ?? 'reshiram'].arena } : { theme: setup.theme, duel: this.kind === 'duel' })
+    this.world = new World(this.rng, this.kind === 'raid' ? { arena: BOSSES[setup.boss ?? 'reshiram'].arena } : this.kind === 'duel' ? { stadium: setup.stadium ?? 'classic' } : { theme: setup.theme })
     // The client only needs the world: everything else comes from the host.
     if (mode === 'client') return
     this.pickNextZone()
@@ -671,12 +674,11 @@ export class Game {
     // Out-of-combat regeneration (Brawl Stars style); a raid has potions instead
     if (this.kind === 'royale') this.regen(tr, dt)
 
-    // Storm (1 vs 1: the closing ring)
-    const ring = this.kind === 'royale' || this.duel?.phase === 'fight'
-    if (ring && this.zone.outside(tr.x, tr.y) && !m.fainted) {
+    // Storm
+    if (this.kind === 'royale' && this.zone.outside(tr.x, tr.y) && !m.fainted) {
       m.combatT = 0
       this.vOf(tr)?.sfx('stormTick')
-      m.hp -= m.maxHp * (this.duel ? ringDps() : this.zone.dps) * dt
+      m.hp -= m.maxHp * this.zone.dps * dt
       if (m.hp <= 0) {
         m.hp = 0
         this.onFaint(m, null)

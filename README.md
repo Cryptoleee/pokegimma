@@ -8,7 +8,7 @@ Een real-time Pokémon battle royale voor de browser, mobile first, in de stijl 
 
 Er zijn drie modi:
 - **Battle Royale:** 12 trainers, wie als laatste overblijft wint.
-- **1 vs 1:** een duel, best of 3, online, tegen de CPU of met een vriend.
+- **1 vs 1:** een duel in een stadion, best of 3: online, tegen de CPU of met een vriend.
 - **Raid:** alleen of samen tegen één enorme eindbaas.
 
 Op het home-scherm kies je eerst de modus en dan hoe je speelt: online, solo/CPU of met vrienden.
@@ -113,13 +113,18 @@ Elk potje heeft twee gebeurtenissen, tussen de legendarische Pokémon door. Beid
 
 ## 1 vs 1
 
-Een duel tussen twee trainers in een kleine arena, best of 3.
-- **Opzet:** de arena is een open plek in het bos (in de stijl van de gekozen wereld), voor beide kanten gespiegeld. Hij heeft:
-  - hoog gras om je te verstoppen;
-  - rotsen als dekking;
-  - drie plekken met power-ups.
+Een duel tussen twee trainers in een stadion, best of 3.
+- **Stadions:** een rechthoekig wedstrijdveld met witte lijnen, een middencirkel, trainervakken en een Poké Ball in het midden. Eromheen staan een muur met reclameborden en tribunes vol publiek. Jouw kant heeft de ene clubkleur, de tegenstander de andere. Het publiek doet een wave, springt af en toe op en juicht als een ronde beslist is. Elke indeling is gespiegeld, zodat beide spelers hetzelfde veld hebben.
+  - **Pokémon Stadion:** gras met maaistroken, hagen langs de zijlijn om je te verstoppen, beelden als dekking.
+  - **Woestijnarena:** zand, rotsblokken en droog gras.
+  - **IJsbaan:** een gladde ijsbaan in het midden (je glijdt door) met sneeuw en grip langs de rand, plus vallende sneeuw.
+  - **Waterarena:** twee bassins met elk een brug. Lopen kan alleen via de bruggen, schieten kan eroverheen.
+  - **Vulkaanarena:** donkere steen met lavapoelen die je de weg versperren, maar je aanvallen niet.
+
+  Solo en in een lobby kies je een stadion of Willekeurig. Testen kan met `?stadium=<id>`.
 - **Kracht:** beide partners zijn volledig geëvolueerd op Lv 50 met alle vier de aanvallen, net als in een raid. Het gaat om skill en de match-up van types en rollen. HP herstelt niet vanzelf.
 - **Rondes:** wie de Pokémon van de ander verslaat, wint de ronde. Daarna begint de volgende met volle HP vanaf de startplekken, na een aftelling van 3 seconden. Wie eerst twee rondes wint, wint het duel.
+- **Tijdslimiet in plaats van een storm:** een ronde duurt maximaal 75 seconden. Is de tijd op, dan wint wie relatief de meeste HP over heeft. Bij gelijke stand wordt de ronde opnieuw gespeeld. De klok staat in de duel-balk en wordt rood in de laatste 10 seconden.
 - **Power-ups:** ze liggen op drie plekken, de eerste na 6 seconden en na het oppakken 14 seconden later weer:
   - **X Attack:** +35% schade, 10 s;
   - **X Speed:** sneller lopen en kortere cooldowns, 10 s;
@@ -127,16 +132,20 @@ Een duel tussen twee trainers in een kleine arena, best of 3.
   - **Hyper Potion:** +40% HP.
 
   Het middelste plekje geeft vaker X Attack of een Hyper Potion.
-- **De ring:** na 40 seconden trekt een ring in 25 seconden samen naar het midden. Daarbuiten verlies je HP, zodat niemand zich eeuwig kan verstoppen.
 - **Spelen:**
   - **Online:** eigen openbare lobby's, apart van die van Snel spel. Je komt bij de eerste die op een tegenstander wacht; vind je niemand binnen 30 s, dan speel je tegen de CPU.
-  - **Tegen de CPU:** de CPU zoekt je op in het gras, pakt power-ups en blijft binnen de ring.
+  - **Tegen de CPU:** de CPU zoekt je op waar hij je het laatst zag, pakt power-ups, en loopt via het midden om obstakels heen als hij vastzit.
   - **Met een vriend:** een eigen duel met een code. Een duel-lobby laat maximaal 2 spelers toe.
 - **Progressie:**
   - **Tegen een mens:** XP per gewonnen ronde plus winst-XP en PvP-punten.
   - **Tegen de CPU:** minder XP, en de punten tellen voor PvE.
   - **Prestaties:** drie nieuwe, met de titel "Gladiator" bij 10 gewonnen duels.
-- **Code:** `src/game/duel.ts` (rondes, ring, power-ups), de arena in `src/game/world.ts` (`generateDuel`) en de CPU in `src/game/ai.ts`.
+- **Code:**
+  - `src/game/duel.ts`: rondes, tijdslimiet en power-ups;
+  - `src/data/stadiums.ts`: de stadions;
+  - `src/game/world.ts`: indeling en tekenwerk (`generateStadium`, `paintStand`, `paintField`);
+  - `src/game/render.ts`: het bewegende publiek (`drawCrowd`);
+  - `src/game/ai.ts`: de CPU.
 
 ## Raid
 
