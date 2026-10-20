@@ -174,7 +174,7 @@ function lzw(data: Uint8Array, minCode: number, size: number): Uint8Array {
 // ---------------------------------------------------------------- frames
 
 /** Sheets get big with many frames: longer animations play every other frame. */
-const MAX_FRAMES = 48
+const MAX_FRAMES = 36
 
 export interface Cells {
   /** Cell size: the box the whole animation moves in. */
@@ -214,10 +214,11 @@ export function toCells(a: Frames): Cells | null {
       durs.push(a.durs[i])
     }
   }
-  // Too many frames: keep every other one (each lasting twice as long)
-  while (frames.length > MAX_FRAMES) {
-    frames = frames.filter((_, i) => i % 2 === 0)
-    durs = durs.reduce<number[]>((acc, d, i) => (i % 2 === 0 ? acc.push(d) : (acc[acc.length - 1] += d), acc), [])
+  // Too many frames: keep every k-th one (each lasting k times as long)
+  if (frames.length > MAX_FRAMES) {
+    const k = Math.ceil(frames.length / MAX_FRAMES)
+    frames = frames.filter((_, i) => i % k === 0)
+    durs = durs.reduce<number[]>((acc, d, i) => (i % k === 0 ? acc.push(d) : (acc[acc.length - 1] += d), acc), [])
   }
   const data = new Uint8ClampedArray(frames.length * cw * ch * 4)
   frames.forEach((f, i) => {

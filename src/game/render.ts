@@ -407,16 +407,18 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
     m.catching ? 0.6 : 0,
     m.charging ? 0.25 + 0.25 * Math.sin(time * 30) : 0,
   )
-  if (glow > 0 && s.white) {
+  if (glow > 0 && (s.white || live)) {
     ctx.globalAlpha = glow * alpha
-    ctx.drawImage(s.white, fx + s.bx, fy + s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
+    if (s.white) ctx.drawImage(s.white, fx + s.bx, fy + s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
+    else ctx.drawImage(cellIn(s, fx, fy, '#ffffff'), 0, 0, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
   }
   // Type-coloured tint after a hit (yellow crackle for electric, orange for fire, ...)
   if (m.tintT > 0 && m.flash <= 0) {
-    const t = tinted(s, m.tintCol)
+    const t = live ? cellIn(s, fx, fy, m.tintCol) : tinted(s, m.tintCol)
     if (t) {
       ctx.globalAlpha = alpha * Math.min(1, m.tintT / 0.35) * (0.45 + Math.random() * 0.25)
-      ctx.drawImage(t, fx + s.bx, fy + s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
+      if (live) ctx.drawImage(t, 0, 0, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
+      else ctx.drawImage(t, fx + s.bx, fy + s.by, s.bw, s.bh, -dw / 2, -dh + 2, dw, dh)
     }
   }
   ctx.restore()
@@ -445,6 +447,8 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
 const motion = new WeakMap<Mon, { clock: number; last: number; cast: number; atk: number; step: number }>()
 /** Pokémon that hover instead of walking. */
 const HOVER = new Set([81, 82, 462, 92, 93, 374, 375, 607, 608, 609, 151, 200, 429, 479, 480, 481, 482, 488, 109, 110, 201, 343, 344, 355, 422, 425, 426, 436, 437, 442, 562, 563, 592, 593, 615, 641, 642, 645])
+/** Flying-type Pokémon that walk anyway. */
+const WALKERS = new Set([83, 84, 85, 123])
 const ease = (k: number) => 1 - (1 - k) * (1 - k)
 
 /**
@@ -465,7 +469,7 @@ function poseOf(m: Mon, moving: boolean) {
   if (m.castT > st.cast + 0.04) st.atk = 0
   st.cast = m.castT
   st.atk += dt
-  const flier = HOVER.has(m.species.id) || m.species.types.includes('flying')
+  const flier = HOVER.has(m.species.id) || (m.species.types.includes('flying') && !WALKERS.has(m.species.id))
   let dy = 0, sx = 1, sy = 1, rot = 0, lunge = 0
   const lean = Math.max(-1, Math.min(1, m.mvx * 40))
   if (flier) {
@@ -560,6 +564,23 @@ export function bossForm(g: Game, m: Mon) {
 /** The sprite drawn for a Pokémon (animated sheet for bosses and legendaries). */
 function spriteOf(g: Game, m: Mon) {
   return (m.legendary || m.boss ? animSprite(bossForm(g, m)) : null) ?? liveSprite(m.species.id, m.dir === 'up', m.shiny) ?? monSprite(m.species.id, m.dir === 'up', m.shiny)
+}
+
+/**
+ * One frame of a sheet filled with a colour, on a shared scratch canvas: the
+ * animated sheets keep no silhouette copies (that would double their memory).
+ */
+const scratch = document.createElement('canvas')
+function cellIn(s: ReturnType<typeof monSprite>, fx: number, fy: number, col: string): HTMLCanvasElement {
+  // (resizing also clears it)
+  scratch.width = s.bw
+  scratch.height = s.bh
+  const g = scratch.getContext('2d')!
+  g.drawImage(s.img, fx + s.bx, fy + s.by, s.bw, s.bh, 0, 0, s.bw, s.bh)
+  g.globalCompositeOperation = 'source-in'
+  g.fillStyle = col
+  g.fillRect(0, 0, s.bw, s.bh)
+  return scratch
 }
 
 function tinted(s: ReturnType<typeof monSprite>, col: string): HTMLCanvasElement | null {

@@ -9,6 +9,8 @@ import { decodeGif, toCells, type Cells } from './gif'
  */
 
 const BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated'
+/** Sheets kept in memory; the ones used longest ago go first (phones have little canvas memory). */
+const KEEP = 60
 /** Sprites being fetched at the same time. */
 const PARALLEL = 3
 
@@ -38,7 +40,13 @@ export function liveSprite(id: number, back: boolean, shiny: boolean): Sprite | 
   if (id > 649) return null
   const key = `${back ? 'b' : 'f'}${shiny ? 's' : ''}${id}`
   const got = sheets.get(key)
-  if (got !== undefined) return got
+  if (got) {
+    // Most recently used goes to the back of the line
+    sheets.delete(key)
+    sheets.set(key, got)
+    return got
+  }
+  if (got === null) return null
   sheets.set(key, null)
   queue.push({ key, url: `${BASE}/${back ? 'back/' : ''}${shiny ? 'shiny/' : ''}${id}.gif` })
   pump()
@@ -64,11 +72,23 @@ function pump() {
 function done(key: string, cells: Cells | null) {
   sent.delete(key)
   inFlight--
-  if (cells) sheets.set(key, buildSheet(key, cells))
+  if (cells) {
+    sheets.delete(key)
+    sheets.set(key, buildSheet(key, cells))
+    let loaded = 0
+    for (const v of sheets.values()) if (v) loaded++
+    for (const [k, v] of sheets) {
+      if (loaded <= KEEP) break
+      if (v) {
+        sheets.delete(k)
+        loaded--
+      }
+    }
+  }
   pump()
 }
 
-/** Lays the frames out in a grid, plus a white silhouette for hit flashes. */
+/** Lays the frames out in a grid (hit flashes are made per frame when drawn). */
 function buildSheet(key: string, c: Cells): Sprite {
   const { w, h, durs } = c
   const n = durs.length
@@ -79,15 +99,7 @@ function buildSheet(key: string, c: Cells): Sprite {
   const g = sheet.getContext('2d')!
   const size = w * h * 4
   for (let i = 0; i < n; i++) g.putImageData(new ImageData(c.data.slice(i * size, (i + 1) * size), w, h), (i % cols) * w, Math.floor(i / cols) * h)
-  const white = document.createElement('canvas')
-  white.width = sheet.width
-  white.height = sheet.height
-  const wg = white.getContext('2d')!
-  wg.drawImage(sheet, 0, 0)
-  wg.globalCompositeOperation = 'source-in'
-  wg.fillStyle = '#ffffff'
-  wg.fillRect(0, 0, white.width, white.height)
   let t = 0
   const ends = durs.map((d) => (t += d))
-  return { img: sheet, key: `anim:${key}`, bx: 0, by: 0, bw: w, bh: h, white, ready: true, anim: { w, h, cols, durs, ends, total: t } }
+  return { img: sheet, key: `anim:${key}`, bx: 0, by: 0, bw: w, bh: h, ready: true, anim: { w, h, cols, durs, ends, total: t } }
 }
