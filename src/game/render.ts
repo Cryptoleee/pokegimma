@@ -4,6 +4,7 @@ import type { Game } from './game'
 import { BUSH_SIGHT, INTRO_TIME, ITEM_SPRITE } from './game'
 import type { Mon, Trainer } from './entities'
 import { animSprite, frameAt, getSprite, itemUrl, monSprite } from './sprites'
+import { liveSprite } from './monAnim'
 import { trainerSpriteUrl } from '../data/trainers'
 import { drawCharge, drawChargeCore, drawDashAura, drawIncoming, drawMelee, drawProjectile, pal } from './moveFx'
 import { drawGlow } from './vfx'
@@ -286,13 +287,16 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
   const roar = cine >= 0 && cine < 0.92 ? animSprite(`${form}-roar`) : null
   if (roar?.ready) anim = roar
   const back = !anim && m.dir === 'up'
-  const s = anim ?? monSprite(m.species.id, back, m.shiny)
-  const [fx, fy] = roar?.ready ? frameAt(s, cine * ENRAGE_TIME, 0, true) : frameAt(s, time, m.bob * 1000)
+  // Everyone else plays their animated BW sprite once it has loaded (a still one until then)
+  const live = anim ? null : liveSprite(m.species.id, back, m.shiny)
+  const s = anim ?? live ?? monSprite(m.species.id, back, m.shiny)
+  const moving = Math.abs(m.mvx) + Math.abs(m.mvy) > 0.001
+  const pose = m.boss ? null : poseOf(m, moving)
+  const [fx, fy] = roar?.ready ? frameAt(s, cine * ENRAGE_TIME, 0, true) : pose ? frameAt(s, pose.clock) : frameAt(s, time, m.bob * 1000)
   const px = m.x * TILE, py = m.y * TILE
   const sc = m.scale
   const dw = s.bw * sc, dh = s.bh * sc
-  const moving = Math.abs(m.mvx) + Math.abs(m.mvy) > 0.001
-  let bob = Math.sin(time * (moving ? 12 : 3) + m.bob) * (moving ? 1.2 : 0.6)
+  let bob = pose ? pose.dy : Math.sin(time * (moving ? 12 : 3) + m.bob) * (moving ? 1.2 : 0.6)
   if (m.state === 'weak') bob = 0
   if (m.boss) {
     // Flyers hover; walkers stomp with a heavier step
@@ -372,7 +376,7 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
 
   if (m.dash) drawDashAura(ctx, m.dash.move.fx, px, py - dh * 0.45, m.dash.vx, m.dash.vy, time)
   if (m.charging) drawCharge(ctx, m.charging.move.fx, px, py - dh * 0.5, 1 - m.charging.t / m.charging.total, time, py)
-  const lunge = m.castT > 0 ? Math.sin((m.castT / 0.18) * Math.PI) * 3 : 0
+  const lunge = pose ? pose.lunge : m.castT > 0 ? Math.sin((m.castT / 0.18) * Math.PI) * 3 : 0
   let alpha = 1
   if (m.state === 'weak' && m.weakT < 3) alpha = Math.sin(time * 20) > 0 ? 1 : 0.35
   if (m.catching) alpha = 0.5
@@ -385,9 +389,11 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
   const jolt = m.joltT > 0 ? (Math.random() - 0.5) * 3 : ck > 0 ? (Math.random() - 0.5) * ck * ck * 2.6 : 0
   const lift = m.liftT > 0 ? -Math.sin(Math.min(1, m.liftT / 0.5) * Math.PI) * 6 : 0
   ctx.translate(Math.round(px + m.aimX * lunge + jolt), Math.round(py + bob + m.aimY * lunge + lift - rise))
+  if (pose && m.state !== 'weak') ctx.rotate(pose.rot)
   if (flip) ctx.scale(-1, 1)
   if (m.state === 'weak') ctx.rotate(0.25)
-  if (m.castT > 0) ctx.scale(1 + lunge * 0.02, 1 - lunge * 0.02)
+  if (pose) ctx.scale(pose.sx, pose.sy)
+  else if (m.castT > 0) ctx.scale(1 + lunge * 0.02, 1 - lunge * 0.02)
   // (the charge-up's glowing core sits in front of the sprite: see below)
   // Impact frame: squashed for a split second when hit
   if (m.flash > 0) {
@@ -435,6 +441,84 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
   }
 }
 
+/** Per Pokémon: its animation clock, walk cycle and attack timeline (all visual only). */
+const motion = new WeakMap<Mon, { clock: number; last: number; cast: number; atk: number; step: number }>()
+/** Pokémon that hover instead of walking. */
+const HOVER = new Set([81, 82, 462, 92, 93, 374, 375, 607, 608, 609, 151, 200, 429, 479, 480, 481, 482, 488, 109, 110, 201, 343, 344, 355, 422, 425, 426, 436, 437, 442, 562, 563, 592, 593, 615, 641, 642, 645])
+const ease = (k: number) => 1 - (1 - k) * (1 - k)
+
+/**
+ * How a Pokémon moves on top of its animation: it breathes while idle, hops
+ * with squash and stretch (and leans into the turn) while walking, floats if
+ * it flies, and throws itself into an attack: a short wind-up, a lunge toward
+ * the target and a springy return. Charging a big move makes it crouch.
+ */
+function poseOf(m: Mon, moving: boolean) {
+  const now = performance.now() / 1000
+  let st = motion.get(m)
+  if (!st) motion.set(m, (st = { clock: m.bob * 3, last: now, cast: 0, atk: 9, step: 0 }))
+  const dt = Math.min(0.1, Math.max(0, now - st.last))
+  st.last = now
+  st.clock += dt * (moving ? 1.8 : 1)
+  if (moving) st.step += dt * 10
+  // A new attack: the cast timer jumped up
+  if (m.castT > st.cast + 0.04) st.atk = 0
+  st.cast = m.castT
+  st.atk += dt
+  const flier = HOVER.has(m.species.id) || m.species.types.includes('flying')
+  let dy = 0, sx = 1, sy = 1, rot = 0, lunge = 0
+  const lean = Math.max(-1, Math.min(1, m.mvx * 40))
+  if (flier) {
+    // Hovering: bobbing in the air, banking into a turn
+    dy = -3 + Math.sin(now * 3 + m.bob) * 1.6
+    rot = lean * 0.14
+    const b = Math.sin(now * 3 + m.bob)
+    sy = 1 + b * 0.02
+  } else if (moving) {
+    // A hop per step: up and stretched, down and squashed, leaning forward
+    const hop = Math.abs(Math.sin(st.step))
+    dy = -hop * 2.4
+    sy = 0.93 + hop * 0.11
+    sx = 1.05 - hop * 0.07
+    rot = lean * 0.08
+  } else {
+    // Breathing
+    const b = Math.sin(st.clock * 2.6 + m.bob)
+    sy = 1 + b * 0.025
+    sx = 1 - b * 0.012
+  }
+  // Attack: wind-up (0.07 s), lunge (0.08 s), spring back (0.2 s)
+  const a = st.atk
+  if (a < 0.35) {
+    if (a < 0.07) {
+      const k = a / 0.07
+      lunge = -2.5 * k
+      sx *= 1 + 0.09 * k
+      sy *= 1 - 0.09 * k
+    } else if (a < 0.15) {
+      const k = ease((a - 0.07) / 0.08)
+      lunge = -2.5 + 10.5 * k
+      sx *= 1.09 - 0.15 * k
+      sy *= 0.91 + 0.19 * k
+    } else {
+      const k = ease((a - 0.15) / 0.2)
+      lunge = 8 * (1 - k)
+      // A little overshoot as it settles
+      const wob = Math.sin(k * Math.PI * 2) * (1 - k) * 0.05
+      sx *= 1 + wob
+      sy *= 1 - wob
+    }
+    rot += Math.max(-1, Math.min(1, m.aimX)) * 0.1 * Math.max(0, lunge) / 8
+  }
+  // Charging a big move: crouched, ready to spring
+  if (m.charging) {
+    const ck = 1 - m.charging.t / m.charging.total
+    sy *= 1 - 0.09 * ck
+    sx *= 1 + 0.06 * ck
+  }
+  return { clock: st.clock, dy, sx, sy, rot, lunge }
+}
+
 const tintCache = new Map<string, HTMLCanvasElement>()
 
 /** The sprite's silhouette filled with a colour (cached per sprite + colour). */
@@ -475,12 +559,12 @@ export function bossForm(g: Game, m: Mon) {
 
 /** The sprite drawn for a Pokémon (animated sheet for bosses and legendaries). */
 function spriteOf(g: Game, m: Mon) {
-  return (m.legendary || m.boss ? animSprite(bossForm(g, m)) : null) ?? monSprite(m.species.id, m.dir === 'up', m.shiny)
+  return (m.legendary || m.boss ? animSprite(bossForm(g, m)) : null) ?? liveSprite(m.species.id, m.dir === 'up', m.shiny) ?? monSprite(m.species.id, m.dir === 'up', m.shiny)
 }
 
 function tinted(s: ReturnType<typeof monSprite>, col: string): HTMLCanvasElement | null {
   if (!s.white) return null
-  const key = s.img.src + col
+  const key = (s.key ?? (s.img as HTMLImageElement).src) + col
   let c = tintCache.get(key)
   if (!c) {
     if (tintCache.size > 400) tintCache.clear()

@@ -6,7 +6,9 @@ import { BOSS_ACTIONS } from '../data/bossActions'
 const ANIM_URLS = import.meta.glob('../assets/boss/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
 
 export interface Sprite {
-  img: HTMLImageElement
+  img: HTMLImageElement | HTMLCanvasElement
+  /** Cache key for sheets built at runtime (they have no URL). */
+  key?: string
   /** Tight bounding box of opaque pixels. */
   bx: number
   by: number
@@ -86,7 +88,7 @@ export function preloadMon(id: number, shiny = false) {
 }
 
 function measure(s: Sprite) {
-  const { img } = s
+  const img = s.img as HTMLImageElement
   const c = document.createElement('canvas')
   c.width = img.naturalWidth
   c.height = img.naturalHeight
