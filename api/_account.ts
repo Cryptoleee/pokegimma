@@ -113,7 +113,7 @@ export function presenceFrom(b: Record<string, unknown>, now = Date.now()): Pres
   const p: Presence = { s, at: now, name: cleanName(b.name) || undefined }
   if (s === 'lobby' || s === 'game') {
     const code = typeof b.code === 'string' && /^(Q\d{1,2}|[A-Z0-9]{4})$/.test(b.code) ? b.code : undefined
-    const q = typeof b.q === 'number' && Number.isInteger(b.q) && b.q >= -1 && b.q < 64 ? b.q : -1
+    const q = typeof b.q === 'number' && Number.isInteger(b.q) && b.q >= -1 && b.q < 200 ? b.q : -1
     const n = typeof b.n === 'number' && Number.isInteger(b.n) && b.n >= 0 && b.n <= 64 ? b.n : 0
     Object.assign(p, { code, q, n, run: b.run === true || s === 'game' })
   }

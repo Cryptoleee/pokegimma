@@ -80,7 +80,7 @@ export async function POST(req: Request) {
       case 'invite': {
         const other = id(b.id)
         const code = typeof b.code === 'string' && /^(Q\d{1,2}|[A-Z0-9]{4})$/.test(b.code) ? b.code : ''
-        const q = typeof b.q === 'number' && Number.isInteger(b.q) && b.q >= -1 && b.q < 64 ? b.q : -1
+        const q = typeof b.q === 'number' && Number.isInteger(b.q) && b.q >= -1 && b.q < 200 ? b.q : -1
         const [friend] = other && code ? await pipeline([['SISMEMBER', `fr:${uid}`, other]]) : [0]
         if (!Number(friend)) {
           result = 'notfound'
