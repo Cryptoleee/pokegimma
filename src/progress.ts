@@ -76,7 +76,7 @@ function showcaseProgress(arg: string): Progress {
   for (const id of PARTNERS) p.partners[id] = MASTERY[SHINY_AT - 1]
   p.partners[25] = MASTERY[MASTERY.length - 1]
   p.ach = ACHIEVEMENTS.map((a) => a.id)
-  p.stats = { m: 412, w: 63, top3: 171, kos: 1384, caught: 2650, raids: 48, bosses: [...BOSS_IDS], legend: 41, crystal: 26, evolved: 830, mp: 156, mpw: 31, time: 412 * 230, used: [...PARTNERS], bestKos: 11 }
+  p.stats = { m: 412, w: 63, top3: 171, kos: 1384, caught: 2650, raids: 48, bosses: [...BOSS_IDS], legend: 41, crystal: 26, evolved: 830, mp: 156, mpw: 31, time: 412 * 230, used: [...PARTNERS], bestKos: 11, dw: 38, dpw: 14 }
   p.streak = 9
   p.bestStreak = 14
   return p
@@ -193,7 +193,7 @@ let ticket: Promise<string | null> | null = null
 let startedAt = 0
 
 /** A match starts (every mode goes through here). */
-export function matchStarted(kind: 'br' | 'raid', mode: Report['mode'], humans: number) {
+export function matchStarted(kind: Report['kind'], mode: Report['mode'], humans: number) {
   startedAt = Date.now()
   ticket = signedIn() && !showcase
     ? call({ a: 'start', kind, mode, humans }).then((d) => (typeof d?.id === 'string' ? d.id : null))

@@ -22,7 +22,7 @@ redis.call('PFADD', KEYS[3], ARGV[2])
 redis.call('PFADD', KEYS[5], ARGV[2])
 redis.call('PFADD', KEYS[6], ARGV[2])
 local dt = tonumber(ARGV[7])
-if dt > 0 and (ARGV[3] == 'br' or ARGV[3] == 'raid') then redis.call('HINCRBY', KEYS[4], 'pt:' .. ARGV[3], dt) end
+if dt > 0 and (ARGV[3] == 'br' or ARGV[3] == 'raid' or ARGV[3] == 'duel') then redis.call('HINCRBY', KEYS[4], 'pt:' .. ARGV[3], dt) end
 local c = redis.call('ZCOUNT', KEYS[1], ARGV[5], '+inf')
 local f = 'pk:' .. ARGV[4]
 if c > tonumber(redis.call('HGET', KEYS[4], f) or '0') then redis.call('HSET', KEYS[4], f, c) end
@@ -50,9 +50,9 @@ return 1`
 
 const ID = /^[A-Za-z0-9-]{8,64}$/
 const WORD = /^[a-z0-9]{1,16}$/
-const KINDS = ['br', 'raid']
+const KINDS = ['br', 'raid', 'duel']
 const MODES = ['solo', 'quick', 'friends']
-const STATES = ['menu', 'lobby', 'br', 'raid', 'off']
+const STATES = ['menu', 'lobby', 'br', 'raid', 'duel', 'off']
 const RESULTS = ['win', 'lose', 'clear', 'fail']
 const one = (v: unknown, list: string[]) => (typeof v === 'string' && list.includes(v) ? v : null)
 const word = (v: unknown) => (typeof v === 'string' && WORD.test(v) ? v : null)
@@ -91,7 +91,7 @@ export function commandFor(b: Record<string, unknown>, now = Date.now()): Cmd | 
       if (mon) a.push(2, String(mon))
       const boss = word(b.boss), w = word(b.w)
       if (k === 'raid' && boss) a.push(3, `${boss}:play`)
-      if (k === 'br' && w) a.push(4, w)
+      if (k !== 'raid' && w) a.push(4, w)
       const src = typeof b.src === 'string' && /^[a-z0-9-]{1,20}$/.test(b.src) ? b.src : null
       if (src) a.push(1, `pv:${src}`)
       return ['EVAL', BUMP, 4, d, 'mon', 'boss', 'world', ...a]

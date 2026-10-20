@@ -75,6 +75,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   g.vfx.drawUnder(ctx)
   // Raid: boss attacks telegraphed on the ground
   drawHazards(g, ctx, time)
+  if (g.kind === 'duel') drawPads(g, ctx, time)
   drawItems(g, ctx, inView)
 
   // Team rings on the ground + target reticle base + aim preview (under actors)
@@ -137,7 +138,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   if (!g.world.arena) drawClouds(ctx, ox, oy, vw, vh, time)
 
   // Storm: tinted, rain-swept outside, a crackling energy wall on the edge
-  if (g.kind === 'royale') drawStorm(g, ctx, ox, oy, vw, vh, time)
+  if (g.kind === 'royale' || g.kind === 'duel') drawStorm(g, ctx, ox, oy, vw, vh, time)
 
   // Weather and ambient particles
   drawWeather(theme.weather, ctx, ox, oy, vw, vh, time, phaseLook(g)?.weather ?? 1)
@@ -321,6 +322,33 @@ function drawMon(g: Game, ctx: CanvasRenderingContext2D, m: Mon, time: number, f
       ctx.fillRect(Math.round(px + ox) - 1, Math.round(py - dh * 0.25 + oy - rise) - 1, 3, 3)
     }
     ctx.globalAlpha = 1
+  }
+
+  // 1 vs 1 power-ups: red (X Attack), blue streaks (X Speed), a golden bubble (X Defense)
+  const o = m.owner
+  if (o && !m.fainted && (o.atkT > 0 || o.spdT > 0 || o.defT > 0)) {
+    const pulse = 0.5 + 0.5 * Math.sin(time * 6 + m.bob)
+    // Blinks for its last two seconds
+    const fade = (t: number) => (t > 2 || Math.sin(time * 18) > 0 ? 1 : 0.25)
+    if (o.atkT > 0) drawGlow(ctx, px, py - dh * 0.35 - rise, dw * (0.6 + 0.1 * pulse), '#ff5030', (0.2 + 0.12 * pulse) * fade(o.atkT))
+    if (o.spdT > 0) {
+      ctx.globalAlpha = 0.7 * fade(o.spdT)
+      ctx.fillStyle = '#80d0ff'
+      for (let i = 0; i < 4; i++) {
+        const k = (time * 3 + i / 4 + m.bob) % 1
+        ctx.fillRect(Math.round(px - dw * 0.45 + ((i * 37) % 10)), Math.round(py - dh * 0.15 - i * 5 + k * 4 - rise), Math.round(6 + k * 6), 1)
+      }
+      ctx.globalAlpha = 1
+    }
+    if (o.defT > 0) {
+      ctx.globalAlpha = (0.35 + 0.2 * pulse) * fade(o.defT)
+      ctx.strokeStyle = '#ffe070'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.ellipse(px, py - dh * 0.35 - rise, dw * 0.5, dh * 0.5, 0, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.globalAlpha = 1
+    }
   }
 
   // Legendary aura
@@ -780,6 +808,36 @@ function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number
   ctx.strokeText(text, x, y)
   ctx.fillStyle = col
   ctx.fillText(text, x, y)
+}
+
+/** 1 vs 1: the power-up pads, with a ring that fills up until the next power-up. */
+function drawPads(g: Game, ctx: CanvasRenderingContext2D, time: number) {
+  const left = g.duelView?.pads ?? []
+  g.world.pads.forEach((p, i) => {
+    const px = p.x * TILE, py = p.y * TILE
+    const ready = (left[i] ?? 1) <= 0
+    ctx.save()
+    ctx.translate(px, py + 2)
+    ctx.scale(1, 0.5)
+    ctx.fillStyle = 'rgba(20, 24, 40, 0.45)'
+    circle(ctx, 0, 0, 12)
+    ctx.fill()
+    ctx.lineWidth = 2
+    ctx.strokeStyle = i === 0 ? '#ffd040' : '#ffffff'
+    ctx.globalAlpha = ready ? 0.6 + 0.3 * Math.sin(time * 5) : 0.35
+    circle(ctx, 0, 0, 11)
+    ctx.stroke()
+    if (!ready && left[i] !== undefined) {
+      // Fills up toward the next power-up
+      const k = 1 - Math.min(1, left[i] / 14)
+      ctx.globalAlpha = 0.9
+      ctx.beginPath()
+      ctx.arc(0, 0, 11, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2)
+      ctx.stroke()
+    }
+    ctx.restore()
+    if (ready) drawGlow(ctx, px, py - 3, 16, i === 0 ? '#ffd040' : '#ffffff', 0.18 + 0.08 * Math.sin(time * 5))
+  })
 }
 
 function drawItems(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, y: number) => boolean) {

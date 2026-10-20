@@ -6,7 +6,7 @@ import { getLang } from './i18n'
  * sent on localhost or the local network, or on a device excluded from the panel.
  */
 
-export type PlayState = 'menu' | 'lobby' | 'br' | 'raid'
+export type PlayState = 'menu' | 'lobby' | 'br' | 'raid' | 'duel'
 type Event = Record<string, string | number | undefined>
 
 const ID_KEY = 'sb:sid'
@@ -61,7 +61,7 @@ function ping() {
   const now = Date.now()
   const s = getState()
   // Seconds in a match since the last ping (play time per mode)
-  const dt = lastPing && (lastState === 'br' || lastState === 'raid') ? Math.min(300, Math.round((now - lastPing) / 1000)) : 0
+  const dt = lastPing && (lastState === 'br' || lastState === 'raid' || lastState === 'duel') ? Math.min(300, Math.round((now - lastPing) / 1000)) : 0
   lastPing = now
   lastState = s
   send({ e: 'ping', s, dt })
@@ -109,7 +109,7 @@ export function statsStateChanged() {
   }, 300)
 }
 
-export function trackMatch(e: { k: 'br' | 'raid'; m: 'solo' | 'quick' | 'friends'; mon?: number; w?: string; boss?: string; h: number }) {
+export function trackMatch(e: { k: 'br' | 'raid' | 'duel'; m: 'solo' | 'quick' | 'friends'; mon?: number; w?: string; boss?: string; h: number }) {
   // The first match of a device that came in via a ?via= link counts as "played" for that source
   let src: string | undefined
   try {
@@ -125,6 +125,6 @@ export function trackMatch(e: { k: 'br' | 'raid'; m: 'solo' | 'quick' | 'friends
   statsStateChanged()
 }
 
-export function trackEnd(e: { k: 'br' | 'raid'; m: 'solo' | 'quick' | 'friends'; r: 'win' | 'lose' | 'clear' | 'fail'; boss?: string }) {
+export function trackEnd(e: { k: 'br' | 'raid' | 'duel'; m: 'solo' | 'quick' | 'friends'; r: 'win' | 'lose' | 'clear' | 'fail'; boss?: string }) {
   send({ e: 'end', ...e })
 }

@@ -8,6 +8,7 @@ import type { Vfx } from '../game/vfx'
 import type { Command, NetEvent, RosterEntry } from './protocol'
 import { bossAttack, cloneMon, type Hazard } from '../game/boss'
 import { BOSSES } from '../data/bosses'
+import { duelFrozen, type DuelView } from '../game/duel'
 
 /**
  * Multiplayer state sync. The host runs the real simulation; ~20 times a second
@@ -18,7 +19,8 @@ import { BOSSES } from '../data/bosses'
 
 const DIRS: Dir[] = ['down', 'up', 'left', 'right']
 const STATES: WildState[] = ['roam', 'aggro', 'weak']
-const ITEMS: ItemKind[] = ['master', 'potion', 'candy', 'revive', 'evolve']
+// New kinds go at the end: the index is what goes over the wire
+const ITEMS: ItemKind[] = ['master', 'potion', 'candy', 'revive', 'evolve', 'xatk', 'xspd', 'xdef', 'heal']
 const SHAPES: Hazard['shape'][] = ['circle', 'cone', 'line', 'ring', 'grid']
 const r2 = (v: number) => Math.round(v * 100) / 100
 const r1 = (v: number) => Math.round(v * 10) / 10
@@ -144,6 +146,8 @@ export function snapshot(g: Game, v: RemoteViewer) {
       o.rs = r1(tr.respawnT)
       o.bd = Math.round(tr.bossDmg)
     }
+    // 1 vs 1 power-ups (auras, and your own speed)
+    if (tr.atkT > 0 || tr.spdT > 0 || tr.defT > 0) o.bf = [r1(tr.atkT), r1(tr.spdT), r1(tr.defT)]
     if (tr.throwFx) {
       const t = tr.throwFx
       o.th = [r2(t.x), r2(t.y), r2(t.tx), r2(t.ty), r2(t.t), t.master ? 1 : 0]
@@ -163,9 +167,10 @@ export function snapshot(g: Game, v: RemoteViewer) {
     ev: g.events.map((e) => [e.id, e.kind === 'drop' ? 0 : 1, r2(e.x), r2(e.y), r1(e.t), e.total, e.species ?? 0]),
     hz: g.hazards.map((h) => [h.id, SHAPES.indexOf(h.shape), r2(h.x), r2(h.y), r2(h.ang), h.r, h.inner, h.width, r2(Math.max(0, h.t)), r2(h.total), h.type, h.both ? 1 : 0, h.atk, r2(h.vx), r2(h.vy), r2(h.dur)]),
     rv: g.raidView ? raidViewState(g) : undefined,
+    dv: g.duelView ? { ...g.duelView, t: r1(g.duelView.t), roundT: r1(g.duelView.roundT), pads: g.duelView.pads.map(r1), k: g.trainers.map((t) => [t.id, t.kos]) } : undefined,
     me: {
       p: me.party.map((m) => m.id), ac: me.active, mb: me.masterBalls, po: me.potions, re: me.revives,
-      k: me.kos, c: me.caught, sw: r2(me.swapCd), sp: me.spectate?.id ?? 0, dd: r1(me.diedAt),
+      k: me.kos, c: me.caught, sw: r2(me.swapCd), sp: me.spectate?.id ?? 0, dd: r1(me.diedAt), tp: me.tpN,
     },
   }
   // Ground items rarely change: only send them when the count does (and now and then)
@@ -194,7 +199,8 @@ export function runCommand(g: Game, v: RemoteViewer, c: Command) {
     case 'in':
       v.camX = c.cx
       v.camY = c.cy
-      if (!tr.alive) return
+      // Between duel rounds the host decides where everyone stands
+      if (!tr.alive || duelFrozen(g)) return
       // Trust the client's own position, but never through walls or across the map
       if (Math.hypot(c.x - tr.x, c.y - tr.y) < 4 && !g.world.blocked(c.x, c.y)) {
         tr.x = c.x
@@ -206,7 +212,7 @@ export function runCommand(g: Game, v: RemoteViewer, c: Command) {
       tr.netMoving = c.m
       return
     case 'move': {
-      if (!tr.alive || g.introT > 0) return
+      if (!tr.alive || g.introT > 0 || duelFrozen(g)) return
       const tgt = monById(g, c.tg)
       g.useMove(tr.mon, c.s, tgt && tgt !== tr.mon && !tgt.fainted ? tgt : undefined, c.d)
       return
@@ -328,6 +334,7 @@ type Snap = {
   ev?: [number, number, number, number, number, number, number][]
   hz?: [number, number, number, number, number, number, number, number, number, number, string, number, string, number, number, number][]
   rv?: RaidViewState
+  dv?: DuelView & { k: [number, number][] }
   /** Scoreboard: [id, kos, caught, dmg, bossDmg, lives, place, diedAt] per trainer. */
   sb?: number[][]
   me: Record<string, number & number[]>
@@ -357,10 +364,15 @@ export function applySnapshot(g: Game, raw: unknown) {
       tr.respawnT = t.rs
       tr.bossDmg = t.bd
     }
+    const bf = t.bf as unknown as number[] | undefined
+    ;[tr.atkT, tr.spdT, tr.defT] = bf ?? [0, 0, 0]
     const th = t.th as unknown as number[] | undefined
     tr.throwFx = th ? { x: th[0], y: th[1], tx: th[2], ty: th[3], t: th[4], master: !!th[5] } : null
-    // You move yourself; only snap back if the host disagrees a lot (blocked or lagged out)
-    if (tr === me && cs.placed && tr.alive && Math.hypot(t.x - tr.x, t.y - tr.y) < 3) continue
+    // You move yourself; only snap back if the host disagrees a lot (blocked or lagged out),
+    // or put you somewhere new (a duel round starting)
+    const jump = tr === me && s.me.tp !== undefined && s.me.tp !== me.tpN
+    if (jump) me.tpN = s.me.tp
+    if (tr === me && cs.placed && tr.alive && !jump && Math.hypot(t.x - tr.x, t.y - tr.y) < 3) continue
     if (t.d !== undefined) {
       tr.dir = DIRS[t.d]
       tr.faceRight = !!t.f
@@ -430,6 +442,14 @@ export function applySnapshot(g: Game, raw: unknown) {
       m.x = x
       m.y = y
     })
+  }
+  if (s.dv) {
+    const { k, ...view } = s.dv
+    g.duelView = view
+    for (const [id, kos] of k) {
+      const tr = cs.trainers.get(id)
+      if (tr) tr.kos = kos
+    }
   }
   if (s.ev) g.events = s.ev.map(([id, k, x, y, t, total, species]) => ({ id, kind: k ? 'swarm' : 'drop', x, y, t, total, species: species || undefined }))
   if (s.sb)

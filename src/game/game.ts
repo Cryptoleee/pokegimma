@@ -3,6 +3,7 @@ import { eventTimes, startEvent, updateEvents, type WorldEvent } from './events'
 import { roleInfo } from '../data/roles'
 import { decided, scoreRows, type ScoreRow } from './score'
 import { raidDown, raidIntro, setupRaid, updateRaid, type Hazard, type RaidState, type RaidView } from './boss'
+import { applyPowerUp, BUFF, buffDamage, DUEL_DMG, duelDown, duelFrozen, duelView, ringDps, setupDuel, updateDuel, type DuelState, type DuelView } from './duel'
 import { movesetFor, SLOT_UNLOCK, type Move, type MoveFx } from '../data/moves'
 import { Vfx } from './vfx'
 import { chargeTick, dashTick, onBeam, onBurst, onCast as fxCast, onHit, onImpact, onMelee, onRelease, onZap, pal, projectileEnd, projectileTick } from './moveFx'
@@ -24,13 +25,19 @@ import type { VoiceLine } from '../voice'
 import { both, type Txt } from '../i18n'
 
 /** 'evolve' = the Evolution Crystal: walk over it and your Pokémon is fully evolved with every move. */
-export type ItemKind = 'master' | 'potion' | 'candy' | 'revive' | 'evolve'
-const PICKUP_SOUND: Record<ItemKind, ItemSound> = { master: 'pickupMaster', potion: 'pickupPotion', candy: 'pickupCandy', revive: 'pickupRevive', evolve: 'pickupSurge' }
+/** 1 vs 1 power-ups: xatk, xspd, xdef (a few seconds' edge) and heal (Hyper Potion). */
+export type ItemKind = 'master' | 'potion' | 'candy' | 'revive' | 'evolve' | 'xatk' | 'xspd' | 'xdef' | 'heal'
+const PICKUP_SOUND: Record<ItemKind, ItemSound> = {
+  master: 'pickupMaster', potion: 'pickupPotion', candy: 'pickupCandy', revive: 'pickupRevive', evolve: 'pickupSurge',
+  xatk: 'pickupSurge', xspd: 'pickupSurge', xdef: 'pickupSurge', heal: 'pickupPotion',
+}
 export const ITEM_SPRITE: Record<ItemKind, string> = {
   master: 'master-ball', potion: 'potion', candy: 'rare-candy', revive: 'revive', evolve: 'shiny-stone',
+  xatk: 'x-attack', xspd: 'x-speed', xdef: 'x-defense', heal: 'hyper-potion',
 }
 export const ITEM_NL: Record<ItemKind, string> = {
   master: 'Master Ball', potion: 'Potion', candy: 'Rare Candy', revive: 'Revive', evolve: 'Evolution Crystal',
+  xatk: 'X Attack', xspd: 'X Speed', xdef: 'X Defense', heal: 'Hyper Potion',
 }
 
 export interface GroundItem {
@@ -192,6 +199,8 @@ export interface GameResult {
   best: Pick<Mon, 'name' | 'level' | 'shiny'> & { species: { id: number } }
   /** Raid results: your damage to the boss and lives left. */
   raid?: { boss: BossId; dmg: number; share: number; lives: number }
+  /** 1 vs 1: rounds won by you and by them, and who they were. */
+  duel?: { mine: number; theirs: number; opp: string; oppSprite: string; oppMon: number; dmg: number }
   /** Every trainer's stats when your match ended. */
   board: ScoreRow[]
   /** For progress: legendaries caught, evolutions, the Evolution Crystal, people in the match. */
@@ -214,7 +223,7 @@ export interface HumanSetup {
 }
 
 /** Battle royale (last trainer standing) or raid (everyone against a boss). */
-export type MatchKind = 'royale' | 'raid'
+export type MatchKind = 'royale' | 'raid' | 'duel'
 
 export interface MatchSetup {
   seed: number
@@ -332,6 +341,10 @@ export class Game {
   clones: Mon[] = []
   /** Raid: telegraphed boss attacks on the ground (synced to clients). */
   hazards: Hazard[] = []
+  /** 1 vs 1: rounds and power-ups (host and solo). */
+  duel: DuelState | null = null
+  /** 1 vs 1 HUD info, on the host and on clients. */
+  duelView: DuelView | null = null
   /** >0 while spawning effects that clients draw themselves (not sent over the network). */
   vfxMute = 0
   private netT = 0
@@ -340,7 +353,7 @@ export class Game {
   constructor(public setup: MatchSetup, me: number, public hooks: GameHooks, public mode: GameMode = 'solo') {
     this.kind = setup.kind ?? 'royale'
     this.rng = new Rng(setup.seed)
-    this.world = new World(this.rng, this.kind === 'raid' ? { arena: BOSSES[setup.boss ?? 'reshiram'].arena } : { theme: setup.theme })
+    this.world = new World(this.rng, this.kind === 'raid' ? { arena: BOSSES[setup.boss ?? 'reshiram'].arena } : { theme: setup.theme, duel: this.kind === 'duel' })
     // The client only needs the world: everything else comes from the host.
     if (mode === 'client') return
     this.pickNextZone()
@@ -363,6 +376,24 @@ export class Game {
     if (this.kind === 'raid') {
       // Everyone against one boss: no bots, no wild Pokémon, no storm
       setupRaid(this, setup.boss ?? 'reshiram')
+      this.camX = this.player.x
+      this.camY = this.player.y
+      return
+    }
+    if (this.kind === 'duel') {
+      // 1 vs 1: on your own you face the CPU
+      if (this.trainers.length < 2) {
+        const def = BOT_TRAINERS[Math.floor(this.rng.next() * BOT_TRAINERS.length)]
+        const bot = new Trainer(def, def.name, false)
+        const pool = ALL_PARTNERS.filter((id) => id !== this.player.party[0]?.species.id)
+        bot.party = [this.ownMon(new Mon(pool[Math.floor(this.rng.next() * pool.length)], 5), bot)]
+        this.giveBrain(bot)
+        bot.brain!.skill = 0.72
+        this.trainers.push(bot)
+      }
+      this.trainers = this.trainers.slice(0, 2)
+      setupDuel(this)
+      this.duelView = duelView(this)
       this.camX = this.player.x
       this.camY = this.player.y
       return
@@ -529,10 +560,16 @@ export class Game {
     }
     this.time += dt
     if (this.kind === 'royale') this.updateZone(dt)
+    if (this.duel) {
+      updateDuel(this, dt)
+      this.duelView = duelView(this)
+    }
+    // 1 vs 1: nobody moves during the countdown or after a knockout
+    const frozen = duelFrozen(this)
 
     // Player intent
     const p = this.player
-    if (p.alive) {
+    if (p.alive && !frozen) {
       p.vx = this.input.mx
       p.vy = this.input.my
       const dir = this.cursorDir(p.mon)
@@ -542,6 +579,11 @@ export class Game {
 
     for (const tr of this.trainers) {
       if (!tr.alive) continue
+      if (frozen) {
+        tr.vx = tr.vy = 0
+        tr.walkT = 0
+        continue
+      }
       if (tr.brain) botThink(this, tr, dt)
       this.updateTrainer(tr, dt)
     }
@@ -559,7 +601,7 @@ export class Game {
     this.updateCatches(dt)
     this.updateItems()
     if (this.raid) updateRaid(this, dt)
-    else {
+    else if (!this.duel) {
       this.spawnLoop(dt)
       if (this.crystalAt > 0 && this.time >= this.crystalAt) this.spawnCrystal()
       if (this.eventPlan.length && this.time >= this.eventPlan[0].t) startEvent(this, this.eventPlan.shift()!.kind)
@@ -629,11 +671,12 @@ export class Game {
     // Out-of-combat regeneration (Brawl Stars style); a raid has potions instead
     if (this.kind === 'royale') this.regen(tr, dt)
 
-    // Storm
-    if (this.kind === 'royale' && this.zone.outside(tr.x, tr.y) && !m.fainted) {
+    // Storm (1 vs 1: the closing ring)
+    const ring = this.kind === 'royale' || this.duel?.phase === 'fight'
+    if (ring && this.zone.outside(tr.x, tr.y) && !m.fainted) {
       m.combatT = 0
       this.vOf(tr)?.sfx('stormTick')
-      m.hp -= m.maxHp * this.zone.dps * dt
+      m.hp -= m.maxHp * (this.duel ? ringDps() : this.zone.dps) * dt
       if (m.hp <= 0) {
         m.hp = 0
         this.onFaint(m, null)
@@ -657,8 +700,9 @@ export class Game {
 
     // Your own trainer moves locally so walking feels instant
     if (p.alive) {
-      p.vx = this.input.mx
-      p.vy = this.input.my
+      const still = !!this.duelView && this.duelView.phase !== 'fight'
+      p.vx = still ? 0 : this.input.mx
+      p.vy = still ? 0 : this.input.my
       const moving = this.walk(p, dt)
       this.windPush(p, dt)
       p.swapCd = Math.max(0, p.swapCd - dt)
@@ -771,7 +815,7 @@ export class Game {
   walk(tr: Trainer, dt: number) {
     let len = Math.hypot(tr.vx, tr.vy)
     // Speedsters make their trainer quicker on their feet
-    const speed = 4.4 * (tr.mon && !tr.mon.fainted ? roleInfo(tr.mon.species.id).speed : 1)
+    const speed = 4.4 * (tr.mon && !tr.mon.fainted ? roleInfo(tr.mon.species.id).speed : 1) * (tr.spdT > 0 ? BUFF.spd : 1)
     // Frozen solid by an ice attack: can't move for a moment
     if (tr.mon && tr.mon.frozenT > 0 && !tr.mon.fainted) len = 0
     // Ice floor: you keep sliding and turn slowly
@@ -931,7 +975,7 @@ export class Game {
       this.lastTarget = tgt
       this.lastTargetT = 1.6
     }
-    m.cds[slot] = mv.cooldown * (mv.kind === 'dash' ? roleInfo(m.species.id).dashCd : 1)
+    m.cds[slot] = mv.cooldown * (mv.kind === 'dash' ? roleInfo(m.species.id).dashCd : 1) * (m.owner && m.owner.spdT > 0 ? BUFF.cd : 1)
     if (this.send) {
       // Client: the host runs the move; we only predict the cooldown and facing.
       this.aim(m, tgt, dir)
@@ -1247,7 +1291,7 @@ export class Game {
     // The boss's ordinary moves are chip damage (a share of your HP); its telegraphed attacks are the real threat
     const dmg = src.boss
       ? Math.max(1, Math.round(tgt.maxHp * (0.02 + mv.tier * 0.012) * mult * (eff > 1 ? 1.3 : eff < 1 ? 0.75 : 1)))
-      : Math.max(1, Math.round(raw * eff * mult * roleInfo(src.species.id).dmg * DMG_SCALE * this.rng.range(0.9, 1.05)))
+      : Math.max(1, Math.round(raw * eff * mult * roleInfo(src.species.id).dmg * DMG_SCALE * (this.duel ? DUEL_DMG * buffDamage(src, tgt) : 1) * this.rng.range(0.9, 1.05)))
     tgt.hp -= dmg
     if (tgt.boss && src.owner) src.owner.bossDmg += Math.min(dmg, tgt.hp + dmg)
     if (src.owner && tgt.owner && tgt.owner !== src.owner) src.owner.dmg += Math.min(dmg, tgt.hp + dmg)
@@ -1319,6 +1363,7 @@ export class Game {
     // Raid: the boss is down (the raid tick ends the match), or a player loses a life
     if (m.boss) return
     if (this.raid && m.owner) return raidDown(this, m.owner)
+    if (this.duel && m.owner) return duelDown(this, m.owner)
     const koXp = (8 + m.level * 1.8) * RARITY_XP[m.rarity]
     if (!m.owner) {
       m.state = 'weak'
@@ -1447,11 +1492,13 @@ export class Game {
     const p = v.tr
     const b = [...p.party].sort((a, b) => b.level - a.level)[0]
     const r = this.raid
+    const opp = this.duel ? this.trainers.find((t) => t !== p) : null
     v.hooks.end({
       won: r ? r.result === 'won' : p.alive, place: p.alive ? 1 : p.place, total: this.total,
-      time: r ? this.time : p.alive ? this.time : p.diedAt, kos: p.kos, caught: p.caught,
+      time: r ? this.time : this.duel ? this.duel.endAt || this.time : p.alive ? this.time : p.diedAt, kos: p.kos, caught: p.caught,
       best: { name: b.name, level: b.level, shiny: b.shiny, species: { id: b.species.id } },
       raid: r ? { boss: r.def.id, dmg: Math.round(p.bossDmg), share: Math.round((p.bossDmg / r.boss.maxHp) * 100), lives: p.lives } : undefined,
+      duel: opp ? { mine: p.kos, theirs: opp.kos, opp: opp.name, oppSprite: opp.def.sprite, oppMon: opp.mon.species.id, dmg: Math.round(p.dmg) } : undefined,
       board: scoreRows(this), final: decided(this), me: p.id,
       extra: { legend: p.legends, evolved: p.evolutions, crystal: p.crystal, humans: this.setup.humans.length },
     })
@@ -1750,6 +1797,7 @@ export class Game {
   }
 
   private applyItem(tr: Trainer, kind: ItemKind) {
+    if (applyPowerUp(this, tr, kind)) return
     const v = this.vOf(tr)
     v?.sfx('item', PICKUP_SOUND[kind])
     switch (kind) {

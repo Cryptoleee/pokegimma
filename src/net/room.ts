@@ -24,7 +24,13 @@ export const QUICK_SLOTS = 6
 export const QUICK_MAX = 8
 /** Seconds a fresh quick lobby waits for others. */
 export const QUICK_WAIT = 45
-const quickId = (slot: number) => QUICK_PREFIX + slot
+/** 1 vs 1 quick play: its own set of public lobbies (slot numbers from DUEL_SLOT up). */
+const DUEL_PREFIX = 'stormbreak-duel-v1-'
+export const DUEL_SLOT = 100
+/** Seconds a fresh 1 vs 1 lobby waits for an opponent (then it's you against the CPU). */
+export const DUEL_WAIT = 30
+const quickId = (slot: number) => (slot >= DUEL_SLOT ? DUEL_PREFIX + (slot - DUEL_SLOT) : QUICK_PREFIX + slot)
+const quickCode = (slot: number) => (slot >= DUEL_SLOT ? `D${slot - DUEL_SLOT}` : `Q${slot}`)
 
 /**
  * Why the host sends someone away. The host sends the English text; each guest
@@ -125,6 +131,16 @@ export class Room {
     return this.quickSlot >= 0
   }
 
+  /** People this room takes: 2 for a duel, otherwise a full lobby. */
+  get cap() {
+    return this.choice.kind === 'duel' ? 2 : this.quick ? QUICK_MAX : MAX_PLAYERS
+  }
+
+  /** Quick play: how long a fresh lobby waits for others. */
+  get quickWait() {
+    return this.choice.kind === 'duel' ? DUEL_WAIT : QUICK_WAIT
+  }
+
   /** Opens a new room and resolves with it once others can join. */
   static create(me: LobbyPlayer, on: RoomEvents): Promise<Room> {
     return Room.host(me, on, -1)
@@ -138,14 +154,15 @@ export class Room {
     const room = new Room('host', me, on)
     room.players = [me]
     room.quickSlot = slot
+    if (slot >= DUEL_SLOT) room.choice = { kind: 'duel', theme: 'random' }
     return new Promise((resolve, reject) => {
       let tries = 0
       const open = () => {
-        room.code = slot >= 0 ? `Q${slot}` : newCode()
+        room.code = slot >= 0 ? quickCode(slot) : newCode()
         const peer = new Peer(slot >= 0 ? quickId(slot) : PREFIX + room.code, peerOptions())
         room.peer = peer
         peer.on('open', () => {
-          if (slot >= 0) room.quickEnds = performance.now() + QUICK_WAIT * 1000
+          if (slot >= 0) room.quickEnds = performance.now() + room.quickWait * 1000
           resolve(room)
         })
         peer.on('connection', (c) => room.accept(c))
@@ -229,8 +246,9 @@ export class Room {
    * if that lobby is full, playing, or doesn't answer, move on to the next slot.
    * `skip` leaves out a slot (the one you just left).
    */
-  static async quick(me: LobbyPlayer, on: RoomEvents, skip = -1): Promise<Room> {
-    for (let slot = 0; slot < QUICK_SLOTS; slot++) {
+  static async quick(me: LobbyPlayer, on: RoomEvents, skip = -1, duel = false): Promise<Room> {
+    const base = duel ? DUEL_SLOT : 0
+    for (let slot = base; slot < base + QUICK_SLOTS; slot++) {
       if (slot === skip) continue
       try {
         return await Room.host(me, on, slot)
@@ -238,7 +256,7 @@ export class Room {
         if ((e as Error).message !== 'taken') throw e
       }
       try {
-        return await Room.connect(quickId(slot), `Q${slot}`, me, on, 4500, slot)
+        return await Room.connect(quickId(slot), quickCode(slot), me, on, 4500, slot)
       } catch {
         /* full, playing or gone: next slot */
       }
@@ -248,14 +266,14 @@ export class Room {
 
   /** Quick play: join one particular public lobby (moving over from your own empty one). */
   static joinQuick(slot: number, me: LobbyPlayer, on: RoomEvents): Promise<Room> {
-    return Room.connect(quickId(slot), `Q${slot}`, me, on, 4500, slot)
+    return Room.connect(quickId(slot), quickCode(slot), me, on, 4500, slot)
   }
 
   // ---------------- host ----------------
 
   /** Quick play, host: can a newcomer get in right now? */
   private get quickOpen() {
-    return !this.running && this.players.length < QUICK_MAX
+    return !this.running && this.players.length < this.cap
   }
 
   private accept(c: DataConnection) {
@@ -276,7 +294,7 @@ export class Room {
       }
       if (msg.t === 'hello') {
         const known = this.players.some((p) => p.pid === msg.p.pid)
-        const turnAway = !known && (this.quick ? !this.quickOpen : this.players.length >= MAX_PLAYERS)
+        const turnAway = !known && (this.quick ? !this.quickOpen : this.players.length >= this.cap)
         if (turnAway) {
           c.send({ t: 'bye', reason: this.running ? BYE.running.en : BYE.full.en } satisfies HostMsg)
           setTimeout(() => c.close(), 300)
@@ -285,7 +303,7 @@ export class Room {
         // Quick play: someone new joined, give others a moment longer to find us too
         if (this.quick && !known) {
           const now = performance.now()
-          this.quickEnds = this.players.length + 1 >= QUICK_MAX ? Math.min(this.quickEnds, now + 5000) : Math.max(this.quickEnds, now + 12000)
+          this.quickEnds = this.players.length + 1 >= this.cap ? Math.min(this.quickEnds, now + 5000) : Math.max(this.quickEnds, now + 12000)
         }
         pid = msg.p.pid
         // Same player reconnecting on a new connection: drop the old one (not this one;
@@ -347,7 +365,7 @@ export class Room {
   setRunning(running: boolean) {
     this.running = running
     // Quick play: after a match, the next one starts on a fresh timer
-    if (!running && this.quick) this.quickEnds = performance.now() + QUICK_WAIT * 1000
+    if (!running && this.quick) this.quickEnds = performance.now() + this.quickWait * 1000
     this.broadcastLobby()
     this.on.lobby()
   }
@@ -446,13 +464,14 @@ function friendlyError(type: string, code = '') {
  * one shared connection to the PeerJS server (kept open while you're on the menu).
  */
 let probePeer: Peer | null = null
-export function probeQuick(): Promise<QuickStatus[]> {
+export function probeQuick(duel = false): Promise<QuickStatus[]> {
+  const base = duel ? DUEL_SLOT : 0
   return new Promise((resolve) => {
     const out: QuickStatus[] = []
     let left = QUICK_SLOTS
     const done = () => --left <= 0 && resolve(out.sort((a, b) => a.slot - b.slot))
     const run = (peer: Peer) => {
-      for (let slot = 0; slot < QUICK_SLOTS; slot++) {
+      for (let slot = base; slot < base + QUICK_SLOTS; slot++) {
         let finished = false
         const finish = () => {
           if (finished) return

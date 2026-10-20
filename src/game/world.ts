@@ -40,11 +40,15 @@ export type ArenaKind = 'crater' | 'icecave' | 'plateau' | 'sky' | 'lab'
 export interface WorldOpts {
   theme?: ThemeId
   arena?: ArenaKind
+  /** 1 vs 1: a small clearing in the theme's own style. */
+  duel?: boolean
 }
 
 /** Arena centre and radius (tiles). */
 export const ARENA_C = MAP / 2
 export const ARENA_R = 15
+/** 1 vs 1 arena radius (tiles), around ARENA_C. */
+export const DUEL_R = 12
 
 export class World {
   tiles = new Uint8Array(MAP * MAP)
@@ -67,11 +71,15 @@ export class World {
   rods: { x: number; y: number }[] = []
   /** Psychic lab: size of the floor grid cells (tiles). */
   static readonly LAB_CELL = 3
+  /** 1 vs 1: power-up pads (centre first) and the two spawn spots. */
+  pads: { x: number; y: number }[] = []
+  spawns: [number, number][] = []
 
   constructor(public rng: Rng, opts: WorldOpts = {}) {
     this.theme = THEMES[opts.theme ?? (opts.arena ?? 'forest')]
     this.arena = opts.arena ?? null
     if (this.arena) this.generateArena(this.arena)
+    else if (opts.duel) this.generateDuel()
     else this.generate()
     this.render()
   }
@@ -158,6 +166,48 @@ export class World {
         if (t === T.TALL) this.tall.push(i)
       }
     }
+  }
+
+  /**
+   * 1 vs 1: a round clearing in the woods. Everything is mirrored through the
+   * centre, so both spawns see the same grass, rocks and power-up pads.
+   */
+  private generateDuel() {
+    const rng = this.rng
+    const c = ARENA_C, R = DUEL_R
+    this.tiles.fill(T.TREE)
+    for (let y = 0; y < MAP; y++)
+      for (let x = 0; x < MAP; x++) {
+        const dx = x + 0.5 - c, dy = y + 0.5 - c
+        const d = Math.hypot(dx, dy)
+        if (d > R + Math.cos(Math.atan2(dy, dx) * 6) * 0.6) continue
+        // The stadium circle in the middle
+        this.set(x, y, d > 2.6 && d < 3.4 ? T.PATH : T.GRASS)
+      }
+    // Tile (x, y) and its mirror image through the centre
+    const both = (x: number, y: number, t: T) => {
+      this.set(x, y, t)
+      this.set(2 * c - 1 - x, 2 * c - 1 - y, t)
+    }
+    const blob = (cx: number, cy: number, r: number, t: T) => {
+      for (let y = Math.floor(c + cy - r); y <= c + cy + r; y++)
+        for (let x = Math.floor(c + cx - r); x <= c + cx + r; x++)
+          if (Math.hypot(x + 0.5 - c - cx, y + 0.5 - c - cy) <= r && this.at(x, y) === T.GRASS) both(x, y, t)
+    }
+    // Tall grass to hide in: a big patch on each flank, a small one by each spawn
+    blob(-7.5, -3, 2.4, T.TALL)
+    blob(-4.5, 6.5, 1.7, T.TALL)
+    // Boulders for cover: two by the middle, one beside each spawn
+    both(Math.floor(c - 3), Math.floor(c - 2), T.ROCK)
+    both(Math.floor(c + 5.5), Math.floor(c + 7.5), T.ROCK)
+    // Flowers here and there
+    for (let y = c - R; y < c; y++)
+      for (let x = c - R; x < c + R; x++)
+        if (this.at(x, y) === T.GRASS && Math.hypot(x + 0.5 - c, y + 0.5 - c) > 4 && rng.next() < 0.035) both(x, y, T.FLOWER)
+    this.pads = [{ x: c, y: c }, { x: c - 8, y: c + 3.5 }, { x: c + 8, y: c - 3.5 }]
+    this.spawns = [[c, c + 9], [c, c - 9]]
+    for (const p of this.pads) this.set(Math.floor(p.x), Math.floor(p.y), this.at(Math.floor(p.x), Math.floor(p.y)) === T.PATH ? T.PATH : T.GRASS)
+    this.collect(c, c)
   }
 
   /** A round raid arena in the middle of a walled-off map. */

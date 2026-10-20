@@ -4,6 +4,7 @@ import './style.css'
 import { ALL_PARTNERS, ROSTER, TEAM_SIZE } from './data/pokemon'
 import { BOSS_LIST, type BossId } from './data/bosses'
 import { TRAINERS, type TrainerDef } from './data/trainers'
+import { finalForm } from './game/boss'
 import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
 import { render, view } from './game/render'
 import { TILE } from './game/world'
@@ -98,7 +99,7 @@ let pendingJoin = cleanCode(new URLSearchParams(location.search).get('join') ?? 
 
 /** For the creator stats: what you're doing, and how you're playing. */
 const statsMode = () => (room ? (room.quick ? 'quick' : 'friends') : 'solo') as 'solo' | 'quick' | 'friends'
-initStats(() => (game && viewing && !game.over ? (game.kind === 'raid' ? 'raid' : 'br') : room ? 'lobby' : 'menu'))
+initStats(() => (game && viewing && !game.over ? statsKind(game) : room ? 'lobby' : 'menu'))
 
 // ---------- Account (optional Discord login) ----------
 
@@ -242,6 +243,7 @@ function toMenu(extra: Partial<MenuState> = {}) {
     host: hostRoom,
     join: joinRoom,
     quick: () => quickPlay(),
+    quickDuel: () => quickPlay(false, true),
     team: () => wipe(() => pickTeam(() => wipe(() => toMenu()), () => wipe(() => toMenu()), L('Ready ▶', 'Klaar ▶'))),
     back: () => wipe(toTitle),
   })
@@ -250,7 +252,7 @@ function toMenu(extra: Partial<MenuState> = {}) {
   if (code && profile().name && !extra.error) {
     pendingJoin = ''
     const none = () => {}
-    showMenu({ trainer, team, choice, code, busy: L(`Connecting to ${code}…`, `Verbinden met ${code}…`) }, { solo: none, host: none, join: none, rejoin: none, joinFriend: none, profile: none, quick: none, team: none, back: none })
+    showMenu({ trainer, team, choice, code, busy: L(`Connecting to ${code}…`, `Verbinden met ${code}…`) }, { solo: none, host: none, join: none, rejoin: none, joinFriend: none, profile: none, quick: none, quickDuel: none, team: none, back: none })
     joinRoom(code)
   }
 }
@@ -284,6 +286,9 @@ function hooks(): GameHooks {
   }
 }
 
+/** The match kind as stats and progress know it. */
+const statsKind = (g: Game) => (g.kind === 'raid' ? 'raid' : g.kind === 'duel' ? 'duel' : 'br')
+
 function enterMatch(g: Game) {
   clearScreen()
   stopGame()
@@ -291,9 +296,9 @@ function enterMatch(g: Game) {
   viewing = true
   hideInviteToast()
   presenceChanged()
-  matchStarted(g.kind === 'raid' ? 'raid' : 'br', statsMode(), g.setup.humans.length)
+  matchStarted(statsKind(g), statsMode(), g.setup.humans.length)
   trackMatch({
-    k: g.kind === 'raid' ? 'raid' : 'br',
+    k: statsKind(g),
     m: statsMode(),
     mon: team[0],
     w: g.setup.theme,
@@ -316,15 +321,19 @@ function makeHud(g: Game) {
 const LOADING_TIME = 8
 
 /** Tips splash before a match; `start` drops you in afterwards. */
-function loadingThen(setup: MatchSetup, skippable: boolean, start: () => void) {
+function loadingThen(setup: MatchSetup, skippable: boolean, start: () => void, g?: Game) {
   clearScreen()
   playMusic('menu')
-  const players = setup.humans.map((h) => ({
-    name: h.name,
-    sprite: (TRAINERS.find((t) => t.key === h.trainer) ?? TRAINERS[0]).sprite,
-    mon: h.team[0],
-  }))
-  showLoading({ seconds: LOADING_TIME, players, skippable, bots: Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined }, start)
+  const duel = setup.kind === 'duel'
+  // A duel shows both sides (the CPU too, fully evolved like yours)
+  const players = duel && g?.trainers.length
+    ? g.trainers.map((t) => ({ name: t.name, sprite: t.def.sprite, mon: t.mon?.species.id }))
+    : setup.humans.map((h) => ({
+      name: h.name,
+      sprite: (TRAINERS.find((t) => t.key === h.trainer) ?? TRAINERS[0]).sprite,
+      mon: duel ? finalForm(h.team[0]) : h.team[0],
+    }))
+  showLoading({ seconds: LOADING_TIME, players, skippable, bots: duel ? 0 : Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined, duel }, start)
 }
 
 function startSolo() {
@@ -332,20 +341,20 @@ function startSolo() {
   const setup = setupFor(choice, [me()])
   if (showcaseBoost()) setup.boost = true
   const g = new Game(setup, 0, hooks(), 'solo')
-  loadingThen(setup, true, () => enterMatch(g))
+  loadingThen(setup, true, () => enterMatch(g), g)
 }
 
 const soloAgain = () => wipe(startSolo, { flash: true })
 const soloOtherTeam = () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), L('Start the battle ▶', 'Start de battle ▶')))
 
 function onEnd(r: GameResult) {
-  if (game) trackEnd({ k: game.kind === 'raid' ? 'raid' : 'br', m: statsMode(), r: r.raid ? (r.won ? 'clear' : 'fail') : r.won ? 'win' : 'lose', boss: r.raid?.boss })
+  if (game) trackEnd({ k: statsKind(game), m: statsMode(), r: r.raid ? (r.won ? 'clear' : 'fail') : r.won ? 'win' : 'lose', boss: r.raid?.boss })
   hud?.destroy()
   hud = null
   // XP, mastery, quests and achievements for this match (on the server when signed in)
   const reward = game ? matchEnded({
-    kind: game.kind === 'raid' ? 'raid' : 'br', mode: statsMode(), humans: r.extra?.humans ?? 1,
-    won: r.won, place: r.place, total: r.total, time: r.time, kos: r.kos, caught: r.caught, partner: team[0],
+    kind: statsKind(game), mode: statsMode(), humans: r.extra?.humans ?? 1,
+    won: r.won, place: r.place, total: r.total, time: r.time, kos: r.duel ? r.duel.mine : r.kos, lost: r.duel?.theirs, caught: r.caught, partner: team[0],
     boss: r.raid?.boss, share: r.raid?.share, lives: r.raid?.lives,
     legend: r.extra?.legend, evolved: r.extra?.evolved, crystal: r.extra?.crystal,
   }) : undefined
@@ -502,6 +511,7 @@ function roomEvents() {
     },
     closed: (reason: string) => {
       const wasQuick = room?.quick && !game
+      const wasDuel = room?.choice.kind === 'duel'
       rememberRoom()
       room = null
       remotes.clear()
@@ -509,7 +519,7 @@ function roomEvents() {
       if (wasQuick) {
         sfx.leave()
         lobbyUi?.toast(L('The host left: finding a new lobby…', 'De host is weg: we zoeken een nieuwe lobby…'))
-        return quickPlay(true)
+        return quickPlay(true, wasDuel)
       }
       sfx.error()
       wipe(() => toMenu({ error: reason }))
@@ -533,11 +543,11 @@ function roomEvents() {
   }
 }
 
-function hostRoom() {
+function hostRoom(c?: MatchChoice) {
   Room.create(me(), roomEvents())
     .then((r) => {
       room = r
-      r.choice = { ...choice }
+      r.choice = { ...(c ?? choice) }
       wipe(toLobby)
     })
     .catch((e: Error) => {
@@ -593,7 +603,14 @@ function toLobby() {
   playMusic('menu')
   lobbyUi = showLobby(room, {
     start: hostStart,
-    choice: (c) => room?.setChoice(c),
+    choice: (c) => {
+      // A duel is for two: not with more people in the lobby
+      if (c.kind === 'duel' && room && room.players.length > 2) {
+        sfx.error()
+        return lobbyUi?.toast(L('1 vs 1 is for exactly 2 players', '1 tegen 1 is voor precies 2 spelers'))
+      }
+      room?.setChoice(c)
+    },
     team: () => {
       lobbyUi = null
       // Picking a new team: not ready until you're done
@@ -616,12 +633,12 @@ function toLobby() {
 /** Leave the multiplayer room (as host this closes it for everyone) and go to the main menu. */
 // ---------- Quick play ----------
 
-/** Find a public lobby (or host one). `again`: we're already on the lobby screen. */
-function quickPlay(again = false) {
+/** Find a public lobby (or host one). `again`: we're already on the lobby screen. `duel`: 1 vs 1. */
+function quickPlay(again = false, duel = false) {
   stopProbe()
   if (!profile().name) setName(`Trainer ${Math.floor(1000 + Math.random() * 9000)}`)
   ready = false
-  Room.quick(me(), roomEvents())
+  Room.quick(me(), roomEvents(), -1, duel)
     .then((r) => {
       room = r
       if (!again) return wipe(toLobby)
@@ -657,7 +674,7 @@ window.setInterval(() => {
   }
   if (r.players.length === 1 && !quickMerge.busy && now >= quickMerge.at && lobbyUi) {
     quickMerge = { at: now + 8000, busy: true }
-    probeQuick()
+    probeQuick(r.choice.kind === 'duel')
       .then((all) => {
         const target = all.find((s) => s.slot !== r.quickSlot && s.open && s.players >= 1 && (s.players > 1 || s.slot < r.quickSlot))
         if (!target || room !== r || r.players.length !== 1) return

@@ -16,6 +16,7 @@
   --s2: #d95926; /* raid */
   --s3: #199e70; /* lobby */
   --s4: #c98500; /* menu */
+  --s5: #8a5ad6; /* 1 vs 1 */
   --accent: #3987e5;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
@@ -37,6 +38,7 @@
     --s2: #eb6834;
     --s3: #1baf7a;
     --s4: #eda100;
+    --s5: #9d72f0;
     --accent: #2a78d6;
   }
 }

@@ -42,6 +42,15 @@ function raidTips(boss: BossDef): Tip[] {
   ]
 }
 
+/** 1 vs 1 tips: rounds, power-ups, grass and the ring. */
+const duelTips = (): Tip[] => [
+  { icon: '<i class="ld-up">▲</i>', title: L('Best of three', 'Best of three'), text: L('Win two rounds to take the duel. Both Pokémon are fully evolved at Lv 50 with all four moves: pick your partner for the match-up!', 'Win twee rondes en het duel is van jou. Beide Pokémon zijn volledig geëvolueerd op Lv 50 met alle vier de aanvallen: kies je partner op de match-up!') },
+  { icon: `<img class="px" src="${itemUrl('x-attack')}" alt="">`, title: L('Power-ups', 'Power-ups'), text: L('Three pads drop power-ups: <b>X Attack</b> hits harder, <b>X Speed</b> moves and attacks faster, <b>X Defense</b> takes less damage, a <b>Hyper Potion</b> heals. The middle pad has the best ones.', 'Op drie plekken verschijnen power-ups: <b>X Attack</b> raakt harder, <b>X Speed</b> loopt en valt sneller aan, <b>X Defense</b> krijgt minder schade, een <b>Hyper Potion</b> geneest. In het midden liggen de beste.') },
+  { icon: '<i class="ld-eye"></i>', title: L('Hide and ambush', 'Verstoppen en verrassen'), text: L("Tall grass hides you, until you attack. Your rival can't see your HP while you're in there.", 'In het hoge gras ben je onzichtbaar, tot je aanvalt. Je tegenstander ziet je HP dan ook niet.') },
+  { icon: '<i class="ld-storm">⚡</i>', title: L('The ring', 'De ring'), text: L(`After 40 seconds a ring closes in on the middle. Outside it you lose HP, so nobody can hide forever.`, `Na 40 seconden trekt een ring samen naar het midden. Daarbuiten verlies je HP, dus niemand kan zich eeuwig verstoppen.`) },
+  { icon: '<i class="ld-heart">♥</i>', title: L('No healing by itself', 'Geen herstel vanzelf'), text: L("In a duel your HP doesn't come back by itself. Fight for the Hyper Potions.", 'In een duel komt je HP niet vanzelf terug. Vecht om de Hyper Potions.') },
+]
+
 export interface LoadingPlayer {
   name: string
   sprite: string
@@ -52,7 +61,7 @@ export interface LoadingPlayer {
  * Shows the splash for `seconds`, then calls `done`. With `skippable` a button
  * lets you start right away (solo); in multiplayer everyone waits together.
  */
-export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; skippable: boolean; bots: number; raid?: BossId }, done: () => void) {
+export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; skippable: boolean; bots: number; raid?: BossId; duel?: boolean }, done: () => void) {
   const app = document.getElementById('app')!
   const el = document.createElement('div')
   el.className = 'loading'
@@ -60,17 +69,19 @@ export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; s
   const TIPS = battleTips()
   const rest = TIPS.slice(2).sort(() => Math.random() - 0.5)
   const boss = opts.raid ? BOSSES[opts.raid] : null
-  const tips = boss ? raidTips(boss) : [TIPS[Math.random() < 0.5 ? 0 : 1], TIPS[2], ...rest]
+  const tips = boss ? raidTips(boss) : opts.duel ? duelTips() : [TIPS[Math.random() < 0.5 ? 0 : 1], TIPS[2], ...rest]
   el.innerHTML = `
     <div class="ld-bg"></div>
     <div class="ld-l">
     ${boss
       ? `<div class="ld-head"><small>RAID · ${tx(boss.title).toUpperCase()}</small><b>${boss.name}</b></div>
     <div class="ld-boss" style="--c:${boss.color}"><img class="px" src="${animatedUrl(boss.species)}" onerror="this.onerror=null;this.src='${spriteUrl(boss.species)}'" alt=""></div>`
-      : `<div class="ld-head"><small>BATTLE ROYALE</small><b>${L('Loading match', 'Potje wordt geladen')}</b></div>`}
-    <div class="ld-players">
-      ${opts.players.map((p, i) => `<div class="ld-p" style="--d:${i * 70}ms"><img class="px" src="${trainerSpriteUrl(p.sprite)}" alt="">${p.mon ? `<img class="px ld-mon" src="${spriteUrl(p.mon)}" alt="">` : ''}<span>${esc(p.name)}</span></div>`).join('')}
-      ${opts.bots && !boss ? `<div class="ld-p bots" style="--d:${opts.players.length * 70}ms"><b>+${opts.bots}</b><span>bots</span></div>` : ''}
+      : opts.duel
+        ? `<div class="ld-head"><small>1 VS 1 · BEST OF 3</small><b>${L('Duel', 'Duel')}</b></div>`
+        : `<div class="ld-head"><small>BATTLE ROYALE</small><b>${L('Loading match', 'Potje wordt geladen')}</b></div>`}
+    <div class="ld-players ${opts.duel ? 'vs' : ''}">
+      ${opts.players.map((p, i) => `${opts.duel && i === 1 ? '<em class="ld-vs">VS</em>' : ''}<div class="ld-p" style="--d:${i * 70}ms"><img class="px" src="${trainerSpriteUrl(p.sprite)}" alt="">${p.mon ? `<img class="px ld-mon" src="${spriteUrl(p.mon)}" alt="">` : ''}<span>${esc(p.name)}</span></div>`).join('')}
+      ${opts.bots && !boss && !opts.duel ? `<div class="ld-p bots" style="--d:${opts.players.length * 70}ms"><b>+${opts.bots}</b><span>bots</span></div>` : ''}
     </div>
     </div>
     <div class="ld-r">

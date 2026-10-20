@@ -6,7 +6,12 @@ Een real-time Pokémon battle royale voor de browser, mobile first, in de stijl 
 
 **Speel:** https://stormbreak.app
 
-Er zijn twee modi: **Battle Royale** (12 trainers, laatste die overblijft wint) en **Raid** (alleen of samen tegen één enorme eindbaas). Beide kun je solo of met vrienden spelen.
+Er zijn drie modi:
+- **Battle Royale:** 12 trainers, wie als laatste overblijft wint.
+- **1 vs 1:** een duel, best of 3, online, tegen de CPU of met een vriend.
+- **Raid:** alleen of samen tegen één enorme eindbaas.
+
+Op het home-scherm kies je eerst de modus en dan hoe je speelt: online, solo/CPU of met vrienden.
 
 Na een korte uitleg vul je je naam in en kies je: **solo** tegen bots, of **samen** met vrienden. Je kiest een trainer en één partner-Pokémon uit een roster van 24 (te filteren op rol en op melee/ranged); in de wereld vang je er nog twee bij (max. 3). Daarna word je gedropt op een grote kaart met in totaal 12 trainers. Je Pokémon loopt achter je aan en vecht in real time. Versla en vang wilde Pokémon, raap Master Balls en items op en blijf binnen de zone. Wie als laatste trainer overblijft, wint.
 
@@ -36,10 +41,10 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 
 Zit je naast iemand? Dan heb je zo een potje:
 
-1. Speler 1 vult in het hoofdmenu een naam in, tikt **Multiplayer** en dan **Potje maken**. Er verschijnt een code van 4 tekens en een QR-code.
-2. Speler 2 tikt **Multiplayer** en typt de code bij **Meedoen**, of scant de QR-code met de camera. De link opent de game en doet meteen mee.
+1. Speler 1 vult in het hoofdmenu een naam in, kiest een modus, tikt **Met vrienden** en dan **Potje maken**. Er verschijnt een code van 4 tekens en een QR-code.
+2. Speler 2 tikt bij een modus op **Met vrienden** en typt de code bij **Meedoen**, of scant de QR-code met de camera. De link opent de game en doet meteen mee.
 3. In de lobby kiest iedereen een trainer en Pokémon met **Team kiezen** en tikt op **Klaar**. Je ziet bij iedereen of die klaar is, en je kunt chatten (ook met snelle knoppen).
-4. De host kiest bovenin de lobby de modus (Battle Royale of Raid) en bij een battle royale de wereld. De anderen zien die keuze meteen.
+4. De host kiest bovenin de lobby de modus (Battle Royale, 1 vs 1 of Raid) en de wereld. De anderen zien die keuze meteen. 1 vs 1 kan alleen met precies 2 spelers.
 5. Zodra iedereen klaar is, tikt de host **Start!** Iedereen ziet 8 seconden een laadscherm met tips en start dan tegelijk. De lege plekken (tot 12) worden bots.
 
 In het potje zelf kun je ook chatten via de 💬-knop (op desktop: Enter).
@@ -106,6 +111,33 @@ Elk potje heeft twee gebeurtenissen, tussen de legendarische Pokémon door. Beid
 - **Bevoorrading:** na 10 seconden aftellen valt er een kist met een Master Ball, Potions, Rare Candy en een Revive.
 - **Zwerm:** zes wilde Pokémon van dezelfde ongewone of zeldzame soort in een stuk hoog gras.
 
+## 1 vs 1
+
+Een duel tussen twee trainers in een kleine arena, best of 3.
+- **Opzet:** de arena is een open plek in het bos (in de stijl van de gekozen wereld), voor beide kanten gespiegeld. Hij heeft:
+  - hoog gras om je te verstoppen;
+  - rotsen als dekking;
+  - drie plekken met power-ups.
+- **Kracht:** beide partners zijn volledig geëvolueerd op Lv 50 met alle vier de aanvallen, net als in een raid. Het gaat om skill en de match-up van types en rollen. HP herstelt niet vanzelf.
+- **Rondes:** wie de Pokémon van de ander verslaat, wint de ronde. Daarna begint de volgende met volle HP vanaf de startplekken, na een aftelling van 3 seconden. Wie eerst twee rondes wint, wint het duel.
+- **Power-ups:** ze liggen op drie plekken, de eerste na 6 seconden en na het oppakken 14 seconden later weer:
+  - **X Attack:** +35% schade, 10 s;
+  - **X Speed:** sneller lopen en kortere cooldowns, 10 s;
+  - **X Defense:** −40% schade, 10 s;
+  - **Hyper Potion:** +40% HP.
+
+  Het middelste plekje geeft vaker X Attack of een Hyper Potion.
+- **De ring:** na 40 seconden trekt een ring in 25 seconden samen naar het midden. Daarbuiten verlies je HP, zodat niemand zich eeuwig kan verstoppen.
+- **Spelen:**
+  - **Online:** eigen openbare lobby's, apart van die van Snel spel. Je komt bij de eerste die op een tegenstander wacht; vind je niemand binnen 30 s, dan speel je tegen de CPU.
+  - **Tegen de CPU:** de CPU zoekt je op in het gras, pakt power-ups en blijft binnen de ring.
+  - **Met een vriend:** een eigen duel met een code. Een duel-lobby laat maximaal 2 spelers toe.
+- **Progressie:**
+  - **Tegen een mens:** XP per gewonnen ronde plus winst-XP en PvP-punten.
+  - **Tegen de CPU:** minder XP, en de punten tellen voor PvE.
+  - **Prestaties:** drie nieuwe, met de titel "Gladiator" bij 10 gewonnen duels.
+- **Code:** `src/game/duel.ts` (rondes, ring, power-ups), de arena in `src/game/world.ts` (`generateDuel`) en de CPU in `src/game/ai.ts`.
+
 ## Raid
 
 Een raid is PvE: jij (en tot 11 vrienden) tegen één legendarische baas, in een eigen arena. Er is geen storm en er zijn geen bots of wilde Pokémon. De baas is een verrassing: hij wordt willekeurig gekozen (nooit twee keer dezelfde na elkaar) en je ziet hem pas op het laadscherm.
@@ -160,7 +192,7 @@ Gasten en accounts gebruiken dezelfde regels (`api/_progress.ts`). Een gast bewa
   - Op slot zie je ze met het level waarop ze vrijkomen. Het profiel heeft een tabblad "Vrijspelen" met de hele road.
   - De volgorde staat in `REWARD_ROAD` in `api/_progress.ts`; de signature-aanvallen in `SIGNATURE` in `src/data/moves.ts`.
 - **Titels:** per level (Beginner → Stormbreker), via prestaties en via mastery. Je kiest zelf welke titel je laat zien in je profiel. Je level en titel staan in de lobby.
-- **27 prestaties**, elk met bonus-XP en soms een titel.
+- **30 prestaties**, elk met bonus-XP en soms een titel.
 - **Dagopdrachten:** elke dag dezelfde 3 voor iedereen (om middernacht, Nederlandse tijd), plus een teller voor dagen op rij.
 - **Ranglijsten (week en altijd):**
   - **PvP:** battle royale met andere mensen. Je krijgt punten voor je plaats en +4 per uitgeschakelde trainer.

@@ -8,6 +8,7 @@ import { boardHtml } from './scoreboard'
 import { L } from '../i18n'
 import type { Reward } from '../progress'
 import { rewardsHtml, runRewards } from './rewards'
+import { esc } from './menu'
 
 /** End-of-match screen: placement badge, your trainer and best Pokémon, counted stats. */
 export interface ResultAction {
@@ -20,6 +21,7 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
   const el = document.getElementById('screen')!
   const tier = r.won ? 'gold' : r.place <= 3 ? 'silver' : 'bronze'
   const boss = r.raid ? BOSSES[r.raid.boss] : null
+  const duel = r.duel
   el.innerHTML = `
     <div class="res ${r.won ? 'won' : ''} ${reward ? 'has-rw' : ''}">
       <canvas class="confetti"></canvas>
@@ -32,7 +34,11 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
           <div class="sb-scroll">${boardHtml(r.board, !!r.raid, r.me)}</div>
         </div>
         <div class="res-mine">
-        ${boss
+        ${duel
+          ? `<div class="medal duel ${r.won ? 'gold' : 'bronze'}"><small>${r.won ? L('VICTORY', 'GEWONNEN') : L('DEFEAT', 'VERLOREN')}</small><b>${duel.mine}-${duel.theirs}</b></div>
+        <div class="res-title">${r.won ? L('Duel won!', 'Duel gewonnen!') : L('Duel lost', 'Duel verloren')}</div>
+        <div class="res-sub">${L(`1 vs 1 against ${esc(duel.opp)}`, `1 tegen 1 tegen ${esc(duel.opp)}`)}</div>`
+          : boss
           ? `<div class="medal raid ${r.won ? 'gold' : 'bronze'}" style="--c:${boss.color}"><img class="px" src="${spriteUrl(boss.species)}" alt=""></div>
         <div class="res-title">${r.won ? L('Raid cleared!', 'Raid geslaagd!') : L('Raid failed', 'Raid mislukt')}</div>
         <div class="res-sub">${r.won ? L(`${boss.name} is defeated`, `${boss.name} is verslagen`) : L(`${boss.name} was too strong… try again`, `${boss.name} was te sterk… probeer het nog eens`)}</div>`
@@ -45,7 +51,11 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
           <div class="res-plat"></div>
         </div>
         <div class="res-best"><b>${r.best.name}</b> · Lv ${r.best.level}</div>
-        <div class="res-stats">${r.raid
+        <div class="res-stats">${duel
+          ? `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>${L('Time', 'Tijd')}</span></div>
+          <div><b data-n="${duel.mine}">0</b><span>${L('Rounds won', 'Rondes gewonnen')}</span></div>
+          <div><b data-n="${duel.dmg}">0</b><span>${L('Damage', 'Schade')}</span></div>`
+          : r.raid
           ? `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>${L('Time', 'Tijd')}</span></div>
           <div><b data-n="${r.raid.dmg}">0</b><span>${L('Damage', 'Schade')} (${r.raid.share}%)</span></div>
           <div><b data-n="${r.raid.lives}">0</b><span>${L('Lives left', 'Levens over')}</span></div>`
@@ -64,7 +74,7 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
   playMusic(r.won ? 'victory' : 'defeat')
   setTimeout(() => cry(r.best.species.id, 0.3), 600)
   // The medal lands with a ding (higher for a better place)
-  setTimeout(() => sfx.medal(r.raid ? (r.won ? 1 : 0) : r.place), 350)
+  setTimeout(() => sfx.medal(r.raid || r.duel ? (r.won ? 1 : 0) : r.place), 350)
 
   // Count the stats up
   el.querySelectorAll<HTMLElement>('.res-stats b').forEach((b, i) => {

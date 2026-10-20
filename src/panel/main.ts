@@ -77,12 +77,13 @@ function duration(sec: number) {
 /** Sum of the fields matching a prefix over some days. */
 const sum = (days: Day[], test: (field: string) => boolean) =>
   days.reduce((t, d) => t + Object.entries(d).reduce((a, [f, v]) => a + (f !== 'day' && test(f) ? num(v) : 0), 0), 0)
-const matches = (d: Day, k?: 'br' | 'raid') => sum([d], (f) => f.startsWith(k ? `m:${k}:` : 'm:'))
-const playTime = (d: Day) => num(d['pt:br']) + num(d['pt:raid'])
+const matches = (d: Day, k?: 'br' | 'raid' | 'duel') => sum([d], (f) => f.startsWith(k ? `m:${k}:` : 'm:'))
+const playTime = (d: Day) => num(d['pt:br']) + num(d['pt:raid']) + num(d['pt:duel'])
 
 const STATES: { id: string; name: string; color: string }[] = [
   { id: 'br', name: 'Battle royale', color: 'var(--s1)' },
   { id: 'raid', name: 'Raid', color: 'var(--s2)' },
+  { id: 'duel', name: '1 vs 1', color: 'var(--s5)' },
   { id: 'lobby', name: 'Lobby', color: 'var(--s3)' },
   { id: 'menu', name: 'Menu', color: 'var(--s4)' },
 ]
@@ -534,12 +535,15 @@ function draw() {
   ]))
   const brW = sum(days, (f) => f === 'e:br:win'), brL = sum(days, (f) => f === 'e:br:lose')
   const rC = sum(days, (f) => f === 'e:raid:clear'), rF = sum(days, (f) => f === 'e:raid:fail')
+  const dW = sum(days, (f) => f === 'e:duel:win'), dL = sum(days, (f) => f === 'e:duel:lose')
   const results = card('Uitslagen', `Afgelopen potjes · ${range} dagen`, 'c4')
   results.append(barList([
     { name: 'BR gewonnen', value: brW, note: pct(brW, brL) },
     { name: 'BR verloren', value: brL },
     { name: 'Raid verslagen', value: rC, note: pct(rC, rF) },
     { name: 'Raid mislukt', value: rF },
+    { name: '1v1 gewonnen', value: dW, note: pct(dW, dL) },
+    { name: '1v1 verloren', value: dL },
   ]))
   const people = card('Spelers per potje', `Echte spelers in een potje · ${range} dagen`, 'c4')
   people.append(barList(Array.from({ length: 12 }, (_, i) => ({ name: i ? `${i + 1} spelers` : '1 speler', value: sum(days, (f) => f === `h:${i + 1}`) })), 12))
@@ -574,11 +578,11 @@ function draw() {
   const scroll = h('div', 'tscroll')
   const table = h('table')
   const thead = h('tr')
-  for (const c of ['Datum', 'Spelers', 'Nieuw', 'Bezoeken', 'BR', 'Raid', 'Speeltijd', 'Piek']) thead.append(h('th', '', c))
+  for (const c of ['Datum', 'Spelers', 'Nieuw', 'Bezoeken', 'BR', 'Raid', '1v1', 'Speeltijd', 'Piek']) thead.append(h('th', '', c))
   table.append(thead)
   for (const d of [...days].reverse()) {
     const tr = h('tr')
-    for (const c of [dayLabel(d.day), fmt(d.players), fmt(num(d.new)), fmt(num(d.v)), fmt(matches(d, 'br')), fmt(matches(d, 'raid')), duration(playTime(d)), fmt(num(d.pk))]) tr.append(h('td', '', c))
+    for (const c of [dayLabel(d.day), fmt(d.players), fmt(num(d.new)), fmt(num(d.v)), fmt(matches(d, 'br')), fmt(matches(d, 'raid')), fmt(matches(d, 'duel')), duration(playTime(d)), fmt(num(d.pk))]) tr.append(h('td', '', c))
     table.append(tr)
   }
   scroll.append(table)
@@ -592,6 +596,7 @@ function draw() {
     columns(ch2, labels, [
       { name: 'Battle royale', color: 'var(--s1)', values: days.map((d) => matches(d, 'br')) },
       { name: 'Raid', color: 'var(--s2)', values: days.map((d) => matches(d, 'raid')) },
+      { name: '1 vs 1', color: 'var(--s5)', values: days.map((d) => matches(d, 'duel')) },
     ], { tipHead: head })
     columns(ch3, hours.map((x) => `${x}u`), [{ name: 'tegelijk online (piek)', color: 'var(--s1)', values: hours.map((x) => (x <= nowHour ? num(today[`pk:${x}`]) : 0)) }], {
       height: 150,
@@ -601,6 +606,7 @@ function draw() {
     columns(ch4, labels, [
       { name: 'Battle royale', color: 'var(--s1)', values: days.map((d) => num(d['pt:br']) / 60), fmt: mins },
       { name: 'Raid', color: 'var(--s2)', values: days.map((d) => num(d['pt:raid']) / 60), fmt: mins },
+      { name: '1 vs 1', color: 'var(--s5)', values: days.map((d) => num(d['pt:duel']) / 60), fmt: mins },
     ], { tipHead: head, fmtAxis: (v) => fmt(Math.round(v)) })
   }
   paint()

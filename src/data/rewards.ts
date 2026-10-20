@@ -31,6 +31,7 @@ const TITLES: Record<string, T> = {
   allrounder: ['Jack of All Trades', 'Alleskunner'],
   dedicated: ['Dedicated', 'Toegewijd'],
   regular: ['Regular', 'Vaste klant'],
+  gladiator: ['Gladiator', 'Gladiator'],
 }
 
 export function titleName(id: string) {
@@ -59,6 +60,9 @@ export const ACH_INFO: Record<string, { icon: string; name: T; desc: T }> = {
   raid_all: { icon: '🌋', name: ['Legend hunter', 'Legendejager'], desc: ['Defeat all 5 raid bosses', 'Versla alle 5 raid-bazen'] },
   raid_flawless: { icon: '🛡️', name: ['Untouchable', 'Onaantastbaar'], desc: ['Clear a raid without losing a life', 'Haal een raid zonder een leven te verliezen'] },
   raid_mvp: { icon: '🎖️', name: ['Raid MVP', 'Raid-MVP'], desc: ['Do half the boss damage in a raid with others', 'Doe de helft van de baasschade in een raid met anderen'] },
+  duel_first: { icon: '⚔️', name: ['En garde!', 'En garde!'], desc: ['Win a 1 vs 1 duel', 'Win een 1 tegen 1-duel'] },
+  duel_10: { icon: '🛡️', name: ['Gladiator', 'Gladiator'], desc: ['Win 10 duels', 'Win 10 duels'] },
+  duel_flawless: { icon: '💫', name: ['Flawless', 'Foutloos'], desc: ['Win a duel 2-0 against a person', 'Win een duel met 2-0 tegen een speler'] },
   mp_first: { icon: '🤝', name: ['Better together', 'Samen sterker'], desc: ['Play a match with other people', 'Speel een potje met andere mensen'] },
   mp_win: { icon: '🥇', name: ['Duelist', 'Duellist'], desc: ['Win a battle royale against other people', 'Win een battle royale tegen andere mensen'] },
   partners_5: { icon: '🧩', name: ['Team player', 'Teamspeler'], desc: ['Play with 5 different partners', 'Speel met 5 verschillende partners'] },
@@ -109,6 +113,8 @@ export function xpLabel(key: string) {
     evolved: ['Evolutions', 'Evoluties'],
     friends: ['With other players +20%', 'Met andere spelers +20%'],
     firstwin: ['First win of the day', 'Eerste winst van de dag'],
+    rounds: ['Rounds won', 'Rondes gewonnen'],
+    duelwin: ['Duel won!', 'Duel gewonnen!'],
   }
   return m[key] ? t(m[key]) : key
 }

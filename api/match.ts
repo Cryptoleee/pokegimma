@@ -66,7 +66,7 @@ export async function POST(req: Request) {
       const [n] = await pipeline([['INCR', `mtc:${uid}:${hour}`], ['EXPIRE', `mtc:${uid}:${hour}`, 3600]])
       if (Number(n) > MATCHES_PER_HOUR) return json({ error: 'slow down' }, 429)
       const id = token(8)
-      const kind = b.kind === 'raid' ? 'raid' : 'br'
+      const kind = b.kind === 'raid' || b.kind === 'duel' ? b.kind : 'br'
       const mode = b.mode === 'quick' || b.mode === 'friends' ? b.mode : 'solo'
       const humans = Math.max(1, Math.min(12, Math.floor(Number(b.humans) || 1)))
       await pipeline([['SET', `mt:${uid}:${id}`, JSON.stringify({ at: now, kind, mode, humans }), 'EX', 3600]])

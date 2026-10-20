@@ -164,6 +164,10 @@ export interface BotBrain {
   stuckT: number
   mode: string
   strafe: number
+  /** 1 vs 1: where the opponent was last seen, and when. */
+  seenX?: number
+  seenY?: number
+  seenT?: number
 }
 
 export class Trainer {
@@ -217,6 +221,12 @@ export class Trainer {
   catchCd = 0
   /** Who this player is watching after being knocked out. */
   spectate: Trainer | null = null
+  /** Times the host put this trainer somewhere else (a new duel round): clients snap there. */
+  tpN = 0
+  /** 1 vs 1: power-ups still running (seconds): X Attack, X Speed, X Defense. */
+  atkT = 0
+  spdT = 0
+  defT = 0
   /** Throw animation (Poké Ball / Master Ball). */
   throwFx: { x: number; y: number; tx: number; ty: number; t: number; master: boolean } | null = null
 

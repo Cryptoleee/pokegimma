@@ -7,7 +7,7 @@
  * changes how strong you are, so PvP stays fair.
  */
 
-export type Kind = 'br' | 'raid'
+export type Kind = 'br' | 'raid' | 'duel'
 export type Mode = 'solo' | 'quick' | 'friends'
 
 /** What one player's match looked like (from the results screen). */
@@ -29,6 +29,8 @@ export interface Report {
   /** Raid: your share of the boss's HP (%), lives left. */
   share?: number
   lives?: number
+  /** Duel: rounds you lost (rounds won are `kos`). */
+  lost?: number
   /** Legendaries caught, evolutions, grabbed the Evolution Crystal. */
   legend?: number
   evolved?: number
@@ -117,6 +119,9 @@ export interface Stats {
   used: number[]
   /** Best single match: knockouts. */
   bestKos: number
+  /** 1 vs 1 duels won, and won against a person. */
+  dw: number
+  dpw: number
 }
 
 export interface Daily {
@@ -153,7 +158,7 @@ export interface Progress {
 export function newProgress(): Progress {
   return {
     v: 1, xp: 0, partners: {}, ach: [],
-    stats: { m: 0, w: 0, top3: 0, kos: 0, caught: 0, raids: 0, bosses: [], legend: 0, crystal: 0, evolved: 0, mp: 0, mpw: 0, time: 0, used: [], bestKos: 0 },
+    stats: { m: 0, w: 0, top3: 0, kos: 0, caught: 0, raids: 0, bosses: [], legend: 0, crystal: 0, evolved: 0, mp: 0, mpw: 0, time: 0, used: [], bestKos: 0, dw: 0, dpw: 0 },
     day: '', streak: 0, bestStreak: 0, daily: { day: '', p: [0, 0, 0], firstWin: false }, title: '', shiny: [], pvp: 0, pve: 0,
   }
 }
@@ -262,6 +267,9 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'raid_all', xp: 600, title: 'legendhunter', test: (p) => BOSS_IDS.every((b) => p.stats.bosses.includes(b)) },
   { id: 'raid_flawless', xp: 300, test: (_, r) => !!r && r.kind === 'raid' && r.won && (r.lives ?? 0) >= RAID_LIVES },
   { id: 'raid_mvp', xp: 250, test: (_, r) => !!r && r.kind === 'raid' && r.won && r.humans >= 2 && (r.share ?? 0) >= 50 },
+  { id: 'duel_first', xp: 150, test: (p) => p.stats.dw >= 1 },
+  { id: 'duel_10', xp: 400, title: 'gladiator', test: (p) => p.stats.dw >= 10 },
+  { id: 'duel_flawless', xp: 250, test: (_, r) => !!r && r.kind === 'duel' && r.won && r.humans >= 2 && (r.lost ?? 1) === 0 },
   { id: 'mp_first', xp: 100, test: (p) => p.stats.mp >= 1 },
   { id: 'mp_win', xp: 300, title: 'duelist', test: (p) => p.stats.mpw >= 1 },
   { id: 'partners_5', xp: 150, test: (p) => p.stats.used.length >= 5 },
@@ -319,8 +327,9 @@ export const FIRST_WIN_XP = 100
 /** Clamp a report from the outside world to sane values. `maxTime`: seconds since the match started. */
 export function sanitize(raw: Partial<Report>, maxTime = 1800): Report | null {
   const int = (v: unknown, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.floor(Number(v) || 0)))
-  const kind: Kind = raw.kind === 'raid' ? 'raid' : 'br'
+  const kind: Kind = raw.kind === 'raid' || raw.kind === 'duel' ? raw.kind : 'br'
   const mode: Mode = raw.mode === 'quick' || raw.mode === 'friends' ? raw.mode : 'solo'
+  if (kind === 'duel') return sanitizeDuel(raw, mode, maxTime, int)
   const total = int(raw.total, kind === 'br' ? 4 : 1, 12)
   const time = int(raw.time, 0, Math.min(1500, maxTime))
   // Nobody wins a battle royale in under a minute and a half
@@ -350,13 +359,37 @@ export function sanitize(raw: Partial<Report>, maxTime = 1800): Report | null {
   return r
 }
 
+/**
+ * A duel: best of three rounds. A round takes at least ~6 s (moves need to land
+ * and the next round starts after a countdown), so a 2-0 needs ~20 s.
+ */
+function sanitizeDuel(raw: Partial<Report>, mode: Mode, maxTime: number, int: (v: unknown, lo: number, hi: number) => number): Report {
+  const time = int(raw.time, 0, Math.min(900, maxTime))
+  const rounds = Math.min(3, Math.floor(time / 6))
+  const kos = int(raw.kos, 0, Math.min(2, rounds))
+  const lost = int(raw.lost, 0, Math.min(2, rounds - kos))
+  const won = !!raw.won && kos === 2 && lost < 2 && time >= 20
+  return {
+    kind: 'duel', mode,
+    humans: mode === 'solo' ? 1 : int(raw.humans, 1, 2),
+    won, place: won ? 1 : 2, total: 2, time, kos, lost, caught: 0,
+    partner: PARTNERS.includes(Number(raw.partner)) ? Number(raw.partner) : 0,
+    legend: 0, evolved: 0, crystal: false,
+  }
+}
+
 export type XpLine = [key: string, xp: number]
 
 /** XP for the match itself (before quests and achievements), with what it's for. */
 export function matchXp(r: Report): XpLine[] {
   const lines: XpLine[] = [['match', 25]]
   if (r.time >= 10) lines.push(['time', Math.min(60, Math.floor(r.time / 10))])
-  if (r.kind === 'br') {
+  if (r.kind === 'duel') {
+    // Against a person it's worth more than against the CPU (no quick XP farm)
+    const people = r.humans >= 2
+    if (r.kos) lines.push(['rounds', r.kos * (people ? 15 : 10)])
+    if (r.won) lines.push(['duelwin', people ? 100 : 30])
+  } else if (r.kind === 'br') {
     if (r.kos) lines.push(['kos', Math.min(10, r.kos) * 30])
     if (r.caught) lines.push(['caught', Math.min(10, r.caught) * 8])
     if (r.won) lines.push(['win', 150])
@@ -379,6 +412,7 @@ export function matchXp(r: Report): XpLine[] {
 /** Ranking points: PvP = battle royale with other people; PvE = raids and battle royale against bots. */
 export function pointsFor(r: Report): { pvp: number; pve: number } {
   if (r.kind === 'raid') return { pvp: 0, pve: r.won ? 25 + Math.round(Math.min(100, r.share ?? 0) / 4) : Math.round((r.share ?? 0) / 10) }
+  if (r.kind === 'duel') return r.humans >= 2 ? { pvp: (r.won ? 20 : 3) + 4 * r.kos, pve: 0 } : { pvp: 0, pve: (r.won ? 6 : 1) + r.kos }
   const place = r.won ? 30 : r.place === 2 ? 20 : r.place === 3 ? 15 : r.place <= Math.ceil(r.total / 2) ? 8 : 3
   if (r.humans >= 2) return { pvp: place + 4 * Math.min(10, r.kos), pve: 0 }
   return { pvp: 0, pve: (r.won ? 10 : r.place <= 3 ? 5 : 1) + Math.min(10, r.kos) }
@@ -443,6 +477,9 @@ export function applyMatch(p: Progress, r: Report, day: string): Outcome {
     if (r.won) s.w++
     if (r.place <= 3) s.top3++
     if (r.won && r.humans >= 2) s.mpw++
+  } else if (r.kind === 'duel') {
+    if (r.won) s.dw++
+    if (r.won && r.humans >= 2) s.dpw++
   } else if (r.won) {
     s.raids++
     if (r.boss && !s.bosses.includes(r.boss)) s.bosses.push(r.boss)
@@ -550,6 +587,7 @@ export function mergeGuest(acc: Progress, guest: Partial<Progress>): Progress {
   s.time += cap(gs.time, 200 * 600)
   s.bestKos = Math.max(s.bestKos, cap(gs.bestKos, 11))
   s.raids += cap(gs.raids, 60)
+  s.dw += cap(gs.dw, 60)
   for (const b of gs.bosses) if (BOSS_IDS.includes(b) && !s.bosses.includes(b)) s.bosses.push(b)
   for (const id of gs.used) if (PARTNERS.includes(id) && !s.used.includes(id)) s.used.push(id)
   // Achievements follow from the merged stats (not taken over as-is)

@@ -9,9 +9,78 @@ export function botThink(g: Game, tr: Trainer, dt: number) {
   if (b.thinkT <= 0) {
     // Bots need a moment to react, like people do (the weaker ones a bit longer)
     b.thinkT = 0.26 + (1 - b.skill) * 0.45 + Math.random() * 0.15
-    decide(g, tr)
+    if (g.duel) decideDuel(g, tr)
+    else decide(g, tr)
   }
   steer(g, tr, dt)
+}
+
+/**
+ * 1 vs 1 CPU: go after the opponent, grab power-ups when it's worth the detour,
+ * stay inside the ring, and hunt for someone hiding in the grass where it last
+ * saw them.
+ */
+function decideDuel(g: Game, tr: Trainer) {
+  const b = tr.brain!
+  const m = tr.mon
+  const z = g.zone
+  const foe = g.trainers.find((t) => t !== tr && t.alive)
+  if (!foe || m.fainted) return
+  const e = foe.mon
+  const ratio = m.hp / m.maxHp
+  const seen = !e.fainted && g.canSee(m, e)
+  if (seen) {
+    b.seenX = e.x
+    b.seenY = e.y
+    b.seenT = g.time
+  }
+  const dFoe = Math.hypot(e.x - tr.x, e.y - tr.y)
+  b.target = null
+  b.mode = 'goal'
+
+  // Power-ups: a heal when hurt, anything else when the foe isn't right on top of us
+  let item = null, bd = 99
+  for (const it of g.items) {
+    const want = it.kind === 'heal' ? (ratio < 0.6 ? 2.2 : 0) : dFoe > 4 || !seen ? 1 : 0
+    if (!want || Math.hypot(it.x - z.x, it.y - z.y) > z.r - 0.5) continue
+    const d = Math.hypot(it.x - tr.x, it.y - tr.y) / want
+    if (d < bd && d < 9) { bd = d; item = it }
+  }
+  const outside = Math.hypot(tr.x - z.x, tr.y - z.y) > z.r - 1.2
+  if (outside) {
+    b.goalX = z.x
+    b.goalY = z.y
+  } else if (item && (!seen || ratio < 0.6 || bd < dFoe * 0.6)) {
+    b.goalX = item.x
+    b.goalY = item.y
+  } else if (seen) {
+    b.mode = 'fight'
+    b.target = e
+  } else if (b.seenT !== undefined && g.time - b.seenT < 6) {
+    // Check where they were last seen
+    b.goalX = b.seenX!
+    b.goalY = b.seenY!
+  } else {
+    // Sweep through the arena (grass patches included)
+    if (Math.hypot(b.goalX - tr.x, b.goalY - tr.y) < 1.2 || b.stuckT > 0.8 || Math.hypot(b.goalX - z.x, b.goalY - z.y) > z.r - 1) {
+      const [x, y] = g.world.randomWalkable((x, y) => Math.hypot(x - z.x, y - z.y) < Math.max(1, z.r - 2))
+      b.goalX = x
+      b.goalY = y
+      b.stuckT = 0
+    }
+  }
+
+  // Attack whenever the foe is in reach, even on the way somewhere
+  if (seen && Math.random() < 0.45 + b.skill * 0.45) {
+    let slot = g.bestSlot(m, dFoe)
+    if (slot > 0 && Math.random() > b.skill + 0.15 && m.cds[0] <= 0 && m.moves[0].range + 0.3 >= dFoe) slot = 0
+    if (slot >= 0) {
+      if (Math.random() < (1 - b.skill) * 0.7) {
+        const a = Math.atan2(e.y - m.y, e.x - m.x) + (Math.random() < 0.5 ? -1 : 1) * (0.45 + Math.random() * 0.4)
+        g.useMove(m, slot, null, { x: Math.cos(a), y: Math.sin(a), k: Math.min(1, dFoe / Math.max(1, m.moves[slot].range)) })
+      } else g.useMove(m, slot, e)
+    }
+  }
 }
 
 function decide(g: Game, tr: Trainer) {

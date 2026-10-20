@@ -72,6 +72,7 @@ function meTab(p: Progress, trainerSprite: string, name: string) {
         ${[
           [s.m, L('Matches', 'Potjes')], [s.w, L('Wins', 'Gewonnen')], [s.top3, 'Top 3'],
           [s.kos, L('Knockouts', 'Uitgeschakeld')], [s.caught, L('Caught', 'Gevangen')], [s.raids, L('Raids cleared', 'Raids gehaald')],
+          [s.dw ?? 0, L('Duels won', 'Duels gewonnen')],
           [`${s.bosses.length}/${BOSS_IDS.length}`, L('Bosses beaten', 'Bazen verslagen')], [s.legend, L('Legendaries', 'Legendarisch')], [fmtTime(s.time), L('Played', 'Gespeeld')],
         ].map(([v, t]) => `<div><b>${v}</b><span>${t}</span></div>`).join('')}
       </div>
@@ -176,8 +177,8 @@ function rankTab(board: string, period: string) {
     <div class="pf-seg" data-k="board"><button data-v="pvp" class="${board === 'pvp' ? 'on' : ''}">⚔️ PvP</button><button data-v="pve" class="${board === 'pve' ? 'on' : ''}">🐉 PvE</button></div>
     <div class="pf-seg" data-k="period"><button data-v="week" class="${period === 'week' ? 'on' : ''}">${L('This week', 'Deze week')}</button><button data-v="all" class="${period === 'all' ? 'on' : ''}">${L('All time', 'Altijd')}</button></div>
     <p class="pf-intro">${board === 'pvp'
-      ? L('Battle royale against other people: points for your place (+4 per knockout).', 'Battle royale tegen andere mensen: punten voor je plaats (+4 per uitgeschakelde trainer).')
-      : L('Raids (clear + boss damage) and battle royale against bots.', 'Raids (gehaald + baasschade) en battle royale tegen bots.')}</p>
+      ? L('Battle royale and 1 vs 1 against other people: points for your place or the duel (+4 per knockout or round).', 'Battle royale en 1 tegen 1 tegen andere mensen: punten voor je plaats of het duel (+4 per uitgeschakelde trainer of ronde).')
+      : L('Raids (clear + boss damage), battle royale against bots and duels against the CPU.', 'Raids (gehaald + baasschade), battle royale tegen bots en duels tegen de CPU.')}</p>
     <div class="pf-ranks"><div class="pf-empty">${L('Loading…', 'Laden…')}</div></div>`
 }
 

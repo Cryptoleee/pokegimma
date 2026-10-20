@@ -8638,3 +8638,305 @@ em.lock {
   padding-top: 14px;
   border-top: 2px solid rgba(255, 255, 255, 0.12);
 }
+
+/* ---------- 1 vs 1 ---------- */
+.duel-mode .topright .mapframe,
+.duel-mode .topright .chips {
+  display: none;
+}
+.duelbar {
+  position: absolute;
+  left: calc(8px + var(--safe-l));
+  width: min(250px, calc(100vw - 168px - var(--safe-l)));
+  top: calc(74px + var(--safe-t));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px 8px 6px;
+  border-radius: 10px;
+  background: rgba(10, 8, 18, 0.62);
+  box-shadow: 0 0 14px rgba(255, 208, 64, 0.25);
+  color: #fff;
+  pointer-events: none;
+  animation: legendPop 0.6s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.duelbar.hidden {
+  display: none;
+}
+@media (orientation: landscape) and (min-width: 700px) {
+  .duelbar {
+    width: 320px;
+  }
+}
+.db-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.db-top b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 30%;
+}
+.db-me {
+  color: #8ef08e;
+}
+.db-them {
+  color: #ff8a80;
+}
+.db-pips {
+  color: #ffd040;
+  letter-spacing: 1px;
+  font-size: 10px;
+}
+.db-mid {
+  flex: 1;
+  text-align: center;
+  font-size: 10px;
+  opacity: 0.85;
+}
+.db-bars {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.db-hp {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+.db-hp i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(#90f070, #40b040);
+  transition: width 0.2s;
+}
+.db-hp.them {
+  direction: rtl;
+}
+.db-hp.them i {
+  background: linear-gradient(#ff8a70, #d04030);
+}
+.db-hp.hid i {
+  opacity: 0.35;
+}
+.db-buffs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.db-buffs:empty {
+  display: none;
+}
+.db-buffs span {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.db-buffs .atk {
+  color: #ff9a80;
+}
+.db-buffs .spd {
+  color: #90d8ff;
+}
+.db-buffs .def {
+  color: #ffe070;
+}
+.db-buffs .end {
+  animation: blink 0.4s steps(2) infinite;
+}
+/* Loading: the two duellists face each other */
+.ld-players.vs {
+  align-items: center;
+  gap: 14px;
+}
+.ld-players.vs .ld-p {
+  width: 84px;
+}
+.ld-vs {
+  font-style: normal;
+  font-size: 30px;
+  color: #ffd040;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.6), 0 0 14px rgba(255, 208, 64, 0.5);
+  animation: legendPop 0.6s cubic-bezier(0.2, 1.5, 0.4, 1) 0.2s both;
+}
+/* Results: the duel score in the medal */
+.medal.duel b {
+  font-size: 40px;
+  letter-spacing: 1px;
+}
+/* 1 vs 1: the event feed sits below the duel bar and the buttons */
+.duel-mode .topright {
+  top: calc(132px + var(--safe-t));
+}
+.duel-mode .respawn {
+  top: 23%;
+}
+/* Phones: the feed sits under your Pokémon card, so in a duel it goes below the duel bar */
+body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
+  top: calc(146px + var(--safe-t));
+}
+/* Three modes side by side */
+.cp-modes {
+  grid-template-columns: repeat(3, 1fr);
+}
+.cp-modes button b {
+  font-size: 15px;
+}
+
+/* ---------- Home: mode first ---------- */
+.home-modes .mode.m-royale {
+  grid-column: 1 / -1;
+  min-height: 104px;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  background: linear-gradient(135deg, #ff7ad0, #a050ff 55%, #5a38e0);
+}
+.home-modes .mode.m-royale::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: qpShine 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.home-modes .mode.m-duel {
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  background: linear-gradient(150deg, #ffb040, #ff5a3a 50%, #c02848);
+}
+.home-modes .mode.m-raid {
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  background: linear-gradient(150deg, #48d8c0, #2a8ab0 50%, #1d4a8a);
+}
+.home-modes .mode small {
+  color: rgba(255, 255, 255, 0.92);
+  opacity: 1;
+}
+/* A few partners peeking in on the battle royale card */
+.mode-art {
+  position: absolute;
+  right: 6px;
+  bottom: -6px;
+  display: flex;
+  pointer-events: none;
+}
+.mode-art img {
+  width: 56px;
+  height: 56px;
+  margin-left: -22px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35));
+  transform: translateY(calc(var(--i) * -2px));
+  opacity: 0.95;
+}
+.mode-new {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #1a1420;
+  background: #ffe066;
+  text-shadow: none;
+  box-shadow: 0 2px 0 #1a1420;
+  animation: newPulse 1.6s ease-in-out infinite;
+}
+@keyframes newPulse {
+  50% { transform: scale(1.08); }
+}
+
+/* The sheet after picking a mode: how do you want to play it? */
+.play-sheet h3 {
+  margin: 0;
+}
+.ps-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0.8;
+  padding-right: 40px;
+}
+.ps-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ps-opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  font-family: var(--font);
+  text-align: left;
+  color: #1a1420;
+  border-radius: 16px;
+  border: 3px solid #1a1420;
+  box-shadow: 0 4px 0 #1a1420;
+  background: linear-gradient(#fff3a0, #ffd84a 45%, #f0a020);
+}
+.ps-opt:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #1a1420;
+}
+.ps-opt i {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-size: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+}
+.ps-opt span {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.ps-opt b {
+  font-size: 18px;
+}
+.ps-opt small {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.ps-opt em {
+  font-style: normal;
+  opacity: 0.6;
+}
+.ps-opt.quick,
+.ps-opt.online {
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #ff7ad0, #a050ff 55%, #5a38e0);
+}
+.ps-opt.multi {
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+  background: linear-gradient(#6aa0ff, #3870c8 50%, #24508f);
+}
+.ps-opt.quick small,
+.ps-opt.online small,
+.ps-opt.multi small {
+  opacity: 0.9;
+}
+/* The solo sheet already knows its mode */
+.solo-sheet .cp-modes {
+  display: none;
+}
+/* Sheets cover the whole screen (the home column's width rule doesn't apply to them) */
+.home > .sheet {
+  width: auto;
+}

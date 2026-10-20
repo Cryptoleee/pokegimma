@@ -13,6 +13,7 @@ import type { Mon } from '../game/entities'
 import type { ChatLine } from '../net/protocol'
 import { esc, QUICK_CHAT } from './menu'
 import { BOSSES, RAID_LIVES } from '../data/bosses'
+import { DUEL_WINS, RING_AT } from '../game/duel'
 import { L, tx, type Txt } from '../i18n'
 
 const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = '') => {
@@ -69,6 +70,10 @@ export class Hud {
   private bossBar = h('div', 'bossbar hidden')
   private respawnEl = h('div', 'respawn hidden')
   private bossKey = ''
+  /** 1 vs 1: score, both HP bars, ring timer and your power-ups. */
+  private duelBar = h('div', 'duelbar hidden')
+  private duelKey = ''
+  private countSec = 0
   /** Resets for every touch control, so a lost touch can never leave one stuck. */
   private releasers: (() => void)[] = []
 
@@ -129,10 +134,11 @@ export class Hud {
     score.title = L('Scoreboard (Tab)', 'Scorebord (Tab)')
     score.onclick = () => this.board.toggle()
     sys.append(menu, mute, score)
-    root.append(sys, this.toastEl, this.bannerEl, this.legend, this.bossBar, this.respawnEl)
+    root.append(sys, this.toastEl, this.bannerEl, this.legend, this.bossBar, this.duelBar, this.respawnEl)
     this.board = new LiveBoard(root, g, () => g.player.id)
     if (g.kind === 'raid') root.classList.add('raid-mode')
     else root.classList.remove('raid-mode')
+    root.classList.toggle('duel-mode', g.kind === 'duel')
 
     // Multiplayer chat: a button opens quick phrases and a text field
     if (opts.chat) {
@@ -542,6 +548,7 @@ export class Hud {
     this.vStorm.classList.toggle('on', p.alive && g.introT <= 0 && g.zone.outside(p.x, p.y))
 
     if (g.kind === 'raid') return this.updateRaid()
+    if (g.kind === 'duel') return this.updateDuel()
 
     // Chips
     this.aliveChip.innerHTML = `<i>👤</i>${g.alive.length}`
@@ -604,6 +611,48 @@ export class Hud {
     this.respawnSec = sec
     this.respawnEl.classList.toggle('hidden', !down)
     if (down) this.respawnEl.innerHTML = `<small>${L(`${p.mon.name} fainted`, `${p.mon.name} is verslagen`)}</small><b>${Math.ceil(p.respawnT)}</b><span>${L(`${p.lives} ${p.lives === 1 ? 'life' : 'lives'} left`, `nog ${p.lives} ${p.lives === 1 ? 'leven' : 'levens'}`)}</span>`
+  }
+
+  /** 1 vs 1: rounds won (pips), both HP bars, the round and ring timer, your power-ups; big countdown between rounds. */
+  private updateDuel() {
+    const g = this.g, p = g.player
+    const opp = g.trainers.find((t) => t !== p)
+    const dv = g.duelView
+    this.legend.classList.add('hidden')
+    this.duelBar.classList.toggle('hidden', !opp || !dv || g.introT > INTRO_TIME * 0.45)
+    if (!opp || !dv) return
+    const key = `${opp.id}:${opp.name}`
+    if (this.duelKey !== key) {
+      this.duelKey = key
+      this.duelBar.innerHTML = `
+        <div class="db-top"><b class="db-me">${L('You', 'Jij')}</b><span class="db-pips me"></span><span class="db-mid"></span><span class="db-pips them"></span><b class="db-them">${esc(opp.name)}</b></div>
+        <div class="db-bars"><div class="db-hp me"><i></i></div><div class="db-hp them"><i></i></div></div>
+        <div class="db-buffs"></div>`
+    }
+    const pips = (n: number) => '●'.repeat(Math.min(DUEL_WINS, n)) + '○'.repeat(Math.max(0, DUEL_WINS - n))
+    const set = (sel: string, html: string) => {
+      const el = this.duelBar.querySelector(sel) as HTMLElement
+      if (el.innerHTML !== html) el.innerHTML = html
+    }
+    set('.db-pips.me', pips(p.kos))
+    set('.db-pips.them', pips(opp.kos))
+    const ringIn = Math.max(0, Math.ceil(RING_AT - dv.roundT))
+    set('.db-mid', `${L('R', 'R')}${dv.round}${dv.phase === 'fight' ? ` · ${ringIn > 0 ? `⏱ ${ringIn}` : `⚡ ${L('RING', 'RING')}`}` : ''}`)
+    const hp = (m: Mon | undefined) => (m ? Math.max(0, m.hp / m.maxHp) : 0)
+    ;(this.duelBar.querySelector('.db-hp.me i') as HTMLElement).style.width = `${hp(p.mon) * 100}%`
+    ;(this.duelBar.querySelector('.db-hp.them i') as HTMLElement).style.width = `${hp(opp.mon) * 100}%`
+    // A rival hiding in the grass: you don't see their health change
+    this.duelBar.querySelector('.db-hp.them')!.classList.toggle('hid', !!opp.mon && !g.canSee(p.mon, opp.mon))
+    const buffs = ([['atkT', '⚔', 'X Attack', 'atk'], ['spdT', '»', 'X Speed', 'spd'], ['defT', '◈', 'X Defense', 'def']] as const)
+      .filter(([k]) => p[k] > 0)
+      .map(([k, icon, name, cls]) => `<span class="${cls} ${p[k] < 2.5 ? 'end' : ''}">${icon} ${name} ${Math.ceil(p[k])}</span>`).join('')
+    set('.db-buffs', buffs)
+    // Between rounds: the big countdown
+    const counting = dv.phase === 'count' && dv.t > 0
+    const sec = counting ? Math.ceil(dv.t) : 0
+    this.respawnEl.classList.toggle('hidden', !counting)
+    if (counting && sec !== this.countSec) this.respawnEl.innerHTML = `<small>${L(`Round ${dv.round}`, `Ronde ${dv.round}`)}</small><b>${sec}</b><span>${p.kos} - ${opp.kos}</span>`
+    this.countSec = sec
   }
 
   /** Gold alert while a legendary roams: name, distance, an arrow toward it and how to catch it. */
