@@ -22,6 +22,24 @@ export interface NewsEntry {
 
 export const NEWS: NewsEntry[] = [
   {
+    id: '2026-10-20b',
+    title: ['New mode: 1 vs 1', 'Nieuwe modus: 1 tegen 1'],
+    intro: [
+      'Face one trainer in a stadium. Best of three, both partners fully evolved at Lv 50. Skill and match-ups decide.',
+      'Tegen één trainer in een stadion. Best of three, beide partners volledig geëvolueerd op Lv 50. Skill en match-ups beslissen.',
+    ],
+    items: [
+      { icon: '⚔️', text: ['1 vs 1 online against a random player, against the CPU, or with a friend using a code', '1 tegen 1 online tegen een willekeurige speler, tegen de CPU, of met een vriend via een code'] },
+      { icon: '💥', text: ['Power-ups on three pads: X Attack, X Speed, X Defense and Hyper Potions', 'Power-ups op drie plekken: X Attack, X Speed, X Defense en Hyper Potions'] },
+      { icon: '🏟️', text: ['Five stadiums: Pokémon Stadium, Desert Arena, Ice Rink, Water Arena and Volcano Arena, with a crowd that cheers you on', 'Vijf stadions: Pokémon Stadion, Woestijnarena, IJsbaan, Waterarena en Vulkaanarena, met publiek dat je aanmoedigt'] },
+      { icon: '⏱', text: ['Hide in the grass and ambush your rival; a round lasts 75 seconds, then more HP wins it', 'Verstop je in het gras en verras je tegenstander; een ronde duurt 75 seconden, daarna wint wie meer HP heeft'] },
+      { icon: '🏅', text: ['3 new achievements and the title "Gladiator"; online duels count for the PvP ranking', '3 nieuwe prestaties en de titel "Gladiator"; online duels tellen mee voor de PvP-ranglijst'] },
+      { icon: '🏠', text: ['A new home screen: pick a mode first, then how you want to play', 'Een nieuw home-scherm: kies eerst een modus, dan hoe je wilt spelen'] },
+      { icon: '✨', text: ['Every Pokémon now moves with its animated sprite: breathing, hopping as it walks and lunging when it attacks', 'Elke Pokémon beweegt nu met zijn geanimeerde sprite: ademen, huppelen tijdens het lopen en uitvallen bij een aanval'] },
+      { icon: '⚖️', text: ['Battle royale balance: a caught legendary joins at your level and awakens like a legendary partner, KOs on weaker trainers give less XP, and Snorlax is tamed', 'Balans in de battle royale: een gevangen legendary komt op jouw level binnen en ontwaakt net als een legendarische partner, KO\'s op zwakkere trainers geven minder XP, en Snorlax is getemd'] },
+    ],
+  },
+  {
     id: '2026-10-18b',
     title: ['The Progression Update', 'De progressie-update'],
     intro: [
