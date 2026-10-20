@@ -22,21 +22,6 @@ export interface NewsEntry {
 
 export const NEWS: NewsEntry[] = [
   {
-    id: '2026-10-20',
-    title: ['New mode: 1 vs 1', 'Nieuwe modus: 1 tegen 1'],
-    intro: [
-      'Face one trainer in a small arena. Best of three, both partners fully evolved at Lv 50. Skill and match-ups decide.',
-      'Tegen één trainer in een kleine arena. Best of three, beide partners volledig geëvolueerd op Lv 50. Skill en match-ups beslissen.',
-    ],
-    items: [
-      { icon: '⚔️', text: ['1 vs 1 online against a random player, against the CPU, or with a friend using a code', '1 tegen 1 online tegen een willekeurige speler, tegen de CPU, of met een vriend via een code'] },
-      { icon: '💥', text: ['Power-ups on three pads: X Attack, X Speed, X Defense and Hyper Potions', 'Power-ups op drie plekken: X Attack, X Speed, X Defense en Hyper Potions'] },
-      { icon: '🌿', text: ['Hide in the tall grass and ambush your rival; after 40 seconds a ring closes in', 'Verstop je in het hoge gras en verras je tegenstander; na 40 seconden trekt een ring samen'] },
-      { icon: '🏅', text: ['3 new achievements and the title "Gladiator"; online duels count for the PvP ranking', '3 nieuwe prestaties en de titel "Gladiator"; online duels tellen mee voor de PvP-ranglijst'] },
-      { icon: '🏠', text: ['A new home screen: pick a mode first, then how you want to play', 'Een nieuw home-scherm: kies eerst een modus, dan hoe je wilt spelen'] },
-    ],
-  },
-  {
     id: '2026-10-18b',
     title: ['The Progression Update', 'De progressie-update'],
     intro: [
