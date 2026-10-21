@@ -6,6 +6,7 @@ import { TYPE_COLOR, TYPE_NL } from '../data/types'
 import { sfx } from '../audio'
 import { itemUrl } from '../game/sprites'
 import { L } from '../i18n'
+import { BOLT, icon, IC, strike } from './app'
 
 /**
  * How-to-play shown after "Tik om te starten": a framed battle scene per
@@ -52,12 +53,13 @@ const slides = (): Slide[] => [
       <img class="px t-prof" src="${trainerSpriteUrl('juniper')}" alt="">
       <div class="t-modes">
         <div class="t-mode br"><b>Battle Royale</b><small>${L('12 trainers · 1 winner', '12 trainers · 1 winnaar')}</small></div>
+        <div class="t-mode duel"><b>1 vs 1</b><small>${L('duel · best of 3', 'duel · best of 3')}</small></div>
         <div class="t-mode raid"><b>Raid</b><small>${L('team up against a boss', 'samen tegen een eindbaas')}</small></div>
       </div>
       <div class="t-spark"><i></i><i></i><i></i><i></i><i></i></div>`,
     text: L(
-      "Welcome to Stormbreak Royale! I'm Professor Juniper. There are two ways to play: a Battle Royale, where you fight to be the last trainer standing, or a Raid, where you team up to take down a boss.",
-      'Welkom bij Stormbreak Royale! Ik ben Professor Juniper. Je kunt op twee manieren spelen: een Battle Royale, waarin je als laatste trainer overblijft, of een Raid, waarin je samen een eindbaas verslaat.',
+      "Welcome to Stormbreak Royale! I'm Professor Juniper. There are three ways to play: a Battle Royale, where you fight to be the last trainer standing, a 1 vs 1 duel, or a Raid, where you team up to take down a boss.",
+      'Welkom bij Stormbreak Royale! Ik ben Professor Juniper. Je kunt op drie manieren spelen: een Battle Royale, waarin je als laatste trainer overblijft, een duel 1 tegen 1, of een Raid, waarin je samen een eindbaas verslaat.',
     ),
   },
   {
@@ -152,6 +154,7 @@ const slides = (): Slide[] => [
     title: L('The storm', 'De storm'),
     bg: 'storm',
     stage: () => `
+      <div class="t-sky">${strike({ w: 320, h: 180, x: 70, x2: 92, reach: 0.8, seed: 4, every: 5, delay: 1 })}${strike({ w: 320, h: 180, x: 260, x2: 238, reach: 0.7, seed: 9, every: 7, delay: 3.5 })}</div>
       <div class="t-map">
         <div class="t-zone"></div>
         <div class="t-dot you"></div><div class="t-dot r1"></div><div class="t-dot r2"></div><div class="t-dot r3"></div><div class="t-dot out"></div>
@@ -182,20 +185,22 @@ export function showIntro(onDone: () => void) {
   const SLIDES = slides()
   const el = document.getElementById('screen')!
   el.innerHTML = `
-    <div class="tut">
+    <div class="tut n-tut">
       <div class="tut-top">
+        <span class="n-tut-brand">${BOLT}</span>
         <span class="tut-step"></span>
         <b class="tut-title"></b>
-        <button class="tut-skip skip">${L('Skip ▶▶', 'Overslaan ▶▶')}</button>
+        <button class="tut-skip skip">${L('Skip', 'Overslaan')}</button>
       </div>
       <div class="tut-main">
         <div class="tut-stage"></div>
         <div class="tut-box">
+          <b class="n-tut-h"></b>
           <p></p>
           <div class="tut-nav">
-            <button class="tut-prev" aria-label="${L('Previous', 'Vorige')}">${L('◀ Back', '◀ Terug')}</button>
+            <button class="tut-prev" aria-label="${L('Previous', 'Vorige')}">${icon(IC.back)}</button>
             <div class="tut-dots">${SLIDES.map((s, i) => `<button data-i="${i}" aria-label="${s.title}"></button>`).join('')}</div>
-            <button class="tut-next">${L('Next ▶', 'Verder ▶')}</button>
+            <button class="tut-next"></button>
           </div>
         </div>
       </div>
@@ -236,12 +241,13 @@ export function showIntro(onDone: () => void) {
     stage.innerHTML = s.stage()
     el.querySelector('.tut-step')!.textContent = `${i + 1} / ${SLIDES.length}`
     el.querySelector('.tut-title')!.textContent = s.title
+    el.querySelector('.n-tut-h')!.textContent = s.title
     dots.forEach((d, j) => {
       d.classList.toggle('on', j === i)
       d.classList.toggle('seen', j <= Math.max(seen, i))
     })
     prev.disabled = i === 0
-    next.textContent = i === SLIDES.length - 1 ? L("Let's go! ▶", 'Spelen! ▶') : L('Next ▶', 'Verder ▶')
+    next.innerHTML = i === SLIDES.length - 1 ? `${L("Let's play", 'Spelen')}${BOLT}` : `${L('Next', 'Verder')}${icon(IC.next, 18)}`
     next.classList.toggle('last', i === SLIDES.length - 1)
     full = s.text
     clearInterval(typing)

@@ -3,6 +3,8 @@ import { accountState, accountStatus, friendAction, joinable, login, logout, onA
 import { MAX_PLAYERS, QUICK_MAX, type Room } from '../net/room'
 import { L } from '../i18n'
 import { esc } from './menu'
+import { appShell, bindShell, strike, type AppTab } from './app'
+import { trainerSpriteUrl } from '../data/trainers'
 
 /**
  * Friends: the card on the home screen, the friends sheet (log in with Discord,
@@ -74,12 +76,20 @@ const RESULT: Record<FriendResult, () => string> = {
   error: () => L('Something went wrong. Try again.', 'Er ging iets mis. Probeer het opnieuw.'),
 }
 
-/** Open the friends sheet (inside `host`, e.g. the home screen). */
-export function openFriends(host: HTMLElement, on: FriendsActions) {
-  host.querySelector('.fr-sheet')?.remove()
+/** The Friends tab: your code, requests and who's online, as a page in the menu app. */
+export function showFriends(o: FriendsActions & { tab(t: AppTab): void }) {
+  const el = document.getElementById('screen')!
+  el.innerHTML = appShell('friends', `<div class="n-page n-friends"><header class="n-top"><h1 class="n-h1">${L('Friends', 'Vrienden')}</h1></header><div class="n-frhost"></div></div>`)
+  bindShell(el, o.tab)
+  openFriends(el.querySelector('.n-frhost') as HTMLElement, o, true)
+}
+
+/** Open the friends list (inside `host`): a sheet, or the page itself (`page`). */
+export function openFriends(host: HTMLElement, on: FriendsActions, page = false) {
+  host.querySelector('.fr-sheet, .fr-page')?.remove()
   const sheet = document.createElement('div')
-  sheet.className = 'sheet fr-sheet'
-  sheet.innerHTML = `<div class="sheet-card"><button class="sheet-x" aria-label="${L('Close', 'Sluiten')}">✕</button><h3>${L('Friends', 'Vrienden')}</h3><div class="fr-body"></div></div>`
+  sheet.className = page ? 'fr-page' : 'sheet fr-sheet'
+  sheet.innerHTML = page ? '<div class="fr-body"></div>' : `<div class="sheet-card"><button class="sheet-x" aria-label="${L('Close', 'Sluiten')}">✕</button><h3>${L('Friends', 'Vrienden')}</h3><div class="fr-body"></div></div>`
   host.append(sheet)
   const body = sheet.querySelector('.fr-body') as HTMLElement
   let msg = ''
@@ -93,6 +103,7 @@ export function openFriends(host: HTMLElement, on: FriendsActions) {
     typed = (body.querySelector('.fr-add input') as HTMLInputElement | null)?.value ?? typed
     if (!s) {
       body.innerHTML = `
+        ${sheet.classList.contains('fr-page') ? `<div class="fr-hero" aria-hidden="true">${strike({ w: 400, h: 200, x: 300, x2: 270, reach: 0.6, seed: 11, every: 9, delay: 2 })}${['hilda', 'hilbert', 'bianca'].map((t) => `<img class="px" src="${trainerSpriteUrl(t)}" alt="">`).join('')}</div>` : ''}
         <p>${L('Log in with Discord to add friends, see who\'s online and join their lobby in one tap.', 'Log in met Discord om vrienden toe te voegen, te zien wie er online is en met één tik in hun lobby te springen.')}</p>
         <button class="cta fr-login">${DISCORD} ${L('Log in with Discord', 'Inloggen met Discord')}</button>
         <small class="fr-fine">${L('Optional: you can always keep playing as a guest. We only get your Discord name and avatar.', 'Optioneel: je kunt altijd als gast blijven spelen. We krijgen alleen je Discord-naam en avatar.')}</small>`
@@ -196,10 +207,11 @@ export function openFriends(host: HTMLElement, on: FriendsActions) {
   const close = () => {
     setFast(false)
     off()
+    if (page) return
     sheet.classList.remove('open')
     setTimeout(() => sheet.remove(), 350)
   }
-  sheet.querySelector('.sheet-x')!.addEventListener('click', () => {
+  sheet.querySelector('.sheet-x')?.addEventListener('click', () => {
     sfx.select()
     close()
   })

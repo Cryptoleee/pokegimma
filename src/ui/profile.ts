@@ -10,6 +10,9 @@ import { ACHIEVEMENTS, BOSS_IDS, dailyOf, isUnlocked, levelCost, nextUnlock, REW
 const liveStreak = (p: Progress) => (p.day === today() || p.day === prevDay(today()) ? p.streak : 0)
 import { achDesc, achName, ACH_INFO, questText, titleName, trainerName } from '../data/rewards'
 import { esc } from './menu'
+import { appShell, bindShell, type AppTab } from './app'
+import { askName } from './home'
+import { profile } from '../profile'
 
 /**
  * Your profile: trainer level and title, today's quests and streak, lifetime
@@ -47,7 +50,7 @@ function meTab(p: Progress, trainerSprite: string, name: string) {
     <div class="pf-card pf-head">
       <img class="px pf-tr" src="${trainerSpriteUrl(trainerSprite)}" alt="">
       <div class="pf-id">
-        <b>${esc(name)}</b>
+        <b>${esc(name)} <button class="pf-rename" aria-label="${L('Change your name', 'Naam wijzigen')}">✎</button></b>
         <button class="pf-title">🏷️ ${esc(titleName(titleOf(p)))} <small>▾</small></button>
         <div class="pf-lv"><em>Lv ${lv.lv}</em>${bar(lv.k)}<small>${lv.need ? `${lv.into}/${lv.need} XP` : 'MAX'}</small></div>
       </div>
@@ -203,41 +206,44 @@ async function fillRank(el: HTMLElement, board: string, period: string) {
 
 // ---------------------------------------------------------------- screen
 
-export function showProfile(o: { trainerSprite: string; name: string; tab?: Tab; back: () => void }) {
+export function showProfile(o: { trainerSprite: string; name: string; tab?: Tab; nav(t: AppTab): void }) {
   const el = screen()
   let tab: Tab = o.tab ?? 'me'
   let board = 'pvp', period = 'week'
   const paint = () => {
     const p = progress()
     const tabs: [Tab, string][] = [['me', L('Profile', 'Profiel')], ['road', L('Unlocks', 'Vrijspelen')], ['mons', 'Pokémon'], ['ach', L('Awards', 'Prestaties')], ['rank', L('Rankings', 'Ranglijst')]]
-    const scroll = (el.querySelector('.pf-body') as HTMLElement | null)?.scrollTop ?? 0
-    el.innerHTML = `
-      <div class="sel pf">
-        <div class="sel-head">
-          <button class="sel-back" aria-label="${L('Back', 'Terug')}">◀</button>
-          <div class="sel-title"><small>${signedIn() ? `${L('ACCOUNT', 'ACCOUNT')} · ${esc(accountState()?.me.dname ?? '')}` : L('GUEST · THIS DEVICE', 'GAST · DIT APPARAAT')}</small><b>${L('Trainer profile', 'Trainerprofiel')}</b></div>
-        </div>
-        <nav class="pf-tabs">${tabs.map(([k, t]) => `<button data-tab="${k}" class="${k === tab ? 'on' : ''}">${t}</button>`).join('')}</nav>
+    const scroll = (el.querySelector('.n-main') as HTMLElement | null)?.scrollTop ?? 0
+    el.innerHTML = appShell('profile', `
+      <div class="n-page pf">
+        <header class="n-top"><h1 class="n-h1">${L('Profile', 'Profiel')}</h1><span class="n-note">${signedIn() ? esc(accountState()?.me.dname ?? '') : L('Guest · this device', 'Gast · dit apparaat')}</span></header>
+        <nav class="pf-tabs n-seg">${tabs.map(([k, t]) => `<button data-tab="${k}" class="${k === tab ? 'on' : ''}">${t}</button>`).join('')}</nav>
         <div class="pf-body">${tab === 'me' ? meTab(p, o.trainerSprite, o.name) : tab === 'road' ? roadTab(p) : tab === 'mons' ? monsTab(p) : tab === 'ach' ? achTab(p) : rankTab(board, period)}</div>
-      </div>`
-    const body = el.querySelector('.pf-body') as HTMLElement
-    body.scrollTop = scroll
-    el.querySelector('.sel-back')!.addEventListener('click', () => {
-      sfx.select()
+      </div>`)
+    bindShell(el, (t) => {
       off()
-      o.back()
+      o.nav(t)
     })
+    const body = el.querySelector('.n-main') as HTMLElement
+    body.scrollTop = scroll
     el.querySelectorAll<HTMLElement>('.pf-tabs button').forEach((b) => b.addEventListener('click', () => {
       sfx.select()
       tab = b.dataset.tab as Tab
       body.scrollTop = 0
       paint()
-      ;(el.querySelector('.pf-body') as HTMLElement).scrollTop = 0
+      ;(el.querySelector('.n-main') as HTMLElement).scrollTop = 0
     }))
     el.querySelectorAll('.pf-login').forEach((b) => b.addEventListener('click', () => {
       sfx.select()
       login()
     }))
+    el.querySelector('.pf-rename')?.addEventListener('click', () => {
+      sfx.select()
+      askName(() => {
+        o.name = profile().name || o.name
+        paint()
+      }, true)
+    })
     el.querySelector('.pf-title')?.addEventListener('click', () => {
       sfx.select()
       pickTitle(p)

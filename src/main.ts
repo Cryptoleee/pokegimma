@@ -13,12 +13,15 @@ import { chatWidget, feedLine, Hud } from './ui/hud'
 import { clearScreen, showLeaveConfirm, showPartyFull } from './ui/screens'
 import { showIntro } from './ui/intro'
 import { showTitle } from './ui/title'
-import { showRoster, showTrainerSelect } from './ui/select'
+import { showTeam } from './ui/team'
+import { showFriends } from './ui/friends'
 import { showResults } from './ui/results'
 import { LiveBoard, showFinalBoard } from './ui/scoreboard'
 import { decided, scoreRows } from './game/score'
 import { showEvolution } from './ui/cutscene'
-import { confirmLeaveLobby, setOnline, shinyPartner, showLobby, showMenu, type MenuState } from './ui/menu'
+import { confirmLeaveLobby, shinyPartner, showLobby } from './ui/menu'
+import { askName, setOnline, showMenu, type MenuState } from './ui/home'
+import type { AppTab } from './ui/app'
 import { showLoading } from './ui/loading'
 import { wipe } from './ui/transition'
 import { currentMusic, playMusic, setTempo } from './music'
@@ -82,7 +85,7 @@ function ownedPicks() {
 onProgress(() => {
   const before = trainer.key + team.join()
   ownedPicks()
-  if (trainer.key + team.join() !== before && document.querySelector('#screen > .home')) toMenu()
+  if (trainer.key + team.join() !== before && document.querySelector('#screen .n-app[data-tab="play"]')) toMenu()
 })
 let game: Game | null = null
 let hud: Hud | null = null
@@ -122,8 +125,6 @@ onAccount(() => {
   const s = accountState()
   if (accountStatus() !== 'in' || !s || profile().name) return
   setName(s.me.name)
-  const input = document.querySelector('#mm-name') as HTMLInputElement | null
-  if (input && !input.value) input.value = profile().name
 })
 /** An invite that came in mid-match waits until you're back on the home screen or in a lobby. */
 let heldInvite: Invite | null = null
@@ -217,12 +218,12 @@ function me(): LobbyPlayer {
 function toTitle() {
   stopGame()
   const logged = loginResult && loginResult !== 'off'
-  showTitle(() => (pendingJoin ? toMenu() : logged ? toMenu({ friends: true }) : showIntro(() => wipe(() => toMenu()))))
+  showTitle(() => (pendingJoin ? toMenu() : logged ? toTab('friends') : showIntro(() => wipe(() => toMenu()))))
 }
 
 // A new language re-renders the home screen (the lobby and battle pick it up on their next update)
 onLangChange(() => {
-  if (document.querySelector('#screen > .home')) toMenu()
+  if (document.querySelector('#screen .n-app[data-tab="play"]')) toMenu()
 })
 
 function toMenu(extra: Partial<MenuState> = {}) {
@@ -234,14 +235,24 @@ function toMenu(extra: Partial<MenuState> = {}) {
   statsStateChanged()
   presenceChanged()
   showHeldInvite()
-  showMenu({ trainer, team, choice, code: code || undefined, rejoin: rejoinCode(), ...extra }, {
-    rejoin: (c) => {
+  showMenu({ trainer, team, choice, code: code || undefined, rejoin: rejoinCode(), ...extra }, menuActions())
+  watchOnline()
+  // Opened a shared link and we already know your name: straight in.
+  if (code && profile().name && !extra.error) {
+    pendingJoin = ''
+    showMenu({ trainer, team, choice, code, busy: L(`Connecting to ${code}…`, `Verbinden met ${code}…`) }, menuActions())
+    joinRoom(code)
+  }
+}
+
+function menuActions() {
+  return {
+    rejoin: (c: string) => {
       forgetRoom()
       joinRoom(c)
     },
     joinFriend,
-    profile: () => wipe(() => showProfile({ trainerSprite: trainer.sprite, name: profile().name || trainer.name, back: () => wipe(() => toMenu()) })),
-    solo: (c) => {
+    solo: (c: MatchChoice) => {
       choice = c
       store.set('choice', c)
       wipe(startSolo, { flash: true })
@@ -250,33 +261,37 @@ function toMenu(extra: Partial<MenuState> = {}) {
     join: joinRoom,
     quick: () => quickPlay(),
     quickDuel: () => quickPlay(false, true),
-    team: () => wipe(() => pickTeam(() => wipe(() => toMenu()), () => wipe(() => toMenu()), L('Ready ▶', 'Klaar ▶'))),
+    tab: toTab,
+    setTeam: (t: TrainerDef, mon: number, view: MenuState['view']) => {
+      saveTeam(t, mon)
+      toMenu({ view })
+    },
     back: () => wipe(toTitle),
-  })
-  watchOnline()
-  // Opened a shared link and we already know your name: straight in.
-  if (code && profile().name && !extra.error) {
-    pendingJoin = ''
-    const none = () => {}
-    showMenu({ trainer, team, choice, code, busy: L(`Connecting to ${code}…`, `Verbinden met ${code}…`) }, { solo: none, host: none, join: none, rejoin: none, joinFriend: none, profile: none, quick: none, quickDuel: none, team: none, back: none })
-    joinRoom(code)
   }
 }
 
-/** Trainer, then partner. */
-function pickTeam(done: () => void, back: () => void, cta: string) {
+/** The menu's tabs: Play, Team, Friends and Profile. */
+function toTab(t: AppTab) {
+  ownedPicks()
   playMusic('menu')
-  showTrainerSelect(trainer.key, back, (t) => {
-    trainer = t
-    store.set('trainer', t.key)
-    wipe(() =>
-      showRoster(team, () => wipe(() => pickTeam(done, back, cta)), (picked) => {
-        team = picked
-        store.set('team', picked)
-        done()
-      }, cta),
-    )
-  })
+  if (t === 'play') return toMenu()
+  if (t === 'profile') return showProfile({ trainerSprite: trainer.sprite, name: profile().name || trainer.name, nav: toTab })
+  if (t === 'friends') return showFriends({ tab: toTab, join: (c, q) => askName(() => joinFriend(c, q)) })
+  showTeam({ trainer, mon: team[0], set: saveTeam, tab: toTab })
+}
+
+function saveTeam(t: TrainerDef, mon: number) {
+  trainer = t
+  team = [mon]
+  store.set('trainer', t.key)
+  store.set('team', team)
+}
+
+/** The Team screen as a picker (from a lobby or the results): a Done button, no tabs. */
+function teamPicker(done: () => void, doneLabel: string) {
+  ownedPicks()
+  playMusic('menu')
+  showTeam({ trainer, mon: team[0], set: saveTeam, tab: toTab, done, doneLabel })
 }
 
 // ---------- Matches ----------
@@ -351,7 +366,7 @@ function startSolo() {
 }
 
 const soloAgain = () => wipe(startSolo, { flash: true })
-const soloOtherTeam = () => wipe(() => pickTeam(() => wipe(startSolo, { flash: true }), () => wipe(() => toMenu()), L('Start the battle ▶', 'Start de battle ▶')))
+const soloOtherTeam = () => wipe(() => teamPicker(() => wipe(startSolo, { flash: true }), L('Start the battle', 'Start de battle')))
 
 function onEnd(r: GameResult) {
   if (game) trackEnd({ k: statsKind(game), m: statsMode(), r: r.raid ? (r.won ? 'clear' : 'fail') : r.won ? 'win' : 'lose', boss: r.raid?.boss })
@@ -622,11 +637,16 @@ function toLobby() {
       // Picking a new team: not ready until you're done
       ready = false
       room?.updateMe(me())
-      wipe(() => pickTeam(() => {
+      wipe(() => teamPicker(() => {
         ready = true
         room?.updateMe(me())
         wipe(toLobby)
-      }, () => wipe(toLobby), L('Ready ▶', 'Klaar ▶')))
+      }, L('Ready', 'Klaar')))
+    },
+    pickTeam: (t, mon) => {
+      saveTeam(t, mon)
+      room?.updateMe(me())
+      lobbyUi?.refresh()
     },
     ready: (on) => {
       ready = on
@@ -701,7 +721,7 @@ let onlineTimer = 0
 function watchOnline() {
   clearInterval(onlineTimer)
   const tick = () => {
-    if (!document.querySelector('.home') || room) {
+    if (!document.querySelector('.n-app[data-tab="play"]') || room) {
       clearInterval(onlineTimer)
       stopProbe()
       return

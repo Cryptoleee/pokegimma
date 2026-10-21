@@ -104,7 +104,7 @@ export function showNews(onClose?: () => void) {
     })
   // Leaving home underneath (joining a friend, quick play found a lobby) closes the notes too
   const scr = document.getElementById('screen')!
-  const leave = new MutationObserver(() => !scr.querySelector('.home') && close())
+  const leave = new MutationObserver(() => !scr.querySelector('.n-app[data-tab="play"]') && close())
   leave.observe(scr, { childList: true })
   const close = () => {
     leave.disconnect()
@@ -142,7 +142,7 @@ export function maybeShowNews() {
   shownThisSession = true
   setTimeout(() => {
     // Only on a quiet home screen (no sheet or dialog open)
-    if (!document.querySelector('#screen > .home') || !document.getElementById('modal')!.classList.contains('hidden') || document.querySelector('.sheet.open, #screen .home button:disabled')) return
+    if (!document.querySelector('#screen .n-home') || !document.getElementById('modal')!.classList.contains('hidden') || document.querySelector('.n-sheet, .sheet.open, #screen .n-main button:disabled')) return
     sfx.banner()
     showNews()
   }, 700)

@@ -1,24 +1,21 @@
-import { showOptions } from './screens'
 import qrcode from 'qrcode-generator'
-import logoSmall from '../assets/stormbreak-logo-small.webp'
 import { animatedUrl, SPECIES, spriteUrl } from '../data/pokemon'
 import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
 import { sfx } from '../audio'
-import { NAME_MAX, profile, setName } from '../profile'
-import { CHAT_MAX, cleanCode, MAX_PLAYERS, type Room } from '../net/room'
+import { CHAT_MAX, type Room } from '../net/room'
 import type { ChatLine, MatchChoice } from '../net/protocol'
 import { ROYALE_THEMES, THEMES } from '../data/themes'
 import { BOSS_LIST, BOSSES } from '../data/bosses'
 import { SEATS } from '../game/game'
-import { bindLangSwitch, L, langSwitch } from '../i18n'
-import { accountStatus, onAccount } from '../account'
-import { friendsCard, openFriends, openInvite, paintFriendsCard } from './friends'
-import { homeBadge } from './profile'
-import { maybeShowNews, newsButton, showNews } from './news'
+import { accountStatus } from '../account'
+import { L } from '../i18n'
+import { openInvite } from './friends'
+import { progress } from '../progress'
 import { STADIUM_LIST, STADIUMS } from '../data/stadiums'
-import { onProgress, progress } from '../progress'
 import { titleName } from '../data/rewards'
 import { masteryOf, SHINY_AT } from '../../api/_progress'
+import { icon, IC, teamCard } from './app'
+import { openTeamSheet } from './team'
 
 /** Your partner is shown shiny (unlocked with mastery and switched on). */
 export function shinyPartner(id: number) {
@@ -94,336 +91,15 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
   return { paint }
 }
 
-export interface MenuActions {
-  solo(c: MatchChoice): void
-  /** Quick play: a public lobby with random players. */
-  quick(): void
-  /** 1 vs 1 online: a public duel lobby (or the CPU if nobody shows up). */
-  quickDuel(): void
-  /** Make a private match (of this mode, or the last one you played). */
-  host(c?: MatchChoice): void
-  join(code: string): void
-  /** Back into the friends' lobby you just left. */
-  rejoin(code: string): void
-  /** Join a friend's lobby (`q` ≥ 0: a quick play slot). */
-  joinFriend(code: string, q: number): void
-  /** Your trainer profile: level, quests, mastery, achievements, rankings. */
-  profile(): void
-  team(): void
-  back(): void
-}
-
-export interface MenuState {
-  trainer: TrainerDef
-  team: number[]
-  /** Last solo choice (mode + world/boss). */
-  choice: MatchChoice
-  /** A lobby you left a moment ago (shown as "Rejoin"). */
-  rejoin?: string
-  /** Open the friends sheet straight away (just logged in). */
-  friends?: boolean
-  /** Pre-filled join code (from a shared link). */
-  code?: string
-  error?: string
-  busy?: string
-}
-
-export function showMenu(st: MenuState, on: MenuActions) {
-  const el = screen()
-  const mon = st.team[0]
-  const sheetOpen = !!(st.code || st.error || st.busy)
-  el.innerHTML = `
-    <div class="home">
-      <div class="home-top">
-        <button class="sel-back" aria-label="${L('Back to the title screen', 'Terug naar het titelscherm')}">◀</button>
-        <div class="home-logo"><img src="${logoSmall}" alt="Stormbreak Royale"></div>
-        ${langSwitch('home-lang')}
-        ${newsButton()}
-        <button class="sel-back home-opts" aria-label="${L('Options', 'Opties')}">⚙️</button>
-      </div>
-      <div class="home-stage">
-        <div class="hs-bg"></div>
-        <div class="hs-beam"></div>
-        <div class="hs-plat"></div>
-        <img class="px hs-tr" src="${trainerSpriteUrl(st.trainer.sprite)}" alt="">
-        ${mon ? gif(mon, 'hs-mon', shinyPartner(mon)) : ''}
-        <div class="hs-tag"><small>${L('YOUR TEAM', 'JOUW TEAM')}</small><b>${st.trainer.name}${mon ? ` &amp; ${SPECIES[mon].name}` : ''}</b></div>
-        <button class="hs-edit">✎ ${L('Pick trainer &amp; Pokémon', 'Kies trainer &amp; Pokémon')}</button>
-        ${homeBadge()}
-      </div>
-      <div class="home-name">
-        <label for="mm-name">${L('Your name', 'Jouw naam')}</label>
-        <input id="mm-name" maxlength="${NAME_MAX}" autocomplete="nickname" spellcheck="false" placeholder="${L('Enter your name', 'Typ je naam')}" value="${esc(profile().name)}">
-      </div>
-      ${st.rejoin ? `<button class="home-rejoin"><i>↩</i><span><b>${L('Rejoin lobby', 'Terug naar de lobby')} <span class="cd">${esc(st.rejoin)}</span></b><small>${L('you left it a moment ago', 'je ging er net uit')}</small></span><em>▶</em></button>` : ''}
-      <div class="home-modes">
-        <button class="mode m-royale" data-mode="royale"><span class="mode-art">${[25, 4, 7, 1, 447].map((id, i) => `<img class="px" style="--i:${i}" src="${spriteUrl(id)}" alt="">`).join('')}</span><i>⚡</i><b>Battle Royale</b><small>${L(`${SEATS} trainers · 1 winner`, `${SEATS} trainers · 1 winnaar`)}</small><span class="qp-online"><em></em><span>${L('checking who\'s online…', 'online zoeken…')}</span></span></button>
-        <button class="mode m-duel" data-mode="duel"><em class="mode-new">${L('NEW', 'NIEUW')}</em><i>⚔️</i><b>1 vs 1</b><small>${L('duel · best of 3', 'duel · best of 3')}</small></button>
-        <button class="mode m-raid" data-mode="raid"><i>🐉</i><b>Raid</b><small>${L('team up vs. a boss', 'samen vs. een eindbaas')}</small></button>
-      </div>
-      ${friendsCard()}
-      <div class="mm-msg ${st.error && !sheetOpen ? 'err' : ''}"></div>
-
-      <div class="sheet play-sheet">
-        <div class="sheet-card">
-          <button class="sheet-x" aria-label="${L('Close', 'Sluiten')}">✕</button>
-          <h3 class="ps-title"></h3>
-          <p class="ps-sub"></p>
-          <div class="ps-opts"></div>
-        </div>
-      </div>
-
-      <div class="sheet solo-sheet">
-        <div class="sheet-card">
-          <button class="sheet-x" aria-label="${L('Close', 'Sluiten')}">✕</button>
-          <h3 class="solo-title">Solo</h3>
-          <div class="cp"></div>
-          <button class="cta solo-go"></button>
-        </div>
-      </div>
-
-      <div class="sheet mp-sheet ${sheetOpen ? 'open' : ''}">
-        <div class="sheet-card">
-          <button class="sheet-x" aria-label="${L('Close', 'Sluiten')}">✕</button>
-          <h3>${L('With friends', 'Met vrienden')}</h3>
-          <p class="mp-sub">${L(`Play with friends, side by side or online. Up to ${MAX_PLAYERS} players; empty spots become bots.`, `Speel samen met vrienden, naast je of online. Tot ${MAX_PLAYERS} spelers; lege plekken worden bots.`)}</p>
-          <button class="cta mm-host">＋ ${L('Create match', 'Potje maken')}<small>${L('you\'re the host and get a code', 'jij bent de host en krijgt een code')}</small></button>
-          <div class="sheet-or"><span>${L('or join one', 'of doe mee')}</span></div>
-          <form class="mm-code">
-            <input id="mm-code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" value="${esc(st.code ?? '')}" inputmode="text">
-            <button class="mm-go" type="submit">${L('Join ▶', 'Meedoen ▶')}</button>
-          </form>
-          <div class="mm-msg sheet-msg ${st.error ? 'err' : st.busy ? 'busy' : ''}">${esc(st.error ?? st.busy ?? '')}</div>
-        </div>
-      </div>
-    </div>`
-
-  const name = el.querySelector('#mm-name') as HTMLInputElement
-  const code = el.querySelector('#mm-code') as HTMLInputElement
-  const sheet = el.querySelector('.mp-sheet') as HTMLElement
-  const solo = el.querySelector('.solo-sheet') as HTMLElement
-  let choice = { ...st.choice }
-  const goBtn = el.querySelector('.solo-go') as HTMLButtonElement
-  const goLabel = () => (goBtn.innerHTML = choice.kind === 'raid'
-    ? `Start raid ▶<small>${L(`your ${mon ? SPECIES[mon].name : 'partner'} becomes Lv 50 and fully evolved`, `jouw ${mon ? SPECIES[mon].name : 'partner'} wordt Lv 50 en volledig geëvolueerd`)}</small>`
-    : choice.kind === 'duel'
-      ? `${L('Start 1 vs 1 ▶', 'Start 1 tegen 1 ▶')}<small>${L('against the CPU · both Lv 50, fully evolved', 'tegen de CPU · allebei Lv 50, volledig geëvolueerd')}</small>`
-      : `Start battle royale ▶<small>${L(`vs. ${SEATS - 1} bots`, `tegen ${SEATS - 1} bots`)}</small>`)
-  const soloPicker = choicePicker(el.querySelector('.solo-sheet .cp') as HTMLElement, () => choice, (c) => {
-    choice = c
-    goLabel()
-  })
-  goLabel()
-  const play = el.querySelector('.play-sheet') as HTMLElement
-  /** The friends sheet makes a match of the mode you came from (null: the last one you played). */
-  let hostKind: MatchChoice['kind'] | null = null
-  const msg = el.querySelector('.sheet-msg') as HTMLElement
-  name.addEventListener('input', () => setName(name.value))
-  name.addEventListener('keydown', (e) => e.key === 'Enter' && name.blur())
-  code.addEventListener('input', () => (code.value = cleanCode(code.value)))
-
-  /** Multiplayer needs a name so others know who you are. */
-  const named = () => {
-    setName(name.value)
-    if (profile().name) return true
-    sheet.classList.remove('open')
-    play.classList.remove('open')
-    name.focus()
-    name.classList.remove('shake')
-    void name.offsetWidth
-    name.classList.add('shake')
-    const m = el.querySelector('.home > .mm-msg') as HTMLElement
-    m.className = 'mm-msg err'
-    m.textContent = L('Enter your name first', 'Vul eerst je naam in')
-    sfx.error()
-    return false
-  }
-  const busy = (text: string) => {
-    msg.className = 'mm-msg sheet-msg busy'
-    msg.textContent = text
-    el.querySelectorAll('button').forEach((b) => (b.disabled = true))
-  }
-  const click = (sel: string, fn: () => void) =>
-    el.querySelector(sel)!.addEventListener('click', () => {
-      sfx.select()
-      fn()
-    })
-
-  click('.sel-back:not(.home-opts):not(.home-news)', on.back)
-  click('.home-opts', showOptions)
-  click('.home-news', () => showNews())
-  // The whole home re-renders on a language change (main listens to onLangChange)
-  bindLangSwitch(el.querySelector('.home-top')!, () => sfx.select())
-  el.querySelector('.home-rejoin')?.addEventListener('click', () => {
-    sfx.select()
-    if (named()) on.rejoin(st.rejoin!)
-  })
-  click('.hs-edit', () => {
-    setName(name.value)
-    on.team()
-  })
-  click('.solo-go', () => on.solo(choice))
-
-  // Mode first: a card per mode, then how you want to play it
-  const soloTitle = el.querySelector('.solo-title') as HTMLElement
-  const openSolo = (kind: MatchChoice['kind'], title: string) => {
-    choice = { ...choice, kind }
-    soloPicker.paint()
-    goLabel()
-    soloTitle.textContent = title
-    play.classList.remove('open')
-    solo.classList.add('open')
-  }
-  const quickGo = (duel: boolean) => {
-    setName(name.value)
-    play.classList.remove('open')
-    const m = el.querySelector('.home > .mm-msg') as HTMLElement
-    m.className = 'mm-msg busy'
-    m.textContent = duel ? L('Finding an opponent…', 'Tegenstander zoeken…') : L('Finding a public lobby…', 'Openbare lobby zoeken…')
-    el.querySelectorAll('button').forEach((b) => (b.disabled = true))
-    if (duel) on.quickDuel()
-    else on.quick()
-  }
-  const withFriends = (kind: MatchChoice['kind']) => {
-    if (!named()) return
-    hostKind = kind
-    ;(el.querySelector('.mp-sub') as HTMLElement).textContent = kind === 'duel'
-      ? L('A duel with a friend: make one and share the code, or enter theirs.', 'Een duel met een vriend: maak er een en deel de code, of vul die van je vriend in.')
-      : kind === 'raid'
-        ? L(`Take on a boss together. Up to ${MAX_PLAYERS} players.`, `Samen tegen een eindbaas. Tot ${MAX_PLAYERS} spelers.`)
-        : L(`Play with friends, side by side or online. Up to ${MAX_PLAYERS} players; empty spots become bots.`, `Speel samen met vrienden, naast je of online. Tot ${MAX_PLAYERS} spelers; lege plekken worden bots.`)
-    play.classList.remove('open')
-    sheet.classList.add('open')
-  }
-  type Opt = { cls: string; icon: string; b: string; s: string; go: () => void }
-  const MODES: Record<MatchChoice['kind'], { title: string; sub: string; opts: Opt[] }> = {
-    royale: {
-      title: 'Battle Royale',
-      sub: L(`${SEATS} trainers on one island: last one standing wins. Catch, level up and evolve along the way.`, `${SEATS} trainers op één eiland: wie als laatste overblijft wint. Vang, level en evolueer onderweg.`),
-      opts: [
-        { cls: 'quick', icon: '⚡', b: L('Quick play', 'Snel spel'), s: L('online with random players', 'online met willekeurige spelers'), go: () => quickGo(false) },
-        { cls: 'solo', icon: '▶', b: 'Solo', s: L(`against ${SEATS - 1} bots`, `tegen ${SEATS - 1} bots`), go: () => openSolo('royale', 'Battle Royale · Solo') },
-        { cls: 'multi', icon: '👥', b: L('With friends', 'Met vrienden'), s: L('your own match with a code', 'eigen potje met code'), go: () => withFriends('royale') },
-      ],
-    },
-    duel: {
-      title: '1 vs 1',
-      sub: L('A duel in a small arena, best of 3. Both Pokémon fully evolved at Lv 50. Grab power-ups, hide in the grass, mind the ring.', 'Een duel in een kleine arena, best of 3. Beide Pokémon volledig geëvolueerd op Lv 50. Pak power-ups, verstop je in het gras en let op de ring.'),
-      opts: [
-        { cls: 'online', icon: '🌐', b: 'Online', s: L('against a random player', 'tegen een willekeurige speler'), go: () => quickGo(true) },
-        { cls: 'cpu', icon: '🤖', b: L('Against the CPU', 'Tegen de CPU'), s: L('practice any time', 'oefenen wanneer je wilt'), go: () => openSolo('duel', L('1 vs 1 · CPU', '1 tegen 1 · CPU')) },
-        { cls: 'multi', icon: '👥', b: L('With a friend', 'Met een vriend'), s: L('your own duel with a code', 'eigen duel met code'), go: () => withFriends('duel') },
-      ],
-    },
-    raid: {
-      title: 'Raid',
-      sub: L('Team up against a legendary boss. Get out of the red shapes on the ground!', 'Samen tegen een legendarische eindbaas. Loop weg uit de rode vormen op de grond!'),
-      opts: [
-        { cls: 'solo', icon: '▶', b: 'Solo', s: L('just you against the boss', 'alleen tegen de baas'), go: () => openSolo('raid', 'Raid · Solo') },
-        { cls: 'multi', icon: '👥', b: L('With friends', 'Met vrienden'), s: L(`up to ${MAX_PLAYERS} players, with a code`, `tot ${MAX_PLAYERS} spelers, met code`), go: () => withFriends('raid') },
-      ],
-    },
-  }
-  el.querySelectorAll<HTMLButtonElement>('.home-modes .mode').forEach((card) => card.addEventListener('click', () => {
-    sfx.select()
-    setName(name.value)
-    const kind = card.dataset.mode as MatchChoice['kind']
-    const m = MODES[kind]
-    ;(play.querySelector('.ps-title') as HTMLElement).textContent = m.title
-    ;(play.querySelector('.ps-sub') as HTMLElement).textContent = m.sub
-    const opts = play.querySelector('.ps-opts') as HTMLElement
-    opts.innerHTML = m.opts.map((o, i) => `<button class="ps-opt ${o.cls}" data-i="${i}"><i>${o.icon}</i><span><b>${o.b}</b><small>${o.s}</small></span><em>▶</em></button>`).join('')
-    opts.querySelectorAll<HTMLButtonElement>('.ps-opt').forEach((b) => b.addEventListener('click', () => {
-      sfx.select()
-      m.opts[Number(b.dataset.i)].go()
-    }))
-    play.className = `sheet play-sheet ps-${kind} open`
-  }))
-  el.querySelectorAll('.sheet-x').forEach((x) => x.addEventListener('click', () => {
-    sfx.select()
-    el.querySelectorAll('.sheet').forEach((sh) => sh.classList.remove('open'))
-  }))
-  el.querySelectorAll<HTMLElement>('.sheet').forEach((sh) => sh.addEventListener('click', (e) => e.target === sh && sh.classList.remove('open')))
-  click('.mm-host', () => {
-    if (!named()) return
-    busy(L('Creating match…', 'Potje aanmaken…'))
-    on.host(hostKind ? { ...choice, kind: hostKind } : undefined)
-  })
-  el.querySelector('.mm-code')!.addEventListener('submit', (e) => {
-    e.preventDefault()
-    if (!named()) return
-    const c = cleanCode(code.value)
-    if (c.length !== 4) {
-      msg.className = 'mm-msg sheet-msg err'
-      msg.textContent = L('A code has 4 characters', 'Een code heeft 4 tekens')
-      sfx.error()
-      code.focus()
-      return
-    }
-    sfx.select()
-    busy(L(`Connecting to ${c}…`, `Verbinden met ${c}…`))
-    on.join(c)
-  })
-  // Level badge: follows your progress (e.g. after logging in); opens the profile
-  const bindBadge = () => el.querySelector('.hs-prog')?.addEventListener('click', () => {
-    sfx.select()
-    setName(name.value)
-    on.profile()
-  })
-  bindBadge()
-  const offProg = onProgress(() => {
-    const b = el.querySelector('.hs-prog')
-    if (!b || !document.body.contains(b)) return offProg()
-    b.outerHTML = homeBadge()
-    bindBadge()
-  })
-
-  // Friends: the card follows the account state; tapping it opens the sheet
-  const fcard = el.querySelector('.home-friends') as HTMLElement
-  paintFriendsCard(fcard)
-  const offAcc = onAccount(() => (document.body.contains(fcard) ? paintFriendsCard(fcard) : offAcc()))
-  fcard.addEventListener('click', () => {
-    sfx.select()
-    setName(name.value)
-    openFriends(el.querySelector('.home') as HTMLElement, {
-      join: (c, q) => {
-        if (!named()) return
-        const m = el.querySelector('.home > .mm-msg') as HTMLElement
-        m.className = 'mm-msg busy'
-        m.textContent = L('Joining your friend…', 'Naar je vriend…')
-        el.querySelectorAll('button').forEach((b) => (b.disabled = true))
-        on.joinFriend(c, q)
-      },
-    })
-  })
-  if (st.friends) fcard.click()
-  if (st.busy) busy(st.busy)
-  else if (!profile().name && !st.friends) setTimeout(() => name.focus(), 300)
-  // A new update: shown once to returning players (only on a quiet home)
-  if (!sheetOpen && !st.friends) maybeShowNews()
-}
-
-/** Home: the live "players online" line on the quick play button. */
-export function setOnline(all: { players: number; running: boolean; open: boolean }[]) {
-  const el = document.querySelector('.qp-online span')
-  if (!el) return
-  const playing = all.filter((s) => s.running).reduce((n, s) => n + s.players, 0)
-  const waiting = all.filter((s) => !s.running).reduce((n, s) => n + s.players, 0)
-  const total = playing + waiting
-  el.parentElement!.classList.toggle('live', total > 0)
-  el.textContent = total === 0
-    ? L('nobody online: start one!', 'niemand online: start er een!')
-    : waiting > 0
-      ? L(`${total} online · ${waiting} waiting for a match`, `${total} online · ${waiting} wacht${waiting === 1 ? '' : 'en'} op een potje`)
-      : L(`${total} online, playing now`, `${total} online aan het spelen`)
-}
-
 // ---------------- Lobby ----------------
 
 export interface LobbyActions {
   start(): void
   choice(c: MatchChoice): void
+  /** The full Team screen (from the switch sheet's "see all"). */
   team(): void
+  /** A quick switch from the sheet, staying in the lobby. */
+  pickTeam(t: TrainerDef, mon: number): void
   ready(on: boolean): void
   leave(): void
 }
@@ -474,64 +150,93 @@ export function showLobby(room: Room, on: LobbyActions) {
   const qr = qrcode(0, 'M')
   qr.addData(room.link)
   qr.make()
+  const loggedIn = accountStatus() === 'in'
   const codeCard = `
-      <div class="lb-code">
-        ${room.isHost ? `<div class="lb-qr">${qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true })}</div>` : ''}
-        <div class="lb-codetext">
-          <small>Code</small>
-          <b>${room.code.split('').map((c) => `<i>${c}</i>`).join('')}</b>
-          <span>${room.isHost ? L('Have friends enter this code or scan the QR code', 'Laat vrienden deze code invoeren of de QR-code scannen') : L('Share this code with anyone who wants to join', 'Deel deze code met wie nog mee wil doen')}</span>
-          <button class="ghost2 lb-share">${L('Share link ⤴', 'Link delen ⤴')}</button>
-          ${accountStatus() === 'in' ? `<button class="ghost2 lb-invite">👥 ${L('Invite friends', 'Vrienden uitnodigen')}</button>` : ''}
+      <section class="nl-code">
+        ${room.isHost ? `<div class="nl-qr">${qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true })}</div>` : ''}
+        <div class="nl-codetext">
+          <span class="n-label">${L('Lobby code', 'Lobbycode')}</span>
+          <b>${esc(room.code)}</b>
+          <small>${room.isHost ? L('Have friends enter this code or scan the QR code', 'Laat vrienden deze code invoeren of de QR-code scannen') : L('Share this code with anyone who wants to join', 'Deel deze code met wie nog mee wil doen')}</small>
+          <div class="nl-codeacts">
+            <button class="n-btn3 nl-share">${icon(IC.share, 16)}${L('Share link', 'Link delen')}</button>
+            ${loggedIn ? `<button class="n-btn3 nl-invite">${icon(IC.plus, 16)}${L('Invite friends', 'Vrienden uitnodigen')}</button>` : ''}
+          </div>
         </div>
-      </div>`
+      </section>`
   const quickCard = `
-      <div class="qp-card">
-        <div class="qp-radar"><i></i><i></i><i></i><svg viewBox="0 0 100 100"><circle class="qp-ring-bg" cx="50" cy="50" r="44"/><circle class="qp-ring" cx="50" cy="50" r="44"/></svg><b class="qp-time">--</b></div>
-        <div class="qp-text"><small>${L('PUBLIC LOBBY', 'OPENBARE LOBBY')}</small><b class="qp-title">${L('Finding players…', 'Spelers zoeken…')}</b><span class="qp-sub"></span>${accountStatus() === 'in' ? `<button class="ghost2 lb-invite">👥 ${L('Invite friends', 'Vrienden uitnodigen')}</button>` : ''}</div>
-      </div>`
+      <section class="nl-quick">
+        <div class="nl-radar"><i></i><i></i><svg viewBox="0 0 100 100"><circle class="nl-ring-bg" cx="50" cy="50" r="44"/><circle class="nl-ring" cx="50" cy="50" r="44"/></svg><b class="nl-time">--</b></div>
+        <div class="nl-qtext"><span class="n-label">${L('Public lobby', 'Openbare lobby')}</span><b class="nl-qtitle">${L('Finding players…', 'Spelers zoeken…')}</b><small class="nl-qsub"></small>${loggedIn ? `<button class="n-btn3 nl-invite">${icon(IC.plus, 16)}${L('Invite friends', 'Vrienden uitnodigen')}</button>` : ''}</div>
+      </section>`
+  const title = quick ? (room.choice.kind === 'duel' ? L('1 vs 1 online', '1 tegen 1 online') : L('Quick play', 'Snel spel')) : L('Lobby', 'Lobby')
   el.innerHTML = `
-    <div class="sel lobby lb2 ${quick ? 'quick' : ''}">
-      <div class="sel-head">
-        <div class="sel-title"><small></small><b>${quick ? (room.choice.kind === 'duel' ? L('1 vs 1 online', '1 tegen 1 online') : L('Quick play', 'Snel spel')) : L('With friends', 'Met vrienden')}</b></div>
-        <button class="lb-leave">${L('Leave', 'Verlaten')}</button>
-      </div>
-      <div class="lb-pages">
-        <section class="lb-page on" data-page="lobby">
-          ${quick ? quickCard : codeCard}
-          ${quick ? '' : '<div class="lb-choice"><div class="cp"></div></div>'}
-          <div class="lb-steps"></div>
-          <div class="lb-list"></div>
-        </section>
-        <section class="lb-page lb-chat" data-page="chat">
-          <div class="lb-log"></div>
-          <div class="lb-quick">${QUICK_CHAT.map((q) => `<button>${q}</button>`).join('')}</div>
-          <form class="lb-say"><input maxlength="${CHAT_MAX}" placeholder="${L('Type a message…', 'Typ een bericht…')}" autocomplete="off" enterkeyhint="send"><button type="submit">➤</button></form>
-        </section>
-      </div>
-      <div class="lb-dock">
-        <button class="cta lb-start"></button>
-        <nav class="lb-tabs">
-          <button data-tab="lobby" class="on"><i>👥</i><span>Lobby</span><b class="lb-count"></b></button>
-          <button data-tab="chat"><i>💬</i><span>Chat</span><b class="lb-unread hidden"></b></button>
-          <button data-tab="team"><i>🎒</i><span>Team</span></button>
-        </nav>
-      </div>
-      <div class="lb-toast hidden"></div>
+    <div class="n-app n-focus nl ${quick ? 'quick' : ''} ${room.isHost ? 'host' : ''}" data-tab="lobby">
+      <main class="n-main">
+        <div class="n-page nl-page">
+          <header class="nl-head">
+            <button class="n-icon nl-leave" data-act="leave" aria-label="${L('Leave the lobby', 'Lobby verlaten')}">${icon(IC.back)}</button>
+            <div class="nl-title"><b>${title}</b><small class="nl-sub"></small></div>
+            ${quick ? '' : `<button class="nl-pill nl-share" aria-label="${L(`Share code ${room.code}`, `Code ${room.code} delen`)}">${esc(room.code)}${icon(IC.share, 16)}</button>`}
+          </header>
+          <div class="nl-body">
+            <div class="nl-col nl-left" data-page="lobby">
+              <div class="nl-teamslot"></div>
+              ${quick ? quickCard : ''}
+              ${quick ? '' : `<section class="nl-choice"><div class="n-sec"><h3 class="n-h3">${L('Match', 'Potje')}</h3><small>${room.isHost ? L('you choose as host', 'jij kiest als host') : L('the host chooses', 'de host kiest')}</small></div><div class="cp"></div></section>`}
+              <div class="nl-steps"></div>
+              <div class="n-sec"><h3 class="n-h3">${L('Players', 'Spelers')} <span class="nl-count"></span></h3><small class="nl-botnote"></small></div>
+              <div class="nl-list"></div>
+              ${quick ? '' : `<button class="nl-addfriend">${icon(IC.plus, 16)}${L('Invite a friend', 'Nodig een vriend uit')}</button>`}
+            </div>
+            <div class="nl-col nl-right">
+              ${quick ? '' : codeCard}
+              <section class="nl-chat" data-page="chat">
+                <div class="n-sec nl-chathead"><h3 class="n-h3">Chat</h3></div>
+                <div class="nl-log" aria-live="polite" data-empty="${L('Say hi to the lobby 👋', 'Zeg hoi tegen de lobby 👋')}"></div>
+                <div class="nl-quickchat">${QUICK_CHAT.map((q) => `<button>${q}</button>`).join('')}</div>
+                <form class="nl-say"><input maxlength="${CHAT_MAX}" placeholder="${L('Type a message…', 'Typ een bericht…')}" autocomplete="off" enterkeyhint="send"><button type="submit" aria-label="${L('Send', 'Versturen')}">${icon('<path d="M4 12l16-8-6 16-3-7z"/>', 18)}</button></form>
+              </section>
+            </div>
+          </div>
+          <div class="nl-dock">
+            <button class="nl-chatbtn" aria-label="Chat">${icon(IC.chat, 22)}<i class="nl-unread hidden"></i></button>
+            <button class="n-btn nl-start lb-start"></button>
+          </div>
+          <div class="nl-toast hidden" role="status"></div>
+        </div>
+      </main>
     </div>`
 
-  const root = el.querySelector('.lb2') as HTMLElement
-  const list = el.querySelector('.lb-list') as HTMLElement
-  const steps = el.querySelector('.lb-steps') as HTMLElement
-  const start = el.querySelector('.lb-start') as HTMLButtonElement
-  const head = el.querySelector('.sel-title small') as HTMLElement
-  const log = el.querySelector('.lb-log') as HTMLElement
-  const count = el.querySelector('.lb-count') as HTMLElement
-  const unread = el.querySelector('.lb-unread') as HTMLElement
-  const picker = quick ? null : choicePicker(el.querySelector('.lb-choice .cp') as HTMLElement, () => room.choice, room.isHost ? (c) => on.choice(c) : null)
+  const root = el.querySelector('.nl') as HTMLElement
+  const list = el.querySelector('.nl-list') as HTMLElement
+  const steps = el.querySelector('.nl-steps') as HTMLElement
+  const start = el.querySelector('.nl-start') as HTMLButtonElement
+  const head = el.querySelector('.nl-sub') as HTMLElement
+  const log = el.querySelector('.nl-log') as HTMLElement
+  const count = el.querySelector('.nl-count') as HTMLElement
+  const botNote = el.querySelector('.nl-botnote') as HTMLElement
+  const unread = el.querySelector('.nl-unread') as HTMLElement
+  const teamSlot = el.querySelector('.nl-teamslot') as HTMLElement
+  const picker = quick ? null : choicePicker(el.querySelector('.nl-choice .cp') as HTMLElement, () => room.choice, room.isHost ? (c) => on.choice(c) : null)
   const others = () => room.players.filter((p) => p.pid !== room.players[0]?.pid)
   let page = 'lobby'
   let unreadN = 0
+  let teamKey = ''
+
+  // Your team, big, with Switch: changing it right here is how you level other partners
+  const paintTeam = () => {
+    const tr = TRAINERS.find((t) => t.key === room.me.trainer) ?? TRAINERS[0]
+    const mon = room.me.team[0]
+    const key = `${tr.key}:${mon}:${progress().partners[mon] ?? 0}`
+    if (key === teamKey) return
+    teamKey = key
+    teamSlot.innerHTML = teamCard(tr, mon, shinyPartner(mon))
+    teamSlot.querySelector('[data-act="switch"]')!.addEventListener('click', () => {
+      sfx.select()
+      openTeamSheet({ trainer: tr, mon, pick: (t, m) => on.pickTeam(t, m), seeAll: on.team })
+    })
+  }
 
   // Quick play: the countdown ring and the "found so far" line
   const paintQuick = () => {
@@ -539,13 +244,13 @@ export function showLobby(room: Room, on: LobbyActions) {
     const left = Math.max(0, room.quickEnds - performance.now()) / 1000
     const n = room.players.length
     const duel = room.choice.kind === 'duel'
-    const ring = el.querySelector('.qp-ring') as SVGCircleElement | null
+    const ring = el.querySelector('.nl-ring') as SVGCircleElement | null
     if (!ring) return
-    const time = el.querySelector('.qp-time') as HTMLElement
+    const time = el.querySelector('.nl-time') as HTMLElement
     time.textContent = room.running ? '▶' : `${Math.ceil(left)}`
     ring.style.strokeDashoffset = `${276.5 * (1 - Math.min(1, left / room.quickWait))}`
-    const title = el.querySelector('.qp-title') as HTMLElement
-    const sub = el.querySelector('.qp-sub') as HTMLElement
+    const title = el.querySelector('.nl-qtitle') as HTMLElement
+    const sub = el.querySelector('.nl-qsub') as HTMLElement
     title.textContent = room.running
       ? L('Match in progress', 'Potje is bezig')
       : duel
@@ -563,13 +268,21 @@ export function showLobby(room: Room, on: LobbyActions) {
         )
   }
 
+  /** "Battle Royale · Forest": what this lobby is going to play. */
+  const matchLine = () => {
+    const c = room.choice
+    if (c.kind === 'raid') return `Raid · ${L('random boss', 'willekeurige baas')}`
+    if (c.kind === 'duel') return `1 vs 1 · ${c.stadium && c.stadium !== 'random' ? STADIUMS[c.stadium].name : L('random stadium', 'willekeurig stadion')}`
+    return `Battle Royale · ${c.theme && c.theme !== 'random' ? THEMES[c.theme].name : L('random world', 'willekeurige wereld')}`
+  }
+
   const refresh = () => {
     const bots = Math.max(0, SEATS - room.players.length)
     const me = room.players.find((p) => p.pid === room.me.pid) ?? room.me
-    head.textContent = quick
-      ? `${L('PUBLIC LOBBY', 'OPENBARE LOBBY')} · ${room.players.length}/${room.cap}`
-      : `${room.isHost ? L('YOUR MATCH', 'JOUW POTJE') : 'LOBBY'} · ${room.players.length}/${room.cap} ${L('PLAYERS', 'SPELERS')}`
-    count.textContent = `${room.players.length}`
+    head.textContent = quick ? matchLine().replace(/ · .*/, '') : matchLine()
+    count.textContent = `${room.players.length}/${room.cap}`
+    root.classList.toggle('alone', room.players.length < 2)
+    paintTeam()
     if (picker && !room.isHost) picker.paint()
     const raid = room.choice.kind === 'raid'
     const duel = room.choice.kind === 'duel'
@@ -577,19 +290,21 @@ export function showLobby(room: Room, on: LobbyActions) {
       const tr = TRAINERS.find((t) => t.key === p.trainer) ?? TRAINERS[0]
       const isMe = p.pid === room.me.pid
       const ready = quick ? !!p.ready : i === 0 || p.ready
-      const state = quick ? (p.ready ? 'START ✓' : L('waiting', 'wacht')) : i === 0 ? 'HOST' : p.ready ? L('READY ✓', 'KLAAR ✓') : L('picking…', 'kiest…')
+      const state = quick ? (p.ready ? 'Start ✓' : L('waiting', 'wacht')) : i === 0 ? 'Host' : p.ready ? L('Ready', 'Klaar') : L('Picking…', 'Kiest team')
+      const tags = [isMe ? L('you', 'jij') : '', !quick && i === 0 ? 'host' : ''].filter(Boolean).join(' · ')
+      const lv = p.lv ? `Lv ${Math.max(1, Math.min(99, Number(p.lv) || 1))} · ` : ''
       return `
-        <div class="lb-p ${isMe ? 'lb-me' : ''} ${ready ? 'ready' : ''}" style="--d:${i * 60}ms">
-          <img class="px lb-tr" src="${trainerSpriteUrl(tr.sprite)}" alt="">
-          <div class="lb-name"><b>${p.lv ? `<em class="lb-lv">${Math.max(1, Math.min(99, Number(p.lv) || 1))}</em>` : ''}${esc(p.name)}</b>${p.title ? `<small class="lb-title">${esc(titleName(String(p.title)))}</small>` : ''}<span>${!quick && i === 0 ? '<em>HOST</em>' : ''}${isMe ? `<em class="you">${L('YOU', 'JIJ')}</em>` : ''}${tr.name}${p.team[0] ? ` &amp; ${SPECIES[p.team[0]].name}` : ''}</span></div>
-          ${p.team[0] ? gif(p.team[0], 'lb-mon', !!p.shiny) : ''}
-          <span class="lb-state">${state}</span>
+        <div class="nl-p ${isMe ? 'me' : ''} ${ready ? 'ready' : ''}" style="--d:${i * 60}ms">
+          <span class="nl-p-pic"><img class="px" src="${trainerSpriteUrl(tr.sprite)}" alt="">${p.team[0] ? gif(p.team[0], '', !!p.shiny) : ''}</span>
+          <span class="nl-p-info"><b>${esc(p.name)}${tags ? ` <em>(${tags})</em>` : ''}</b><small>${lv}${p.title ? `${esc(titleName(String(p.title)))} · ` : ''}${tr.name}${p.team[0] ? ` &amp; ${SPECIES[p.team[0]].name}` : ''}</small></span>
+          <span class="nl-state">${state}</span>
         </div>`
-    }).join('') + (duel
-      ? `<div class="lb-bots">${room.players.length < 2 ? L('1 vs 1: on your own you face the CPU', '1 tegen 1: alleen speel je tegen de CPU') : L('1 vs 1 · best of 3', '1 tegen 1 · best of 3')}</div>`
+    }).join('')
+    botNote.textContent = duel
+      ? room.players.length < 2 ? L('alone you face the CPU', 'alleen speel je tegen de CPU') : L('best of 3', 'best of 3')
       : raid
-      ? `<div class="lb-bots">${L('Raid: team up against a random boss', 'Raid: samen tegen een willekeurige baas')}</div>`
-      : `<div class="lb-bots">${L(`+ ${bots} bot${bots === 1 ? '' : 's'} fill${bots === 1 ? 's' : ''} up the arena`, `+ ${bots} bot${bots === 1 ? '' : 's'} vullen de arena aan`)}</div>`)
+        ? L('together against a random boss', 'samen tegen een willekeurige baas')
+        : L(`+ ${bots} bot${bots === 1 ? '' : 's'} fill up the arena`, `+ ${bots} bot${bots === 1 ? '' : 's'} vullen de arena aan`)
 
     if (quick) {
       const n = room.players.length, votes = room.players.filter((p) => p.ready).length
@@ -612,12 +327,12 @@ export function showLobby(room: Room, on: LobbyActions) {
       start.innerHTML = room.running
         ? L('Match in progress…<small>you\'ll join the next one</small>', 'Potje is bezig…<small>je doet mee met het volgende</small>')
         : n < 2 && duel
-          ? L('Play the CPU now ▶<small>don\'t wait for an opponent</small>', 'Nu tegen de CPU ▶<small>niet wachten op een tegenstander</small>')
+          ? L('Play the CPU now<small>don\'t wait for an opponent</small>', 'Nu tegen de CPU<small>niet wachten op een tegenstander</small>')
         : n < 2
-          ? L('Start now with bots ▶<small>don\'t wait for others</small>', 'Start nu met bots ▶<small>niet wachten op anderen</small>')
+          ? L('Start now with bots<small>don\'t wait for others</small>', 'Start nu met bots<small>niet wachten op anderen</small>')
           : me.ready
             ? L(`Ready ✓<small>waiting for the rest · ${votes}/${n}</small>`, `Klaar ✓<small>wachten op de rest · ${votes}/${n}</small>`)
-            : L(`Start now ▶<small>${votes}/${n} want${votes === 1 ? 's' : ''} to start</small>`, `Start nu ▶<small>${votes}/${n} wil starten</small>`)
+            : L(`Start now<small>${votes}/${n} want${votes === 1 ? 's' : ''} to start</small>`, `Start nu<small>${votes}/${n} wil starten</small>`)
     } else if (room.isHost) {
       const waiting = others().filter((p) => !p.ready)
       const names = waiting.map((p) => esc(p.name)).join(', ')
@@ -643,11 +358,11 @@ export function showLobby(room: Room, on: LobbyActions) {
           ? L(`Waiting… <small>${others().length - waiting.length}/${others().length} ready</small>`, `Wachten… <small>${others().length - waiting.length}/${others().length} klaar</small>`)
           : duel
             ? np < 2
-              ? L('Start 1 vs 1 ▶<small>against the CPU</small>', 'Start 1 tegen 1 ▶<small>tegen de CPU</small>')
-              : L(`Start 1 vs 1 ▶<small>you vs. ${esc(others()[0]?.name ?? '')}</small>`, `Start 1 tegen 1 ▶<small>jij tegen ${esc(others()[0]?.name ?? '')}</small>`)
+              ? L('Start 1 vs 1<small>against the CPU</small>', 'Start 1 tegen 1<small>tegen de CPU</small>')
+              : L(`Start 1 vs 1<small>you vs. ${esc(others()[0]?.name ?? '')}</small>`, `Start 1 tegen 1<small>jij tegen ${esc(others()[0]?.name ?? '')}</small>`)
           : raid
-            ? L(`Start raid! ▶<small>${np} player${np === 1 ? '' : 's'} vs. a boss</small>`, `Start raid! ▶<small>${np} speler${np === 1 ? '' : 's'} tegen een eindbaas</small>`)
-            : L(`Start! ▶<small>${np} player${np === 1 ? '' : 's'} + ${bots} bots</small>`, `Start! ▶<small>${np} speler${np === 1 ? '' : 's'} + ${bots} bots</small>`)
+            ? L(`Start raid<small>${np} player${np === 1 ? '' : 's'} vs. a boss</small>`, `Start raid<small>${np} speler${np === 1 ? '' : 's'} tegen een eindbaas</small>`)
+            : L(`Start match<small>${np} player${np === 1 ? '' : 's'} + ${bots} bots</small>`, `Start potje<small>${np} speler${np === 1 ? '' : 's'} + ${bots} bots</small>`)
     } else {
       steps.innerHTML = me.ready
         ? L(
@@ -655,8 +370,8 @@ export function showLobby(room: Room, on: LobbyActions) {
             `<b>Je bent klaar ✓</b><span>Wachten tot ${esc(room.players[0]?.name ?? 'de host')} het potje start.</span>`,
           )
         : L(
-            '<ol><li><b>Pick your trainer &amp; Pokémon</b> under “Team”</li><li>Tap <b>Ready</b> once your team is set</li></ol>',
-            '<ol><li><b>Kies je trainer &amp; Pokémon</b> onder “Team”</li><li>Tik op <b>Klaar</b> zodra je team goed is</li></ol>',
+            '<b>Happy with your team?</b><span>Switch it above if you like, then tap Ready.</span>',
+            '<b>Tevreden met je team?</b><span>Wissel het hierboven als je wilt en tik dan op Klaar.</span>',
           )
       steps.classList.toggle('todo', !me.ready)
       start.disabled = room.running
@@ -665,7 +380,7 @@ export function showLobby(room: Room, on: LobbyActions) {
         ? L('A match is still running…', 'Er loopt nog een potje…')
         : me.ready
           ? L('Ready ✓<small>tap to cancel</small>', 'Klaar ✓<small>tik om te annuleren</small>')
-          : L('Ready ▶<small>my team is set</small>', 'Klaar ▶<small>ik heb mijn team</small>')
+          : L('I\'m ready<small>my team is set</small>', 'Ik ben klaar<small>mijn team staat</small>')
     }
     paintQuick()
   }
@@ -683,26 +398,25 @@ export function showLobby(room: Room, on: LobbyActions) {
   // The countdown ticks between lobby updates
   const ticker = window.setInterval(() => (document.body.contains(root) ? paintQuick() : clearInterval(ticker)), 250)
 
+  // Phones: the lobby or the chat (the chat button flips between them). Desktop shows both.
+  const wide = matchMedia('(min-width: 1100px)')
   const show = (p: string) => {
     page = p
-    el.querySelectorAll<HTMLElement>('.lb-page').forEach((s) => s.classList.toggle('on', s.dataset.page === p))
-    el.querySelectorAll<HTMLElement>('.lb-tabs [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === p))
-    if (p === 'chat') {
+    root.dataset.page = p
+    if (p === 'chat' || wide.matches) {
       unreadN = 0
       unread.classList.add('hidden')
       log.scrollTop = log.scrollHeight
     }
   }
-  el.querySelectorAll<HTMLElement>('.lb-tabs [data-tab]').forEach((b) =>
-    b.addEventListener('click', () => {
-      sfx.select()
-      if (b.dataset.tab === 'team') on.team()
-      else show(b.dataset.tab!)
-    }),
-  )
-  // Leaving needs a second tap (as host it closes the lobby for everyone)
-  el.querySelector('.lb-leave')!.addEventListener('click', () => {
+  show('lobby')
+  el.querySelector('.nl-chatbtn')!.addEventListener('click', () => {
     sfx.select()
+    show(page === 'chat' ? 'lobby' : 'chat')
+  })
+  el.querySelector('.nl-leave')!.addEventListener('click', () => {
+    sfx.select()
+    if (page === 'chat' && !wide.matches) return show('lobby')
     confirmLeaveLobby(room, on.leave)
   })
   start.addEventListener('click', () => {
@@ -711,58 +425,65 @@ export function showLobby(room: Room, on: LobbyActions) {
     if (room.isHost && !quick) on.start()
     else on.ready(!room.me.ready)
   })
-  const input = el.querySelector('.lb-say input') as HTMLInputElement
+  const input = el.querySelector('.nl-say input') as HTMLInputElement
   // While typing, the dock steps aside so the keyboard doesn't push everything up
   input.addEventListener('focus', () => root.classList.add('typing'))
   input.addEventListener('blur', () => root.classList.remove('typing'))
-  el.querySelector('.lb-say')!.addEventListener('submit', (e) => {
+  el.querySelector('.nl-say')!.addEventListener('submit', (e) => {
     e.preventDefault()
     if (input.value.trim()) sfx.blip()
     room.say(input.value)
     input.value = ''
   })
-  el.querySelectorAll<HTMLButtonElement>('.lb-quick button').forEach((b) => b.addEventListener('click', () => {
+  el.querySelectorAll<HTMLButtonElement>('.nl-quickchat button').forEach((b) => b.addEventListener('click', () => {
     sfx.blip()
     room.say(b.textContent!)
   }))
-  el.querySelector('.lb-invite')?.addEventListener('click', () => {
-    sfx.select()
-    openInvite(room)
-  })
-  el.querySelector('.lb-share')?.addEventListener('click', async (e) => {
-    const share = e.currentTarget as HTMLButtonElement
+  const share = async (btn: HTMLElement) => {
     sfx.select()
     const data = { title: 'Stormbreak Royale', text: L(`Join my match! Code ${room.code}`, `Doe mee met mijn potje! Code ${room.code}`), url: room.link }
     try {
       if (navigator.share) await navigator.share(data)
       else {
         await navigator.clipboard.writeText(room.link)
-        share.textContent = L('Link copied ✓', 'Link gekopieerd ✓')
+        toast(L('Link copied ✓', 'Link gekopieerd ✓'))
+        btn.classList.add('done')
       }
     } catch {
       /* cancelled */
     }
+  }
+  el.querySelectorAll<HTMLElement>('.nl-share').forEach((b) => b.addEventListener('click', () => share(b)))
+  el.querySelectorAll<HTMLElement>('.nl-invite').forEach((b) => b.addEventListener('click', () => {
+    sfx.select()
+    openInvite(room)
+  }))
+  el.querySelector('.nl-addfriend')?.addEventListener('click', (e) => {
+    if (accountStatus() === 'in') {
+      sfx.select()
+      openInvite(room)
+    } else share(e.currentTarget as HTMLElement)
   })
-  const toastEl = el.querySelector('.lb-toast') as HTMLElement
+  const toastEl = el.querySelector('.nl-toast') as HTMLElement
   let toastT = 0
+  const toast = (text: string) => {
+    toastEl.textContent = text
+    toastEl.classList.remove('hidden')
+    clearTimeout(toastT)
+    toastT = window.setTimeout(() => toastEl.classList.add('hidden'), 3500)
+  }
   return {
     refresh,
     chat: (m: ChatLine) => {
       addLine(m)
       if (m.pid !== room.me.pid) {
         sfx.blip()
-        if (page !== 'chat') {
+        if (page !== 'chat' && !wide.matches) {
           unreadN++
-          unread.textContent = `${unreadN}`
           unread.classList.remove('hidden')
         }
       }
     },
-    toast: (text: string) => {
-      toastEl.textContent = text
-      toastEl.classList.remove('hidden')
-      clearTimeout(toastT)
-      toastT = window.setTimeout(() => toastEl.classList.add('hidden'), 3500)
-    },
+    toast,
   }
 }

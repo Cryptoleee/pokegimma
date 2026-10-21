@@ -1,0 +1,203 @@
+import './app.css'
+import { animatedUrl, SPECIES, spriteUrl } from '../data/pokemon'
+import { trainerSpriteUrl, type TrainerDef } from '../data/trainers'
+import { TYPE_NL } from '../data/types'
+import { ROLES, roleOf } from '../data/roles'
+import { sfx } from '../audio'
+import { L } from '../i18n'
+import { progress } from '../progress'
+import { masteryOf, MAX_MASTERY, SHINY_AT } from '../../api/_progress'
+
+/**
+ * The menu app: a dark shell with four tabs (Play, Team, Friends, Profile) as a
+ * bar at the bottom on phones and a rail on the left on wider screens, plus the
+ * shared pieces every menu screen uses (your team on a stage, the team card,
+ * lightning in the background).
+ */
+
+export type AppTab = 'play' | 'team' | 'friends' | 'profile'
+
+export const appEsc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+
+const ICONS: Record<AppTab, string> = {
+  play: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  team: '<circle cx="12" cy="12" r="9"/><path d="M3 12h6M15 12h6"/><circle cx="12" cy="12" r="3"/>',
+  friends: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.5c2.4 0 4 1.5 4.5 4"/>',
+  profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.2-6 8-6s7 2 8 6"/>',
+}
+
+/** A line icon (24×24, stroked in the text colour). */
+export const icon = (paths: string, size = 20) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`
+export const BOLT = '<svg class="n-bolt-ic" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>'
+export const IC = {
+  back: '<path d="M15 6l-6 6 6 6"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  next: '<path d="M9 6l6 6-6 6"/>',
+  news: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+  opts: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+  star: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
+  swap: '<path d="M4 7h13l-3-3M20 17H7l3 3"/>',
+  more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  share: '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M7 8l5-5 5 5"/>',
+  chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+  check: '<path d="M5 12l5 5 9-10"/>',
+}
+
+const TAB_NAMES: Record<AppTab, () => string> = {
+  play: () => L('Play', 'Spelen'),
+  team: () => 'Team',
+  friends: () => L('Friends', 'Vrienden'),
+  profile: () => L('Profile', 'Profiel'),
+}
+
+/**
+ * The shell around a menu page. `focus` hides the tab bar on phones (a mode
+ * screen or a picker you came to from somewhere else); the rail stays on desktop.
+ */
+export function appShell(tab: AppTab, page: string, o: { focus?: boolean; badge?: Partial<Record<AppTab, number>>; cls?: string } = {}) {
+  const tabs = (Object.keys(ICONS) as AppTab[]).map((t) => {
+    const n = o.badge?.[t] ?? 0
+    return `<button class="n-tab ${t === tab ? 'on' : ''}" data-tab="${t}" ${t === tab ? 'aria-current="page"' : ''}>${icon(ICONS[t], 22)}<span>${TAB_NAMES[t]()}</span>${n ? `<b class="n-badge">${n}</b>` : ''}</button>`
+  }).join('')
+  return `
+    <div class="n-app ${o.focus ? 'n-focus' : ''} ${o.cls ?? ''}" data-tab="${tab}">
+      <nav class="n-nav" aria-label="${L('Main menu', 'Hoofdmenu')}">
+        <div class="n-brand">${BOLT}<span>STORMBREAK</span></div>
+        ${tabs}
+      </nav>
+      <main class="n-main">${page}</main>
+    </div>`
+}
+
+/** Tab presses go to `go`; the current tab is a no-op. */
+export function bindShell(root: ParentNode, go: (t: AppTab) => void) {
+  root.querySelectorAll<HTMLElement>('.n-nav .n-tab').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (b.classList.contains('on')) return
+      sfx.select()
+      go(b.dataset.tab as AppTab)
+    }),
+  )
+}
+
+// ---------------------------------------------------------------- lightning
+
+/** A tiny seeded random, so the same bolt keeps its shape between repaints. */
+function rand(seed: number) {
+  let s = seed >>> 0 || 1
+  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296)
+}
+
+/** Jagged line from a to b by midpoint displacement. */
+function jag(r: () => number, ax: number, ay: number, bx: number, by: number, disp: number, depth: number) {
+  let pts: [number, number][] = [[ax, ay], [bx, by]]
+  let d = disp
+  for (let k = 0; k < depth; k++) {
+    const next: [number, number][] = [pts[0]]
+    for (let i = 1; i < pts.length; i++) {
+      const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]
+      const len = Math.hypot(x1 - x0, y1 - y0) || 1
+      const o = (r() * 2 - 1) * d
+      next.push([(x0 + x1) / 2 - ((y1 - y0) / len) * o, (y0 + y1) / 2 + ((x1 - x0) / len) * o], [x1, y1])
+    }
+    pts = next
+    d *= 0.55
+  }
+  return pts
+}
+const pathOf = (pts: [number, number][]) => 'M' + pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join('L')
+
+let boltN = 0
+
+/**
+ * A lightning strike drawn in a w×h box from (x, 0) down to (x2, h·reach): a
+ * white core with a blue glow and a few forks. It flickers in now and then
+ * (`every` seconds, offset by `delay`); the sky behind lights up with it.
+ */
+export function strike(o: { w: number; h: number; x: number; x2: number; reach?: number; seed: number; every?: number; delay?: number; size?: number }) {
+  const r = rand(o.seed)
+  const y2 = o.h * (o.reach ?? 0.75)
+  const size = o.size ?? 1
+  const main = jag(r, o.x, -4, o.x2, y2, Math.max(14, o.h * 0.09), 6)
+  const forks: string[] = []
+  for (let i = 0; i < 3; i++) {
+    const at = main[Math.floor(main.length * (0.2 + r() * 0.45))]
+    const ang = Math.atan2(y2, o.x2 - o.x) + (r() < 0.5 ? -1 : 1) * (0.45 + r() * 0.45)
+    const len = o.h * (0.12 + r() * 0.16)
+    forks.push(pathOf(jag(r, at[0], at[1], at[0] + Math.cos(ang) * len, at[1] + Math.sin(ang) * len, len * 0.25, 5)))
+  }
+  const id = `nb${++boltN}`
+  const style = `--every:${o.every ?? 8}s;--delay:${o.delay ?? 0}s`
+  const sx = ((o.x + o.x2) / 2 / o.w) * 100
+  return `
+    <div class="n-sky" aria-hidden="true" style="${style};--sx:${sx.toFixed(0)}%"></div>
+    <svg class="n-strike" aria-hidden="true" viewBox="0 0 ${o.w} ${o.h}" preserveAspectRatio="none" style="${style}">
+      <defs><filter id="${id}" x="-50%" y="-10%" width="200%" height="120%"><feGaussianBlur stdDeviation="${(4 * size).toFixed(1)}"/></filter></defs>
+      <path d="${pathOf(main)}" stroke="#9fc0ff" stroke-opacity="0.8" stroke-width="${(7 * size).toFixed(1)}" filter="url(#${id})"/>
+      <path d="${pathOf(main)}" stroke="#fff" stroke-width="${(1.8 * size).toFixed(1)}"/>
+      ${forks.map((f) => `<path d="${f}" stroke="#fff" stroke-opacity="0.75" stroke-width="${(0.9 * size).toFixed(1)}"/>`).join('')}
+    </svg>`
+}
+
+// ---------------------------------------------------------------- your team
+
+/** An animated Pokémon (still sprite if the animation fails to load). */
+export function monImg(id: number, cls = '', shiny = false) {
+  return `<img class="px ${cls}" src="${animatedUrl(id, shiny)}" onerror="this.onerror=null;this.src='${spriteUrl(id, { shiny })}'" alt="${appEsc(SPECIES[id]?.name ?? '')}">`
+}
+
+/** Your trainer and partner side by side on a little platform, both alive. */
+export function teamStage(trainer: TrainerDef, mon: number | undefined, shiny: boolean, cls = '') {
+  return `
+    <div class="n-duo ${cls}">
+      <i class="n-plat"></i>
+      <img class="px n-tr" src="${trainerSpriteUrl(trainer.sprite)}" alt="${appEsc(trainer.name)}">
+      ${mon ? monImg(mon, 'n-mon', shiny) : ''}
+    </div>`
+}
+
+/** Mastery of a partner, with the next goal to show (shiny at ★5, then max). */
+export function masteryLine(id: number) {
+  const m = masteryOf(progress().partners[id] ?? 0)
+  const left = SHINY_AT - m.lv
+  const name = SPECIES[id]?.name ?? ''
+  const hint = m.lv >= MAX_MASTERY
+    ? L('Mastered', 'Gemeesterd')
+    : left > 0
+      ? L(`${left} more level${left === 1 ? '' : 's'} to shiny ${name}`, `Nog ${left} level${left === 1 ? '' : 's'} tot shiny ${name}`)
+      : L(`Shiny unlocked · ${MAX_MASTERY - m.lv} to mastered`, `Shiny vrijgespeeld · nog ${MAX_MASTERY - m.lv} tot meester`)
+  return { lv: m.lv, k: m.k, hint }
+}
+
+export const bar = (k: number, cls = '') => `<span class="n-bar ${cls}"><i style="width:${(Math.max(0, Math.min(1, k)) * 100).toFixed(1)}%"></i></span>`
+
+/** Type and role of a species, as small chips. */
+export function monChips(id: number) {
+  const sp = SPECIES[id]
+  const role = ROLES[roleOf(id)]
+  return `${sp.types.map((t) => `<span class="n-chip">${TYPE_NL[t]}</span>`).join('')}<span class="n-chip">${role.name}</span>`
+}
+
+/**
+ * The team card on a mode screen: your duo, mastery and a hint, with a big
+ * Switch button (it's how you change your team right before a match).
+ */
+export function teamCard(trainer: TrainerDef, mon: number | undefined, shiny: boolean, note?: string) {
+  const m = mon ? masteryLine(mon) : null
+  return `
+    <button class="n-teamcard" data-act="switch">
+      <span class="n-tc-pic">${teamStage(trainer, mon, shiny, 'n-duo-s')}</span>
+      <span class="n-tc-info">
+        <b>${appEsc(trainer.name)}${mon ? ` &amp; ${SPECIES[mon].name}` : ''}</b>
+        ${m ? `<span class="n-tc-m">${L('Mastery', 'Meesterschap')} ${m.lv}${bar(m.k)}</span><small>${appEsc(note ?? m.hint)}</small>` : ''}
+      </span>
+      <span class="n-btn2 n-tc-go">${L('Switch', 'Wissel')}</span>
+    </button>`
+}
+
+// Modals over the menu (options, news, confirm, invite) take the menu's look; in a match they stay pixel art
+const screenEl = document.getElementById('screen')
+if (screenEl)
+  new MutationObserver(() => document.body.classList.toggle('n-ui', !!screenEl.querySelector(':scope > .n-app, :scope > .n-tut'))).observe(screenEl, { childList: true })

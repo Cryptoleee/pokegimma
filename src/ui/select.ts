@@ -20,7 +20,7 @@ const lockChip = (kind: 'partner' | 'trainer', id: string | number) => owned(kin
 const screen = () => document.getElementById('screen')!
 
 /** Tag line and quote per trainer, read when painted so they follow the current language. */
-const TRAINER_INFO: Record<string, { tag: () => string; accent: string; quote: () => string }> = {
+export const TRAINER_INFO: Record<string, { tag: () => string; accent: string; quote: () => string }> = {
   hilbert: { tag: () => L('Fearless adventurer', 'Onverschrokken avonturier'), accent: '#3870c8', quote: () => L('Let\'s go!', 'Laten we gaan!') },
   hilda: { tag: () => L('Champion in the making', 'Kampioen in wording'), accent: '#e05080', quote: () => L('I never give up.', 'Ik geef nooit op.') },
   nate: { tag: () => L('Fast starter from Aspertia', 'Snelle starter uit Aspertia'), accent: '#e08030', quote: () => L('Who\'s next?', 'Wie is de volgende?') },

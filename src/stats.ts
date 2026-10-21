@@ -3,7 +3,8 @@ import { getLang } from './i18n'
 /**
  * Anonymous play stats for the creator panel (/stats). A random id per device
  * (not your player id or name), sent with sendBeacon to /api/t. Nothing is
- * sent on localhost or the local network, or on a device excluded from the panel.
+ * sent on localhost, the local network or a Vercel preview, or on a device
+ * excluded from the panel.
  */
 
 export type PlayState = 'menu' | 'lobby' | 'br' | 'raid' | 'duel'
@@ -15,7 +16,7 @@ const PING_MS = 90_000
 const VIA_KEY = 'sb:via'
 const VIA_PLAYED_KEY = 'sb:viaPlayed'
 
-const local = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])|\.local$/.test(location.hostname)
+const local = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])|\.local$|\.vercel\.app$/.test(location.hostname)
 const forced = new URLSearchParams(location.search).get('stats') === 'force'
 let on = forced || !local
 try {
