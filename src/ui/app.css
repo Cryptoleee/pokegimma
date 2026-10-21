@@ -3430,3 +3430,66 @@
     height: 60px;
   }
 }
+
+/* Phones held sideways: an icon rail and a shorter stage, so the content gets the room */
+@media (min-width: 640px) and (max-height: 560px) {
+  .n-app {
+    flex-direction: row;
+  }
+  .n-nav,
+  .n-focus .n-nav {
+    display: flex;
+    flex-direction: column;
+    width: 76px;
+    padding: 12px 8px calc(12px + var(--safe-b)) calc(8px + var(--safe-l));
+    gap: 2px;
+    border-top: 0;
+    border-right: 1px solid var(--n-s3);
+  }
+  .n-brand {
+    display: flex;
+    justify-content: center;
+    margin: 4px 0 10px;
+  }
+  .n-brand span,
+  .n-tab span {
+    display: none;
+  }
+  .n-tab {
+    flex-direction: column;
+    justify-content: center;
+    padding: 12px 0;
+  }
+  .n-tab.on {
+    background: var(--n-s2);
+  }
+  .n-page {
+    padding-top: calc(var(--safe-t) + 12px);
+  }
+  .n-stage,
+  .n-home .n-stage {
+    height: 220px;
+    min-height: 0;
+  }
+  .n-stage .n-tr,
+  .n-stage .n-mon {
+    zoom: 2;
+  }
+  .nl-teamslot .n-tc-pic {
+    height: 110px;
+  }
+  .nl-teamslot .n-tc-pic .n-tr,
+  .nl-teamslot .n-tc-pic .n-mon {
+    zoom: 1;
+  }
+  .nl-teamslot .n-teamcard {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'pic info go';
+  }
+  .nl-teamslot .n-tc-pic {
+    width: 120px;
+  }
+  .n-tp-stage {
+    height: 170px;
+  }
+}
