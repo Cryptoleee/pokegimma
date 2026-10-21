@@ -18,6 +18,57 @@ import { shinyPartner } from './menu'
  * partners (most-played first, with their mastery), your trainers and the
  * next reward you're working towards.
  */
+const arrows = `<button class="n-ts-arrow prev" data-dir="-1" aria-label="${'\u2039'}">${icon(IC.back, 18)}</button><button class="n-ts-arrow next" data-dir="1" aria-label="${'\u203a'}">${icon(IC.next, 18)}</button>`
+
+/**
+ * A row of picks you can move through any way you like: swipe on a phone,
+ * the mouse wheel or a drag with the mouse, or the arrows at its ends.
+ */
+function scroller(wrap: HTMLElement) {
+  const row = wrap.querySelector('.n-ts-row') as HTMLElement
+  const ends = () => {
+    wrap.classList.toggle('at-start', row.scrollLeft < 4)
+    wrap.classList.toggle('at-end', row.scrollLeft > row.scrollWidth - row.clientWidth - 4)
+  }
+  row.addEventListener('scroll', ends, { passive: true })
+  requestAnimationFrame(ends)
+  // A vertical wheel moves the row sideways
+  row.addEventListener('wheel', (e) => {
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
+    e.preventDefault()
+    row.scrollLeft += e.deltaY
+  }, { passive: false })
+  wrap.querySelectorAll<HTMLElement>('.n-ts-arrow').forEach((b) => b.addEventListener('click', () => {
+    row.scrollBy({ left: Number(b.dataset.dir) * row.clientWidth * 0.8, behavior: 'smooth' })
+  }))
+  // Drag with the mouse (touch already swipes); a drag doesn't count as a click
+  let x0 = 0, sl = 0, dragging = false, moved = false
+  row.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse') return
+    dragging = true
+    moved = false
+    x0 = e.clientX
+    sl = row.scrollLeft
+  })
+  row.addEventListener('pointermove', (e) => {
+    if (!dragging) return
+    if (!moved && Math.abs(e.clientX - x0) > 5) {
+      moved = true
+      row.setPointerCapture(e.pointerId)
+    }
+    if (moved) row.scrollLeft = sl - (e.clientX - x0)
+  })
+  const stop = () => (dragging = false)
+  row.addEventListener('pointerup', stop)
+  row.addEventListener('pointercancel', stop)
+  row.addEventListener('click', (e) => {
+    if (!moved) return
+    e.stopPropagation()
+    e.preventDefault()
+    moved = false
+  }, true)
+}
+
 export function openTeamSheet(o: { trainer: TrainerDef; mon: number | undefined; pick(t: TrainerDef, mon: number): void; seeAll(): void }) {
   const p = progress()
   const mons = ALL_PARTNERS.filter((id) => isUnlocked(p, 'partner', id))
@@ -58,9 +109,9 @@ export function openTeamSheet(o: { trainer: TrainerDef; mon: number | undefined;
           </div>
         </div>
         <div class="n-sec"><b class="n-h3">Pokémon</b><button class="n-link" data-act="all">${L(`All ${ALL_PARTNERS.length}`, `Alle ${ALL_PARTNERS.length}`)}</button></div>
-        <div class="n-ts-row">${mons.map((id) => `<button class="n-ts-mon ${id === mon ? 'on' : ''}" data-mon="${id}" aria-pressed="${id === mon}" aria-label="${SPECIES[id].name}"><img class="px" src="${spriteUrl(id)}" alt=""><span>★${masteryOf(p.partners[id] ?? 0).lv}</span></button>`).join('')}</div>
+        <div class="n-ts-wrap">${arrows}<div class="n-ts-row">${mons.map((id) => `<button class="n-ts-mon ${id === mon ? 'on' : ''}" data-mon="${id}" aria-pressed="${id === mon}" aria-label="${SPECIES[id].name}"><img class="px" src="${spriteUrl(id)}" alt=""><span>★${masteryOf(p.partners[id] ?? 0).lv}</span></button>`).join('')}</div></div>
         <div class="n-sec"><b class="n-h3">Trainer</b><button class="n-link" data-act="all">${L(`All ${TRAINERS.length}`, `Alle ${TRAINERS.length}`)}</button></div>
-        <div class="n-ts-row">${trainers.map((t) => `<button class="n-ts-tr ${t.key === tr.key ? 'on' : ''}" data-tr="${t.key}" aria-pressed="${t.key === tr.key}" aria-label="${esc(t.name)}"><img class="px" src="${trainerSpriteUrl(t.sprite)}" alt=""></button>`).join('')}</div>
+        <div class="n-ts-wrap">${arrows}<div class="n-ts-row">${trainers.map((t) => `<button class="n-ts-tr ${t.key === tr.key ? 'on' : ''}" data-tr="${t.key}" aria-pressed="${t.key === tr.key}" aria-label="${esc(t.name)}"><img class="px" src="${trainerSpriteUrl(t.sprite)}" alt=""></button>`).join('')}</div></div>
         ${reward()}
         <button class="n-btn" data-act="use">${L('Use this team', 'Gebruik dit team')}</button>
       </div>`
@@ -68,6 +119,7 @@ export function openTeamSheet(o: { trainer: TrainerDef; mon: number | undefined;
       sfx.select()
       close()
     })
+    s.querySelectorAll<HTMLElement>('.n-ts-wrap').forEach(scroller)
     s.querySelectorAll<HTMLElement>('[data-act="all"]').forEach((b) => b.addEventListener('click', () => {
       sfx.select()
       close()

@@ -389,7 +389,8 @@ export function showMenu(st: MenuState, on: MenuActions) {
       act('[data-act="more"]', () => open('royale'))
       act('.n-mode', (b) => open(b.dataset.mode as MatchChoice['kind']))
       act('[data-go]', (b) => go(b.closest<HTMLElement>('.n-mode')!.dataset.mode as MatchChoice['kind'], b.dataset.go as Opt))
-      act('[data-act="switch"]', () => openTeamSheet({ trainer: st.trainer, mon, seeAll: () => on.tab('team'), pick: (t, id) => on.setTeam(t, id, 'home') }))
+      // From home, Switch is the full Team screen (the quick sheet is for mode screens and lobbies)
+      act('[data-act="switch"]', () => on.tab('team'))
       act('[data-act="road"]', () => on.tab('profile'))
       act('[data-act="newscard"]', () => showNews(() => paint()))
       // The cards are divs with buttons inside: give them a keyboard path too
