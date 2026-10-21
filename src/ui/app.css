@@ -807,6 +807,48 @@
   flex-direction: column;
   gap: 14px;
 }
+/* Home: straight into a friend's room with their code */
+.n-joincode {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+}
+.n-jc-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.n-jc-txt b {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+.n-jc-txt b svg {
+  color: var(--n-acc);
+}
+.n-jc-txt small {
+  color: var(--n-mute);
+  font-size: 12px;
+}
+.n-joincode .n-field input,
+.n-joincode .n-field .n-btn2 {
+  height: 46px;
+}
+@media (min-width: 640px) {
+  .n-joincode {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+  .n-jc-txt {
+    flex: 1;
+  }
+  .n-joincode .n-field {
+    flex: 0 0 min(300px, 55%);
+  }
+}
 .n-online {
   display: inline-flex;
   align-items: center;

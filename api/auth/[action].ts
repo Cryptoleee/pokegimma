@@ -11,6 +11,9 @@ import { accountsOn, cleanName, cookie, cookies, discordEnv, friendCode, json, p
 declare const process: { env: Record<string, string | undefined> }
 
 const API = () => process.env.DISCORD_API || 'https://discord.com/api'
+/** Discord only knows our own domain, so a login from a vercel.app address (the old link) starts over there. */
+const SITE = 'https://www.stormbreak.app'
+const offSite = (req: Request) => new URL(req.url).hostname.endsWith('.vercel.app')
 const redirectUri = (req: Request) => `${new URL(req.url).origin}/api/auth/callback`
 const back = (req: Request, result: string, extra: string[] = []) => {
   const h = new Headers({ Location: `${new URL(req.url).origin}/?login=${result}`, 'Cache-Control': 'no-store' })
@@ -38,6 +41,7 @@ export async function GET(req: Request) {
   const a = action(req)
   if (a === 'login') {
     if (!accountsOn()) return back(req, 'off')
+    if (offSite(req)) return new Response(null, { status: 302, headers: { Location: `${SITE}/api/auth/login`, 'Cache-Control': 'no-store' } })
     const state = token(16)
     const u = new URL('https://discord.com/oauth2/authorize')
     u.searchParams.set('client_id', discordEnv().id!)

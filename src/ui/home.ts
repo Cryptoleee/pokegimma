@@ -197,6 +197,10 @@ export function showMenu(st: MenuState, on: MenuActions) {
               <div class="n-mode-acts n-desk"><button class="n-btn n-quick" data-go="solo">Solo</button><button class="n-btn3" data-go="friends">${L('Friends', 'Vrienden')}</button></div>
             </div>
           </div>
+          <form class="n-card n-joincode mm-code">
+            <span class="n-jc-txt"><b>${icon(IC.friends, 16)}${L('Join a friend', 'Join een vriend')}</b><small>${L('Got a room code? Fill it in here', 'Heb je een roomcode? Vul hem hier in')}</small></span>
+            <span class="n-field"><input id="mm-code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD" aria-label="${L('Room code', 'Roomcode')}" value="${esc(code)}"><button class="n-btn2" type="submit">${L('Join', 'Meedoen')}</button></span>
+          </form>
           <div class="n-msg mm-msg ${msgCls}">${esc(msg)}</div>
         </div>
         ${extras(p, q, done, xp.lv)}
@@ -399,6 +403,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
         c.setAttribute('role', 'button')
         c.addEventListener('keydown', (e) => e.key === 'Enter' && e.target === c && c.click())
       })
+      bindJoin()
       maybeShowNews()
       return
     }
@@ -425,6 +430,11 @@ export function showMenu(st: MenuState, on: MenuActions) {
       pick: (t, id) => on.setTeam(t, id, view),
     }))
     act('[data-act="go"]', () => go(kind, opt()))
+    bindJoin()
+  }
+
+  /** The "join with a code" field (home and the friends option of a mode). */
+  const bindJoin = () => {
     const codeIn = el.querySelector('#mm-code') as HTMLInputElement | null
     codeIn?.addEventListener('input', () => (codeIn.value = cleanCode(codeIn.value)))
     el.querySelector('form.mm-code')?.addEventListener('submit', (e) => {

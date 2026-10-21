@@ -213,6 +213,13 @@ Gasten en accounts gebruiken dezelfde regels (`api/_progress.ts`). Een gast bewa
   - Er zijn harde limieten, zoals maximaal 1 KO per 20 seconden en geen winst binnen 90 seconden.
 - **Waar het staat:** `api/match.ts` (start/einde/titel/shiny) en `api/rank.ts` (ranglijst). Alles staat in dezelfde Upstash Redis.
 
+## Verbinding tussen spelers (TURN)
+
+Spelers verbinden rechtstreeks met de host (WebRTC). Op mobiele data en achter strenge routers lukt dat alleen via een doorgeefserver (TURN). De gratis TURN-servers van PeerJS bestaan niet meer, dus de game haalt ze op via `/api/ice`:
+- **Cloudflare (aanbevolen, gratis tot 1000 GB/maand):** Cloudflare-dashboard → Realtime → TURN Server → Create. Zet `CF_TURN_KEY_ID` (Turn Token ID) en `CF_TURN_API_TOKEN` (API Token) in Vercel.
+- **Of een andere TURN-dienst:** `TURN_URLS` (komma-gescheiden), `TURN_USERNAME`, `TURN_CREDENTIAL`.
+- Zonder deze instellingen verandert er niets: dan gebruikt PeerJS zijn eigen STUN-server. Dat werkt vaak op wifi, maar niet tussen alle netwerken (4G/5G, strenge routers).
+
 ## Vrienden (optioneel, Discord-login)
 
 - **Gast blijft standaard.** Inloggen met Discord is alleen nodig voor vrienden. Zonder login werkt alles zoals altijd.
