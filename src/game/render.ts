@@ -252,6 +252,24 @@ function drawFoliage(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: num
 
 const TRAINER_SCALE = 0.42
 
+/**
+ * Run cycles (side view, facing right) baked from video into one strip of
+ * 80×80 frames per trainer: one full cycle, the ground line and the body's
+ * centre per strip. Trainers without one hop and sway on their still sprite.
+ */
+const RUN_URLS = import.meta.glob('../assets/run/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
+const RUNS: Record<string, { frames: number; ground: number; cx: number }> = {
+  hilbert: { frames: 16, ground: 78, cx: 40.5 },
+}
+/** Seconds per full cycle (two strides) at full speed. */
+const RUN_CYCLE = 0.6
+
+function runSheet(sprite: string) {
+  const r = RUNS[sprite]
+  const url = r && RUN_URLS[`../assets/run/${sprite}.png`]
+  return url ? { r, s: getSprite(url) } : null
+}
+
 function trainerHeight(tr: Trainer) {
   const s = getSprite(trainerSpriteUrl(tr.def.sprite))
   return s.ready ? s.bh * TRAINER_SCALE : 28
@@ -262,6 +280,21 @@ function drawTrainer(g: Game, ctx: CanvasRenderingContext2D, tr: Trainer, _time:
   const px = tr.x * TILE, py = tr.y * TILE
   shadow(ctx, px, py + 1, 13)
   if (!s.ready) return
+  // Running: the real run cycle if this trainer has one (walkT grows 7 per second while moving)
+  const run = tr.walkT > 0 ? runSheet(tr.def.sprite) : null
+  if (run?.s.ready) {
+    const { frames, ground, cx } = run.r
+    const f = Math.floor((tr.walkT / 7 / RUN_CYCLE) * frames) % frames
+    const sc = TRAINER_SCALE
+    ctx.save()
+    ctx.globalAlpha = fade
+    ctx.translate(Math.round(px), Math.round(py))
+    if (!tr.faceRight) ctx.scale(-1, 1)
+    ctx.drawImage(run.s.img, f * 80, 0, 80, 80, -cx * sc, 1 - (ground + 1) * sc, 80 * sc, 80 * sc)
+    ctx.restore()
+    grassOver(g, ctx, tr.x, tr.y)
+    return
+  }
   const dw = s.bw * TRAINER_SCALE, dh = s.bh * TRAINER_SCALE
   // Walk cycle: a little hop and sway, like BW overworld bobbing.
   const step = tr.walkT > 0 ? tr.walkT * 0.9 : 0
