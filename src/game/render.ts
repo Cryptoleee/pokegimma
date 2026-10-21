@@ -259,10 +259,31 @@ const TRAINER_SCALE = 0.42
  */
 const RUN_URLS = import.meta.glob('../assets/run/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
 const RUNS: Record<string, { frames: number; ground: number; cx: number }> = {
-  hilbert: { frames: 16, ground: 78, cx: 40.5 },
+  hilbert: { frames: 16, ground: 78, cx: 37.3 },
+  hilda: { frames: 12, ground: 79, cx: 36.0 },
+  nate: { frames: 14, ground: 75, cx: 37.1 },
+  rosa: { frames: 16, ground: 76, cx: 33.2 },
+  cheren: { frames: 16, ground: 78, cx: 34.1 },
+  bianca: { frames: 16, ground: 78, cx: 33.2 },
+  n: { frames: 16, ground: 77, cx: 42.3 },
+  iris: { frames: 14, ground: 78, cx: 38.1 },
+  'elesa-masters': { frames: 17, ground: 79, cx: 36.2 },
+  hugh: { frames: 16, ground: 73, cx: 34.1 },
+  skyla: { frames: 19, ground: 79, cx: 38.4 },
+  roxie: { frames: 16, ground: 70, cx: 31.7 },
+  burgh: { frames: 16, ground: 78, cx: 36.5 },
+  shauntal: { frames: 16, ground: 78, cx: 36.6 },
+  colress: { frames: 16, ground: 77, cx: 36.1 },
+  drayden: { frames: 16, ground: 79, cx: 37.7 },
+  grimsley: { frames: 8, ground: 78, cx: 45.2 },
+  steven: { frames: 16, ground: 75, cx: 35.2 },
+  lance: { frames: 12, ground: 77, cx: 28.5 },
+  cynthia: { frames: 29, ground: 79, cx: 32.3 },
+  ghetsis: { frames: 16, ground: 78, cx: 35.1 },
+  red: { frames: 16, ground: 77, cx: 31.7 },
 }
-/** Seconds per full cycle (two strides) at full speed. */
-const RUN_CYCLE = 0.6
+/** Seconds per strip: each clip's own tempo, a touch quicker, kept within a sensible running pace. */
+const runCycle = (frames: number) => Math.min(0.75, Math.max(0.3, (frames / 24) * 0.9))
 
 function runSheet(sprite: string) {
   const r = RUNS[sprite]
@@ -284,7 +305,7 @@ function drawTrainer(g: Game, ctx: CanvasRenderingContext2D, tr: Trainer, _time:
   const run = tr.walkT > 0 ? runSheet(tr.def.sprite) : null
   if (run?.s.ready) {
     const { frames, ground, cx } = run.r
-    const f = Math.floor((tr.walkT / 7 / RUN_CYCLE) * frames) % frames
+    const f = Math.floor((tr.walkT / 7 / runCycle(frames)) * frames) % frames
     const sc = TRAINER_SCALE
     ctx.save()
     ctx.globalAlpha = fade
