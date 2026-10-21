@@ -1,5 +1,6 @@
 import { SPECIES, spriteUrl } from '../data/pokemon'
-import type { TrainerDef } from '../data/trainers'
+import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
+import { questText, trainerName } from '../data/rewards'
 import { ROYALE_THEMES, THEMES } from '../data/themes'
 import { STADIUM_LIST, STADIUMS } from '../data/stadiums'
 import { BOSS_LIST, BOSSES } from '../data/bosses'
@@ -11,10 +12,10 @@ import { profile, setName, NAME_MAX } from '../profile'
 import { cleanCode, MAX_PLAYERS } from '../net/room'
 import type { MatchChoice } from '../net/protocol'
 import { progress, onProgress, today } from '../progress'
-import { dailyOf, levelOf } from '../../api/_progress'
+import { dailyOf, levelCost, levelOf, nextUnlock } from '../../api/_progress'
 import { showOptions } from './screens'
-import { hasUnseen, maybeShowNews, showNews } from './news'
-import { appEsc as esc, appShell, bindShell, BOLT, IC, icon, monChips, monImg, strike, teamCard, teamStage, type AppTab } from './app'
+import { hasUnseen, maybeShowNews, newsPreview, showNews } from './news'
+import { appEsc as esc, appShell, bar, bindShell, BOLT, IC, icon, masteryLine, monChips, monImg, strike, teamCard, teamStage, type AppTab } from './app'
 import { openTeamSheet } from './team'
 import { shinyPartner } from './menu'
 
@@ -141,6 +142,8 @@ export function showMenu(st: MenuState, on: MenuActions) {
     const q = dailyOf(p, today())
     const done = q.filter((x) => x.p >= x.target).length
     const name = profile().name
+    const xp = levelOf(p.xp)
+    const m = mon ? masteryLine(mon) : null
     return `
       <div class="n-page n-home">
         <header class="n-top">
@@ -149,39 +152,89 @@ export function showMenu(st: MenuState, on: MenuActions) {
           <button class="n-icon home-news" aria-label="${L('What’s new', 'Wat is er nieuw')}">${icon(IC.news)}${hasUnseen() ? '<i class="n-pip"></i>' : ''}</button>
           <button class="n-icon home-opts" aria-label="${L('Options', 'Opties')}">${icon(IC.opts)}</button>
         </header>
-        <section class="n-stage">
-          ${strike({ w: 350, h: 282, x: 268, x2: 214, reach: 0.73, seed: 7, every: 9 })}
-          <div class="n-stage-tag"><span class="n-label">${L('Your team', 'Jouw team')}</span><b>${esc(st.trainer.name)}${mon ? ` &amp; ${SPECIES[mon].name}` : ''}</b></div>
-          ${teamStage(st.trainer, mon, shiny)}
-          <div class="n-stage-chips"><span class="n-chip">Lv ${lv}</span>${mon ? monChips(mon) : ''}</div>
-          <button class="n-btn2 n-stage-edit" data-act="team">${L('Change', 'Wijzig')}</button>
-        </section>
         ${st.rejoin ? `<button class="n-card n-rejoin" data-act="rejoin"><span><b>${L('Back to the lobby', 'Terug naar de lobby')} <em>${esc(st.rejoin)}</em></b><small>${L('you left it a moment ago', 'je ging er net uit')}</small></span>${icon(IC.next, 18)}</button>` : ''}
+        <div class="n-teamcol">
+          <section class="n-stage">
+            ${strike({ w: 350, h: 282, x: 268, x2: 214, reach: 0.73, seed: 7, every: 9 })}
+            <div class="n-stage-tag"><span class="n-label">${L('Your team', 'Jouw team')}</span><b>${esc(st.trainer.name)}${mon ? ` &amp; ${SPECIES[mon].name}` : ''}</b></div>
+            ${teamStage(st.trainer, mon, shiny)}
+            <div class="n-stage-chips"><span class="n-chip">Lv ${lv}</span>${mon ? monChips(mon) : ''}</div>
+            <button class="n-btn2 n-stage-edit" data-act="team">${L('Change', 'Wijzig')}</button>
+          </section>
+          <section class="n-teaminfo n-desk">
+            ${m ? `<div class="n-ti-row"><span class="n-label">${L('Mastery', 'Meesterschap')}</span><b>★${m.lv}</b>${bar(m.k)}<small>${esc(m.hint)}</small></div>` : ''}
+            <div class="n-ti-row"><span class="n-label">${L('Trainer level', 'Trainerlevel')}</span><b>Lv ${xp.lv}</b>${bar(xp.k, 'white')}<small>${xp.need ? L(`${xp.need - xp.into} XP to Lv ${xp.lv + 1}`, `Nog ${xp.need - xp.into} XP tot Lv ${xp.lv + 1}`) : L('Max level', 'Hoogste level')}</small></div>
+            <div class="n-ti-acts"><button class="n-btn2" data-act="switch">${icon(IC.swap, 16)}${L('Switch team', 'Wissel team')}</button><button class="n-btn3" data-act="team">${L('All partners', 'Alle partners')}</button></div>
+          </section>
+        </div>
         <div class="n-playcol">
-          <div class="n-sec"><h2 class="n-h2">${L('Play', 'Spelen')}</h2><span class="n-online"><i class="n-dot"></i><span class="n-online-txt">${L('checking…', 'online zoeken…')}</span></span></div>
+          <div class="n-sec n-mob"><h2 class="n-h2">${L('Play', 'Spelen')}</h2><span class="n-online"><i class="n-dot"></i><span class="n-online-txt">${L('checking…', 'online zoeken…')}</span></span></div>
           <div class="n-modes">
             <div class="n-mode n-mode-royale" data-mode="royale">
               <div class="n-art n-art-royale" aria-hidden="true">
                 <img class="px a1" src="${spriteUrl(6)}" alt=""><img class="px a2" src="${spriteUrl(1)}" alt=""><img class="px a3" src="${spriteUrl(7)}" alt=""><img class="px a4" src="${spriteUrl(25)}" alt="">
               </div>
-              <div class="n-mode-txt"><b>Battle Royale</b><small>${L(`${SEATS} trainers · 1 winner`, `${SEATS} trainers · 1 winnaar`)}</small></div>
+              <div class="n-mode-txt"><b>Battle Royale</b><small>${L(`${SEATS} trainers · 1 winner`, `${SEATS} trainers · 1 winnaar`)}</small><p class="n-mode-desc n-desk">${esc(MODE.royale.desc)}</p><span class="n-online n-desk"><i class="n-dot"></i><span class="n-online-txt">${L('checking…', 'online zoeken…')}</span></span></div>
               <div class="n-mode-acts">
                 <button class="n-btn n-quick" data-act="quick">${BOLT}${L('Quick play', 'Snel spel')}</button>
+                <button class="n-btn3 n-desk" data-go="solo">Solo</button>
+                <button class="n-btn3 n-desk" data-go="friends">${L('Friends', 'Vrienden')}</button>
                 <button class="n-icon n-more" data-act="more" aria-label="${L('More ways to play Battle Royale', 'Meer manieren om Battle Royale te spelen')}">${icon(IC.more, 18)}</button>
               </div>
             </div>
-            <button class="n-mode n-mode-duel" data-mode="duel">
+            <div class="n-mode n-mode-duel" data-mode="duel">
               <img class="px n-art n-art-one" src="${spriteUrl(448)}" alt="">
               <span class="n-chip acc n-new">${L('NEW', 'NIEUW')}</span>
-              <span class="n-mode-txt"><b>1 vs 1</b><small>${L('Duel · best of 3', 'Duel · best of 3')}</small></span>
-            </button>
-            <button class="n-mode n-mode-raid" data-mode="raid">
+              <span class="n-mode-txt"><b>1 vs 1</b><small>${L('Duel · best of 3', 'Duel · best of 3')}</small><span class="n-mode-desc n-desk">${esc(MODE.duel.desc)}</span></span>
+              <div class="n-mode-acts n-desk"><button class="n-btn n-quick" data-go="online">${L('Online', 'Online')}</button><button class="n-btn3" data-go="cpu">CPU</button></div>
+            </div>
+            <div class="n-mode n-mode-raid" data-mode="raid">
               <img class="px n-art n-art-one n-art-boss" src="${spriteUrl(644)}" alt="">
-              <span class="n-mode-txt"><b>Raid</b><small>${L('Team up vs. a boss', 'Samen vs. een baas')}</small></span>
-            </button>
+              <span class="n-mode-txt"><b>Raid</b><small>${L('Team up vs. a boss', 'Samen vs. een baas')}</small><span class="n-mode-desc n-desk">${esc(MODE.raid.desc)}</span></span>
+              <div class="n-mode-acts n-desk"><button class="n-btn n-quick" data-go="solo">Solo</button><button class="n-btn3" data-go="friends">${L('Friends', 'Vrienden')}</button></div>
+            </div>
           </div>
           <div class="n-msg mm-msg ${msgCls}">${esc(msg)}</div>
         </div>
+        ${extras(p, q, done, xp.lv)}
+      </div>`
+  }
+
+  /** Desktop: a row of real things to do and look forward to under the hero. */
+  const extras = (p: ReturnType<typeof progress>, q: ReturnType<typeof dailyOf>, done: number, lv: number) => {
+    const next = nextUnlock(p)
+    const xp = levelOf(p.xp)
+    let toGo = 0
+    if (next) for (let l = lv; l < next.lv; l++) toGo += levelCost(l)
+    toGo -= xp.into
+    const img = next ? (next.kind === 'partner' ? spriteUrl(Number(next.id)) : trainerSpriteUrl(TRAINERS.find((t) => t.key === next.id)?.sprite ?? next.id)) : ''
+    const rname = next ? (next.kind === 'partner' ? SPECIES[Number(next.id)]?.name : trainerName(next.id)) : ''
+    const k = next ? (lv === next.lv - 1 ? xp.k : (lv - 1 + xp.k) / (next.lv - 1)) : 1
+    const nw = newsPreview()
+    return `
+      <div class="n-extra n-desk">
+        <section class="n-xcard" data-act="quests" role="button" tabindex="0">
+          <div class="n-sec"><h3 class="n-h3">${L('Daily quests', 'Dagopdrachten')}</h3><small>${done}/${q.length}</small></div>
+          <div class="n-qlist">${q.map((x) => `
+            <div class="n-q ${x.p >= x.target ? 'done' : ''}">
+              <span>${x.p >= x.target ? icon(IC.check, 14) : ''}${esc(questText(x.id, x.target))}</span><em>${Math.min(x.p, x.target)}/${x.target}</em>
+              ${bar(x.p / x.target)}<small>+${x.xp} XP</small>
+            </div>`).join('')}</div>
+        </section>
+        <section class="n-xcard n-xreward" data-act="road" role="button" tabindex="0">
+          <div class="n-sec"><h3 class="n-h3">${L('Next reward', 'Volgende beloning')}</h3>${next ? `<small>Lv ${next.lv}</small>` : ''}</div>
+          ${next ? `
+            <div class="n-xr-body">
+              <span class="n-xr-pic"><img class="px n-sil" src="${img}" alt=""></span>
+              <div class="n-xr-info"><b>${esc(rname ?? '')}</b><small>${next.kind === 'partner' ? L('Partner Pokémon', 'Partner-Pokémon') : 'Trainer'}</small>${bar(k)}<small>${L(`${toGo} XP to go`, `Nog ${toGo} XP`)}</small></div>
+            </div>` : `<p class="n-note">${L('You unlocked everything. Respect!', 'Je hebt alles vrijgespeeld. Respect!')}</p>`}
+        </section>
+        <section class="n-xcard n-xnews" data-act="newscard" role="button" tabindex="0">
+          <div class="n-sec"><h3 class="n-h3">${L('News', 'Nieuws')}${nw.unseen ? '<i class="n-pip"></i>' : ''}</h3><small>${esc(nw.date)}</small></div>
+          <b class="n-xn-title">${esc(nw.title)}</b>
+          <ul class="n-xn-items">${nw.items.map((it) => `<li><i>${it.icon}</i><span>${esc(it.text)}</span></li>`).join('')}</ul>
+          <span class="n-link">${L('Read everything', 'Alles lezen')} ›</span>
+        </section>
       </div>`
   }
 
@@ -331,11 +384,16 @@ export function showMenu(st: MenuState, on: MenuActions) {
       act('[data-act="quick"]', () => askName(() => quickGo(false)))
       act('[data-act="more"]', () => open('royale'))
       act('.n-mode', (b) => open(b.dataset.mode as MatchChoice['kind']))
-      // The whole BR card opens its screen too (it's a div: give it a keyboard path)
-      const br = el.querySelector('.n-mode-royale') as HTMLElement
-      br.tabIndex = 0
-      br.setAttribute('role', 'button')
-      br.addEventListener('keydown', (e) => e.key === 'Enter' && e.target === br && open('royale'))
+      act('[data-go]', (b) => go(b.closest<HTMLElement>('.n-mode')!.dataset.mode as MatchChoice['kind'], b.dataset.go as Opt))
+      act('[data-act="switch"]', () => openTeamSheet({ trainer: st.trainer, mon, seeAll: () => on.tab('team'), pick: (t, id) => on.setTeam(t, id, 'home') }))
+      act('[data-act="road"]', () => on.tab('profile'))
+      act('[data-act="newscard"]', () => showNews(() => paint()))
+      // The cards are divs with buttons inside: give them a keyboard path too
+      el.querySelectorAll<HTMLElement>('.n-mode, .n-xcard').forEach((c) => {
+        c.tabIndex = 0
+        c.setAttribute('role', 'button')
+        c.addEventListener('keydown', (e) => e.key === 'Enter' && e.target === c && c.click())
+      })
       maybeShowNews()
       return
     }

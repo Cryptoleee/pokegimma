@@ -50,6 +50,17 @@ const fmtDate = (id: string) => {
   return Number.isNaN(d.getTime()) ? id : d.toLocaleDateString(L('en-GB', 'nl-NL'), { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+/** The newest post in short (home on desktop): date, title and its first few points. */
+export function newsPreview(items = 3) {
+  const e = latestNews()
+  return {
+    date: fmtDate(e.id),
+    title: tx(e.title),
+    items: e.items.slice(0, items).map((it) => ({ icon: it.icon, text: tx(it.text) })),
+    unseen: hasUnseen(),
+  }
+}
+
 /** Which video fits this screen: 9:16 on an upright phone, 16:9 otherwise (or whichever exists). */
 function pickVideo(v: NonNullable<NewsEntry['video']>) {
   const upright = matchMedia('(orientation: portrait)').matches
