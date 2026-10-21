@@ -43,6 +43,8 @@ export interface MenuActions {
   joinFriend(code: string, q: number): void
   /** Another tab (Team, Friends, Profile). */
   tab(t: AppTab): void
+  /** The full Team screen from a mode screen's switch sheet, with a way back to that mode. */
+  teamAll(kind: MatchChoice['kind']): void
   /** New team from the switch sheet; the menu repaints on the same screen. */
   setTeam(t: TrainerDef, mon: number, view: MenuView): void
   back(): void
@@ -418,7 +420,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
     act('[data-act="switch"]', () => openTeamSheet({
       trainer: st.trainer,
       mon,
-      seeAll: () => on.tab('team'),
+      seeAll: () => on.teamAll(kind),
       pick: (t, id) => on.setTeam(t, id, view),
     }))
     act('[data-act="go"]', () => go(kind, opt()))

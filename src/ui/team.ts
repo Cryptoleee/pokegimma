@@ -128,6 +128,9 @@ export interface TeamPageOpts {
   /** Picker mode (from a lobby): no tab bar, a Done button instead. */
   done?: () => void
   doneLabel?: string
+  /** Picker mode: where the back button goes, and what it says ("Back to the lobby"). Default: done. */
+  back?: () => void
+  backLabel?: string
   tab(t: AppTab): void
 }
 
@@ -231,7 +234,7 @@ export function showTeam(o: TeamPageOpts) {
     const scroll = (el.querySelector('.n-main') as HTMLElement | null)?.scrollTop ?? 0
     const page = `
       <div class="n-page n-teampage">
-        <header class="n-top">${o.done ? `<button class="n-icon" data-act="done" aria-label="${L('Back', 'Terug')}">${icon(IC.back)}</button>` : ''}<h1 class="n-h1">Team</h1></header>
+        <header class="n-top">${o.done ? `<button class="n-backpill" data-act="back">${icon(IC.back, 18)}<span>${esc(o.backLabel ?? L('Back', 'Terug'))}</span></button>` : ''}<h1 class="n-h1">Team</h1></header>
         ${preview()}
         <div class="n-teampick">
           <div class="n-seg" role="tablist" aria-label="Team"><button role="tab" data-pane="mon" class="${pane === 'mon' ? 'on' : ''}" aria-selected="${pane === 'mon'}">Pokémon</button><button role="tab" data-pane="trainer" class="${pane === 'trainer' ? 'on' : ''}" aria-selected="${pane === 'trainer'}">Trainer</button></div>
@@ -239,7 +242,7 @@ export function showTeam(o: TeamPageOpts) {
         </div>
         ${o.done ? `<div class="n-dock"><button class="n-btn" data-act="done">${esc(o.doneLabel ?? L('Done', 'Klaar'))}</button></div>` : ''}
       </div>`
-    el.innerHTML = appShell('team', page, { focus: !!o.done })
+    el.innerHTML = appShell('team', page, { focus: !!o.done, bare: !!o.done })
     bindShell(el, o.tab)
     ;(el.querySelector('.n-main') as HTMLElement).scrollTop = scroll
     const on = (sel: string, fn: (b: HTMLElement) => void) => el.querySelectorAll<HTMLElement>(sel).forEach((b) => b.addEventListener('click', () => {
@@ -247,6 +250,7 @@ export function showTeam(o: TeamPageOpts) {
       fn(b)
     }))
     on('[data-act="done"]', () => o.done!())
+    on('[data-act="back"]', () => (o.back ?? o.done)!())
     on('[data-pane]', (b) => {
       pane = b.dataset.pane as 'mon' | 'trainer'
       peekMon = peekTr = null

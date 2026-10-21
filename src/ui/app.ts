@@ -56,18 +56,19 @@ const TAB_NAMES: Record<AppTab, () => string> = {
 /**
  * The shell around a menu page. `focus` hides the tab bar on phones (a mode
  * screen or a picker you came to from somewhere else); the rail stays on desktop.
+ * `bare`: no tabs at all (a picker you must leave the way you came, like from a lobby).
  */
-export function appShell(tab: AppTab, page: string, o: { focus?: boolean; badge?: Partial<Record<AppTab, number>>; cls?: string } = {}) {
+export function appShell(tab: AppTab, page: string, o: { focus?: boolean; bare?: boolean; badge?: Partial<Record<AppTab, number>>; cls?: string } = {}) {
   const tabs = (Object.keys(ICONS) as AppTab[]).map((t) => {
     const n = o.badge?.[t] ?? 0
     return `<button class="n-tab ${t === tab ? 'on' : ''}" data-tab="${t}" ${t === tab ? 'aria-current="page"' : ''}>${icon(ICONS[t], 22)}<span>${TAB_NAMES[t]()}</span>${n ? `<b class="n-badge">${n}</b>` : ''}</button>`
   }).join('')
   return `
     <div class="n-app ${o.focus ? 'n-focus' : ''} ${o.cls ?? ''}" data-tab="${tab}">
-      <nav class="n-nav" aria-label="${L('Main menu', 'Hoofdmenu')}">
+      ${o.bare ? '' : `<nav class="n-nav" aria-label="${L('Main menu', 'Hoofdmenu')}">
         <div class="n-brand"><img class="n-logo" src="${logoUrl}" alt="Stormbreak Royale">${BOLT}</div>
         ${tabs}
-      </nav>
+      </nav>`}
       <main class="n-main">${page}</main>
     </div>`
 }

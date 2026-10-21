@@ -3885,3 +3885,24 @@
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
+
+/* Picker mode: a labelled way back ("Back to the lobby") */
+.n-backpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 14px 0 10px;
+  border-radius: 20px;
+  border: 1px solid var(--n-line2);
+  background: var(--n-s2);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.n-backpill:hover {
+  border-color: var(--n-dim);
+}
+.n-teampage .n-top:has(.n-backpill) .n-h1 {
+  margin-left: 6px;
+}

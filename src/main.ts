@@ -262,6 +262,11 @@ function menuActions() {
     quick: () => quickPlay(),
     quickDuel: () => quickPlay(false, true),
     tab: toTab,
+    teamAll: (kind: MatchChoice['kind']) => {
+      const name = kind === 'raid' ? 'Raid' : kind === 'duel' ? '1 vs 1' : 'Battle Royale'
+      const back = () => toMenu({ view: kind })
+      wipe(() => teamPicker(back, L('Done', 'Klaar'), { label: L(`Back to ${name}`, `Terug naar ${name}`), go: back }))
+    },
     setTeam: (t: TrainerDef, mon: number, view: MenuState['view']) => {
       saveTeam(t, mon)
       toMenu({ view })
@@ -288,10 +293,10 @@ function saveTeam(t: TrainerDef, mon: number) {
 }
 
 /** The Team screen as a picker (from a lobby or the results): a Done button, no tabs. */
-function teamPicker(done: () => void, doneLabel: string) {
+function teamPicker(done: () => void, doneLabel: string, back?: { label: string; go: () => void }) {
   ownedPicks()
   playMusic('menu')
-  showTeam({ trainer, mon: team[0], set: saveTeam, tab: toTab, done, doneLabel })
+  showTeam({ trainer, mon: team[0], set: saveTeam, tab: toTab, done, doneLabel, back: back?.go, backLabel: back?.label })
 }
 
 // ---------- Matches ----------
@@ -641,7 +646,14 @@ function toLobby() {
         ready = true
         room?.updateMe(me())
         wipe(toLobby)
-      }, L('Ready', 'Klaar')))
+      }, L('Ready', 'Klaar'), {
+        label: L('Back to the lobby', 'Terug naar de lobby'),
+        // Back without saying you're ready: tap Ready in the lobby when you are
+        go: () => {
+          room?.updateMe(me())
+          wipe(toLobby)
+        },
+      }))
     },
     pickTeam: (t, mon) => {
       saveTeam(t, mon)

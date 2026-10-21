@@ -16,7 +16,7 @@ export const TRAINERS: TrainerDef[] = [
   { key: 'n', name: 'N', sprite: 'n' },
   { key: 'iris', name: 'Iris', sprite: 'iris' },
   // Unlocked on the reward road (trainer level)
-  { key: 'elesa', name: 'Elesa', sprite: 'elesa' },
+  { key: 'elesa', name: 'Elesa', sprite: 'elesa-masters' }, // standing (her BW sprite lies on the floor)
   { key: 'hugh', name: 'Hugh', sprite: 'hugh' },
   { key: 'skyla', name: 'Skyla', sprite: 'skyla' },
   { key: 'roxie', name: 'Roxie', sprite: 'roxie' },
