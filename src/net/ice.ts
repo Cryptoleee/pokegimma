@@ -17,10 +17,10 @@ export function loadIce(): Promise<void> {
   loading ??= fetch('/api/ice', { credentials: 'same-origin' })
     .then((r) => ((r.headers.get('content-type') ?? '').includes('json') ? r.json() : null))
     .then((d: { iceServers?: RTCIceServer[]; turn?: boolean } | null) => {
-      if (d?.turn && Array.isArray(d.iceServers) && d.iceServers.length) {
-        servers = d.iceServers
-        fetchedAt = Date.now()
-      }
+      if (!d) return
+      // Asked once: no relay set up is an answer too
+      fetchedAt = Date.now()
+      if (d.turn && Array.isArray(d.iceServers) && d.iceServers.length) servers = d.iceServers
     })
     .catch(() => {})
     .finally(() => (loading = null))
