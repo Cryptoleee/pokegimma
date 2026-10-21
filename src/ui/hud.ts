@@ -64,8 +64,7 @@ export class Hud {
   /** Legendary alert: where it is and how to get it. */
   private legend = h('div', 'legend hidden')
   private legendId = -1
-  private chatBar: HTMLElement | null = null
-  private chatBtn: HTMLButtonElement | null = null
+  private chat: ChatWidget | null = null
   /** Raid: boss bar, team lives and the respawn countdown. */
   private bossBar = h('div', 'bossbar hidden')
   private respawnEl = h('div', 'respawn hidden')
@@ -140,13 +139,11 @@ export class Hud {
     else root.classList.remove('raid-mode')
     root.classList.toggle('duel-mode', g.kind === 'duel')
 
-    // Multiplayer chat: a button opens quick phrases and a text field
+    // Multiplayer chat: the conversation bottom left, a button (or Enter) to talk
     if (opts.chat) {
-      const c = chatWidget(opts.chat)
-      sys.append(c.btn)
-      root.append(c.bar)
-      this.chatBar = c.bar
-      this.chatBtn = c.btn
+      this.chat = chatWidget(opts.chat)
+      sys.append(this.chat.btn)
+      root.append(this.chat.panel)
     }
 
     // Items
@@ -288,23 +285,14 @@ export class Hud {
 
   /** Desktop: Enter opens the chat. Returns false when there's no chat. */
   openChat() {
-    if (!this.chatBar) return false
-    this.chatBar.classList.remove('hidden')
-    this.chatBtn?.classList.remove('unread')
-    ;(this.chatBar.querySelector('input') as HTMLInputElement).focus()
+    if (!this.chat) return false
+    this.chat.open()
     return true
   }
 
-  /** A chat line in the feed (top right). */
+  /** A chat line in the conversation. */
   chatLine(m: ChatLine, mine: boolean) {
-    const d = h('div', 'chatline', `<b>${esc(m.name)}</b> ${esc(m.text)}`)
-    this.feedEl.append(d)
-    trimChat(this.feedEl)
-    setTimeout(() => d.remove(), 8000)
-    if (!mine) {
-      sfx.blip()
-      if (this.chatBar?.classList.contains('hidden')) this.chatBtn?.classList.add('unread')
-    }
+    this.chat?.line(m, mine)
   }
 
   /** Let go of every attack button and the joystick (e.g. when no finger is on the screen). */
@@ -783,70 +771,95 @@ export class Hud {
 }
 
 /**
- * The chat button and its bar (quick phrases + a text field). Used in the match HUD and
- * while spectating, so you can keep talking after you're out.
+ * The chat during a match (and while spectating): the last lines of the
+ * conversation bottom left, a button (or Enter on desktop) to open quick
+ * phrases and a text field, and a count of unread lines on the button.
+ * What people say also pops up above their trainer (see chatBubble in render).
  */
+export type ChatWidget = ReturnType<typeof chatWidget>
+const CHAT_KEEP = 6
+
 export function chatWidget(say: (text: string) => void) {
-  const btn = h('button', 'sysbtn chatbtn', '💬') as HTMLButtonElement
+  const btn = h('button', 'sysbtn chatbtn', `${CHAT_ICON}<i class="chat-n"></i>`) as HTMLButtonElement
   btn.setAttribute('aria-label', 'Chat')
-  const bar = h('form', 'chatbar hidden', `
-    <div class="cb-quick">${QUICK_CHAT.map((q) => `<button type="button">${tx(q)}</button>`).join('')}</div>
-    <div class="cb-row"><input maxlength="80" placeholder="${L('Message…', 'Bericht…')}" autocomplete="off" enterkeyhint="send"><button type="submit">➤</button></div>`)
+  const panel = h('div', 'hchat', `
+    <div class="hchat-log" aria-live="polite"></div>
+    <form class="hchat-bar hidden">
+      <div class="hchat-quick">${QUICK_CHAT.map((q) => `<button type="button">${tx(q)}</button>`).join('')}</div>
+      <div class="hchat-row"><input maxlength="80" placeholder="${L('Say something…', 'Zeg iets…')}" autocomplete="off" enterkeyhint="send" aria-label="${L('Message', 'Bericht')}"><button type="submit" aria-label="${L('Send', 'Verstuur')}">${SEND_ICON}</button></div>
+    </form>
+    <div class="hchat-hint"><kbd>Enter</kbd>${L('to chat', 'om te chatten')}</div>`)
+  const log = panel.querySelector('.hchat-log') as HTMLElement
+  const bar = panel.querySelector('.hchat-bar') as HTMLFormElement
   const input = bar.querySelector('input') as HTMLInputElement
+  const count = btn.querySelector('.chat-n') as HTMLElement
+  let unread = 0
+  const setUnread = (n: number) => {
+    unread = n
+    count.textContent = n > 9 ? '9+' : n ? String(n) : ''
+    btn.classList.toggle('unread', n > 0)
+  }
+  const isOpen = () => !bar.classList.contains('hidden')
+  const open = () => {
+    bar.classList.remove('hidden')
+    panel.classList.add('open')
+    btn.classList.add('on')
+    setUnread(0)
+    input.focus()
+  }
   const close = () => {
     bar.classList.add('hidden')
+    panel.classList.remove('open')
+    btn.classList.remove('on')
     input.blur()
+  }
+  const send = (text: string) => {
+    if (text.trim()) {
+      sfx.blip()
+      say(text)
+    }
+    close()
   }
   btn.onclick = () => {
     sfx.select()
-    btn.classList.remove('unread')
-    if (bar.classList.toggle('hidden')) input.blur()
+    if (isOpen()) close()
+    else open()
   }
   bar.addEventListener('submit', (e) => {
     e.preventDefault()
-    if (input.value.trim()) sfx.blip()
-    say(input.value)
+    const text = input.value
     input.value = ''
-    close()
+    send(text)
   })
   input.addEventListener('keydown', (e) => {
     e.stopPropagation()
     if (e.key === 'Escape') close()
   })
-  bar.querySelectorAll<HTMLButtonElement>('.cb-quick button').forEach((b) =>
-    b.addEventListener('click', () => {
-      sfx.blip()
-      say(b.textContent!)
-      close()
-    }),
-  )
+  // Typing must not move your trainer or fire attacks
+  input.addEventListener('keyup', (e) => e.stopPropagation())
+  panel.addEventListener('pointerdown', (e) => isOpen() && e.stopPropagation())
+  bar.querySelectorAll<HTMLButtonElement>('.hchat-quick button').forEach((b) => b.addEventListener('click', () => send(b.textContent!)))
   return {
     btn,
-    bar,
-    open() {
-      bar.classList.remove('hidden')
-      btn.classList.remove('unread')
-      input.focus()
-    },
-    /** A line in the given feed; marks the button unread when the bar is closed. */
-    line(feed: HTMLElement, m: ChatLine, mine: boolean) {
-      const d = h('div', 'chatline', `<b>${esc(m.name)}</b> ${esc(m.text)}`)
-      feed.append(d)
-      trimChat(feed)
-      setTimeout(() => d.remove(), 8000)
+    panel,
+    open,
+    /** A line in the conversation; counts as unread while the chat is closed. */
+    line(m: ChatLine, mine: boolean) {
+      const d = h('div', `hchat-line ${mine ? 'mine' : ''}`, `<b>${esc(m.name)}</b><span>${esc(m.text)}</span>`)
+      log.append(d)
+      const all = log.querySelectorAll('.hchat-line')
+      for (let i = 0; i < all.length - CHAT_KEEP; i++) all[i].remove()
+      setTimeout(() => d.classList.add('old'), 12000)
       if (!mine) {
         sfx.blip()
-        if (bar.classList.contains('hidden')) btn.classList.add('unread')
+        if (!isOpen()) setUnread(unread + 1)
       }
     },
   }
 }
 
-/** Chat lines share the feed with announcements; only the chat gets trimmed here. */
-function trimChat(feed: HTMLElement) {
-  const lines = feed.querySelectorAll('.chatline')
-  for (let i = 0; i < lines.length - 3; i++) lines[i].remove()
-}
+const CHAT_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>'
+const SEND_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg>'
 
 /** How many announcements stay in view (they dim after a few seconds instead of vanishing). */
 const FEED_KEEP = 5

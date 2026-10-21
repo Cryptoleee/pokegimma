@@ -29,6 +29,7 @@ export function zoomFor(cw: number, ch: number, wide = false) {
 export const view = { ox: 0, oy: 0, Z: 1 }
 
 export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: number) {
+  if (cur !== g) bubbles.clear()
   cur = g
   if (g.kind === 'raid') updateCinematic(g)
   // Drop-in: start high above the arena and swoop down to the player
@@ -183,6 +184,8 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // Cinematic vignette (heavier at night)
   ctx.drawImage(vignette(), 0, 0, cw, ch)
   if (theme.dark) ctx.drawImage(vignette(), -cw * 0.1, -ch * 0.1, cw * 1.2, ch * 1.2)
+  // Chat bubbles, sharp in screen pixels
+  drawBubbles(g, ctx, ox, oy, Z, cw, ch)
   // Raid: each phase looks more dangerous; the phase change plays as a short cinematic
   if (g.kind === 'raid') drawPhaseScreen(g, ctx, cw, ch)
   if (g.vfx.screenFlash > 0) {
@@ -289,6 +292,92 @@ function runSheet(sprite: string) {
   const r = RUNS[sprite]
   const url = r && RUN_URLS[`../assets/run/${sprite}.png`]
   return url ? { r, s: getSprite(url) } : null
+}
+
+/** What players said in the chat, shown above their trainer for a few seconds. */
+const bubbles = new Map<string, { text: string; at: number; mine: boolean }>()
+export function chatBubble(pid: string, text: string, mine: boolean) {
+  if (pid && text.trim()) bubbles.set(pid, { text: text.trim(), at: performance.now(), mine })
+}
+const bubbleMs = (text: string) => Math.min(8000, 3500 + text.length * 70)
+const BUBBLE_FONT = '"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif'
+
+/** Split text into at most `max` lines that fit `w` (the last one cut off with …). */
+function wrap(ctx: CanvasRenderingContext2D, text: string, w: number, max: number) {
+  const lines: string[] = []
+  let line = ''
+  for (const word of text.split(/\s+/)) {
+    const next = line ? `${line} ${word}` : word
+    if (ctx.measureText(next).width <= w || !line) line = next
+    else {
+      lines.push(line)
+      line = word
+    }
+  }
+  if (line) lines.push(line)
+  if (lines.length > max) {
+    lines.length = max
+    lines[max - 1] += '…'
+  }
+  // A single word longer than the bubble
+  return lines.map((l) => {
+    if (ctx.measureText(l).width <= w) return l
+    while (l.length > 1 && ctx.measureText(`${l}…`).width > w) l = l.slice(0, -1)
+    return `${l}…`
+  })
+}
+
+function drawBubbles(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: number, Z: number, cw: number, ch: number) {
+  if (!bubbles.size) return
+  const now = performance.now()
+  const dpr = ctx.canvas.width / (ctx.canvas.clientWidth || ctx.canvas.width)
+  for (const tr of g.trainers) {
+    const b = tr.pid ? bubbles.get(tr.pid) : undefined
+    if (!b) continue
+    const age = now - b.at, life = bubbleMs(b.text)
+    if (age > life) {
+      bubbles.delete(tr.pid)
+      continue
+    }
+    // Hidden in the grass stays hidden: no bubble gives you away
+    if (!tr.alive || vis(g, tr, tr.isPlayer) <= 0) continue
+    // Above the trainer, and above their Pokémon's nameplate when it stands right beside them
+    let top = tr.y * TILE - trainerHeight(tr) - 12
+    const m = tr.mon
+    if (m && !m.fainted && (!tr.isPlayer || g.partnerOut) && Math.abs(m.x - tr.x) < 2.5 && Math.abs(m.y - tr.y) < 2)
+      top = Math.min(top, spriteTop(m) - 22)
+    const x = (tr.x * TILE - ox) * Z
+    const y = (top - oy) * Z
+    if (x < -150 * dpr || x > cw + 150 * dpr || y < -20 * dpr || y > ch + 120 * dpr) continue
+    const pop = Math.min(1, age / 160)
+    const k = 1 - Math.pow(1 - pop, 3)
+    ctx.save()
+    ctx.globalAlpha = Math.min(1, (life - age) / 400) * Math.min(1, age / 100)
+    ctx.translate(Math.round(x), Math.round(y))
+    ctx.scale(0.7 + 0.3 * k, 0.7 + 0.3 * k)
+    ctx.font = `700 ${13 * dpr}px ${BUBBLE_FONT}`
+    const lines = wrap(ctx, b.text, 200 * dpr, 3)
+    const lh = 17 * dpr, pad = 10 * dpr
+    const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + pad * 2
+    const h = lines.length * lh + pad * 1.2
+    const tail = 7 * dpr
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)'
+    ctx.shadowBlur = 10 * dpr
+    ctx.shadowOffsetY = 2 * dpr
+    ctx.fillStyle = b.mine ? '#ffd60a' : '#f5f5f7'
+    ctx.beginPath()
+    ctx.roundRect(-w / 2, -h - tail, w, h, 12 * dpr)
+    ctx.moveTo(-tail, -tail - 1)
+    ctx.lineTo(0, 0)
+    ctx.lineTo(tail, -tail - 1)
+    ctx.fill()
+    ctx.shadowColor = 'transparent'
+    ctx.fillStyle = '#0a0a0b'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    lines.forEach((l, i) => ctx.fillText(l, 0, -h - tail + pad * 0.6 + lh * (i + 0.5)))
+    ctx.restore()
+  }
 }
 
 function trainerHeight(tr: Trainer) {

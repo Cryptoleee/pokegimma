@@ -5,6 +5,8 @@ import { sfx } from '../audio'
 import type { Game } from '../game/game'
 import { decided, scoreRows, type ScoreRow } from '../game/score'
 import { L } from '../i18n'
+import { appEsc as esc } from './app'
+import { actionsHtml, bindActions, MODE_RGB, type ResultAction } from './results'
 
 /**
  * The match scoreboard: a table of every trainer. Shown live during a match
@@ -37,6 +39,34 @@ export function boardHtml(rows: ScoreRow[], raid: boolean, me: number) {
     })
     .join('')
   return `<table class="sb-table ${raid ? 'raid' : ''}"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
+}
+
+/**
+ * The scoreboard for the results screens (new style): one row per trainer with
+ * their place, trainer and Pokémon, and the numbers that matter for the mode.
+ * Phones leave out caught and time.
+ */
+export function boardList(rows: ScoreRow[], raid: boolean, me: number) {
+  const multi = rows.filter((r) => r.human).length > 1
+  const head = raid
+    ? `<span>#</span><span>Trainer</span><span>Pokémon</span><span>${L('Damage', 'Schade')}</span><span>${L('Lives', 'Levens')}</span>`
+    : `<span>#</span><span>Trainer</span><span>Pokémon</span><span>K.O.</span><span>${L('Damage', 'Schade')}</span><span class="opt">${L('Caught', 'Gevangen')}</span><span class="opt">${L('Time', 'Tijd')}</span>`
+  const body = rows
+    .map((r, i) => {
+      const rank = raid ? `${i + 1}` : r.place ? `${r.place}` : `<i class="nrb-live" title="${L('Still in the game', 'Nog in het spel')}"></i>`
+      const tag = r.id === me ? `<em class="me">${L('you', 'jij')}</em>` : multi && r.human ? `<em>${L('player', 'speler')}</em>` : ''
+      const out = raid ? r.lives <= 0 && !r.alive : !r.alive && r.place !== 1
+      return `<div class="nrb-row ${r.id === me ? 'me' : ''} ${out ? 'out' : ''} ${!raid && r.place === 1 ? 'win' : ''}">
+        <span class="nrb-rank">${rank}</span>
+        <span class="nrb-who"><img class="px" src="${trainerSpriteUrl(r.sprite)}" alt=""><b>${r.name}</b>${tag}</span>
+        <span class="nrb-mon">${r.mon ? `<img class="px" src="${spriteUrl(r.mon, { shiny: r.shiny })}" alt=""><small>Lv ${r.lv}</small>` : ''}</span>
+        ${raid
+          ? `<span class="nrb-n"><b>${r.bossDmg}</b><small>${r.share}%</small></span><span class="nrb-lives">${'<i></i>'.repeat(Math.max(0, r.lives))}${'<i class="lost"></i>'.repeat(Math.max(0, RAID_LIVES - r.lives))}</span>`
+          : `<span class="nrb-n"><b>${r.kos}</b></span><span class="nrb-n">${r.dmg}</span><span class="nrb-n opt">${r.caught}</span><span class="nrb-n opt">${time(r.time)}</span>`}
+      </div>`
+    })
+    .join('')
+  return `<div class="nrb ${raid ? 'raid' : ''}"><div class="nrb-row nrb-head">${head}</div>${body}</div>`
 }
 
 /** Live scoreboard over the game (toggle with the 🏆 button or Tab). */
@@ -83,39 +113,36 @@ export class LiveBoard {
   }
 }
 
-export interface BoardAction {
-  label: string
-  run: () => void
-}
+export type BoardAction = ResultAction
 
 /** Final standings after watching a match to the end. */
 export function showFinalBoard(rows: ScoreRow[], raid: boolean, me: number, main: BoardAction, more: BoardAction[]) {
   const el = document.getElementById('screen')!
   const top = rows[0]
+  const champ = !raid && top && top.place === 1 ? top : null
   const title = raid
     ? L('Raid over', 'Raid voorbij')
-    : top && top.place === 1
-      ? top.id === me ? L('You win!', 'Jij wint!') : L(`${top.name} wins!`, `${top.name} wint!`)
+    : champ
+      ? champ.id === me ? L('You win!', 'Jij wint!') : L(`${champ.name} wins!`, `${champ.name} wint!`)
       : L('Final standings', 'Eindstand')
+  const kind = raid ? 'raid' : 'royale'
   el.innerHTML = `
-    <div class="res sb-final">
-      <div class="res-glow"></div>
-      <div class="res-card wide">
-        <div class="res-title">${title}</div>
-        <div class="res-sub">${raid ? L('Who dealt the most damage?', 'Wie deed de meeste schade?') : L('Final standings of the match', 'Eindstand van het potje')}</div>
-        ${top && !raid ? `<div class="sb-winner"><img class="px tr" src="${trainerSpriteUrl(top.sprite)}" alt="">${top.mon ? `<img class="px mon" src="${spriteUrl(top.mon, { shiny: top.shiny })}" alt="">` : ''}<span>👑</span></div>` : ''}
-        <div class="sb-scroll">${boardHtml(rows, raid, me)}</div>
-        <div class="res-actions">
-          <button class="cta" data-a="0">${main.label}</button>
-          <div class="res-more">${more.map((a, i) => `<button class="ghost2" data-a="${i + 1}">${a.label}</button>`).join('')}</div>
-        </div>
+    <div class="nres nres-final nres-${kind}" style="--mc:${MODE_RGB[kind]}" data-tab="board">
+      <div class="nr-glow"></div>
+      <div class="nr-shell">
+        <section class="nr-hero">
+          <header class="nr-head">
+            <div class="nr-badge"><b>${raid ? '★' : '#1'}</b></div>
+            <div class="nr-headtxt"><span class="n-label">${raid ? 'Raid' : L('Winner', 'Winnaar')}</span><h1>${esc(title)}</h1><p>${raid ? L('Who dealt the most damage?', 'Wie deed de meeste schade?') : L('Final standings of the match', 'Eindstand van het potje')}</p></div>
+          </header>
+          ${champ ? `<div class="nr-stage"><div class="n-duo"><i class="n-plat"></i><img class="px n-tr" src="${trainerSpriteUrl(champ.sprite)}" alt="">${champ.mon ? `<img class="px n-mon" src="${spriteUrl(champ.mon, { shiny: champ.shiny })}" alt="">` : ''}</div></div>` : ''}
+        </section>
+        <section class="nr-pane" data-pane="board">
+          <div class="nr-panehead"><b>${L('Final standings', 'Eindstand')}</b></div>
+          ${boardList(rows, raid, me)}
+        </section>
+        ${actionsHtml(main, more)}
       </div>
     </div>`
-  const actions = [main, ...more]
-  el.querySelectorAll<HTMLElement>('[data-a]').forEach((b) =>
-    b.addEventListener('click', () => {
-      sfx.select()
-      actions[Number(b.dataset.a)].run()
-    }),
-  )
+  bindActions(el, [main, ...more])
 }

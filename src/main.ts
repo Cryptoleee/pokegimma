@@ -7,7 +7,7 @@ import { TRAINERS, type TrainerDef } from './data/trainers'
 import { finalForm } from './game/boss'
 import { pickStadium, STADIUMS, type StadiumId } from './data/stadiums'
 import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
-import { render, view } from './game/render'
+import { chatBubble, render, view } from './game/render'
 import { TILE } from './game/world'
 import { chatWidget, feedLine, Hud } from './ui/hud'
 import { clearScreen, showLeaveConfirm, showPartyFull } from './ui/screens'
@@ -21,7 +21,7 @@ import { decided, scoreRows } from './game/score'
 import { showEvolution } from './ui/cutscene'
 import { confirmLeaveLobby, shinyPartner, showLobby } from './ui/menu'
 import { askName, setOnline, showMenu, type MenuState } from './ui/home'
-import type { AppTab } from './ui/app'
+import { IC, type AppTab } from './ui/app'
 import { showLoading } from './ui/loading'
 import { wipe } from './ui/transition'
 import { currentMusic, playMusic, setTempo } from './music'
@@ -388,9 +388,9 @@ function onEnd(r: GameResult) {
     legend: r.extra?.legend, evolved: r.extra?.evolved, crystal: r.extra?.crystal,
   }) : undefined
   // The match goes on without you (bots or other players still in it): you can watch
-  const watch = r.final ? [] : [{ label: L('Keep watching 👁', 'Kijk verder 👁'), run: () => spectate() }]
+  const watch = r.final ? [] : [{ label: L('Keep watching', 'Kijk verder'), run: () => spectate(), icon: IC.eye }]
   if (!room) {
-    showResults(r, trainer.sprite, { label: L('Play again ▶', 'Nog een keer ▶'), run: soloAgain }, [
+    showResults(r, trainer.sprite, { label: L('Play again', 'Nog een keer'), run: soloAgain, icon: IC.replay }, [
       ...watch,
       { label: L('Other team', 'Ander team'), run: soloOtherTeam },
       { label: L('Main menu', 'Hoofdmenu'), run: () => wipe(() => toMenu()) },
@@ -399,8 +399,8 @@ function onEnd(r: GameResult) {
   }
   // Online the match usually goes on for your friends: watching is the main option, the lobby can wait
   const lobby = { label: L('To the lobby', 'Naar de lobby'), run: () => wipe(toLobby) }
-  if (watch.length) showResults(r, trainer.sprite, { label: L('Keep watching 👁', 'Kijk verder 👁'), run: () => spectate() }, [lobby, { label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }], reward)
-  else showResults(r, trainer.sprite, { ...lobby, label: L('To the lobby ▶', 'Naar de lobby ▶') }, [{ label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }], reward)
+  if (watch.length) showResults(r, trainer.sprite, { label: L('Keep watching', 'Kijk verder'), run: () => spectate(), icon: IC.eye }, [lobby, { label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }], reward)
+  else showResults(r, trainer.sprite, { ...lobby, label: L('To the lobby', 'Naar de lobby') }, [{ label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }], reward)
 }
 
 // ---------- Watching after you're out ----------
@@ -410,7 +410,7 @@ let spec: { g: Game; board: LiveBoard; speed: number; name: string; endT: number
 
 /** Watch the rest of the match after you're out. */
 /** Chat while spectating (multiplayer only). */
-let specChat: (ReturnType<typeof chatWidget> & { feed: HTMLElement }) | null = null
+let specChat: ReturnType<typeof chatWidget> | null = null
 let specFeed: HTMLElement | null = null
 
 function spectate() {
@@ -440,10 +440,9 @@ function spectate() {
   specFeed.className = 'feed spec-feed'
   hudRoot.append(specFeed)
   if (room) {
-    const c = chatWidget((t) => room?.say(t))
-    hudRoot.querySelector('.spec-btns')!.prepend(c.btn)
-    hudRoot.append(c.bar)
-    specChat = { ...c, feed: specFeed }
+    specChat = chatWidget((t) => room?.say(t))
+    hudRoot.querySelector('.spec-btns')!.prepend(specChat.btn)
+    hudRoot.append(specChat.panel)
   }
   spec = { g, board, speed: 1, name: '', endT: -1 }
   const cycle = (d: number) => {
@@ -500,8 +499,8 @@ function spectateTick(dt: number) {
       hudRoot.innerHTML = ''
       viewing = false
       sfx.select()
-      if (room) showFinalBoard(rows, g.kind === 'raid', g.player.id, { label: L('To the lobby ▶', 'Naar de lobby ▶'), run: () => wipe(toLobby) }, [{ label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }])
-      else showFinalBoard(rows, g.kind === 'raid', g.player.id, { label: L('Play again ▶', 'Nog een keer ▶'), run: soloAgain }, [
+      if (room) showFinalBoard(rows, g.kind === 'raid', g.player.id, { label: L('To the lobby', 'Naar de lobby'), run: () => wipe(toLobby) }, [{ label: L('Main menu', 'Hoofdmenu'), run: () => leaveRoom() }])
+      else showFinalBoard(rows, g.kind === 'raid', g.player.id, { label: L('Play again', 'Nog een keer'), run: soloAgain, icon: IC.replay }, [
         { label: L('Other team', 'Ander team'), run: soloOtherTeam },
         { label: L('Main menu', 'Hoofdmenu'), run: () => wipe(() => toMenu()) },
       ])
@@ -536,7 +535,9 @@ function roomEvents() {
     chat: (m: ChatLine) => {
       lobbyUi?.chat(m)
       if (viewing) hud?.chatLine(m, m.pid === profile().id)
-      if (spec && specChat) specChat.line(specChat.feed, m, m.pid === profile().id)
+      if (spec && specChat) specChat.line(m, m.pid === profile().id)
+      // In a match: what they say pops up above their trainer too
+      if (viewing || spec) chatBubble(m.pid, m.text, m.pid === profile().id)
     },
     closed: (reason: string) => {
       const wasQuick = room?.quick && !game

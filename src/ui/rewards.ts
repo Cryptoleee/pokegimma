@@ -6,6 +6,7 @@ import { levelOf, masteryOf, MAX_MASTERY, SHINY_AT, type Outcome } from '../../a
 import { achDesc, achName, ACH_INFO, questText, unlockText, xpLabel } from '../data/rewards'
 import type { Reward } from '../progress'
 import { esc } from './menu'
+import { IC, icon } from './app'
 import { TRAINERS, trainerSpriteUrl } from '../data/trainers'
 import { nextUnlock } from '../../api/_progress'
 import { trainerName } from '../data/rewards'
@@ -18,11 +19,11 @@ import { trainerName } from '../data/rewards'
 
 export function rewardsHtml() {
   return `
-    <div class="rw loading">
-      <div class="rw-top"><b class="rw-xp">+0 XP</b><span class="rw-note">${L('Counting your rewards…', 'Beloningen tellen…')}</span></div>
-      <div class="rw-bar rw-lvl"><span class="rw-a">Lv 1</span><div class="rw-track"><i></i></div><span class="rw-b"></span></div>
-      <div class="rw-bar rw-mas hidden"><img class="px" alt=""><span class="rw-a"></span><div class="rw-track"><i></i></div><span class="rw-b"></span></div>
-      <div class="rw-foot"></div>
+    <div class="nrw loading">
+      <div class="nrw-top"><b class="nrw-xp">+0 XP</b><span class="nrw-note">${L('Counting your rewards…', 'Beloningen tellen…')}</span></div>
+      <div class="nrw-bar nrw-lvl"><span class="nrw-a">Lv 1</span><div class="nrw-track"><i></i></div><span class="nrw-b"></span></div>
+      <div class="nrw-bar nrw-mas hidden"><img class="px" alt=""><span class="nrw-a"></span><div class="nrw-track"><i></i></div><span class="nrw-b"></span></div>
+      <div class="nrw-foot"></div>
     </div>`
 }
 
@@ -63,26 +64,26 @@ function countUp(el: HTMLElement, to: number, fmt: (n: number) => string, ms = 9
 }
 
 function detailHtml(o: Outcome, saved: boolean) {
-  const lines = o.lines.map(([k, x]) => `<div class="rwd-line"><span>${esc(xpLabel(k))}</span><b>+${x}</b></div>`).join('')
+  const lines = o.lines.map(([k, x]) => `<div class="nrd-line"><span>${esc(xpLabel(k))}</span><b>+${x}</b></div>`).join('')
   const quests = o.daily.map((q) => `
-    <div class="rwd-q ${q.p >= q.target ? 'done' : ''}">
+    <div class="nrd-q ${q.p >= q.target ? 'done' : ''}">
       <span>${q.p >= q.target ? '✅' : '📜'} ${esc(questText(q.id, q.target))}</span>
       <em>${Math.min(q.p, q.target)}/${q.target} · +${q.xp}</em>
-      <div class="rw-track"><i style="width:${Math.min(1, q.p / q.target) * 100}%"></i></div>
+      <div class="nrw-track"><i style="width:${Math.min(1, q.p / q.target) * 100}%"></i></div>
     </div>`).join('')
-  const ach = o.ach.map((a) => `<div class="rwd-ach"><i>${ACH_INFO[a.id]?.icon ?? '🏆'}</i><span><b>${esc(achName(a.id))}</b><small>${esc(achDesc(a.id))}</small></span><em>+${a.xp}</em></div>`).join('')
+  const ach = o.ach.map((a) => `<div class="nrd-ach"><i>${ACH_INFO[a.id]?.icon ?? '🏆'}</i><span><b>${esc(achName(a.id))}</b><small>${esc(achDesc(a.id))}</small></span><em>+${a.xp}</em></div>`).join('')
   const unl = o.unlocks.map((u) => {
     const x = unlockText(u)
-    return `<div class="rwd-ach unl"><i>${x.icon}</i><span><b>${esc(x.text)}</b></span></div>`
+    return `<div class="nrd-ach unl"><i>${x.icon}</i><span><b>${esc(x.text)}</b></span></div>`
   }).join('')
   const pts = o.points.pvp || o.points.pve
-    ? `<div class="rwd-line pts"><span>${o.points.pvp ? L('PvP ranking points', 'PvP-rankingpunten') : L('PvE ranking points', 'PvE-rankingpunten')}</span><b>+${o.points.pvp || o.points.pve}</b></div>`
+    ? `<div class="nrd-line pts"><span>${o.points.pvp ? L('PvP ranking points', 'PvP-rankingpunten') : L('PvE ranking points', 'PvE-rankingpunten')}</span><b>+${o.points.pvp || o.points.pve}</b></div>`
     : ''
   return `
     <h4>${L('Experience', 'Ervaring')} <small>+${o.total} XP</small></h4>
-    <div class="rwd-lines">${lines}${saved ? pts : ''}</div>
+    <div class="nrd-lines">${lines}${saved ? pts : ''}</div>
     ${ach || unl ? `<h4>${L('Unlocked', 'Vrijgespeeld')}</h4>${unl}${ach}` : ''}
-    <h4>${L('Daily quests', 'Dagopdrachten')} <small>🔥 ${L(`${o.streak}-day streak`, `${o.streak} dagen op rij`)}</small></h4>
+    <h4>${L('Daily quests', 'Dagopdrachten')} <small>🔥 ${L(`${o.streak}-day streak`, `${o.streak} ${o.streak === 1 ? 'dag' : 'dagen'} op rij`)}</small></h4>
     ${quests}`
 }
 
@@ -91,8 +92,8 @@ async function celebrate(root: HTMLElement, items: { icon: string; title: string
   for (const it of items) {
     if (!root.isConnected) return
     const pop = document.createElement('div')
-    pop.className = 'rw-pop'
-    pop.innerHTML = `<div class="rw-pop-card">${it.img ? `<img class="px" src="${it.img}" alt="">` : `<i>${it.icon}</i>`}<b>${esc(it.title)}</b><span>${esc(it.sub)}</span></div>`
+    pop.className = 'nrw-pop'
+    pop.innerHTML = `<div class="nrw-pop-card">${it.img ? `<img class="px" src="${it.img}" alt="">` : `<i>${it.icon}</i>`}<b>${esc(it.title)}</b><span>${esc(it.sub)}</span></div>`
     root.append(pop)
     sfx.banner()
     await new Promise<void>((done) => {
@@ -110,19 +111,22 @@ async function celebrate(root: HTMLElement, items: { icon: string; title: string
   }
 }
 
-export async function runRewards(el: HTMLElement, reward: Promise<Reward | null>, openTab: () => void) {
-  const box = el.querySelector('.rw') as HTMLElement
-  const detail = el.querySelector('.res-rw') as HTMLElement
-  const tabBtn = el.querySelector('.res-tabs [data-tab="rw"]') as HTMLElement | null
+/** `openTab` shows the details; `noRewards` is called when there turn out to be none. */
+export async function runRewards(el: HTMLElement, reward: Promise<Reward | null>, openTab: () => void, noRewards: () => void) {
+  const root = el.querySelector('.nres') as HTMLElement
+  const box = el.querySelector('.nrw') as HTMLElement
+  const detail = el.querySelector('[data-pane="rw"]') as HTMLElement
+  const tabBtn = el.querySelector('.nr-tabs [data-tab="rw"]') as HTMLElement | null
   const res = await reward.catch(() => null)
   if (!box.isConnected) return
   box.classList.remove('loading')
-  const note = box.querySelector('.rw-note') as HTMLElement
-  const foot = box.querySelector('.rw-foot') as HTMLElement
+  const note = box.querySelector('.nrw-note') as HTMLElement
+  const foot = box.querySelector('.nrw-foot') as HTMLElement
   if (!res) {
     note.textContent = L('Couldn’t save this match’s progress', 'Voortgang van dit potje kon niet worden opgeslagen')
-    box.querySelector('.rw-lvl')?.classList.add('hidden')
+    box.querySelector('.nrw-lvl')?.classList.add('hidden')
     tabBtn?.classList.add('hidden')
+    noRewards()
     return
   }
   const { outcome: o, progress: p, saved, showcase } = res
@@ -130,42 +134,42 @@ export async function runRewards(el: HTMLElement, reward: Promise<Reward | null>
 
   // Footer: what's next, or (guests) why to log in
   const shinyLeft = o.mastery.partner && masteryOf(o.mastery.xpTo).lv < SHINY_AT ? SHINY_AT - masteryOf(o.mastery.xpTo).lv : 0
-  foot.innerHTML = `<button class="rw-more">${L('Details', 'Details')} ▸</button>`
+  foot.innerHTML = `<button class="nrw-more">${L('Details', 'Details')}${icon(IC.next, 14)}</button>`
     + (!saved && !showcase && accountStatus() === 'guest'
-      ? `<button class="rw-login">💾 ${L('Log in to save & rank', 'Log in om op te slaan')}</button>`
+      ? `<button class="nrw-login">💾 ${L('Log in to save & rank', 'Log in om op te slaan')}</button>`
       : nextUnlock(p)
-        ? `<span class="rw-hint">🔓 ${L('Next', 'Volgende')}: ${esc(nextUnlock(p)!.kind === 'partner' ? SPECIES[Number(nextUnlock(p)!.id)]?.name ?? '' : trainerName(nextUnlock(p)!.id))} · Lv ${nextUnlock(p)!.lv}</span>`
+        ? `<span class="nrw-hint">🔓 ${L('Next', 'Volgende')}: ${esc(nextUnlock(p)!.kind === 'partner' ? SPECIES[Number(nextUnlock(p)!.id)]?.name ?? '' : trainerName(nextUnlock(p)!.id))} · Lv ${nextUnlock(p)!.lv}</span>`
         : shinyLeft && o.mastery.partner
-        ? `<span class="rw-hint">✨ ${L(`Shiny ${SPECIES[o.mastery.partner]?.name} at mastery ${SHINY_AT}`, `Shiny ${SPECIES[o.mastery.partner]?.name} bij mastery ${SHINY_AT}`)}</span>`
+        ? `<span class="nrw-hint">✨ ${L(`Shiny ${SPECIES[o.mastery.partner]?.name} at mastery ${SHINY_AT}`, `Shiny ${SPECIES[o.mastery.partner]?.name} bij mastery ${SHINY_AT}`)}</span>`
         : '')
-  foot.querySelector('.rw-more')!.addEventListener('click', () => {
+  foot.querySelector('.nrw-more')!.addEventListener('click', () => {
     sfx.select()
     openTab()
   })
-  foot.querySelector('.rw-login')?.addEventListener('click', () => {
+  foot.querySelector('.nrw-login')?.addEventListener('click', () => {
     sfx.select()
     login()
   })
   note.textContent = showcase ? '' : saved ? L('Saved to your account', 'Opgeslagen in je account') : L('Saved on this device', 'Opgeslagen op dit apparaat')
 
   // XP counts up, then the bars fill
-  countUp(box.querySelector('.rw-xp') as HTMLElement, o.total, (n) => `+${n} XP`)
+  countUp(box.querySelector('.nrw-xp') as HTMLElement, o.total, (n) => `+${n} XP`)
   sfx.tick()
   const lvBefore = levelOf(p.xp - o.total), lvAfter = levelOf(p.xp)
-  const lvlA = box.querySelector('.rw-lvl .rw-a') as HTMLElement, lvlB = box.querySelector('.rw-lvl .rw-b') as HTMLElement
+  const lvlA = box.querySelector('.nrw-lvl .nrw-a') as HTMLElement, lvlB = box.querySelector('.nrw-lvl .nrw-b') as HTMLElement
   lvlA.textContent = `Lv ${lvBefore.lv}`
   lvlB.textContent = `${lvBefore.into}/${lvBefore.need}`
-  const mas = box.querySelector('.rw-mas') as HTMLElement
+  const mas = box.querySelector('.nrw-mas') as HTMLElement
   const partner = o.mastery.partner
   if (partner) {
     mas.classList.remove('hidden')
     ;(mas.querySelector('img') as HTMLImageElement).src = spriteUrl(partner, { shiny: p.shiny.includes(partner) && o.mastery.to >= SHINY_AT })
-    ;(mas.querySelector('.rw-a') as HTMLElement).textContent = `★${o.mastery.from}`
+    ;(mas.querySelector('.nrw-a') as HTMLElement).textContent = `★${o.mastery.from}`
     const mb = masteryOf(o.mastery.xpFrom)
-    ;(mas.querySelector('.rw-b') as HTMLElement).textContent = o.mastery.to >= MAX_MASTERY ? 'MAX' : `${mb.into}/${mb.need}`
+    ;(mas.querySelector('.nrw-b') as HTMLElement).textContent = o.mastery.to >= MAX_MASTERY ? 'MAX' : `${mb.into}/${mb.need}`
   }
   await sleep(500)
-  const lvTrack = box.querySelector('.rw-lvl .rw-track') as HTMLElement
+  const lvTrack = box.querySelector('.nrw-lvl .nrw-track') as HTMLElement
   await fill(lvTrack, lvBefore.k, lvAfter.k, lvAfter.lv - lvBefore.lv, (i) => {
     lvlA.textContent = `Lv ${lvBefore.lv + i + 1}`
     sfx.medal(1)
@@ -173,11 +177,11 @@ export async function runRewards(el: HTMLElement, reward: Promise<Reward | null>
   lvlB.textContent = lvAfter.need ? `${lvAfter.into}/${lvAfter.need}` : 'MAX'
   if (partner) {
     const m0 = masteryOf(o.mastery.xpFrom), m1 = masteryOf(o.mastery.xpTo)
-    await fill(mas.querySelector('.rw-track') as HTMLElement, m0.k, m1.k, m1.lv - m0.lv, (i) => {
-      ;(mas.querySelector('.rw-a') as HTMLElement).textContent = `★${m0.lv + i + 1}`
+    await fill(mas.querySelector('.nrw-track') as HTMLElement, m0.k, m1.k, m1.lv - m0.lv, (i) => {
+      ;(mas.querySelector('.nrw-a') as HTMLElement).textContent = `★${m0.lv + i + 1}`
       sfx.medal(1)
     })
-    ;(mas.querySelector('.rw-b') as HTMLElement).textContent = m1.lv >= MAX_MASTERY ? 'MAX' : `${m1.into}/${m1.need}`
+    ;(mas.querySelector('.nrw-b') as HTMLElement).textContent = m1.lv >= MAX_MASTERY ? 'MAX' : `${m1.into}/${m1.need}`
   }
 
   // Celebrations: level up, unlocks, achievements
@@ -188,12 +192,12 @@ export async function runRewards(el: HTMLElement, reward: Promise<Reward | null>
     const [kind, id] = u.split(':')
     const img = kind === 'shiny' ? spriteUrl(Number(id), { shiny: true }) : kind === 'partner' ? spriteUrl(Number(id)) : kind === 'trainer' ? trainerSpriteUrl(TRAINERS.find((t) => t.key === id)?.sprite ?? id) : undefined
     const sub = kind === 'shiny' ? L('Switch it on or off in your profile', 'Aan of uit te zetten in je profiel')
-      : kind === 'partner' ? L('Pick it under “Pick trainer & Pokémon”', 'Kies hem onder “Kies trainer & Pokémon”')
-      : kind === 'trainer' ? L('Pick them under “Pick trainer & Pokémon”', 'Kies je nieuwe trainer onder “Kies trainer & Pokémon”')
+      : kind === 'partner' ? L('Pick it on the Team tab', 'Kies hem in het tabblad Team')
+      : kind === 'trainer' ? L('Pick them on the Team tab', 'Kies je nieuwe trainer in het tabblad Team')
       : L('Unlocked', 'Vrijgespeeld')
     pops.push({ icon: x.icon, title: x.text, sub, img })
   }
   for (const a of o.ach) pops.push({ icon: ACH_INFO[a.id]?.icon ?? '🏆', title: achName(a.id), sub: `${L('Achievement', 'Prestatie')} · +${a.xp} XP` })
   for (const q of o.quests) pops.push({ icon: '📜', title: L('Quest complete!', 'Opdracht voltooid!'), sub: `${questText(q.id, o.daily.find((d) => d.id === q.id)?.target ?? 1)} · +${q.xp} XP` })
-  await celebrate(el.querySelector('.res') as HTMLElement, pops)
+  await celebrate(root, pops)
 }

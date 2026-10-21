@@ -224,6 +224,21 @@ export function showLobby(room: Room, on: LobbyActions) {
   const others = () => room.players.filter((p) => p.pid !== room.players[0]?.pid)
   let page = 'lobby'
   let unreadN = 0
+  // What someone just said pops up over their row in the list (kept when the list repaints)
+  const said = new Map<string, { text: string; t: number }>()
+  const BUBBLE_MS = 5000
+  const bubble = (pid: string, fresh: boolean) => {
+    const b = said.get(pid)
+    if (!b || performance.now() - b.t > BUBBLE_MS) return ''
+    return `<span class="nl-bub ${fresh ? '' : 'stay'} ${pid === room.me.pid ? 'mine' : ''}" style="--left:${BUBBLE_MS - (performance.now() - b.t)}ms">${esc(b.text)}</span>`
+  }
+  const sayOver = (m: ChatLine) => {
+    said.set(m.pid, { text: m.text, t: performance.now() })
+    const row = [...root.querySelectorAll<HTMLElement>('.nl-p')].find((r) => r.dataset.pid === m.pid)
+    if (!row) return
+    row.querySelector('.nl-bub')?.remove()
+    row.querySelector('.nl-p-pic')!.insertAdjacentHTML('afterend', bubble(m.pid, true))
+  }
   let teamKey = ''
 
   // Your team, big, with Switch: changing it right here is how you level other partners
@@ -296,8 +311,8 @@ export function showLobby(room: Room, on: LobbyActions) {
       const tags = [isMe ? L('you', 'jij') : '', !quick && i === 0 ? 'host' : ''].filter(Boolean).join(' · ')
       const lv = p.lv ? `Lv ${Math.max(1, Math.min(99, Number(p.lv) || 1))} · ` : ''
       return `
-        <div class="nl-p ${isMe ? 'me' : ''} ${ready ? 'ready' : ''}" style="--d:${i * 60}ms">
-          <span class="nl-p-pic"><img class="px" src="${trainerSpriteUrl(tr.sprite)}" alt="">${p.team[0] ? gif(p.team[0], '', !!p.shiny) : ''}</span>
+        <div class="nl-p ${isMe ? 'me' : ''} ${ready ? 'ready' : ''}" style="--d:${i * 60}ms" data-pid="${esc(p.pid)}">
+          <span class="nl-p-pic"><img class="px" src="${trainerSpriteUrl(tr.sprite)}" alt="">${p.team[0] ? gif(p.team[0], '', !!p.shiny) : ''}</span>${bubble(p.pid, false)}
           <span class="nl-p-info"><b>${esc(p.name)}${tags ? ` <em>(${tags})</em>` : ''}</b><small>${lv}${p.title ? `${esc(titleName(String(p.title)))} · ` : ''}${tr.name}${p.team[0] ? ` &amp; ${SPECIES[p.team[0]].name}` : ''}</small></span>
           <span class="nl-state">${state}</span>
         </div>`
@@ -478,6 +493,7 @@ export function showLobby(room: Room, on: LobbyActions) {
     refresh,
     chat: (m: ChatLine) => {
       addLine(m)
+      sayOver(m)
       if (m.pid !== room.me.pid) {
         sfx.blip()
         if (page !== 'chat' && !wide.matches) {

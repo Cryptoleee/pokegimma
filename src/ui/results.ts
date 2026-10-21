@@ -1,89 +1,124 @@
-import { animatedUrl, spriteUrl } from '../data/pokemon'
-import { trainerSpriteUrl } from '../data/trainers'
+import { spriteUrl } from '../data/pokemon'
+import { TRAINERS } from '../data/trainers'
 import { cry, sfx } from '../audio'
 import { playMusic } from '../music'
 import type { GameResult } from '../game/game'
 import { BOSSES } from '../data/bosses'
-import { boardHtml } from './scoreboard'
+import { boardList } from './scoreboard'
 import { L } from '../i18n'
 import type { Reward } from '../progress'
 import { rewardsHtml, runRewards } from './rewards'
-import { esc } from './menu'
+import { appEsc as esc, IC, icon, teamStage } from './app'
 
-/** End-of-match screen: placement badge, your trainer and best Pokémon, counted stats. */
+/** End-of-match screen: where you placed, your team, counted stats, rewards and the scoreboard. */
 export interface ResultAction {
   label: string
   run: () => void
+  /** An icon from IC (the big button gets an arrow when it has none). */
+  icon?: string
+}
+
+/** Each mode's colour, as on its cards in the menu. */
+export const MODE_RGB = { royale: '255, 170, 40', duel: '80, 145, 255', raid: '255, 64, 88' } as const
+
+type Tab = 'mine' | 'rw' | 'board'
+/** Wide screens show your match on the left at all times; the tabs on the right switch between rewards and the scoreboard. */
+const wide = matchMedia('(min-width: 1000px)')
+
+/** Buttons under the results (and under the final standings). */
+export function actionsHtml(main: ResultAction, more: ResultAction[]) {
+  return `
+    <div class="nr-actions">
+      <button class="n-btn nr-main" data-a="0">${esc(main.label)}${icon(main.icon ?? IC.next, 20)}</button>
+      ${more.length ? `<div class="nr-more">${more.map((a, i) => `<button class="n-btn3" data-a="${i + 1}">${a.icon ? icon(a.icon, 16) : ''}${esc(a.label)}</button>`).join('')}</div>` : ''}
+    </div>`
+}
+
+export function bindActions(el: HTMLElement, actions: ResultAction[]) {
+  el.querySelectorAll<HTMLElement>('.nr-actions [data-a]').forEach((b) =>
+    b.addEventListener('click', () => {
+      sfx.select()
+      actions[Number(b.dataset.a)].run()
+    }),
+  )
 }
 
 /** `main` is the big button; `more` are the smaller ones below it (e.g. other team, main menu). */
 export function showResults(r: GameResult, trainerSprite: string, main: ResultAction, more: ResultAction[], reward?: Promise<Reward | null>) {
   const el = document.getElementById('screen')!
-  const tier = r.won ? 'gold' : r.place <= 3 ? 'silver' : 'bronze'
   const boss = r.raid ? BOSSES[r.raid.boss] : null
   const duel = r.duel
+  const kind = duel ? 'duel' : boss ? 'raid' : 'royale'
+  const trainer = TRAINERS.find((t) => t.sprite === trainerSprite) ?? TRAINERS[0]
+  const time = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s) % 60).padStart(2, '0')}`
+
+  // What you got: the big badge, a kicker above the title, the title and a line under it
+  const badge = duel
+    ? `<div class="nr-badge"><b>${duel.mine}<i>–</i>${duel.theirs}</b></div>`
+    : boss
+      ? `<div class="nr-badge nr-boss"><img class="px" src="${spriteUrl(boss.species)}" alt=""></div>`
+      : `<div class="nr-badge"><b>#${r.place}</b></div>`
+  const kicker = duel
+    ? r.won ? L('Victory', 'Gewonnen') : L('Defeat', 'Verloren')
+    : boss
+      ? 'Raid'
+      : r.won ? L('Winner', 'Winnaar') : L('Place', 'Plaats')
+  const title = duel
+    ? r.won ? L('Duel won!', 'Duel gewonnen!') : L('Duel lost', 'Duel verloren')
+    : boss
+      ? r.won ? L('Raid cleared!', 'Raid geslaagd!') : L('Raid failed', 'Raid mislukt')
+      : r.won ? L('Arena champion!', 'Kampioen van de arena!') : r.place <= 3 ? L('So close! Top 3', 'Bijna! Top 3') : L('Knocked out', 'Uitgeschakeld')
+  const sub = duel
+    ? L(`1 vs 1 against ${esc(duel.opp)}`, `1 tegen 1 tegen ${esc(duel.opp)}`)
+    : boss
+      ? r.won ? L(`${boss.name} is defeated`, `${boss.name} is verslagen`) : L(`${boss.name} was too strong… try again`, `${boss.name} was te sterk… probeer het nog eens`)
+      : L(`out of ${r.total} trainers`, `van de ${r.total} trainers`)
+  const stat = (n: number, label: string, fmt = '') => `<div class="nr-stat"><b data-n="${n}" ${fmt ? `data-fmt="${fmt}"` : ''}>0</b><span>${label}</span></div>`
+  const stats = duel
+    ? stat(Math.floor(r.time), L('Time', 'Tijd'), 'time') + stat(duel.mine, L('Rounds won', 'Rondes gewonnen')) + stat(duel.dmg, L('Damage', 'Schade'))
+    : r.raid
+      ? stat(Math.floor(r.time), L('Time', 'Tijd'), 'time') + stat(r.raid.dmg, `${L('Damage', 'Schade')} · ${r.raid.share}%`) + stat(r.raid.lives, L('Lives left', 'Levens over'))
+      : stat(Math.floor(r.time), L('Survived', 'Overleefd'), 'time') + stat(r.kos, L("Trainers K.O.'d", 'Trainers K.O.')) + stat(r.caught, L('Caught', 'Gevangen'))
+
+  const tabs: [Tab, string][] = [['mine', L('Your match', 'Jouw potje')], ...(reward ? [['rw', L('Rewards', 'Beloningen')] as [Tab, string]] : []), ['board', L('Scoreboard', 'Scorebord')]]
   el.innerHTML = `
-    <div class="res ${r.won ? 'won' : ''} ${reward ? 'has-rw' : ''}">
+    <div class="nres nres-${kind} ${r.won ? 'won' : ''}" style="--mc:${r.won && kind === 'royale' ? '255, 214, 10' : MODE_RGB[kind]}">
       <canvas class="confetti"></canvas>
-      <div class="res-glow"></div>
-      <div class="res-card">
-        <div class="res-tabs"><button class="on" data-tab="mine">${L('Your match', 'Jouw potje')}</button>${reward ? `<button data-tab="rw">${L('Rewards', 'Beloningen')}</button>` : ''}<button data-tab="board">${L('Scoreboard', 'Scorebord')}</button></div>
-        <div class="res-rw hidden"></div>
-        <div class="res-board hidden">
-          <div class="res-sub">${r.final ? L('Final standings', 'Eindstand') : L('Standings: the match is still going', 'Tussenstand: het potje loopt nog')}</div>
-          <div class="sb-scroll">${boardHtml(r.board, !!r.raid, r.me)}</div>
-        </div>
-        <div class="res-mine">
-        ${duel
-          ? `<div class="medal duel ${r.won ? 'gold' : 'bronze'}"><small>${r.won ? L('VICTORY', 'GEWONNEN') : L('DEFEAT', 'VERLOREN')}</small><b>${duel.mine}-${duel.theirs}</b></div>
-        <div class="res-title">${r.won ? L('Duel won!', 'Duel gewonnen!') : L('Duel lost', 'Duel verloren')}</div>
-        <div class="res-sub">${L(`1 vs 1 against ${esc(duel.opp)}`, `1 tegen 1 tegen ${esc(duel.opp)}`)}</div>`
-          : boss
-          ? `<div class="medal raid ${r.won ? 'gold' : 'bronze'}" style="--c:${boss.color}"><img class="px" src="${spriteUrl(boss.species)}" alt=""></div>
-        <div class="res-title">${r.won ? L('Raid cleared!', 'Raid geslaagd!') : L('Raid failed', 'Raid mislukt')}</div>
-        <div class="res-sub">${r.won ? L(`${boss.name} is defeated`, `${boss.name} is verslagen`) : L(`${boss.name} was too strong… try again`, `${boss.name} was te sterk… probeer het nog eens`)}</div>`
-          : `<div class="medal ${tier}"><small>${r.won ? L('WINNER', 'WINNAAR') : L('PLACE', 'PLAATS')}</small><b>#${r.place}</b></div>
-        <div class="res-title">${r.won ? L('Arena champion!', 'Kampioen van de arena!') : r.place <= 3 ? L('So close! Top 3', 'Bijna! Top 3') : L('Knocked out', 'Uitgeschakeld')}</div>
-        <div class="res-sub">${L(`out of ${r.total} trainers`, `van de ${r.total} trainers`)}</div>`}
-        <div class="res-stage">
-          <img class="px res-tr" src="${trainerSpriteUrl(trainerSprite)}" alt="">
-          <img class="px res-mon" src="${animatedUrl(r.best.species.id)}" onerror="this.onerror=null;this.src='${spriteUrl(r.best.species.id)}'" alt="">
-          <div class="res-plat"></div>
-        </div>
-        <div class="res-best"><b>${r.best.name}</b> · Lv ${r.best.level}</div>
-        <div class="res-stats">${duel
-          ? `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>${L('Time', 'Tijd')}</span></div>
-          <div><b data-n="${duel.mine}">0</b><span>${L('Rounds won', 'Rondes gewonnen')}</span></div>
-          <div><b data-n="${duel.dmg}">0</b><span>${L('Damage', 'Schade')}</span></div>`
-          : r.raid
-          ? `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>${L('Time', 'Tijd')}</span></div>
-          <div><b data-n="${r.raid.dmg}">0</b><span>${L('Damage', 'Schade')} (${r.raid.share}%)</span></div>
-          <div><b data-n="${r.raid.lives}">0</b><span>${L('Lives left', 'Levens over')}</span></div>`
-          : `<div><b data-n="${Math.floor(r.time)}" data-fmt="time">0:00</b><span>${L('Survived', 'Overleefd')}</span></div>
-          <div><b data-n="${r.kos}">0</b><span>${L("Trainers K.O.'d", 'Trainers K.O.')}</span></div>
-          <div><b data-n="${r.caught}">0</b><span>${L('Caught', 'Gevangen')}</span></div>`}
-        </div>
-        ${reward ? rewardsHtml() : ''}
-        </div>
-        <div class="res-actions">
-          <button class="cta" data-a="0">${main.label}</button>
-          <div class="res-more">${more.map((a, i) => `<button class="ghost2" data-a="${i + 1}">${a.label}</button>`).join('')}</div>
-        </div>
+      <div class="nr-glow"></div>
+      <div class="nr-shell">
+        <div class="n-seg nr-tabs" role="tablist">${tabs.map(([t, label]) => `<button role="tab" data-tab="${t}">${label}</button>`).join('')}</div>
+        <section class="nr-hero" data-pane="mine">
+          <header class="nr-head">
+            ${badge}
+            <div class="nr-headtxt"><span class="n-label">${kicker}</span><h1>${title}</h1><p>${sub}</p></div>
+          </header>
+          <div class="nr-stage">${teamStage(trainer, r.best.species.id, !!r.best.shiny)}</div>
+          <div class="nr-best"><b>${esc(r.best.name)}</b><span>Lv ${r.best.level}</span></div>
+          <div class="nr-stats">${stats}</div>
+          ${reward ? rewardsHtml() : ''}
+        </section>
+        <section class="nr-pane" data-pane="rw"></section>
+        <section class="nr-pane" data-pane="board">
+          <div class="nr-panehead"><b>${r.final ? L('Final standings', 'Eindstand') : L('Standings so far', 'Tussenstand')}</b><small>${r.final ? (boss ? L('Who dealt the most damage?', 'Wie deed de meeste schade?') : '') : L('the match is still going', 'het potje loopt nog')}</small></div>
+          ${boardList(r.board, !!r.raid, r.me)}
+        </section>
+        ${actionsHtml(main, more)}
       </div>
     </div>`
+  const root = el.querySelector('.nres') as HTMLElement
   playMusic(r.won ? 'victory' : 'defeat')
   setTimeout(() => cry(r.best.species.id, 0.3), 600)
-  // The medal lands with a ding (higher for a better place)
+  // The badge lands with a ding (higher for a better place)
   setTimeout(() => sfx.medal(r.raid || r.duel ? (r.won ? 1 : 0) : r.place), 350)
 
   // Count the stats up
-  el.querySelectorAll<HTMLElement>('.res-stats b').forEach((b, i) => {
+  el.querySelectorAll<HTMLElement>('.nr-stat b').forEach((b, i) => {
     const target = Number(b.dataset.n)
     const t0 = performance.now() + 500 + i * 250
     const tick = (now: number) => {
       const k = Math.min(1, Math.max(0, (now - t0) / 900))
       const v = Math.round(target * (1 - Math.pow(1 - k, 3)))
-      const text = b.dataset.fmt === 'time' ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}` : `${v}`
+      const text = b.dataset.fmt === 'time' ? time(v) : `${v}`
       if (text !== b.textContent && k > 0 && k < 1) sfx.tick()
       b.textContent = text
       if (k < 1) requestAnimationFrame(tick)
@@ -92,64 +127,66 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
     requestAnimationFrame(tick)
   })
 
-  // Confetti for winners
-  if (r.won) {
-    const c = el.querySelector('.confetti') as HTMLCanvasElement
-    const g = c.getContext('2d')!
-    c.width = innerWidth
-    c.height = innerHeight
-    const cols = ['#ffd84a', '#e83838', '#3870c8', '#58c040', '#f070b0', '#ffffff']
-    const bits = Array.from({ length: 160 }, () => ({
-      x: Math.random() * c.width, y: -Math.random() * c.height, vx: (Math.random() - 0.5) * 60, vy: 60 + Math.random() * 120,
-      r: Math.random() * 6, vr: (Math.random() - 0.5) * 10, w: 4 + Math.random() * 5, h: 6 + Math.random() * 8, col: cols[Math.floor(Math.random() * cols.length)],
-    }))
-    let last = performance.now()
-    const loop = (now: number) => {
-      if (!c.isConnected) return
-      const dt = Math.min(0.05, (now - last) / 1000)
-      last = now
-      g.clearRect(0, 0, c.width, c.height)
-      for (const b of bits) {
-        b.x += (b.vx + Math.sin(now / 400 + b.r) * 30) * dt
-        b.y += b.vy * dt
-        b.r += b.vr * dt
-        if (b.y > c.height + 20) {
-          b.y = -20
-          b.x = Math.random() * c.width
-        }
-        g.save()
-        g.translate(b.x, b.y)
-        g.rotate(b.r)
-        g.scale(1, Math.cos(b.r * 2))
-        g.fillStyle = b.col
-        g.fillRect(-b.w / 2, -b.h / 2, b.w, b.h)
-        g.restore()
+  if (r.won) confetti(el.querySelector('.confetti') as HTMLCanvasElement, `rgb(${MODE_RGB[kind]})`)
+
+  // Tabs. On a wide screen your match stays on the left, so the right side starts on the rewards
+  const has = (t: Tab) => !!el.querySelector(`.nr-tabs [data-tab="${t}"]:not(.hidden)`)
+  const show = (t: Tab) => {
+    if (wide.matches && t === 'mine') t = has('rw') ? 'rw' : 'board'
+    root.dataset.tab = t
+    el.querySelectorAll<HTMLElement>('.nr-tabs [data-tab]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.tab === t)
+      b.setAttribute('aria-selected', String(b.dataset.tab === t))
+    })
+  }
+  el.querySelectorAll<HTMLElement>('.nr-tabs [data-tab]').forEach((b) =>
+    b.addEventListener('click', () => {
+      sfx.select()
+      show(b.dataset.tab as Tab)
+    }),
+  )
+  show('mine')
+  const resized = () => (root.isConnected ? show(root.dataset.tab as Tab) : wide.removeEventListener('change', resized))
+  wide.addEventListener('change', resized)
+
+  if (reward) runRewards(el, reward, () => show('rw'), () => root.dataset.tab === 'rw' && show('board'))
+
+  bindActions(el, [main, ...more])
+}
+
+/** Confetti for winners, in gold, white and the mode's colour. */
+function confetti(c: HTMLCanvasElement, accent: string) {
+  const g = c.getContext('2d')!
+  c.width = innerWidth
+  c.height = innerHeight
+  const cols = ['#ffd60a', '#ffffff', accent, '#ffd60a', '#f5f5f7']
+  const bits = Array.from({ length: 140 }, () => ({
+    x: Math.random() * c.width, y: -Math.random() * c.height, vx: (Math.random() - 0.5) * 60, vy: 60 + Math.random() * 120,
+    r: Math.random() * 6, vr: (Math.random() - 0.5) * 10, w: 4 + Math.random() * 5, h: 6 + Math.random() * 8, col: cols[Math.floor(Math.random() * cols.length)],
+  }))
+  let last = performance.now()
+  const loop = (now: number) => {
+    if (!c.isConnected) return
+    const dt = Math.min(0.05, (now - last) / 1000)
+    last = now
+    g.clearRect(0, 0, c.width, c.height)
+    for (const b of bits) {
+      b.x += (b.vx + Math.sin(now / 400 + b.r) * 30) * dt
+      b.y += b.vy * dt
+      b.r += b.vr * dt
+      if (b.y > c.height + 20) {
+        b.y = -20
+        b.x = Math.random() * c.width
       }
-      requestAnimationFrame(loop)
+      g.save()
+      g.translate(b.x, b.y)
+      g.rotate(b.r)
+      g.scale(1, Math.cos(b.r * 2))
+      g.fillStyle = b.col
+      g.fillRect(-b.w / 2, -b.h / 2, b.w, b.h)
+      g.restore()
     }
     requestAnimationFrame(loop)
   }
-
-  // Tabs: your match / the scoreboard
-  el.querySelectorAll<HTMLElement>('.res-tabs button').forEach((b) =>
-    b.addEventListener('click', () => {
-      sfx.select()
-      const tab = b.dataset.tab
-      el.querySelectorAll('.res-tabs button').forEach((o) => o.classList.toggle('on', o === b))
-      el.querySelector('.res-board')!.classList.toggle('hidden', tab !== 'board')
-      el.querySelector('.res-rw')?.classList.toggle('hidden', tab !== 'rw')
-      el.querySelector('.res-mine')!.classList.toggle('hidden', tab !== 'mine')
-      el.querySelector('.res-card')!.classList.toggle('wide', tab === 'board')
-    }),
-  )
-
-  if (reward) runRewards(el, reward, () => (el.querySelector('.res-tabs [data-tab="rw"]') as HTMLElement | null)?.click())
-
-  const actions = [main, ...more]
-  el.querySelectorAll<HTMLElement>('.res-actions [data-a]').forEach((b) =>
-    b.addEventListener('click', () => {
-      sfx.select()
-      actions[Number(b.dataset.a)].run()
-    }),
-  )
+  requestAnimationFrame(loop)
 }
