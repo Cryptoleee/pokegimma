@@ -69,6 +69,43 @@ function peerOptions(): PeerOptions {
   return { ...base, host, port: Number(port || 9000), path: '/', secure: location.protocol === 'https:' }
 }
 
+/**
+ * Keeps track of how far a connection got, for the error message when it fails:
+ * the last ICE state, whether a relay was configured, the kinds of routes each
+ * side offered (h = on the device, s = through the router, r = through the relay)
+ * and the error codes of relay servers that didn't answer. That tells a relay
+ * that can't be reached apart from networks that can't meet.
+ */
+function watchIce(pc: RTCPeerConnection | null | undefined): () => string {
+  if (!pc) return () => ''
+  type Kinds = { host: number; srflx: number; relay: number }
+  const mine: Kinds = { host: 0, srflx: 0, relay: 0 }
+  const theirs: Kinds = { host: 0, srflx: 0, relay: 0 }
+  const errs = new Set<number>()
+  let state: string = pc.iceConnectionState
+  const note = (to: Kinds, cand?: string | null) => {
+    const t = / typ (host|srflx|relay)/.exec(cand ?? '')?.[1] as keyof Kinds | undefined
+    if (t) to[t]++
+  }
+  pc.addEventListener('icecandidate', (e) => note(mine, e.candidate?.candidate))
+  pc.addEventListener('icecandidateerror', (e) => {
+    const ev = e as RTCPeerConnectionIceErrorEvent
+    if (/^turns?:/.test(ev.url ?? '')) errs.add(ev.errorCode)
+  })
+  pc.addEventListener('iceconnectionstatechange', () => {
+    if (pc.iceConnectionState !== 'closed') state = pc.iceConnectionState
+  })
+  // The other side's routes arrive through PeerJS calling this
+  const add = pc.addIceCandidate.bind(pc)
+  pc.addIceCandidate = ((c?: RTCIceCandidateInit) => {
+    note(theirs, c?.candidate)
+    return add(c)
+  }) as typeof pc.addIceCandidate
+  const kinds = (k: Kinds) => `h${k.host} s${k.srflx} r${k.relay}`
+  return () =>
+    ` [${state} · ${iceServers() ? 'relay' : L('no relay', 'geen relay')} · ${L('you', 'jij')} ${kinds(mine)} · host ${kinds(theirs)}${errs.size ? ` · relay ${L('error', 'fout')} ${[...errs].join('/')}` : ''}]`
+}
+
 export interface RoomEvents {
   /** Lobby changed (someone joined, left or picked a new team). */
   lobby(): void
@@ -214,8 +251,10 @@ export class Room {
         peer.destroy()
         reject(new Error(msg))
       }
+      // How far the connection got, added to the error (see watchIce)
+      let report = () => ''
       // The match was found but no direct line came up (often mobile data or a strict router)
-      const timer = setTimeout(() => fail(L('Couldn’t connect to this match. Try again in a moment.', 'Kon geen verbinding maken met dit potje. Probeer het zo nog eens.')), timeoutMs)
+      const timer = setTimeout(() => fail(L('Couldn’t connect to this match. Try again in a moment.', 'Kon geen verbinding maken met dit potje. Probeer het zo nog eens.') + report()), timeoutMs)
       peer.on('error', (e) => {
         if (!settled) fail(friendlyError(e.type, code))
         else console.warn('[room]', e.type, e.message)
@@ -223,6 +262,7 @@ export class Room {
       peer.on('open', () => {
         const c = peer.connect(id, { reliable: true, serialization: 'json' })
         room.host = c
+        report = watchIce(c.peerConnection)
         c.on('open', () => c.send({ t: 'hello', p: me } satisfies GuestMsg))
         c.on('data', (d) => {
           const msg = d as HostMsg
@@ -238,10 +278,10 @@ export class Room {
         })
         // Closing before the host said anything: the host was found, but no line between your networks came up
         c.on('close', () => {
-          if (!settled) fail(L('Found the match, but your networks couldn’t connect. Try again in a moment.', 'Potje gevonden, maar jullie netwerken kregen geen verbinding. Probeer het zo nog eens.'))
+          if (!settled) fail(L('Found the match, but your networks couldn’t connect. Try again in a moment.', 'Potje gevonden, maar jullie netwerken kregen geen verbinding. Probeer het zo nog eens.') + report())
           else room.shut(L('The host left the match.', 'De host heeft het potje verlaten.'))
         })
-        c.on('error', () => fail(L('Found the match, but your networks couldn’t connect. Try again in a moment.', 'Potje gevonden, maar jullie netwerken kregen geen verbinding. Probeer het zo nog eens.')))
+        c.on('error', () => fail(L('Found the match, but your networks couldn’t connect. Try again in a moment.', 'Potje gevonden, maar jullie netwerken kregen geen verbinding. Probeer het zo nog eens.') + report()))
       })
     }))
   }
