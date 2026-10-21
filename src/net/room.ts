@@ -58,6 +58,13 @@ export interface QuickStatus {
 export const newCode = () => Array.from({ length: 4 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('')
 export const cleanCode = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)
 
+/**
+ * Our own ID for a guest (and the lobby probe), so PeerJS goes straight to the
+ * server's socket instead of first asking it for an ID: one request less, and
+ * that request could hang on mobile data.
+ */
+const guestId = () => `stormbreak-g-${Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(36).padStart(2, '0')).join('')}`
+
 /** `?peer=host:port` points at a self-hosted PeerJS server (handy for testing). */
 function peerOptions(): PeerOptions {
   const custom = new URLSearchParams(location.search).get('peer')
@@ -76,7 +83,7 @@ function peerOptions(): PeerOptions {
  * and the error codes of relay servers that didn't answer. That tells a relay
  * that can't be reached apart from networks that can't meet.
  */
-function watchIce(pc: RTCPeerConnection | null | undefined): () => string {
+function watchIce(pc: RTCPeerConnection | null | undefined, serverMs: number): () => string {
   if (!pc) return () => ''
   type Kinds = { host: number; srflx: number; relay: number }
   const mine: Kinds = { host: 0, srflx: 0, relay: 0 }
@@ -103,7 +110,7 @@ function watchIce(pc: RTCPeerConnection | null | undefined): () => string {
   }) as typeof pc.addIceCandidate
   const kinds = (k: Kinds) => `h${k.host} s${k.srflx} r${k.relay}`
   return () =>
-    ` [${state} · ${iceServers() ? 'relay' : L('no relay', 'geen relay')} · ${L('you', 'jij')} ${kinds(mine)} · host ${kinds(theirs)}${errs.size ? ` · relay ${L('error', 'fout')} ${[...errs].join('/')}` : ''}]`
+    ` [${state} · ${iceServers() ? 'relay' : L('no relay', 'geen relay')} · ${L('you', 'jij')} ${kinds(mine)} · host ${kinds(theirs)}${errs.size ? ` · relay ${L('error', 'fout')} ${[...errs].join('/')}` : ''} · server ${(serverMs / 1000).toFixed(1)}s]`
 }
 
 export interface RoomEvents {
@@ -232,7 +239,7 @@ export class Room {
 
   /** Joins someone's room by code. */
   static join(code: string, me: LobbyPlayer, on: RoomEvents): Promise<Room> {
-    return Room.connect(PREFIX + code, code, me, on, 12000, -1)
+    return Room.connect(PREFIX + code, code, me, on, 20000, -1)
   }
 
   private static connect(id: string, code: string, me: LobbyPlayer, on: RoomEvents, timeoutMs: number, slot: number): Promise<Room> {
@@ -240,7 +247,7 @@ export class Room {
     room.code = code
     room.quickSlot = slot
     return iceReady().then(() => new Promise<Room>((resolve, reject) => {
-      const peer = new Peer(peerOptions())
+      const peer = new Peer(guestId(), peerOptions())
       room.peer = peer
       let settled = false
       const fail = (msg: string) => {
@@ -251,8 +258,10 @@ export class Room {
         peer.destroy()
         reject(new Error(msg))
       }
-      // How far the connection got, added to the error (see watchIce)
-      let report = () => ''
+      // How far the connection got, added to the error (see watchIce). Until the
+      // game server answers, that's as far as it got.
+      const t0 = performance.now()
+      let report = () => ` [${L('no game server', 'geen gameserver')} · ${((performance.now() - t0) / 1000).toFixed(0)}s]`
       // The match was found but no direct line came up (often mobile data or a strict router)
       const timer = setTimeout(() => fail(L('Couldn’t connect to this match. Try again in a moment.', 'Kon geen verbinding maken met dit potje. Probeer het zo nog eens.') + report()), timeoutMs)
       peer.on('error', (e) => {
@@ -262,7 +271,7 @@ export class Room {
       peer.on('open', () => {
         const c = peer.connect(id, { reliable: true, serialization: 'json' })
         room.host = c
-        report = watchIce(c.peerConnection)
+        report = watchIce(c.peerConnection, performance.now() - t0)
         c.on('open', () => c.send({ t: 'hello', p: me } satisfies GuestMsg))
         c.on('data', (d) => {
           const msg = d as HostMsg
@@ -302,7 +311,7 @@ export class Room {
         if ((e as Error).message !== 'taken') throw e
       }
       try {
-        return await Room.connect(quickId(slot), quickCode(slot), me, on, 4500, slot)
+        return await Room.connect(quickId(slot), quickCode(slot), me, on, 8000, slot)
       } catch {
         /* full, playing or gone: next slot */
       }
@@ -312,7 +321,7 @@ export class Room {
 
   /** Quick play: join one particular public lobby (moving over from your own empty one). */
   static joinQuick(slot: number, me: LobbyPlayer, on: RoomEvents): Promise<Room> {
-    return Room.connect(quickId(slot), quickCode(slot), me, on, 6000, slot)
+    return Room.connect(quickId(slot), quickCode(slot), me, on, 9000, slot)
   }
 
   // ---------------- host ----------------
@@ -540,7 +549,7 @@ export function probeQuick(duel = false): Promise<QuickStatus[]> {
     }
     if (probePeer && !probePeer.destroyed && probePeer.open) return run(probePeer)
     probePeer?.destroy()
-    const peer = new Peer(peerOptions())
+    const peer = new Peer(guestId(), peerOptions())
     probePeer = peer
     // An empty slot shows up here as 'peer-unavailable'; that slot's timer just runs out
     peer.on('error', () => {})
