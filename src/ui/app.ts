@@ -1,7 +1,8 @@
 import './app.css'
+import { animateTrainers, trainerArt } from './trainerAnim'
 import logoUrl from '../assets/stormbreak-logo-small.webp'
 import { animatedUrl, SPECIES, spriteUrl } from '../data/pokemon'
-import { trainerSpriteUrl, type TrainerDef } from '../data/trainers'
+import type { TrainerDef } from '../data/trainers'
 import { TYPE_NL } from '../data/types'
 import { ROLES, roleOf } from '../data/roles'
 import { sfx } from '../audio'
@@ -152,10 +153,11 @@ export function monImg(id: number, cls = '', shiny = false) {
 
 /** Your trainer and partner side by side on a little platform, both alive. */
 export function teamStage(trainer: TrainerDef, mon: number | undefined, shiny: boolean, cls = '') {
+  queueMicrotask(animateTrainers)
   return `
     <div class="n-duo ${cls}">
       <i class="n-plat"></i>
-      <img class="px n-tr" src="${trainerSpriteUrl(trainer.sprite)}" alt="${appEsc(trainer.name)}">
+      ${trainerArt(trainer, 'n-tr')}
       ${mon ? monImg(mon, 'n-mon', shiny) : ''}
     </div>`
 }

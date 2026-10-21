@@ -3919,3 +3919,29 @@
 .n-backpill[class*='n-tint-']:hover {
   border-color: rgba(var(--mc), 0.7);
 }
+
+/* Animated trainers (trainerAnim.ts): a strip of 80×80 frames, played now and then */
+.n-tra {
+  display: inline-block;
+  flex: none;
+  width: 80px;
+  height: 80px;
+  background: var(--u) 0 0 no-repeat;
+  image-rendering: pixelated;
+}
+.n-tra.play {
+  animation: n-tra calc(var(--n) * 41.667ms) steps(var(--n)) 1 !important;
+}
+@keyframes n-tra {
+  from {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: calc(var(--n) * -80px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .n-tra.play {
+    animation: none !important;
+  }
+}
