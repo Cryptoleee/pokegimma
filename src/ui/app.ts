@@ -1,4 +1,5 @@
 import './app.css'
+import logoUrl from '../assets/stormbreak-logo-small.webp'
 import { animatedUrl, SPECIES, spriteUrl } from '../data/pokemon'
 import { trainerSpriteUrl, type TrainerDef } from '../data/trainers'
 import { TYPE_NL } from '../data/types'
@@ -64,7 +65,7 @@ export function appShell(tab: AppTab, page: string, o: { focus?: boolean; badge?
   return `
     <div class="n-app ${o.focus ? 'n-focus' : ''} ${o.cls ?? ''}" data-tab="${tab}">
       <nav class="n-nav" aria-label="${L('Main menu', 'Hoofdmenu')}">
-        <div class="n-brand">${BOLT}<span>STORMBREAK</span></div>
+        <div class="n-brand"><img class="n-logo" src="${logoUrl}" alt="Stormbreak Royale">${BOLT}</div>
         ${tabs}
       </nav>
       <main class="n-main">${page}</main>
