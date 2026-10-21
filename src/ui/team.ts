@@ -131,6 +131,8 @@ export interface TeamPageOpts {
   /** Picker mode: where the back button goes, and what it says ("Back to the lobby"). Default: done. */
   back?: () => void
   backLabel?: string
+  /** The mode you came from: the back button takes its colour. */
+  backKind?: 'royale' | 'duel' | 'raid'
   tab(t: AppTab): void
 }
 
@@ -234,7 +236,7 @@ export function showTeam(o: TeamPageOpts) {
     const scroll = (el.querySelector('.n-main') as HTMLElement | null)?.scrollTop ?? 0
     const page = `
       <div class="n-page n-teampage">
-        <header class="n-top">${o.done ? `<button class="n-backpill" data-act="back">${icon(IC.back, 18)}<span>${esc(o.backLabel ?? L('Back', 'Terug'))}</span></button>` : ''}<h1 class="n-h1">Team</h1></header>
+        <header class="n-top">${o.done ? `<button class="n-backpill ${o.backKind ? `n-tint-${o.backKind}` : ''}" data-act="back">${icon(IC.back, 18)}<span>${esc(o.backLabel ?? L('Back', 'Terug'))}</span></button>` : ''}<h1 class="n-h1">Team</h1></header>
         ${preview()}
         <div class="n-teampick">
           <div class="n-seg" role="tablist" aria-label="Team"><button role="tab" data-pane="mon" class="${pane === 'mon' ? 'on' : ''}" aria-selected="${pane === 'mon'}">Pokémon</button><button role="tab" data-pane="trainer" class="${pane === 'trainer' ? 'on' : ''}" aria-selected="${pane === 'trainer'}">Trainer</button></div>

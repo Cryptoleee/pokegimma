@@ -265,7 +265,7 @@ function menuActions() {
     teamAll: (kind: MatchChoice['kind']) => {
       const name = kind === 'raid' ? 'Raid' : kind === 'duel' ? '1 vs 1' : 'Battle Royale'
       const back = () => toMenu({ view: kind })
-      wipe(() => teamPicker(back, L('Done', 'Klaar'), { label: L(`Back to ${name}`, `Terug naar ${name}`), go: back }))
+      wipe(() => teamPicker(back, L('Done', 'Klaar'), { label: L(`Back to ${name}`, `Terug naar ${name}`), go: back, kind }))
     },
     setTeam: (t: TrainerDef, mon: number, view: MenuState['view']) => {
       saveTeam(t, mon)
@@ -293,10 +293,10 @@ function saveTeam(t: TrainerDef, mon: number) {
 }
 
 /** The Team screen as a picker (from a lobby or the results): a Done button, no tabs. */
-function teamPicker(done: () => void, doneLabel: string, back?: { label: string; go: () => void }) {
+function teamPicker(done: () => void, doneLabel: string, back?: { label: string; go: () => void; kind?: MatchChoice['kind'] }) {
   ownedPicks()
   playMusic('menu')
-  showTeam({ trainer, mon: team[0], set: saveTeam, tab: toTab, done, doneLabel, back: back?.go, backLabel: back?.label })
+  showTeam({ trainer, mon: team[0], set: saveTeam, tab: toTab, done, doneLabel, back: back?.go, backLabel: back?.label, backKind: back?.kind })
 }
 
 // ---------- Matches ----------
@@ -648,6 +648,7 @@ function toLobby() {
         wipe(toLobby)
       }, L('Ready', 'Klaar'), {
         label: L('Back to the lobby', 'Terug naar de lobby'),
+        kind: room?.choice.kind,
         // Back without saying you're ready: tap Ready in the lobby when you are
         go: () => {
           room?.updateMe(me())

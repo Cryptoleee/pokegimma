@@ -3906,3 +3906,16 @@
 .n-teampage .n-top:has(.n-backpill) .n-h1 {
   margin-left: 6px;
 }
+
+/* The back button wears the colour of the mode you came from */
+.n-backpill.n-tint-royale { --mc: 255, 170, 40; }
+.n-backpill.n-tint-duel { --mc: 80, 145, 255; }
+.n-backpill.n-tint-raid { --mc: 255, 64, 88; }
+.n-backpill[class*='n-tint-'] {
+  background: radial-gradient(ellipse 90% 140% at 15% 50%, rgba(var(--mc), 0.22), rgba(var(--mc), 0) 75%), var(--n-s2);
+  border-color: rgba(var(--mc), 0.4);
+  box-shadow: inset 0 0 14px rgba(var(--mc), 0.12);
+}
+.n-backpill[class*='n-tint-']:hover {
+  border-color: rgba(var(--mc), 0.7);
+}
