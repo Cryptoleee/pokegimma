@@ -21,7 +21,7 @@ import { decided, scoreRows } from './game/score'
 import { showEvolution } from './ui/cutscene'
 import { confirmLeaveLobby, shinyPartner, showLobby } from './ui/menu'
 import { askName, setOnline, showMenu, type MenuState } from './ui/home'
-import { IC, type AppTab } from './ui/app'
+import { IC, icon, type AppTab } from './ui/app'
 import { showLoading } from './ui/loading'
 import { wipe } from './ui/transition'
 import { currentMusic, playMusic, setTempo } from './music'
@@ -424,12 +424,12 @@ function spectate() {
   hudRoot.classList.remove('hidden', 'intro-mode')
   hudRoot.innerHTML = `
     <div class="spec-bar">
-      <span class="spec-tag">👁 ${L('Spectating', 'Toeschouwer')}</span>
-      <div class="spec-follow"><button class="spec-prev" aria-label="${L('Previous trainer', 'Vorige trainer')}">◀</button><span class="spec-name"></span><button class="spec-next" aria-label="${L('Next trainer', 'Volgende trainer')}">▶</button></div>
+      <span class="spec-tag">${icon(IC.eye, 16)}${L('Spectating', 'Toeschouwer')}</span>
+      <div class="spec-follow"><button class="spec-prev" aria-label="${L('Previous trainer', 'Vorige trainer')}">${icon(IC.back, 16)}</button><span class="spec-name"></span><button class="spec-next" aria-label="${L('Next trainer', 'Volgende trainer')}">${icon(IC.next, 16)}</button></div>
       <div class="spec-btns">
         ${room ? '' : `<button class="spec-speed" title="${L('Speed', 'Snelheid')}">1×</button>`}
-        <button class="spec-board" title="${L('Scoreboard (Tab)', 'Scorebord (Tab)')}">🏆</button>
-        <button class="spec-leave">${room ? L('To the lobby ▶', 'Naar de lobby ▶') : L('Stop', 'Stoppen')}</button>
+        <button class="spec-board" title="${L('Scoreboard (Tab)', 'Scorebord (Tab)')}" aria-label="${L('Scoreboard', 'Scorebord')}">${icon(IC.star, 16)}</button>
+        <button class="spec-leave">${room ? L('To the lobby', 'Naar de lobby') : L('Stop', 'Stoppen')}</button>
       </div>
     </div>`
   const board = new LiveBoard(hudRoot, g, () => g.player.id)

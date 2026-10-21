@@ -204,7 +204,5 @@ export function teamCard(trainer: TrainerDef, mon: number | undefined, shiny: bo
     </button>`
 }
 
-// Modals over the menu (options, news, confirm, invite) take the menu's look; in a match they stay pixel art
-const screenEl = document.getElementById('screen')
-if (screenEl)
-  new MutationObserver(() => document.body.classList.toggle('n-ui', !!screenEl.querySelector(':scope > .n-app, :scope > .n-tut'))).observe(screenEl, { childList: true })
+// Every modal (options, news, invites, leaving a match, a full team) takes the menu's look
+document.body.classList.add('n-ui')

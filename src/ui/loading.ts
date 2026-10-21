@@ -3,6 +3,7 @@ import { trainerSpriteUrl } from '../data/trainers'
 import { itemUrl } from '../game/sprites'
 import { sfx } from '../audio'
 import { esc } from './menu'
+import { MODE_RGB } from './results'
 import { BOSSES, RESPAWN_TIME, type BossDef, type BossId } from '../data/bosses'
 import { L, tx } from '../i18n'
 import { STADIUMS, type StadiumId } from '../data/stadiums'
@@ -66,43 +67,47 @@ export interface LoadingPlayer {
 export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; skippable: boolean; bots: number; raid?: BossId; duel?: boolean; stadium?: StadiumId }, done: () => void) {
   const app = document.getElementById('app')!
   const el = document.createElement('div')
-  el.className = 'loading'
   // Legendary + Master Ball first (most asked), then a random mix
   const TIPS = battleTips()
   const rest = TIPS.slice(2).sort(() => Math.random() - 0.5)
   const boss = opts.raid ? BOSSES[opts.raid] : null
   const stadium = opts.stadium ? STADIUMS[opts.stadium] : null
   const tips = boss ? raidTips(boss) : opts.duel ? [...(stadium ? [{ icon: `<i class="ld-up">${stadium.icon}</i>`, title: stadium.name, text: stadium.tip }] : []), ...duelTips()] : [TIPS[Math.random() < 0.5 ? 0 : 1], TIPS[2], ...rest]
+  const kind = boss ? 'raid' : opts.duel ? 'duel' : 'royale'
+  el.className = `nld nld-${kind}`
+  el.style.setProperty('--mc', MODE_RGB[kind])
   el.innerHTML = `
-    <div class="ld-bg"></div>
-    <div class="ld-l">
-    ${boss
-      ? `<div class="ld-head"><small>RAID · ${tx(boss.title).toUpperCase()}</small><b>${boss.name}</b></div>
-    <div class="ld-boss" style="--c:${boss.color}"><img class="px" src="${animatedUrl(boss.species)}" onerror="this.onerror=null;this.src='${spriteUrl(boss.species)}'" alt=""></div>`
-      : opts.duel
-        ? `<div class="ld-head"><small>1 VS 1 · BEST OF 3</small><b>${stadium ? `${stadium.icon} ${stadium.name}` : L('Duel', 'Duel')}</b></div>`
-        : `<div class="ld-head"><small>BATTLE ROYALE</small><b>${L('Loading match', 'Potje wordt geladen')}</b></div>`}
-    <div class="ld-players ${opts.duel ? 'vs' : ''}">
-      ${opts.players.map((p, i) => `${opts.duel && i === 1 ? '<em class="ld-vs">VS</em>' : ''}<div class="ld-p" style="--d:${i * 70}ms"><img class="px" src="${trainerSpriteUrl(p.sprite)}" alt="">${p.mon ? `<img class="px ld-mon" src="${spriteUrl(p.mon)}" alt="">` : ''}<span>${esc(p.name)}</span></div>`).join('')}
-      ${opts.bots && !boss && !opts.duel ? `<div class="ld-p bots" style="--d:${opts.players.length * 70}ms"><b>+${opts.bots}</b><span>bots</span></div>` : ''}
-    </div>
-    </div>
-    <div class="ld-r">
-    <div class="ld-tip"></div>
-    <div class="ld-dots">${tips.map(() => '<i></i>').join('')}</div>
-    <div class="ld-bar"><i></i></div>
-    <div class="ld-foot">${opts.skippable ? `<button class="cta ld-go">${L("I'm ready ▶", 'Ik ben er klaar voor ▶')}</button>` : `<span class="ld-wait">${L('Everyone starts together…', 'Iedereen start tegelijk…')}</span>`}</div>
+    <div class="nld-glow"></div>
+    <div class="nld-in">
+      <section class="nld-l">
+        ${boss
+          ? `<div class="nld-head"><span class="n-label">Raid · ${esc(tx(boss.title))}</span><h1>${boss.name}</h1></div>
+        <div class="nld-boss"><img class="px" src="${animatedUrl(boss.species)}" onerror="this.onerror=null;this.src='${spriteUrl(boss.species)}'" alt=""></div>`
+          : opts.duel
+            ? `<div class="nld-head"><span class="n-label">1 vs 1 · best of 3</span><h1>${stadium ? `${stadium.icon} ${stadium.name}` : L('Duel', 'Duel')}</h1></div>`
+            : `<div class="nld-head"><span class="n-label">Battle Royale</span><h1>${L('Loading match', 'Potje wordt geladen')}</h1></div>`}
+        <div class="nld-players ${opts.duel ? 'vs' : ''}">
+          ${opts.players.map((p, i) => `${opts.duel && i === 1 ? '<em class="nld-vs">VS</em>' : ''}<div class="nld-p" style="--d:${i * 70}ms"><span class="nld-pic"><img class="px" src="${trainerSpriteUrl(p.sprite)}" alt="">${p.mon ? `<img class="px nld-mon" src="${spriteUrl(p.mon)}" alt="">` : ''}</span><b>${esc(p.name)}</b></div>`).join('')}
+          ${opts.bots && !boss && !opts.duel ? `<div class="nld-p bots" style="--d:${opts.players.length * 70}ms"><span class="nld-pic"><i>+${opts.bots}</i></span><b>bots</b></div>` : ''}
+        </div>
+      </section>
+      <section class="nld-r">
+        <div class="nld-tip ld-tip" role="button" tabindex="0" aria-label="${L('Next tip', 'Volgende tip')}"></div>
+        <div class="nld-dots">${tips.map(() => '<i></i>').join('')}</div>
+        <div class="nld-bar"><i></i></div>
+        <div class="nld-foot">${opts.skippable ? `<button class="n-btn ld-go">${L("I'm ready", 'Ik ben er klaar voor')}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>` : `<span class="nld-wait"><i class="n-dot"></i>${L('Everyone starts together…', 'Iedereen start tegelijk…')}</span>`}</div>
+      </section>
     </div>`
   app.append(el)
   requestAnimationFrame(() => el.classList.add('in'))
 
-  const tipEl = el.querySelector('.ld-tip') as HTMLElement
-  const dots = [...el.querySelectorAll<HTMLElement>('.ld-dots i')]
+  const tipEl = el.querySelector('.nld-tip') as HTMLElement
+  const dots = [...el.querySelectorAll<HTMLElement>('.nld-dots i')]
   let idx = -1
   const next = () => {
     idx = (idx + 1) % tips.length
     const t = tips[idx]
-    tipEl.innerHTML = `<div class="ld-card"><div class="ld-icon">${t.icon}</div><div><small>TIP</small><b>${t.title}</b><p>${t.text}</p></div></div>`
+    tipEl.innerHTML = `<div class="nld-card"><div class="nld-icon">${t.icon}</div><div class="nld-txt"><span class="n-label">Tip</span><b>${t.title}</b><p>${t.text}</p></div></div>`
     dots.forEach((d, i) => d.classList.toggle('on', i === idx))
   }
   next()
@@ -114,7 +119,7 @@ export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; s
     next()
   })
 
-  const bar = el.querySelector('.ld-bar i') as HTMLElement
+  const bar = el.querySelector('.nld-bar i') as HTMLElement
   bar.style.transition = `width ${opts.seconds}s linear`
   requestAnimationFrame(() => requestAnimationFrame(() => (bar.style.width = '100%')))
 

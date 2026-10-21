@@ -5,7 +5,7 @@ import { sfx } from '../audio'
 import type { Game } from '../game/game'
 import { decided, scoreRows, type ScoreRow } from '../game/score'
 import { L } from '../i18n'
-import { appEsc as esc } from './app'
+import { appEsc as esc, IC, icon } from './app'
 import { actionsHtml, bindActions, MODE_RGB, type ResultAction } from './results'
 
 /**
@@ -15,31 +15,6 @@ import { actionsHtml, bindActions, MODE_RGB, type ResultAction } from './results
  */
 
 const time = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s) % 60).padStart(2, '0')}`
-
-export function boardHtml(rows: ScoreRow[], raid: boolean, me: number) {
-  const multi = rows.filter((r) => r.human).length > 1
-  const dmg = L('Damage', 'Schade')
-  const head = raid
-    ? `<th>#</th><th>Trainer</th><th>Pokémon</th><th>${dmg}</th><th>${L('Lives', 'Levens')}</th>`
-    : `<th>#</th><th>Trainer</th><th>Pokémon</th><th>K.O.</th><th>${dmg}</th><th class="opt">${L('Caught', 'Gevangen')}</th><th class="opt">${L('Time', 'Tijd')}</th>`
-  const body = rows
-    .map((r, i) => {
-      const rank = raid ? `${i + 1}` : r.place ? `#${r.place}` : `<span class="sb-live" title="${L('Still in the game', 'Nog in het spel')}">●</span>${i + 1}`
-      const tag = r.id === me ? `<em class="sb-me">${L('you', 'jij')}</em>` : multi && r.human ? `<em class="sb-human">${L('player', 'speler')}</em>` : ''
-      const mon = r.mon ? `<img class="px" src="${spriteUrl(r.mon, { shiny: r.shiny })}" alt=""><small>Lv ${r.lv}</small>` : ''
-      const out = raid ? r.lives <= 0 && !r.alive : !r.alive
-      return `<tr class="${r.id === me ? 'me' : ''} ${out ? 'out' : ''} ${!raid && r.place === 1 ? 'win' : ''}">
-        <td class="sb-rank">${rank}</td>
-        <td><div class="sb-tr"><img class="px" src="${trainerSpriteUrl(r.sprite)}" alt=""><span>${r.name}</span>${tag}</div></td>
-        <td><div class="sb-mon">${mon}</div></td>
-        ${raid
-          ? `<td><b>${r.bossDmg}</b> <small class="sb-share">${r.share}%</small></td><td>${'♥'.repeat(Math.max(0, r.lives))}<span class="sb-lost">${'♥'.repeat(Math.max(0, RAID_LIVES - r.lives))}</span></td>`
-          : `<td><b>${r.kos}</b></td><td>${r.dmg}</td><td class="opt">${r.caught}</td><td class="opt">${time(r.time)}</td>`}
-      </tr>`
-    })
-    .join('')
-  return `<table class="sb-table ${raid ? 'raid' : ''}"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
-}
 
 /**
  * The scoreboard for the results screens (new style): one row per trainer with
@@ -103,8 +78,8 @@ export class LiveBoard {
     const raid = g.kind === 'raid'
     const left = g.trainers.filter((t) => t.alive).length
     this.el.innerHTML = `
-      <div class="sb-head"><b>${raid ? L('Raid · damage', 'Raid · schade') : L('Standings', 'Stand')}</b><small>${raid ? L(`${left} of ${g.trainers.length} still fighting`, `${left} van ${g.trainers.length} nog in de strijd`) : decided(g) ? L('Over', 'Afgelopen') : L(`${left} of ${g.trainers.length} trainers left`, `${left} van ${g.trainers.length} trainers over`)}</small><button class="sb-close" aria-label="${L('Close', 'Sluiten')}">✕</button></div>
-      <div class="sb-scroll">${boardHtml(scoreRows(g), raid, this.me())}</div>`
+      <div class="sb-head"><b>${raid ? L('Raid · damage', 'Raid · schade') : L('Standings', 'Stand')}</b><small>${raid ? L(`${left} of ${g.trainers.length} still fighting`, `${left} van ${g.trainers.length} nog in de strijd`) : decided(g) ? L('Over', 'Afgelopen') : L(`${left} of ${g.trainers.length} trainers left`, `${left} van ${g.trainers.length} trainers over`)}</small><button class="sb-close" aria-label="${L('Close', 'Sluiten')}">${icon(IC.close, 16)}</button></div>
+      <div class="sb-scroll">${boardList(scoreRows(g), raid, this.me())}</div>`
   }
 
   destroy() {

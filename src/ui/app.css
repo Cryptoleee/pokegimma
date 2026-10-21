@@ -3450,6 +3450,67 @@
   color: var(--n-text);
 }
 
+/* Leaving a match: the controls in a tidy list (desktop) */
+.n-ui #modal .keys {
+  gap: 8px 14px;
+  margin: 14px 0 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--n-s2);
+  border: 1px solid var(--n-line);
+  font-size: 13px;
+}
+.n-ui #modal .keys span {
+  display: flex;
+  gap: 4px;
+}
+.n-ui #modal .keys kbd {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.n-ui #modal .keys em {
+  color: var(--n-dim);
+}
+/* A full team: pick who makes room */
+.n-ui #modal .choice {
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+.n-ui #modal .choice button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--n-line2);
+  background: var(--n-s2);
+  color: var(--n-text);
+  font-family: var(--n-font);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+  cursor: pointer;
+}
+.n-ui #modal .choice button:hover {
+  border-color: var(--n-acc);
+}
+.n-ui #modal .choice img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+.n-ui #modal p b {
+  color: var(--n-text);
+}
+
 /* Phones held sideways: an icon rail and a shorter stage, so the content gets the room */
 @media (min-width: 640px) and (max-height: 560px) {
   .n-app {
@@ -5091,4 +5152,381 @@ body.desk .hchat-hint kbd {
 }
 .nres-final .nr-stage {
   align-items: center;
+}
+
+/* ---------------------------------------------------------------- pre-match loading */
+
+/*
+ * Before a match: who's in and rotating tips, in the menu's style with the
+ * mode's colour glowing in. Two columns on wide screens.
+ */
+.nld {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  overflow-y: auto;
+  background: var(--n-bg);
+  color: var(--n-text);
+  font-family: var(--n-font);
+  -webkit-font-smoothing: antialiased;
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+.nld.in {
+  opacity: 1;
+}
+.nld.out {
+  opacity: 0;
+  pointer-events: none;
+}
+.nld h1 {
+  margin: 0;
+}
+.nld button {
+  font-family: inherit;
+  cursor: pointer;
+}
+.nld-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(var(--mc), 0.2), rgba(var(--mc), 0) 70%),
+    radial-gradient(ellipse 60% 40% at 50% 100%, rgba(var(--mc), 0.08), rgba(var(--mc), 0) 70%);
+  pointer-events: none;
+}
+.nld-in {
+  position: relative;
+  width: 100%;
+  max-width: 540px;
+  min-height: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: calc(var(--safe-t) + 28px) 20px calc(var(--safe-b) + 20px);
+  box-sizing: border-box;
+}
+.nld-l,
+.nld-r {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.nld-r {
+  margin-top: auto;
+}
+.nld-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.nld-head .n-label {
+  color: rgb(var(--mc));
+}
+.nld-head h1 {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+}
+.nld-boss {
+  display: grid;
+  place-items: center;
+  height: 190px;
+  border-radius: var(--n-r);
+  background: radial-gradient(ellipse 60% 70% at 50% 60%, rgba(var(--mc), 0.25), rgba(var(--mc), 0) 70%), var(--n-s1);
+  border: 1px solid rgba(var(--mc), 0.3);
+}
+.nld-boss img {
+  zoom: 2;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 22px rgba(var(--mc), 0.45));
+}
+.nld-players {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+.nld-p {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 76px;
+  animation: n-in 0.35s both;
+  animation-delay: var(--d);
+}
+.nld-pic {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: end center;
+  border-radius: 18px;
+  background: var(--n-s2);
+  border: 1px solid var(--n-line);
+  overflow: hidden;
+}
+.nld-pic img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  object-position: 50% 100%;
+  image-rendering: pixelated;
+}
+.nld-pic .nld-mon {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 36px;
+  height: 36px;
+}
+.nld-pic i {
+  place-self: center;
+  font-style: normal;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--n-dim);
+}
+.nld-p b {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+.nld-p.bots b {
+  color: var(--n-mute);
+}
+.nld-players.vs .nld-pic {
+  width: 104px;
+  height: 104px;
+}
+.nld-players.vs .nld-p {
+  width: 104px;
+}
+.nld-players.vs .nld-pic img {
+  width: 88px;
+  height: 88px;
+}
+.nld-vs {
+  font-style: normal;
+  font-size: 22px;
+  font-weight: 800;
+  color: rgb(var(--mc));
+}
+.nld-tip {
+  cursor: pointer;
+}
+.nld-card {
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--n-s1);
+  border: 1px solid var(--n-line2);
+  animation: n-in 0.3s;
+}
+.nld-icon {
+  flex: none;
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--n-s3);
+}
+.nld-icon img {
+  max-width: 52px;
+  max-height: 52px;
+  image-rendering: pixelated;
+}
+.nld-icon i {
+  font-style: normal;
+  font-size: 28px;
+}
+.nld-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.nld-txt .n-label {
+  color: var(--n-acc);
+}
+.nld-txt > b {
+  font-size: 17px;
+  font-weight: 800;
+}
+.nld-txt p {
+  margin: 0;
+  color: var(--n-dim);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.nld-txt p b {
+  color: var(--n-text);
+}
+.nld-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.nld-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--n-line2);
+  transition: width 0.2s, background 0.2s;
+}
+.nld-dots i.on {
+  width: 18px;
+  background: var(--n-acc);
+}
+.nld-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--n-s3);
+  overflow: hidden;
+}
+.nld-bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--n-acc);
+}
+.nld-foot .n-btn {
+  width: 100%;
+}
+.nld-wait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 56px;
+  color: var(--n-dim);
+  font-size: 15px;
+  font-weight: 700;
+}
+@media (min-width: 1000px) {
+  .nld-in {
+    max-width: 1100px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 460px);
+    align-items: center;
+    gap: 56px;
+    padding: 48px;
+  }
+  .nld-r {
+    margin-top: 0;
+  }
+  .nld-head {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .nld-head h1 {
+    font-size: 44px;
+    letter-spacing: -1px;
+  }
+  .nld-players {
+    justify-content: flex-start;
+  }
+  .nld-boss {
+    height: 300px;
+  }
+  .nld-boss img {
+    zoom: 3;
+  }
+}
+
+/* ---------------------------------------------------------------- spectating */
+
+#hud .spec-bar {
+  gap: 8px;
+  padding: 6px;
+  border-radius: 18px;
+  background: rgba(14, 14, 16, 0.92);
+  border: 1px solid var(--n-line2);
+  font-family: var(--n-font);
+  -webkit-font-smoothing: antialiased;
+  color: var(--n-text);
+}
+#hud .spec-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 6px;
+  color: var(--n-acc);
+  font-size: 13px;
+  font-weight: 800;
+}
+#hud .spec-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+#hud .spec-bar button {
+  display: inline-grid;
+  place-items: center;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 12px;
+  border: 1px solid var(--n-line2);
+  background: var(--n-s3);
+  color: var(--n-text);
+  font: 800 13px var(--n-font);
+}
+#hud .spec-bar button:hover {
+  border-color: var(--n-faint);
+}
+#hud .spec-bar .spec-leave {
+  padding: 0 14px;
+  border: 0;
+  background: var(--n-acc);
+  color: var(--n-acc-ink);
+}
+
+/* The live scoreboard over a match (trophy button or Tab) */
+#hud .sb-live-panel {
+  padding: 14px;
+  border-radius: 22px;
+  background: rgba(14, 14, 16, 0.95);
+  border: 1px solid var(--n-line2);
+  font-family: var(--n-font);
+  -webkit-font-smoothing: antialiased;
+  color: var(--n-text);
+  animation: n-modal-in 0.2s ease-out;
+}
+#hud .sb-head {
+  align-items: center;
+  padding: 0 2px 4px;
+}
+#hud .sb-head b {
+  font-size: 18px;
+  font-weight: 800;
+}
+#hud .sb-head small {
+  color: var(--n-mute);
+  font-size: 12px;
+}
+#hud .sb-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  border: 1px solid var(--n-line2);
+  background: var(--n-s3);
+  color: var(--n-text);
+}
+#hud .sb-live-panel .sb-scroll {
+  overflow-y: auto;
+}
+#hud .sb-live-panel .nrb-row {
+  min-height: 46px;
 }
