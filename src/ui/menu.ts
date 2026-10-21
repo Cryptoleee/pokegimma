@@ -16,6 +16,7 @@ import { titleName } from '../data/rewards'
 import { masteryOf, SHINY_AT } from '../../api/_progress'
 import { icon, IC, teamCard } from './app'
 import { openTeamSheet } from './team'
+import { storm, STORM_TINT } from './storm'
 
 /** Your partner is shown shiny (unlocked with mastery and switched on). */
 export function shinyPartner(id: number) {
@@ -209,6 +210,7 @@ export function showLobby(room: Room, on: LobbyActions) {
     </div>`
 
   const root = el.querySelector('.nl') as HTMLElement
+  storm(root, STORM_TINT[room.choice.kind])
   const list = el.querySelector('.nl-list') as HTMLElement
   const steps = el.querySelector('.nl-steps') as HTMLElement
   const start = el.querySelector('.nl-start') as HTMLButtonElement

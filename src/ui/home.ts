@@ -17,6 +17,7 @@ import { showOptions } from './screens'
 import { hasUnseen, maybeShowNews, newsPreview, showNews } from './news'
 import { appEsc as esc, appShell, bar, bindShell, BOLT, IC, icon, masteryLine, monChips, monImg, strike, teamCard, teamStage, type AppTab } from './app'
 import { openTeamSheet } from './team'
+import { storm, STORM_TINT } from './storm'
 import { shinyPartner } from './menu'
 
 /**
@@ -364,6 +365,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
   const paint = () => {
     el.innerHTML = appShell('play', view === 'home' ? home() : modePage(view), { focus: view !== 'home' })
     bindShell(el, on.tab)
+    storm(el.querySelector('.n-app'), view === 'home' ? undefined : STORM_TINT[view])
     const act = (sel: string, fn: (b: HTMLElement) => void) => el.querySelectorAll<HTMLElement>(sel).forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation()
       sfx.select()

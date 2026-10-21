@@ -3850,3 +3850,38 @@
     radial-gradient(ellipse 70% 90% at 50% 110%, rgba(var(--mc), 0.2), rgba(var(--mc), 0) 70%),
     var(--n-s1);
 }
+
+/* The storm behind the menu on desktop (drawn by storm.ts) */
+.n-storm,
+.n-storm-light {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  height: 100%;
+  pointer-events: none;
+}
+.n-storm {
+  z-index: 0;
+  background: radial-gradient(ellipse 70% 38% at 50% 0%, rgba(120, 140, 220, 0.07), rgba(120, 140, 220, 0) 70%);
+}
+.n-storm ~ .n-main,
+.n-app:has(.n-storm) .n-main {
+  position: relative;
+  z-index: 1;
+}
+.n-storm-light {
+  z-index: 2;
+  opacity: 0;
+  mix-blend-mode: screen;
+  background: radial-gradient(ellipse 55% 75% at var(--lx, 50%) 0%, rgba(185, 200, 255, 0.2), rgba(185, 200, 255, 0.05) 55%, rgba(185, 200, 255, 0) 80%);
+}
+
+/* With the storm behind them the panels turn to frosted glass, so a strike glows through */
+.n-app:has(.n-storm) .n-main {
+  --n-s1: rgba(17, 17, 19, 0.76);
+  --n-s2: rgba(21, 21, 24, 0.8);
+}
+.n-app.n-storming :is(.n-teamcol, .n-mode, .n-xcard, .n-banner, .n-mside, .n-seg, .n-tile, .n-teamcard, .nl-code, .nl-quick, .nl-p, .nl-steps, .nl-log, .nl .cp-modes button, .nl .cp-worlds button, .nl .cp-mystery) {
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
