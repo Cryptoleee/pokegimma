@@ -159,7 +159,13 @@ Een raid is PvE: jij (en tot 11 vrienden) tegen één legendarische baas, in een
 
 ### Raid-dungeons
 
-Standaard is een raid een **dungeon**, in de geest van WoW-dungeons: eerst vecht je je door een reeks zalen, en pas aan het eind gaat de poort naar de arena van de legende open. In het raidmenu kies je de dungeon of **Klassiek** (meteen de arena in, willekeurige baas). De eerste dungeon is **De Brandende Diepten** (Reshiram, `src/data/dungeons.ts`, logica in `src/game/dungeon.ts`).
+Standaard is een raid een **dungeon**, in de geest van WoW-dungeons: eerst vecht je je door een reeks zalen, en pas aan het eind gaat de poort naar de arena van de legende open. In het raidmenu kies je de dungeon of **Klassiek** (meteen de arena in, willekeurige baas). Er zijn drie dungeons (`src/data/dungeons.ts`, logica in `src/game/dungeon.ts`, art in `src/game/dungeonArt.ts`), en ze gaan **op volgorde open**: versla er een om de volgende te ontgrendelen (op een preview of localhost kun je een dichte dungeon toch kiezen):
+
+1. **De Brandende Diepten** (Reshiram): vuur en lava. Wachters Magmortar en Camerupt. Beloning: Magby → Magmortar, mini-Reshiram, titel Vlammentemmer.
+2. **De Stormtoren** (Zekrom): links-rechts gespiegeld, geladen water. Plassen ontladen, spoelen in de Dynamozaal vonken naar elkaar, bliksem op de kantelen. Wachters Electivire en Eelektross. Beloning: Elekid → Electivire, mini-Zekrom, titel Stormrijder.
+3. **De IJscitadel** (Kyurem): boven-onder gespiegeld (je begint bovenaan), ijswater. Wakken bevriezen en barsten, ijspegels vallen in de galerij, ijzige windstoten over de wallen. Wachters Mamoswine en Walrein. Beloning: Spheal → Walrein, mini-Kyurem, titel IJsgeboren.
+
+Elke dungeon heeft een thema (`theme` in de data: type, kleuren, relieknamen, teksten voor HUD en laadtips) en een eigen intro en outro (H3-video's in `public/cutscenes`). De Stormtoren en de IJscitadel hergebruiken de art van de Diepten, omgekleurd na het bakken, plus eigen sprites (`src/assets/dungeon/props-*.png`).
 
 - **Groepen en pulls:** in elke zaal staan groepen vijanden klaar (sommige patrouilleren). Kom je binnen 5,5 tegel of raak je er een, dan komt de hele groep op je af, en een gekoppelde groep doet mee (overpull). De poort uit een zaal (basalt plaat met gloeiende runen) gaat pas open als alles erin verslagen is.
 - **Rollen in een groep** (symbool op het naamplaatje): ⚔ brute (meer HP, slaat hard, trager), ✦ caster (houdt afstand, cast een vuurbal: rode cirkel onder je met castbalk), ✚ healer (geneest de zwakste uit de groep, 30%), ◆ schildwacht (vijanden binnen 4,5 tegel nemen 40% minder schade; gele stippelcirkel). Elites (★) zijn groter en taaier.
@@ -171,7 +177,7 @@ Standaard is een raid een **dungeon**, in de geest van WoW-dungeons: eerst vecht
 - **Levens en checkpoints:** 3 levens voor de hele run; neer = na 10 s terug bij de laatste poort. Levens op? Als je team een zaal verovert ben je terug met één leven. Een veroverde zaal geneest 15%.
 - **Types:** dungeonvijanden doen en krijgen tussen 0,75× en 1,5× typeschade, zodat geen partner je erdoorheen sleept.
 - **Schaal:** meer spelers = grotere groepen (+50% per speler) en meer HP voor wachters; moeilijkheid past aantallen, levels, schade en de enrage-timer aan.
-- **Testen:** `?boss=reshiram&room=N` start in zaal N (poorten ervoor open; `room=6` = voor de arena), `?classic=1` slaat de dungeon over.
+- **Testen:** `?boss=reshiram|zekrom|kyurem&room=N` start die dungeon in zaal N (poorten ervoor open; `room=6` = voor de arena), `?classic=1` slaat de dungeon over.
 
 - **Jouw team:** je partner is in de raid volledig geëvolueerd en Lv 50 met alle vier de aanvallen (Pikachu wordt Raichu, Charmander Charizard, enzovoort). Je hebt 2 Potions en HP herstelt niet vanzelf. Er verschijnen wel geregeld Potions in de arena.
 - **Ontwijken:** elke grote aanval zie je eerst als rode vorm op de grond die langzaam volloopt: een cirkel, kegel, lijn of ring. Sta je erin als hij vol is, dan kost dat een groot deel van je HP. Elke waarschuwing is lang genoeg om eruit te lopen als je meteen reageert.

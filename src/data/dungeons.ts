@@ -496,9 +496,9 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
       {
         get name() { return L('The Icicle Gallery', 'De IJspegelgalerij') }, deco: 'icefall', rect: my({ x: 53, y: 8, w: 28, h: 28 }),
         packs: [
-          { at: mya(28, [7, 13]), foes: [f(583, 2, 44, 'caster'), f(91, 1, 44)] },
+          { at: mya(28, [7, 13]), foes: [f(583, 2, 44, 'caster'), f(459, 1, 44)] },
           { at: mya(28, [14, 22]), foes: [f(362, 1, 46, 'guard', true), f(614, 1, 44, 'brute'), f(583, 1, 44, 'caster')] },
-          { at: mya(28, [14, 5]), foes: [f(87, 2, 44), f(225, 1, 44, 'mender')] },
+          { at: mya(28, [14, 5]), foes: [f(86, 2, 44), f(225, 1, 44, 'mender')] },
           { at: mya(28, [22, 14]), link: 2, foes: [f(461, 1, 45, 'brute'), f(215, 1, 44), f(225, 1, 44, 'mender')] },
         ],
       },
