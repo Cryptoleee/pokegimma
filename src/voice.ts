@@ -1,4 +1,4 @@
-import { audioCtx, channelOn, onAudioChange } from './audio'
+import { audioCtx, audioOut, channelOn, onAudioChange } from './audio'
 import { duckMusic } from './music'
 
 /**
@@ -87,7 +87,7 @@ export function say(l: VoiceLine) {
     if (!bus) {
       bus = ctx.createGain()
       bus.gain.value = VOLUME
-      bus.connect(ctx.destination)
+      bus.connect(audioOut())
     }
     const s = ctx.createBufferSource()
     s.buffer = buf

@@ -34,6 +34,20 @@ export function startDuoView() {
     channel.onmessage = (e: MessageEvent) => receive(e.data)
     links.push({ send: (m) => channel.postMessage(m) })
   }
+  // Installed as its own app on duo.<site>: the channel is on the game's origin (www.<site>), reached through a hidden frame there
+  if (location.hostname.startsWith('duo.')) {
+    const game = location.origin.replace('//duo.', '//www.')
+    const frame = document.createElement('iframe')
+    frame.src = `${game}/duo-bridge.html`
+    frame.hidden = true
+    frame.tabIndex = -1
+    frame.setAttribute('aria-hidden', 'true')
+    document.body.append(frame)
+    addEventListener('message', (e) => {
+      if (e.origin === game && e.source === frame.contentWindow) receive(e.data)
+    })
+    links.push({ send: (m) => frame.contentWindow?.postMessage(m, game) })
+  }
   const pres = (navigator as unknown as { presentation?: { receiver?: { connectionList: Promise<PresentationConnectionList> } } }).presentation
   pres?.receiver?.connectionList.then((list) => {
     const wire = (c: PresentationConnection) => {

@@ -61,6 +61,12 @@ let loading: Promise<void> | null = null
 /** Overall level of the samples next to the synth layers. */
 const SAMPLE_GAIN = 0.9
 
+/** Where the bus plays to: the game's output node (see audio.ts), not straight to the speakers. */
+let output: AudioNode | null = null
+export function sfxOutput(n: AudioNode) {
+  output = n
+}
+
 /** Start loading the samples (an AudioBuffer works in any context, offline ones included). */
 export function loadSfx(ctx: BaseAudioContext) {
   loading ??= Promise.all(
@@ -123,7 +129,7 @@ function setup(ctx: AudioContext) {
   makeup.gain.value = 1.25
   bus = ctx.createGain()
   bus.gain.value = 1
-  bus.connect(sat).connect(comp).connect(makeup).connect(ctx.destination)
+  bus.connect(sat).connect(comp).connect(makeup).connect(output?.context === ctx ? output : ctx.destination)
   // Short room reverb for the big ones
   const len = Math.floor(ctx.sampleRate * 1.4)
   const ir = ctx.createBuffer(2, len, ctx.sampleRate)

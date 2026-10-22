@@ -1,4 +1,4 @@
-import { audioCtx, channelOn, onAudioChange } from './audio'
+import { audioCtx, audioOut, channelOn, onAudioChange } from './audio'
 import { PACKS, type Slot } from './data/soundtracks'
 import { Player } from './synth'
 
@@ -29,7 +29,7 @@ function ensure(): Player | null {
   const bus = ctx.createGain()
   musicBus = bus
   bus.gain.value = level()
-  bus.connect(ctx.destination)
+  bus.connect(audioOut())
   onAudioChange(() => bus.gain.setTargetAtTime(level(), ctx.currentTime, 0.05))
   player = new Player(ctx, bus)
   return player

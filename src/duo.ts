@@ -69,8 +69,9 @@ type PresentationRequestCtor = new (urls: string[]) => { start(): Promise<Presen
 
 // ---------------------------------------------------------------- the game's side
 
-/** This window is the second screen itself (/duo), not the game. */
-export const isDuoPage = /^\/duo(\/|\.html)?$/.test(location.pathname) || new URLSearchParams(location.search).get('screen') === '2'
+/** This window is the second screen itself (/duo, or the duo.<site> app), not the game. */
+export const isDuoPage =
+  /^\/duo(\/|\.html)?$/.test(location.pathname) || location.hostname.startsWith('duo.') || new URLSearchParams(location.search).get('screen') === '2'
 
 const channel = !isDuoPage && typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(DUO_CHANNEL) : null
 const conns: PresentationConnection[] = []
@@ -109,7 +110,7 @@ function send(m: DuoMsg) {
 }
 
 /** A second screen said hello in the last few seconds (or a presentation is open). */
-export const connected = () => performance.now() - seen < 6000 || conns.some((c) => c.state === 'connected')
+export const connected = () => (seen > 0 && performance.now() - seen < 6000) || conns.some((c) => c.state === 'connected')
 
 function push(withMini = false) {
   if (!hooks) return

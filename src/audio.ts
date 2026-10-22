@@ -1,16 +1,122 @@
 /** Sound effects with WebAudio: recorded move samples on top of a small synth. */
 import type { MoveFx } from './data/moves'
 import { moveByName } from './data/moves'
-import { loadSfx, namePitch, playBoss, playItem, playMoveCast, playMoveCharge, playMoveHit, type BossSound, type ItemSound } from './moveSfx'
+import { loadSfx, namePitch, playBoss, playItem, playMoveCast, playMoveCharge, playMoveHit, sfxOutput, type BossSound, type ItemSound } from './moveSfx'
+import { connected as duoConnected } from './duo'
 let ctx: AudioContext | null = null
+/** Every live sound goes here; it goes on to the speakers, or to the media player (see route). */
+let out: GainNode | null = null
 let muted = false
 
 export function unlockAudio() {
   if (!ctx) {
     ctx = new AudioContext()
+    out = ctx.createGain()
+    out.connect(ctx.destination)
+    sfxOutput(out)
     void loadSfx(ctx)
   }
   if (ctx.state === 'suspended') void ctx.resume()
+  route()
+}
+
+/**
+ * Sound through a media player instead of straight to the speakers. On the AYN
+ * Thor, the game on the top screen with /duo in a second Chrome window on the
+ * bottom one went completely silent (both AudioContexts "running", nothing
+ * heard). A playing <audio> element with a media session is what Android
+ * treats as real media, so the same sound goes out that way instead.
+ * 'auto' does that while a second screen is connected.
+ */
+export type OutMode = 'auto' | 'on' | 'off'
+const OUT_KEY = 'sb:audioOut'
+let outMode: OutMode = 'auto'
+try {
+  const m = localStorage.getItem(OUT_KEY)
+  if (m === 'on' || m === 'off') outMode = m
+} catch {
+  /* private mode */
+}
+let sink: { dest: MediaStreamAudioDestinationNode; el: HTMLAudioElement } | null = null
+let viaPlayer = false
+let starting = false
+
+export const outputMode = () => outMode
+export function setOutputMode(m: OutMode) {
+  outMode = m
+  try {
+    localStorage.setItem(OUT_KEY, m)
+  } catch {
+    /* private mode */
+  }
+  route()
+}
+/** Whether the sound goes through the media player right now. */
+export const viaMediaPlayer = () => viaPlayer
+
+const wantPlayer = () => outMode === 'on' || (outMode === 'auto' && duoConnected())
+
+function route() {
+  if (!ctx || !out || ctx.state === 'closed') return
+  const want = wantPlayer() && typeof ctx.createMediaStreamDestination === 'function'
+  if (!want) {
+    if (!viaPlayer) return
+    out.disconnect()
+    out.connect(ctx.destination)
+    viaPlayer = false
+    sink?.el.pause()
+    session(false)
+    return
+  }
+  if (viaPlayer && !sink!.el.paused) return
+  if (starting) return
+  if (!sink) {
+    const dest = ctx.createMediaStreamDestination()
+    const el = new Audio()
+    el.srcObject = dest.stream
+    sink = { dest, el }
+  }
+  const s = sink
+  starting = true
+  // Switch over only once the player really plays (it needs an earlier tap); until then the speakers keep it
+  s.el.play().then(
+    () => {
+      starting = false
+      if (!wantPlayer() || !out) return route()
+      if (!viaPlayer) {
+        out.disconnect()
+        out.connect(s.dest)
+        viaPlayer = true
+      }
+      session(true)
+    },
+    () => {
+      starting = false
+    },
+  )
+}
+
+/** The media session that comes with the player: a title and icon, and play/pause from the notification as the sound switch. */
+function session(on: boolean) {
+  const ms = navigator.mediaSession
+  if (!ms) return
+  try {
+    if (on) {
+      ms.metadata = new MediaMetadata({
+        title: 'Stormbreak Royale',
+        artist: 'Stormbreak',
+        artwork: [
+          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+        ],
+      })
+      ms.setActionHandler('play', () => setMuted(false))
+      ms.setActionHandler('pause', () => setMuted(true))
+    }
+    ms.playbackState = on ? (muted ? 'paused' : 'playing') : 'none'
+  } catch {
+    /* an older browser without some of it */
+  }
 }
 
 /**
@@ -21,6 +127,8 @@ export function unlockAudio() {
  */
 function wake() {
   if (ctx && document.visibilityState === 'visible' && (ctx.state as string) !== 'running' && ctx.state !== 'closed') void ctx.resume().catch(() => {})
+  // A second screen came or went, or Android paused the player: put the sound on the right road again
+  route()
 }
 for (const ev of ['focus', 'pageshow', 'pointerdown', 'keydown', 'touchend'] as const) addEventListener(ev, wake, { passive: true, capture: true })
 document.addEventListener('visibilitychange', wake)
@@ -42,6 +150,7 @@ const notify = () => listeners.forEach((f) => f())
 /** The in-game speaker button: silences everything at once. */
 export function setMuted(m: boolean) {
   muted = m
+  if (viaPlayer) session(true)
   notify()
 }
 export function setChannel(c: Channel, on: boolean) {
@@ -62,6 +171,8 @@ export function onAudioChange(f: () => void) {
 }
 /** Shared AudioContext (null until the first user gesture). */
 export const audioCtx = () => ctx
+/** Where live sounds connect to (instead of ctx.destination). */
+export const audioOut = (): AudioNode => out ?? ctx!.destination
 export const isMuted = () => muted
 const sfxOff = () => !channelOn('sfx')
 
@@ -75,7 +186,7 @@ function tone(freq: number, dur: number, type: OscillatorType = 'square', vol = 
   if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur)
   g.gain.setValueAtTime(vol, t)
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-  o.connect(g).connect(ctx.destination)
+  o.connect(g).connect(audioOut())
   o.start(t)
   o.stop(t + dur + 0.02)
 }
@@ -90,7 +201,7 @@ function noise(dur: number, vol = 0.05) {
   const g = ctx.createGain()
   g.gain.value = vol
   s.buffer = buf
-  s.connect(g).connect(ctx.destination)
+  s.connect(g).connect(audioOut())
   s.start()
 }
 
@@ -111,7 +222,7 @@ function bandNoise(dur: number, vol: number, f: number, q = 1, delay = 0, f2 = 0
   const g = ctx.createGain()
   g.gain.value = vol
   s.buffer = buf
-  s.connect(flt).connect(g).connect(ctx.destination)
+  s.connect(flt).connect(g).connect(audioOut())
   s.start(t)
 }
 
@@ -381,7 +492,7 @@ export function cry(id: number, vol = 0.35) {
     const g = c.createGain()
     g.gain.value = vol
     s.buffer = buf
-    s.connect(g).connect(c.destination)
+    s.connect(g).connect(audioOut())
     s.start()
   })
 }

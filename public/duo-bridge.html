@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Stormbreak · duo bridge</title>
+  </head>
+  <body>
+    <script>
+      /*
+       * The second screen as its own app lives on duo.<site>, the game on www.<site>.
+       * A BroadcastChannel only reaches pages of the same origin, so the duo page
+       * loads this page (from the game's origin) in a hidden frame, and it passes
+       * the messages along: channel → duo page, and duo page → channel.
+       */
+      const duo = location.origin.replace('//www.', '//duo.')
+      if (parent !== window && duo !== location.origin && typeof BroadcastChannel !== 'undefined') {
+        const ch = new BroadcastChannel('stormbreak-duo')
+        ch.onmessage = (e) => parent.postMessage(e.data, duo)
+        addEventListener('message', (e) => {
+          if (e.origin === duo && e.source === parent) ch.postMessage(e.data)
+        })
+      }
+    </script>
+  </body>
+</html>

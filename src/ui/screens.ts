@@ -1,5 +1,5 @@
 import { spriteUrl } from '../data/pokemon'
-import { channelPref, setChannel, sfx, type Channel } from '../audio'
+import { channelPref, outputMode, setChannel, setOutputMode, sfx, type Channel, type OutMode } from '../audio'
 import { say } from '../voice'
 import { bindLangSwitch, L, langSwitch } from '../i18n'
 import { presentDuo } from '../duo'
@@ -94,6 +94,10 @@ export function showOptions() {
       ${matchMedia('(pointer: fine)').matches ? `<button class="opt-row opt-keys"><i>⌨️</i><span><b>${L('Controls', 'Besturing')}</b><small>${L('Choose your own keys', 'Kies je eigen toetsen')}</small></span><em class="opt-go">${L('Change', 'Wijzig')}</em></button>` : ''}
       <button class="opt-row opt-duo"><i>🖥️</i><span><b>${L('Second screen', 'Tweede scherm')}</b><small>${L('Map, team, items and chat on a second display (like the AYN Thor’s lower screen)', 'Kaart, team, items en chat op een tweede scherm (zoals het onderscherm van de AYN Thor)')}</small></span><em class="opt-go">${L('Open', 'Open')}</em></button>
       <p class="opt-duo-help hidden"></p>
+      <div class="opt-row opt-lang opt-out"><i>🔈</i><span><b>${L('Sound via media player', 'Geluid via mediaspeler')}</b><small>${L('For dual screens (AYN Thor). Auto: on while /duo is open', 'Voor dual screen (AYN Thor). Auto: aan zolang /duo open is')}</small></span>
+        <div class="lang-sw" role="radiogroup" aria-label="${L('Sound via media player', 'Geluid via mediaspeler')}">${(['auto', 'on', 'off'] as OutMode[])
+          .map((m) => `<button type="button" data-out="${m}" role="radio" aria-checked="${m === outputMode()}" class="${m === outputMode() ? 'on' : ''}">${{ auto: 'Auto', on: L('On', 'Aan'), off: L('Off', 'Uit') }[m]}</button>`)
+          .join('')}</div></div>
       <button class="btn" id="opt-done">${L('Done', 'Klaar')}</button>
     </div>`
   modal.querySelectorAll<HTMLElement>('.opt-row[data-c]').forEach((b) =>
@@ -112,6 +116,16 @@ export function showOptions() {
     sfx.select()
     showKeys(() => showOptions())
   })
+  modal.querySelectorAll<HTMLButtonElement>('[data-out]').forEach((b) =>
+    b.addEventListener('click', () => {
+      setOutputMode(b.dataset.out as OutMode)
+      b.parentElement!.querySelectorAll<HTMLButtonElement>('button').forEach((o) => {
+        o.classList.toggle('on', o === b)
+        o.setAttribute('aria-checked', String(o === b))
+      })
+      sfx.select()
+    }),
+  )
   // Second screen: let the browser put it on the other display, or explain how to open it there
   const duoBtn = modal.querySelector('.opt-duo') as HTMLElement
   duoBtn.addEventListener('click', async () => {

@@ -3,10 +3,10 @@
  * - Pages: always fresh from the network; the last copy when offline.
  * - Built files (/assets/…, names change with every build): from the cache once fetched.
  * - Icons and other static files: the cache first, refreshed in the background.
- * - The API and anything from other sites are never touched.
+ * - The API, the duo bridge (a frame for duo.<site>) and anything from other sites are never touched.
  * Bump VERSION to drop everything cached by an older worker.
  */
-const VERSION = 'v2'
+const VERSION = 'v3'
 const PAGES = `sb-pages-${VERSION}`
 const STATIC = `sb-static-${VERSION}`
 
@@ -28,7 +28,7 @@ self.addEventListener('fetch', (e) => {
   const req = e.request
   if (req.method !== 'GET') return
   const url = new URL(req.url)
-  if (url.origin !== location.origin || url.pathname.startsWith('/api/')) return
+  if (url.origin !== location.origin || url.pathname.startsWith('/api/') || url.pathname === '/duo-bridge.html') return
 
   // Pages: network first, the cached shell when offline (the game and the second screen each their own)
   if (req.mode === 'navigate') {
