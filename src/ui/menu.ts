@@ -39,6 +39,8 @@ export const dungeonOpen = (id: string) => {
 }
 /** On a test build (a preview, your own machine) a locked dungeon can still be played. */
 export const dungeonPlayable = (id: string) => dungeonOpen(id) || local
+/** What a guest sees as picked: just what the host sent (the host's progress decides, not the guest's). */
+export const raidShown = (raid: string | undefined) => (raid === 'classic' ? 'classic' : (DUNGEON_LIST.find((d) => d.id === raid) ?? DUNGEON_LIST[0])?.id ?? 'classic')
 /** The dungeon that's picked: the chosen one if you can play it, else the furthest one that's open. */
 export const raidPick = (raid: string | undefined) => {
   if (raid === 'classic') return 'classic'
@@ -71,8 +73,13 @@ export const QUICK_CHAT = Object.assign(quickPhrases, {
  */
 export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: MatchChoice) => void) | null) {
   const paint = () => {
-    const c = get()
+    let c = get()
     const ro = !set
+    // The host's pick goes out spelled out, so guests show the dungeon that will actually be played
+    if (set && c.kind === 'raid' && c.raid !== raidPick(c.raid)) {
+      set({ ...c, raid: raidPick(c.raid) })
+      c = get()
+    }
     el.innerHTML = `
       <div class="cp-modes">
         <button data-kind="royale" class="${c.kind === 'royale' ? 'on' : ''}" ${ro ? 'disabled' : ''}><b>Battle Royale</b><small>${L('12 trainers · 1 winner', '12 trainers · 1 winnaar')}</small></button>
@@ -93,7 +100,7 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
         : `<div class="cp-worlds cp-raid">${DUNGEON_LIST.map((dd) => {
           // (The host's progress decides: a guest just sees what's picked)
           const lock = !ro && !dungeonOpen(dd.id)
-          return `<button data-raid="${dd.id}" class="${raidPick(c.raid) === dd.id ? 'on' : ''} ${lock ? 'locked' : ''}" ${ro || (lock && !local) ? 'disabled' : ''} style="--c:${dd.theme.dark};--c2:${dd.theme.accent}"><i>${lock ? '🔒' : dd.theme.icon}</i>${esc(dd.name)}</button>`
+          return `<button data-raid="${dd.id}" class="${(ro ? raidShown(c.raid) : raidPick(c.raid)) === dd.id ? 'on' : ''} ${lock ? 'locked' : ''}" ${ro || (lock && !local) ? 'disabled' : ''} style="--c:${dd.theme.dark};--c2:${dd.theme.accent}"><i>${lock ? '🔒' : dd.theme.icon}</i>${esc(dd.name)}</button>`
         }).join('')}<button data-raid="classic" class="${c.raid === 'classic' ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:#5a6a9a;--c2:#3a4470"><i>🎲</i>${L('Classic: random boss', 'Klassiek: willekeurige baas')}</button></div>`}
       <div class="cp-diff" role="radiogroup" aria-label="${L('Difficulty', 'Moeilijkheid')}"><span>${c.kind === 'raid' ? L('Boss', 'Baas') : c.kind === 'duel' ? 'CPU' : 'Bots'}</span>${DIFFICULTIES.map((d) => `<button data-diff="${d}" role="radio" aria-checked="${(c.diff ?? 'normal') === d}" class="${(c.diff ?? 'normal') === d ? 'on' : ''}" ${ro ? 'disabled' : ''}>${diffName(d)}</button>`).join('')}</div>`
     el.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
@@ -315,7 +322,7 @@ export function showLobby(room: Room, on: LobbyActions) {
   /** "Battle Royale · Forest": what this lobby is going to play. */
   const matchLine = () => {
     const c = room.choice
-    if (c.kind === 'raid') return c.raid === 'classic' || !DUNGEON_LIST.length ? `Raid · ${L('random boss', 'willekeurige baas')}` : `Raid · ${DUNGEON_LIST.find((d) => d.id === raidPick(c.raid))?.name ?? ''}`
+    if (c.kind === 'raid') return c.raid === 'classic' || !DUNGEON_LIST.length ? `Raid · ${L('random boss', 'willekeurige baas')}` : `Raid · ${DUNGEON_LIST.find((d) => d.id === (room.isHost ? raidPick : raidShown)(c.raid))?.name ?? ''}`
     if (c.kind === 'duel') return `1 vs 1 · ${c.stadium && c.stadium !== 'random' ? STADIUMS[c.stadium].name : L('random stadium', 'willekeurig stadion')}`
     return `Battle Royale · ${c.theme && c.theme !== 'random' ? THEMES[c.theme].name : L('random world', 'willekeurige wereld')}`
   }
