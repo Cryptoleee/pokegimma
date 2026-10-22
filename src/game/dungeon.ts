@@ -830,6 +830,8 @@ export const gateShown = (gt: Gate, time: number) => !gt.open || time - gt.openA
 
 /** A gate: a slab of dark stone with glowing runes; an opened one sinks into the floor. */
 export function drawGate(ctx: CanvasRenderingContext2D, gt: Gate, time: number) {
+  // The Storm Tower's gates hum blue
+  const st = stormLook()
   {
     const age = gt.open ? time - gt.openAt : -1
     const sink = gt.open ? Math.min(1, age / 1.1) : 0
@@ -845,11 +847,11 @@ export function drawGate(ctx: CanvasRenderingContext2D, gt: Gate, time: number) 
     // Molten seams and a rune that pulses
     const pulse = 0.55 + 0.45 * Math.sin(time * 3 + gt.x)
     ctx.globalCompositeOperation = 'lighter'
-    ctx.fillStyle = `rgba(255,${110 + 60 * pulse},40,${0.55 * (1 - sink)})`
+    ctx.fillStyle = st ? `rgba(${60 + 60 * pulse},${170 + 40 * pulse},255,${0.55 * (1 - sink)})` : `rgba(255,${110 + 60 * pulse},40,${0.55 * (1 - sink)})`
     ctx.fillRect(x, y + h - 2, w, 2)
     ctx.fillRect(x, y - tall, w, 2)
     const rx = x + w / 2, ry = y + h / 2 - tall / 2
-    ctx.fillStyle = `rgba(255,170,60,${0.8 * pulse * (1 - sink)})`
+    ctx.fillStyle = st ? `rgba(200,240,255,${0.8 * pulse * (1 - sink)})` : `rgba(255,170,60,${0.8 * pulse * (1 - sink)})`
     ctx.beginPath()
     ctx.moveTo(rx, ry - 6)
     ctx.lineTo(rx + 4, ry)
@@ -858,8 +860,8 @@ export function drawGate(ctx: CanvasRenderingContext2D, gt: Gate, time: number) 
     ctx.closePath()
     ctx.fill()
     const glow = ctx.createRadialGradient(rx, ry, 0, rx, ry, 26)
-    glow.addColorStop(0, `rgba(255,120,40,${0.35 * pulse * (1 - sink)})`)
-    glow.addColorStop(1, 'rgba(255,120,40,0)')
+    glow.addColorStop(0, st ? `rgba(80,180,255,${0.35 * pulse * (1 - sink)})` : `rgba(255,120,40,${0.35 * pulse * (1 - sink)})`)
+    glow.addColorStop(1, st ? 'rgba(80,180,255,0)' : 'rgba(255,120,40,0)')
     ctx.fillStyle = glow
     ctx.fillRect(rx - 26, ry - 26, 52, 52)
     ctx.restore()
