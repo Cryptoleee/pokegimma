@@ -44,7 +44,7 @@ const LINE_ROLE: Record<number, Role> = {
   495: 'speedster', 447: 'speedster', 570: 'speedster', 123: 'speedster', 255: 'speedster',
   // Unlockable lines
   81: 'attacker', 240: 'attacker', 359: 'attacker', 280: 'attacker', 607: 'attacker', 371: 'attacker', 636: 'attacker', 146: 'attacker',
-  220: 'allrounder', 382: 'allrounder', 151: 'allrounder', 239: 'allrounder',
+  220: 'allrounder', 382: 'allrounder', 151: 'allrounder', 239: 'allrounder', 363: 'defender',
   138: 'defender', 111: 'defender', 144: 'defender', 383: 'defender',
   390: 'speedster', 142: 'speedster', 145: 'speedster',
 }

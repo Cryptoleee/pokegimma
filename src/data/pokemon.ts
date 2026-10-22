@@ -180,6 +180,28 @@ const ROWS: Row[] = [
   [604, 'Eelektross', 'electric', 85, 115, 80, 50],
   [181, 'Ampharos', 'electric', 90, 75, 85, 55],
   [310, 'Manectric', 'electric', 70, 75, 60, 105],
+  // Dungeon foes (the Frozen Citadel), and its raid reward: Spheal grows into the warden Walrein
+  [363, 'Spheal', 'ice/water', 70, 48, 50, 25, 364, 20],
+  [364, 'Sealeo', 'ice/water', 90, 68, 70, 45, 365, 34],
+  [365, 'Walrein', 'ice/water', 110, 88, 90, 65],
+  [361, 'Snorunt', 'ice', 50, 50, 50, 50],
+  [362, 'Glalie', 'ice', 80, 80, 80, 80],
+  [478, 'Froslass', 'ice/ghost', 70, 80, 70, 110],
+  [215, 'Sneasel', 'dark/ice', 55, 65, 65, 115],
+  [461, 'Weavile', 'dark/ice', 70, 83, 75, 125],
+  [459, 'Snover', 'grass/ice', 60, 62, 55, 40],
+  [460, 'Abomasnow', 'grass/ice', 90, 92, 80, 60],
+  [613, 'Cubchoo', 'ice', 55, 65, 40, 40],
+  [614, 'Beartic', 'ice', 95, 90, 80, 50],
+  [582, 'Vanillite', 'ice', 36, 58, 55, 44],
+  [583, 'Vanillish', 'ice', 51, 73, 70, 59],
+  [584, 'Vanilluxe', 'ice', 71, 103, 90, 79],
+  [615, 'Cryogonal', 'ice', 70, 73, 83, 105],
+  [225, 'Delibird', 'ice/flying', 45, 60, 45, 75],
+  [124, 'Jynx', 'ice/psychic', 65, 83, 65, 95],
+  [86, 'Seel', 'water', 65, 45, 63, 45],
+  [87, 'Dewgong', 'water/ice', 90, 70, 88, 70],
+  [91, 'Cloyster', 'water/ice', 50, 90, 113, 70],
   [229, 'Houndoom', 'dark/fire', 75, 100, 65, 95],
   [322, 'Numel', 'fire/ground', 60, 62, 42, 35],
   [323, 'Camerupt', 'fire/ground', 70, 102, 72, 40],
@@ -214,7 +236,7 @@ for (const [id, name, types, hp, atk, def, spe, evo, evoLevel] of ROWS) {
 /** The 24 Pokémon you pick your starting partner from. */
 export const ROSTER = [25, 4, 7, 1, 133, 495, 498, 501, 447, 443, 570, 610, 92, 66, 63, 147, 246, 446, 374, 123, 258, 255, 403, 633]
 /** Extra partners you unlock on the reward road (trainer level), and the raid unlocks (clear a dungeon). */
-export const UNLOCK_PARTNERS = [81, 390, 138, 220, 359, 111, 280, 607, 371, 142, 636, 144, 145, 146, 382, 383, 151, 240, 239]
+export const UNLOCK_PARTNERS = [81, 390, 138, 220, 359, 111, 280, 607, 371, 142, 636, 144, 145, 146, 382, 383, 151, 240, 239, 363]
 /** Everything you can pick: the free roster plus the unlockable ones. */
 export const ALL_PARTNERS = [...ROSTER, ...UNLOCK_PARTNERS]
 /** You start with one partner and can catch more in the world, up to PARTY_MAX. */

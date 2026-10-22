@@ -78,11 +78,13 @@ export type RoomDeco =
   | 'gate' | 'river' | 'hall' | 'forge' | 'den' | 'bastion'
   // The Storm Tower
   | 'sgate' | 'flooded' | 'chapel' | 'dynamo' | 'cistern' | 'ramparts'
+  // The Frozen Citadel
+  | 'igate' | 'frozen' | 'pillars' | 'icefall' | 'icelake' | 'summit'
 
 /** A dungeon's element: what its casters throw, how its foes arrive, what its relics are called. */
 export interface DungeonTheme {
   /** Hazard type of its casters' bolts, pools and room hazards. */
-  type: 'fire' | 'electric'
+  type: 'fire' | 'electric' | 'ice'
   /** Effect (and sound) of its casters' bolts and its foes' arrival. */
   fx: MoveFx
   /** Colours of a foe's arrival burst, hot to cool. */
@@ -93,6 +95,13 @@ export interface DungeonTheme {
   bolts: () => string
   /** The relics its wardens drop: the damage one and the defence one. */
   relics: { ember: () => string; shell: () => string }
+  /** Its icon (relic, menu button) and the dark colour of its menu button. */
+  icon: string
+  dark: string
+  /** The banner on the way to the boss ("To the crater"). */
+  toBoss: () => string
+  /** Loading tips in its own words: its wardens, its "lava", the partner advice and the way to the boss. */
+  tips: { wardens: () => string; liquid: () => string; partner: () => string; boss: (name: string) => string }
 }
 
 export interface Room {
@@ -136,6 +145,11 @@ const MAPW = 128
 const mx = (r: Rect): Rect => ({ x: MAPW - r.x - r.w, y: r.y, w: r.w, h: r.h })
 /** A spot inside a room of width w, mirrored. */
 const ma = (w: number, at: [number, number]): [number, number] => [w - 1 - at[0], at[1]]
+/** The Frozen Citadel runs the other way: rooms mirrored top to bottom (you start at the top). */
+const my = (r: Rect): Rect => ({ x: r.x, y: MAPW - r.y - r.h, w: r.w, h: r.h })
+/** A spot inside a room of height h, mirrored top to bottom. */
+const mya = (h: number, at: [number, number]): [number, number] => [at[0], h - 1 - at[1]]
+const ic = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'ice', phase: 0, weight: 1, ...a })
 const el = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'electric', phase: 0, weight: 1, ...a })
 
 export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
@@ -146,6 +160,14 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
       type: 'fire', fx: 'fireblast', burst: ['#fff2a0', '#ffc840', '#ff7020'], accent: '#ff7a30',
       bolts: () => L('fire bolts', 'vuurballen'),
       relics: { ember: () => L('Ember of the Flame', 'Sintel van de Vlam'), shell: () => L('Shell of the Volcano', 'Pantser van de Vulkaan') },
+      icon: '🔥', dark: '#5a2a1c',
+      toBoss: () => L('To the crater', 'Naar de krater'),
+      tips: {
+        wardens: () => L('Two wardens guard the way, each with their own tricks: a Living Bomb that follows you, pools of magma (don\'t stand in the fire!). They call help and enrage after two minutes. Beat one for a relic for the team and a life back.', 'Twee wachters bewaken de weg, elk met eigen trucs: een Levende Bom die je volgt, poelen van magma (niet in het vuur staan!). Ze roepen hulp en worden na twee minuten woedend. Versla er een voor een reliek voor het team en een leven terug.'),
+        liquid: () => L('Lava burns: cross at the bridges.', 'Lava brandt: steek over bij de bruggen.'),
+        partner: () => L('Everything down here is fire. Types still count, but no more than 1.5× either way: no partner carries you through.', 'Alles hier beneden is vuur. Types tellen mee, maar nooit meer dan 1,5× (beide kanten op): geen partner sleept je erdoorheen.'),
+        boss: (n) => L(`After the last stand the gate to the crater opens. Step in and ${n} wakes: you have 4 minutes. `, `Na het laatste gevecht gaat de poort naar de krater open. Stap erin en ${n} ontwaakt: je hebt 4 minuten. `),
+      },
     },
     get name() { return L('The Burning Depths', 'De Brandende Diepten') },
     get blurb() { return L('Fight down through the volcano: halls full of fire Pokémon packs, two wardens, a last stand, and Reshiram waiting in the crater.', 'Vecht je een weg door de vulkaan: zalen vol groepen vuur-Pokémon, twee wachters, een laatste stand, en Reshiram wacht in de krater.') },
@@ -268,6 +290,14 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
       type: 'electric', fx: 'thunder', burst: ['#ffffff', '#fff27a', '#5ab8ff'], accent: '#ffd23a',
       bolts: () => L('lightning bolts', 'bliksemschichten'),
       relics: { ember: () => L('Spark of the Storm', 'Vonk van de Storm'), shell: () => L('Coil of the Deep', 'Spoel van de Diepte') },
+      icon: '⚡', dark: '#1c2a5a',
+      toBoss: () => L('To the roof', 'Naar het dak'),
+      tips: {
+        wardens: () => L('Two wardens guard the way, each with their own tricks: a Static Charge that follows you, a Zap Cannon in a straight line, fields of current (don\'t stand in them!). They call help and enrage after two minutes. Beat one for a relic for the team and a life back.', 'Twee wachters bewaken de weg, elk met eigen trucs: een Statische Lading die je volgt, een Zap Cannon in een rechte lijn, velden vol stroom (niet in gaan staan!). Ze roepen hulp en worden na twee minuten woedend. Versla er een voor een reliek voor het team en een leven terug.'),
+        liquid: () => L('Charged water shocks: cross at the bridges, and get off the puddles when they light up.', 'Water onder stroom schokt: steek over bij de bruggen, en ga van de plassen af als ze oplichten.'),
+        partner: () => L('Everything in this tower is electric. Types still count, but no more than 1.5× either way: no partner carries you through.', 'Alles in deze toren is elektrisch. Types tellen mee, maar nooit meer dan 1,5× (beide kanten op): geen partner sleept je erdoorheen.'),
+        boss: (n) => L(`After the battlements the way to the roof opens. Step out and ${n} wakes: you have 4 minutes. `, `Na de kantelen gaat de weg naar het dak open. Stap naar buiten en ${n} ontwaakt: je hebt 4 minuten. `),
+      },
     },
     get name() { return L('The Storm Tower', 'De Stormtoren') },
     get blurb() { return L('Climb the ruined tower through the storm: flooded halls that come alive with current, a thunder chapel, a hall of humming dynamos, a drowned cistern, the battlements, and Zekrom waiting on the roof.', 'Beklim de verwoeste toren door de storm: ondergelopen zalen waar stroom door het water jaagt, een donderkapel, een zaal vol zoemende dynamo\'s, een verdronken cisterne, de kantelen, en Zekrom wacht op het dak.') },
@@ -382,6 +412,137 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
       mx({ x: 81, y: 18, w: 2, h: 5 }),
       mx({ x: 106, y: 36, w: 5, h: 2 }),
       mx({ x: 89, y: 62, w: 2, h: 5 }),
+    ],
+  },
+  kyurem: {
+    id: 'citadel',
+    boss: 'kyurem',
+    theme: {
+      type: 'ice', fx: 'blizzard', burst: ['#ffffff', '#c8f0ff', '#7ac8ff'], accent: '#8ad8ff',
+      bolts: () => L('ice shards', 'ijsscherven'),
+      relics: { ember: () => L('Tusk of the Mammoth', 'Slagtand van de Mammoet'), shell: () => L('Hide of the Frozen Lake', 'Vacht van het IJsmeer') },
+      icon: '❄️', dark: '#1c3a52',
+      toBoss: () => L('To the summit', 'Naar de top'),
+      tips: {
+        wardens: () => L('Two wardens guard the way, each with their own tricks: Frozen Ground that follows you, an Ice Beam in a straight line that can freeze you, fields of freezing water (don\'t stand in them!). They call help and enrage after two minutes. Beat one for a relic for the team and a life back.', 'Twee wachters bewaken de weg, elk met eigen trucs: Bevroren Grond die je volgt, een IJsstraal in een rechte lijn die je kan bevriezen, velden ijswater (niet in gaan staan!). Ze roepen hulp en worden na twee minuten woedend. Versla er een voor een reliek voor het team en een leven terug.'),
+        liquid: () => L('The open water freezes you to the bone: stay on the ice, and step back when a hole starts to frost over. Watch the ceiling for icicles.', 'Het open water bevriest je tot op het bot: blijf op het ijs, en stap terug als een wak begint te bevriezen. Let op het plafond: ijspegels vallen.'),
+        partner: () => L('Everything in this citadel is ice. Types still count, but no more than 1.5× either way: no partner carries you through.', 'Alles in deze citadel is ijs. Types tellen mee, maar nooit meer dan 1,5× (beide kanten op): geen partner sleept je erdoorheen.'),
+        boss: (n) => L(`After the ice walls the way to the summit opens. Step out and ${n} wakes: you have 4 minutes. `, `Na de ijswallen gaat de weg naar de top open. Stap naar buiten en ${n} ontwaakt: je hebt 4 minuten. `),
+      },
+    },
+    get name() { return L('The Frozen Citadel', 'De IJscitadel') },
+    get blurb() { return L('Fight down through a citadel swallowed by the glacier: halls of creatures frozen in the ice, falling icicles, a frozen lake that breaks open, the ice walls, and Kyurem waiting at the summit.', 'Vecht je een weg door een citadel die de gletsjer heeft opgeslokt: zalen vol in ijs gevangen Pokémon, vallende ijspegels, een bevroren meer dat openbreekt, de ijswallen, en Kyurem wacht op de top.') },
+    start: [21, 10],
+    lives: 3,
+    intro: {
+      id: 'citadel-intro',
+      look: 'ice',
+      shots: [
+        {
+          src: 'citadel-intro', len: 22.5, lines: [
+            { at: 0.6, until: 3.2, title: true, text: () => L('THE FROZEN CITADEL', 'DE IJSCITADEL'), kicker: () => L('Raid dungeon', 'Raid-dungeon') },
+            { at: 18.4, until: 22.5, title: true, text: () => 'KYUREM', kicker: () => L('The frozen dragon', 'De bevroren draak') },
+          ],
+        },
+      ],
+    },
+    outro: {
+      id: 'citadel-outro',
+      look: 'ice',
+      shots: [
+        {
+          src: 'citadel-outro', len: 12.2, lines: [
+            { at: 8.2, until: 12.2, title: true, heroes: true, text: () => L('KYUREM DEFEATED', 'KYUREM VERSLAGEN'), kicker: () => L('The ice breaks', 'Het ijs breekt') },
+          ],
+        },
+      ],
+    },
+    arenaEntry: [76, 63],
+    rooms: [
+      {
+        get name() { return L('The Frozen Gate', 'De Bevroren Poort') }, deco: 'igate', rect: my({ x: 8, y: 98, w: 26, h: 24 }),
+        packs: [
+          { at: mya(24, [13, 10]), foes: [f(361, 2, 41), f(582, 1, 41, 'caster')] },
+          { at: mya(24, [5, 4]), foes: [f(613, 1, 42, 'brute'), f(225, 1, 41, 'mender'), f(86, 1, 41)] },
+          { at: mya(24, [20, 4]), foes: [f(361, 1, 41), f(582, 2, 41, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('Hall of the Frozen', 'Zaal der Bevrorenen') }, deco: 'frozen', rect: my({ x: 8, y: 60, w: 26, h: 24 }),
+        packs: [
+          { at: mya(24, [7, 18]), foes: [f(220, 2, 42), f(225, 1, 42, 'mender')] },
+          { at: mya(24, [20, 18]), foes: [f(615, 1, 44, 'caster', true), f(361, 2, 42)] },
+          { at: mya(24, [5, 6]), patrol: mya(24, [21, 6]), foes: [f(215, 1, 43), f(361, 1, 42)] },
+          { at: mya(24, [13, 3]), link: 2, foes: [f(614, 1, 43, 'brute'), f(91, 1, 42, 'guard'), f(583, 1, 42, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('The Pillar Hall', 'De Pilarenzaal') }, deco: 'pillars', rect: my({ x: 5, y: 16, w: 32, h: 30 }),
+        packs: [
+          { at: mya(30, [8, 22]), foes: [f(215, 2, 43), f(225, 1, 43, 'mender')] },
+          { at: mya(30, [24, 22]), foes: [f(614, 1, 44, 'brute'), f(124, 1, 43, 'caster')] },
+        ],
+        warden: {
+          sp: 473, lv: 48, hp: 6, at: mya(30, [16, 7]), enrage: 120, relic: 'ember', get title() { return L('Warden of the Frost', 'Wachter van de Vorst') },
+          calls: [{ at: 0.6, foes: [f(459, 1, 43, 'caster'), f(220, 1, 42)] }, { at: 0.3, foes: [f(221, 1, 44, 'brute'), f(225, 1, 43, 'mender')] }],
+          attacks: [
+            ic({ id: 'm_ava', name: 'Avalanche', shape: 'cone', warn: 1.1, cd: 4, dmg: 0.32, target: 'nearest', len: 7, width: 0.45, weight: 3, fx: 'blizzard' }),
+            ic({ id: 'm_frost', get name() { return L('Frozen Ground', 'Bevroren Grond') }, shape: 'circle', warn: 3.6, cd: 11, dmg: 0.4, target: 'random', r: 2.6, weight: 3, follow: true, linger: { dur: 7, dps: 0.12 }, fx: 'blizzard' }),
+            ic({ id: 'm_crash', name: 'Icicle Crash', shape: 'circle', warn: 1.3, cd: 6, dmg: 0.3, target: 'players', r: 2.1, extra: 2, stagger: 0.15, weight: 2, fx: 'stoneedge' }),
+            ic({ id: 'm_quake', name: 'Earthquake', shape: 'circle', warn: 1.4, cd: 9, dmg: 0.34, target: 'self', r: 3.8, weight: 2, fx: 'quake' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Icicle Gallery', 'De IJspegelgalerij') }, deco: 'icefall', rect: my({ x: 53, y: 8, w: 28, h: 28 }),
+        packs: [
+          { at: mya(28, [7, 13]), foes: [f(583, 2, 44, 'caster'), f(91, 1, 44)] },
+          { at: mya(28, [14, 22]), foes: [f(362, 1, 46, 'guard', true), f(614, 1, 44, 'brute'), f(583, 1, 44, 'caster')] },
+          { at: mya(28, [14, 5]), foes: [f(87, 2, 44), f(225, 1, 44, 'mender')] },
+          { at: mya(28, [22, 14]), link: 2, foes: [f(461, 1, 45, 'brute'), f(215, 1, 44), f(225, 1, 44, 'mender')] },
+        ],
+      },
+      {
+        get name() { return L('The Frozen Lake', 'Het Bevroren Meer') }, deco: 'icelake', rect: my({ x: 96, y: 6, w: 26, h: 30 }),
+        packs: [
+          { at: mya(30, [5, 6]), foes: [f(363, 3, 44)] },
+          { at: mya(30, [5, 24]), foes: [f(364, 1, 46, 'brute', true), f(86, 1, 44, 'mender')] },
+        ],
+        warden: {
+          sp: 365, lv: 49, hp: 6.5, at: mya(30, [14, 16]), enrage: 130, relic: 'shell', get title() { return L('Terror of the Frozen Lake', 'Verschrikking van het IJsmeer') },
+          calls: [{ at: 0.65, foes: [f(363, 3, 44)] }, { at: 0.35, foes: [f(364, 1, 46, 'brute', true), f(87, 1, 44, 'mender')] }],
+          attacks: [
+            ic({ id: 'i_ring', name: 'Sheer Cold', shape: 'ring', warn: 1.4, cd: 7, dmg: 0.34, target: 'self', inner: 3.2, r: 8, weight: 2, fx: 'blizzard' }),
+            ic({ id: 'i_beam', name: 'Ice Beam', shape: 'line', warn: 1.35, cd: 7, dmg: 0.34, target: 'nearest', len: 13, width: 1.5, weight: 3, freeze: 0.6, fx: 'icebeam' }),
+            ic({ id: 'i_pool', get name() { return L('Freezing Water', 'IJswater') }, shape: 'circle', warn: 1.5, cd: 9, dmg: 0.22, target: 'players', r: 2.4, extra: 2, stagger: 0.2, weight: 3, linger: { dur: 9, dps: 0.1 }, fx: 'blizzard' }),
+            ic({ id: 'i_hail', name: 'Hail', shape: 'circle', warn: 1.25, cd: 6, dmg: 0.25, target: 'players', r: 2, extra: 3, stagger: 0.12, weight: 2, fx: 'stoneedge' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Ice Walls', 'De IJswallen') }, deco: 'summit', rect: my({ x: 92, y: 54, w: 30, h: 28 }),
+        waves: [
+          { foes: [f(461, 2, 45), f(362, 1, 44, 'guard'), f(478, 1, 44, 'caster')] },
+          { foes: [f(460, 1, 46, 'brute', true), f(478, 2, 45, 'caster'), f(225, 1, 45, 'mender')] },
+          { final: true, foes: [f(614, 1, 47, 'brute', true), f(584, 1, 47, 'caster', true), f(225, 1, 45, 'mender'), f(461, 2, 45), f(362, 1, 45, 'guard')] },
+        ],
+      },
+    ],
+    halls: [
+      my({ x: 18, y: 84, w: 5, h: 14 }),
+      my({ x: 18, y: 46, w: 5, h: 14 }),
+      my({ x: 37, y: 26, w: 16, h: 5 }),
+      my({ x: 81, y: 18, w: 15, h: 5 }),
+      my({ x: 106, y: 36, w: 5, h: 18 }),
+      my({ x: 76, y: 62, w: 16, h: 5 }),
+    ],
+    gates: [
+      my({ x: 18, y: 96, w: 5, h: 2 }),
+      my({ x: 18, y: 58, w: 5, h: 2 }),
+      my({ x: 37, y: 26, w: 2, h: 5 }),
+      my({ x: 81, y: 18, w: 2, h: 5 }),
+      my({ x: 106, y: 36, w: 5, h: 2 }),
+      my({ x: 89, y: 62, w: 2, h: 5 }),
     ],
   },
 }

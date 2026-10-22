@@ -1,5 +1,6 @@
 import propsUrl from '../assets/dungeon/props.png'
 import stormUrl from '../assets/dungeon/props-storm.png'
+import iceUrl from '../assets/dungeon/props-ice.png'
 import type { DungeonDef, Rect, Room } from '../data/dungeons'
 import type { Rng } from './rng'
 import { hash } from './tiles'
@@ -29,6 +30,9 @@ export type PropKind =
   // The Storm Tower
   | 'coil' | 'rod' | 'bell' | 'dstatue' | 'dynamo' | 'lthrone' | 'orb' | 'spool' | 'cocoon' | 'masonry' | 'lcrate' | 'hbarrel'
   | 'sbanner' | 'window' | 'pedestal'
+  // The Frozen Citadel
+  | 'icecrystal' | 'icepillar' | 'frozenmon' | 'istatue' | 'fountain' | 'ithrone' | 'ibrazier' | 'sled' | 'snowpile' | 'icerubble'
+  | 'scrate' | 'ibarrel' | 'ibanner' | 'iwindow' | 'tusk'
 
 /** A placed thing: footprint in tiles (x, y top-left), variant. */
 export interface Prop {
@@ -44,25 +48,38 @@ export interface Prop {
 
 /** Things that block: their tiles become T.PROP (walls of the prop, drawn by the prop itself). */
 const BLOCKS = new Set<PropKind>(['statue', 'column', 'crate', 'barrel', 'anvil', 'crucible', 'chimney', 'trough', 'bones', 'skull', 'cage', 'tower', 'barricade', 'tent', 'ballista', 'firebowl', 'weapons', 'wall', 'throne', 'torchstand', 'spire',
-  'coil', 'rod', 'bell', 'dstatue', 'dynamo', 'lthrone', 'spool', 'masonry', 'lcrate', 'hbarrel', 'pedestal'])
+  'coil', 'rod', 'bell', 'dstatue', 'dynamo', 'lthrone', 'spool', 'masonry', 'lcrate', 'hbarrel', 'pedestal',
+  'icecrystal', 'icepillar', 'frozenmon', 'istatue', 'fountain', 'ithrone', 'ibrazier', 'sled', 'snowpile', 'icerubble', 'scrate', 'ibarrel'])
 /** Moving parts, drawn every frame. */
-export const ANIMATED = new Set<PropKind>(['campfire', 'rune', 'treasure', 'crucible', 'chimney', 'crystal', 'lavafall', 'steam', 'trough', 'firebowl', 'sconce', 'torchstand', 'coil', 'orb', 'pedestal', 'lthrone', 'dynamo'])
+export const ANIMATED = new Set<PropKind>(['campfire', 'rune', 'treasure', 'crucible', 'chimney', 'crystal', 'lavafall', 'steam', 'trough', 'firebowl', 'sconce', 'torchstand', 'coil', 'orb', 'pedestal', 'lthrone', 'dynamo', 'ibrazier', 'icecrystal', 'fountain', 'ithrone'])
 
 /**
- * Which dungeon is being drawn: the Burning Depths (fire, lava) or the Storm
- * Tower (cold wet stone, charged water, lightning). The Storm Tower reuses the
- * Depths' drawing: its baked canvases are cooled down afterwards (warm stone to
- * slate, glowing orange to electric cyan) and everything that burns sparks instead.
+ * Which dungeon is being drawn: the Burning Depths (fire, lava), the Storm
+ * Tower (cold wet stone, charged water, lightning) or the Frozen Citadel (frost,
+ * freezing water, cold blue fire). The other two reuse the Depths' drawing:
+ * their baked canvases are recoloured afterwards (warm stone to slate or to
+ * frosted stone, glowing orange to electric cyan or to icy white-blue) and
+ * everything that burns sparks or glitters instead.
  */
-let elec = false
-export const setDungeonLook = (type: 'fire' | 'electric') => { elec = type === 'electric' }
-export const stormLook = () => elec
-/** Fire colours (r,g,b) by heat, or the storm's: white-hot, mid, dying, and the sparks. */
+export type DungeonLook = 'fire' | 'electric' | 'ice'
+let look: DungeonLook = 'fire'
+let elec = false, icy = false
+export const setDungeonLook = (type: DungeonLook) => {
+  look = type
+  elec = type === 'electric'
+  icy = type === 'ice'
+}
+/** Not the Depths: braziers, gates and the dark burn cold blue. */
+export const coldLook = () => look !== 'fire'
+export const dungeonLook = () => look
+/** Fire colours (r,g,b) by heat, or the storm's or the ice's: white-hot, mid, dying, and the sparks. */
 const heat = () => elec
   ? { hot: '225,245,255', mid: '90,200,255', low: '60,90,255', spark: '255,240,120' }
-  : { hot: '255,240,170', mid: '255,160,50', low: '230,70,20', spark: '255,170,60' }
-/** A light's colour in this dungeon (every warm light turns electric in the storm). */
-const lit = (c: string) => (elec ? (c === '#ffd060' ? '#ffe46a' : '#5ac8ff') : c)
+  : icy
+    ? { hot: '240,252,255', mid: '150,220,255', low: '80,140,230', spark: '255,255,255' }
+    : { hot: '255,240,170', mid: '255,160,50', low: '230,70,20', spark: '255,170,60' }
+/** A light's colour in this dungeon (every warm light turns electric in the storm, icy in the citadel). */
+const lit = (c: string) => (elec ? (c === '#ffd060' ? '#ffe46a' : '#5ac8ff') : icy ? (c === '#ffd060' ? '#e8f8ff' : '#9ad8ff') : c)
 
 interface Ctx {
   w: World
@@ -142,7 +159,7 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
   const rock = (x: number, y: number, s = 1) => {
     for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) if (!c.nearHall(x + dx, y + dy, 3) && floorTile(w.at(x + dx, y + dy))) w.set(x + dx, y + dy, T.ROCK)
   }
-  const BASE: Partial<Record<Room['deco'], number>> = { gate: FM.flag, river: FM.cave, hall: FM.obsidian, forge: FM.flag, den: FM.dirt, sgate: FM.flag, flooded: FM.cave, chapel: FM.obsidian, dynamo: FM.grate, cistern: FM.cave }
+  const BASE: Partial<Record<Room['deco'], number>> = { gate: FM.flag, river: FM.cave, hall: FM.obsidian, forge: FM.flag, den: FM.dirt, sgate: FM.flag, flooded: FM.cave, chapel: FM.obsidian, dynamo: FM.grate, cistern: FM.cave, igate: FM.flag, frozen: FM.cave, pillars: FM.obsidian, icelake: FM.cave }
   const base = BASE[room.deco] ?? FM.paving
   mat(c, rx - 4, ry - 4, rw + 8, rh + 8, base)
   // Wall decorations on the north wall (drawn on its face, if there is one)
@@ -342,16 +359,18 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
       break
     }
     default:
-      stormRoom(c, room, rw, rh, rx, ry, cx, cy, rock, wallDeco)
+      coldRoom(c, room, rw, rh, rx, ry, cx, cy, rock, wallDeco)
   }
 }
 
 /**
- * The Storm Tower's rooms. Its "lava" is charged water (the same tiles, drawn as
- * water): never put on a pack's or a warden's spot, nor where a hall comes in.
- * The pools that pulse and the coils that arc are kept in `w.dsparks`.
+ * The Storm Tower's and the Frozen Citadel's rooms. Their "lava" is charged or
+ * freezing water (the same tiles, drawn as water): never put on a pack's or a
+ * warden's spot or path, nor where a hall comes in. The pools that pulse and the
+ * coils that arc are kept in `w.dsparks`. (The Citadel runs top to bottom: you
+ * come in from the north, its wardens wait at the south end.)
  */
-function stormRoom(c: Ctx, room: Room, rw: number, rh: number, rx: number, ry: number, cx: number, cy: number, rock: (x: number, y: number, s?: number) => void, wallDeco: (kinds: PropKind[], every: number) => void) {
+function coldRoom(c: Ctx, room: Room, rw: number, rh: number, rx: number, ry: number, cx: number, cy: number, rock: (x: number, y: number, s?: number) => void, wallDeco: (kinds: PropKind[], every: number) => void) {
   const w = c.w
   // Where foes stand or walk: a pack's spot to its patrol's end (a point when it doesn't patrol)
   const ways = [...(room.packs ?? []).map((p) => [p.at, p.patrol ?? p.at]), ...(room.warden ? [[room.warden.at, room.warden.at]] : [])]
@@ -505,6 +524,113 @@ function stormRoom(c: Ctx, room: Room, rw: number, rh: number, rx: number, ry: n
       for (let i = 0; i < 8; i++) put(c, 'arrows', rx + 3 + Math.floor(c.rng.next() * (rw - 6)), ry + 3 + Math.floor(c.rng.next() * (rh - 6)), 1, 1, i)
       put(c, 'skeleton', cx + 2, cy - 7, 1, 1, 4)
       wallDeco(['sbanner', 'sconce', 'sbanner', 'chains'], 3)
+      break
+    }
+    case 'igate': {
+      // The frozen gate: a runner down to the inner gate, dragon statues, a camp the cold got to first
+      mat(c, cx - 2, ry, 5, rh, FM.carpet)
+      put(c, 'istatue', cx - 8, ry + rh - 3, 2, 2, 0)
+      put(c, 'istatue', cx + 6, ry + rh - 3, 2, 2, 1)
+      put(c, 'frozenmon', rx + 2, ry + rh - 6, 3, 2)
+      put(c, 'snowpile', rx + rw - 5, ry + 3, 2, 1)
+      put(c, 'snowpile', rx + 3, cy - 2, 2, 1)
+      pool(rx + rw - 5, ry + rh - 6, 1.8)
+      pool(rx + 4, ry + 5, 1.5, false)
+      put(c, 'sled', rx + rw - 5, cy, 2, 1)
+      put(c, 'scrate', rx + rw - 3, cy + 2, 1, 1)
+      put(c, 'ibarrel', rx + rw - 4, cy + 2, 1, 1)
+      put(c, 'ibrazier', cx - 4, ry + rh - 3, 1, 1)
+      put(c, 'ibrazier', cx + 4, ry + rh - 3, 1, 1)
+      put(c, 'skeleton', cx + 4, ry + 5, 1, 1, 0)
+      put(c, 'tusk', rx + 3, cy + 4, 2, 1)
+      put(c, 'icerubble', cx + 8, cy - 4, 2, 1)
+      put(c, 'rune', cx, cy + 2, 1, 1, 2)
+      wallDeco(['sconce', 'ibanner', 'iwindow', 'ibanner'], 3)
+      break
+    }
+    case 'frozen': {
+      // The hall of the frozen: creatures caught in blocks of ice, crystals growing out of the floor, holes in the ice that frost over and burst
+      pool(rx + 5, cy, 2.3)
+      pool(rx + rw - 6, cy - 1, 2.3)
+      pool(cx, cy - 6, 1.9)
+      pool(cx - 1, ry + rh - 7, 1.8)
+      for (const [x, y] of [[cx - 7, cy + 3], [cx + 5, cy + 4], [rx + 3, ry + 3]]) put(c, 'frozenmon', x, y, 3, 2)
+      for (const [x, y] of [[rx + 2, ry + rh - 3], [rx + rw - 3, ry + 2], [cx + 3, cy - 3], [cx - 4, cy - 2]]) put(c, 'icecrystal', x, y, 1, 1)
+      put(c, 'icerubble', rx + rw - 5, ry + rh - 3, 2, 1)
+      put(c, 'skeleton', cx + 4, cy + 7, 1, 1, 2)
+      put(c, 'web', rx + 1, ry + 1, 1, 1, 0)
+      wallDeco(['iwindow', 'sconce', 'ibanner', 'iwindow'], 3)
+      break
+    }
+    case 'pillars': {
+      // The pillar hall: black ice underfoot, a runner to the ice throne at the far (south) end, ice-wrapped pillars down both sides
+      mat(c, cx - 2, ry, 5, rh - 6, FM.carpet)
+      mat(c, cx - 5, ry + rh - 10, 11, 7, FM.dais)
+      put(c, 'rune', cx, ry + rh - 7, 1, 1, 3)
+      for (const x of [rx + 4, rx + 9, rx + rw - 10, rx + rw - 5])
+        for (const y of [ry + 6, ry + rh - 13]) put(c, 'icepillar', x, y, 1, 1)
+      put(c, 'ithrone', cx - 1, ry + rh - 3, 3, 2)
+      put(c, 'istatue', rx + 3, ry + rh - 3, 2, 2, 0)
+      put(c, 'istatue', rx + rw - 5, ry + rh - 3, 2, 2, 1)
+      put(c, 'ibrazier', cx - 7, ry + rh - 5, 1, 1)
+      put(c, 'ibrazier', cx + 7, ry + rh - 5, 1, 1)
+      put(c, 'fountain', rx + 3, ry + 2, 2, 2)
+      put(c, 'fountain', rx + rw - 5, ry + 2, 2, 2)
+      put(c, 'skeleton', cx - 3, ry + 4, 1, 1, 3)
+      wallDeco(['iwindow', 'sconce', 'iwindow', 'ibanner'], 3)
+      break
+    }
+    case 'icefall': {
+      // The icicle gallery: a frozen fountain in the middle, ice pillars round it, the ceiling hung with icicles (they fall)
+      put(c, 'fountain', cx - 1, cy - 1, 3, 2)
+      for (const [dx, dy] of [[-8, -7], [7, -7], [-8, 7], [7, 7]]) put(c, 'icepillar', cx + dx, cy + dy, 1, 1)
+      for (const [x, y] of [[rx + 2, ry + 2], [rx + rw - 3, ry + rh - 3], [rx + 2, ry + rh - 3], [rx + rw - 3, ry + 2]]) put(c, 'icecrystal', x, y, 1, 1)
+      put(c, 'snowpile', rx + 3, cy + 4, 2, 1)
+      put(c, 'snowpile', rx + rw - 5, cy - 5, 2, 1)
+      put(c, 'sled', cx - 5, ry + rh - 3, 2, 1)
+      for (const [x, y, k] of [[rx + rw - 3, ry + 5, 0], [rx + rw - 4, ry + 5, 1], [rx + 2, ry + rh - 6, 0]] as const) put(c, k ? 'ibarrel' : 'scrate', x, y, 1, 1)
+      put(c, 'icerubble', cx + 4, cy + 5, 2, 1)
+      wallDeco(['sconce', 'ibanner', 'chains', 'iwindow'], 3)
+      break
+    }
+    case 'icelake': {
+      // The frozen lake: open water down both sides, holes that frost over and burst, pillars rising out of the ice
+      strip(rx + 1, ry + 4, 2, rh - 8)
+      strip(rx + rw - 3, ry + 4, 2, rh - 8)
+      for (const y of [ry + 8, ry + rh - 9]) {
+        w.dsparks.push({ x: rx + 2, y: y + 0.5, k: 'puddle' }, { x: rx + rw - 2, y: y + 0.5, k: 'puddle' })
+      }
+      pool(cx, ry + 4, 1.8)
+      pool(cx, ry + rh - 4, 1.8)
+      for (const [x, y] of [[cx - 6, cy - 6], [cx + 5, cy - 6], [cx - 6, cy + 6], [cx + 5, cy + 6]]) put(c, 'icepillar', x, y, 1, 1)
+      put(c, 'frozenmon', cx - 1, ry + 1, 3, 2)
+      put(c, 'tusk', rx + rw - 8, ry + rh - 3, 2, 1)
+      put(c, 'bones', cx + 3, cy + 3, 1, 1, 2)
+      put(c, 'skeleton', cx - 4, cy + 2, 1, 1, 1)
+      wallDeco(['sconce', 'iwindow', 'sconce', 'ibanner'], 3)
+      break
+    }
+    case 'summit': {
+      // The ice walls: the citadel's battlements under the glacier, ice pillars along the edges, broken walls for cover, snow drifting in
+      for (let x = rx + 3; x < rx + rw - 3; x += 6) {
+        put(c, 'icepillar', x, ry + 1, 1, 1)
+        put(c, 'icepillar', x + 3, ry + rh - 2, 1, 1)
+      }
+      put(c, 'wall', cx + 4, cy + 4, 4, 1, 0)
+      put(c, 'wall', cx - 7, cy - 4, 3, 1, 1)
+      put(c, 'snowpile', cx - 6, cy + 6, 2, 1)
+      put(c, 'snowpile', cx + 6, cy - 6, 2, 1)
+      put(c, 'icecrystal', rx + 3, ry + 3, 1, 1)
+      put(c, 'icecrystal', rx + rw - 4, ry + rh - 4, 1, 1)
+      pool(cx - 2, cy + 1, 1.5, false)
+      pool(rx + rw - 7, ry + 5, 1.4, false)
+      put(c, 'scrate', rx + rw - 3, cy - 2, 1, 1)
+      put(c, 'ibarrel', rx + rw - 3, cy - 1, 1, 1)
+      put(c, 'sled', rx + 2, cy + 2, 2, 1)
+      put(c, 'ibrazier', rx + 2, cy - 3, 1, 1)
+      for (let i = 0; i < 8; i++) put(c, 'arrows', rx + 3 + Math.floor(c.rng.next() * (rw - 6)), ry + 3 + Math.floor(c.rng.next() * (rh - 6)), 1, 1, i)
+      put(c, 'skeleton', cx + 2, cy - 7, 1, 1, 4)
+      wallDeco(['ibanner', 'sconce', 'ibanner', 'chains'], 3)
       break
     }
   }
@@ -804,20 +930,22 @@ export function bakeProps(g: CanvasRenderingContext2D, o: CanvasRenderingContext
   // Flat things first, standing things after (sorted top to bottom so they overlap right)
   const order = (p: Prop) => (p.kind === 'rails' || p.kind === 'rune' || p.kind === 'nest' || p.kind === 'railing' || p.kind === 'emblem' ? 0 : 1) * 1000 + p.y
   const props = [...w.props].sort((a, b) => order(a) - order(b))
-  if (!elec) {
+  if (look === 'fire') {
     for (const p of props) bakeProp(g, o, w, p)
     return
   }
-  // The Storm Tower: everything drawn for the Depths is cooled down; its own sprites go on after, in their own colours
-  for (const p of props) if (!(p.kind in STORM)) bakeProp(g, o, w, p)
+  // The Storm Tower and the Citadel: everything drawn for the Depths is recoloured; their own sprites go on after, in their own colours
+  const own = (p: Prop) => p.kind in STORM || p.kind in ICE
+  for (const p of props) if (!own(p)) bakeProp(g, o, w, p)
   coolDown(g)
   coolDown(o)
-  for (const p of props) if (p.kind in STORM) bakeProp(g, o, w, p)
+  for (const p of props) if (own(p)) bakeProp(g, o, w, p)
 }
 
 /**
- * Warm to cold, per pixel: brown stone turns slate blue, glowing orange turns
- * electric cyan, gold turns lightning yellow. Greys and blues stay as they are.
+ * Warm to cold, per pixel. The storm: brown stone turns slate blue, glowing
+ * orange turns electric cyan, gold turns lightning yellow. The ice: stone turns
+ * pale frosted grey-blue, every glow an icy white-blue. Greys and blues stay.
  */
 function coolDown(ctx: CanvasRenderingContext2D) {
   const { width: W, height: H } = ctx.canvas
@@ -833,7 +961,10 @@ function coolDown(ctx: CanvasRenderingContext2D) {
     if (h > 80 && h < 320) continue
     let s = c / mx
     let v = mx / 255
-    if (s > 0.5 && v > 0.6) {
+    if (icy) {
+      if (s > 0.5 && v > 0.6) { h = 194; s *= 0.45 }
+      else { h = 208; s = Math.max(s * 0.32, 0.1); v = Math.min(1, v * 1.3 + 0.05) }
+    } else if (s > 0.5 && v > 0.6) {
       // Glowing: gold stays a lightning yellow, everything hotter goes electric cyan
       if (h > 36 && h <= 80) h = 52
       else { h = 196; v = Math.min(1, v * 1.02) }
@@ -870,7 +1001,13 @@ const STORM = {
   orb: [100, 60, 14, 29], spool: [115, 60, 26, 29], cocoon: [35, 98, 14, 23], masonry: [0, 98, 34, 25], lcrate: [80, 98, 18, 18], hbarrel: [65, 98, 14, 19],
   sbanner: [50, 98, 14, 21], window: [62, 60, 16, 32], pedestal: [79, 60, 20, 31],
 } as const satisfies Record<string, readonly [number, number, number, number]>
-type Sprite = keyof typeof ATLAS | keyof typeof STORM
+/** The Frozen Citadel's own sprites. */
+const ICE = {
+  icecrystal: [41, 53, 20, 39], icepillar: [115, 0, 18, 44], frozenmon: [0, 53, 40, 40], istatue: [0, 0, 34, 52], fountain: [35, 0, 38, 52], ithrone: [74, 0, 40, 52],
+  ibrazier: [62, 53, 16, 31], sled: [131, 53, 34, 25], snowpile: [0, 94, 30, 25], icerubble: [50, 94, 30, 19], scrate: [96, 94, 24, 17], ibarrel: [31, 94, 18, 21],
+  ibanner: [81, 94, 14, 18], iwindow: [79, 53, 16, 30], tusk: [96, 53, 34, 27],
+} as const satisfies Record<string, readonly [number, number, number, number]>
+type Sprite = keyof typeof ATLAS | keyof typeof STORM | keyof typeof ICE
 const image = (url: string) => {
   if (typeof Image === 'undefined') return null
   const i = new Image()
@@ -879,15 +1016,17 @@ const image = (url: string) => {
 }
 const atlas = image(propsUrl)
 const stormAtlas = image(stormUrl)
+const iceAtlas = image(iceUrl)
 const ready = (i: HTMLImageElement | null) => !!i && i.complete && i.naturalWidth > 0
 const atlasReady = () => ready(atlas)
 /** Flat on the ground: nothing of it stands over the actors. */
-const FLAT = new Set<Sprite>(['gold', 'carcass', 'banner', 'bones', 'sbanner', 'window', 'cocoon', 'masonry'])
+const FLAT = new Set<Sprite>(['gold', 'carcass', 'banner', 'bones', 'sbanner', 'window', 'cocoon', 'masonry', 'ibanner', 'iwindow', 'icerubble'])
 /** Hung on a wall face. */
-const ON_WALL = new Set<PropKind>(['banner', 'sbanner', 'window', 'cocoon'])
+const ON_WALL = new Set<PropKind>(['banner', 'sbanner', 'window', 'cocoon', 'ibanner', 'iwindow'])
 
 function spriteOf(p: Prop): Sprite | null {
   if (p.kind in STORM) return ready(stormAtlas) ? (p.kind as keyof typeof STORM) : null
+  if (p.kind in ICE) return ready(iceAtlas) ? (p.kind as keyof typeof ICE) : null
   if (!atlasReady()) return null
   switch (p.kind) {
     case 'statue': return 'statue'
@@ -916,9 +1055,7 @@ function spriteOf(p: Prop): Sprite | null {
 
 /** A sprite standing on the bottom of the prop's footprint, centred; what rises above the footprint goes on the overlay. */
 function bakeSprite(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, p: Prop, name: Sprite) {
-  const storm = name in STORM
-  const img = (storm ? stormAtlas : atlas)!
-  const [sx, sy, sw, sh] = storm ? STORM[name as keyof typeof STORM] : ATLAS[name as keyof typeof ATLAS]
+  const [img, [sx, sy, sw, sh]] = name in STORM ? [stormAtlas!, STORM[name as keyof typeof STORM]] : name in ICE ? [iceAtlas!, ICE[name as keyof typeof ICE]] : [atlas!, ATLAS[name as keyof typeof ATLAS]]
   const x = p.x * TILE, y = p.y * TILE, W = p.w * TILE, H = p.h * TILE
   const dx = Math.round(x + W / 2 - sw / 2), dy = y + H - sh
   if (!ON_WALL.has(p.kind) && p.kind !== 'carcass') {
@@ -948,7 +1085,7 @@ function bakeProp(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, w: W
     g.fill()
   }
   const faceTile = faceTile0
-  if (p.kind in STORM) {
+  if (p.kind in STORM || p.kind in ICE) {
     // Its sprite isn't there (yet): a plain block of stone so it still reads as in the way
     if (!BLOCKS.has(p.kind)) return
     shadow(x + W / 2, y + H - 2, W / 2, 4)
@@ -1525,14 +1662,13 @@ function bakeProp(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, w: W
 
 // ---------------------------------------------------------------- moving lava
 
-let lavaTex: HTMLCanvasElement | null = null
-let waterTex: HTMLCanvasElement | null = null
+const liquidTex: Partial<Record<DungeonLook, HTMLCanvasElement>> = {}
 /**
  * A seamless 128×128 lava texture: a warped flow with bright veins. Built from
  * sines with whole-number frequencies, so it tiles without seams or a grid.
  */
 function lavaTexture() {
-  if (elec ? waterTex : lavaTex) return (elec ? waterTex : lavaTex)!
+  if (liquidTex[look]) return liquidTex[look]!
   const s = 128
   const c = document.createElement('canvas')
   c.width = c.height = s
@@ -1540,9 +1676,12 @@ function lavaTexture() {
   const img = g.createImageData(s, s)
   const TAU = Math.PI * 2
   // The storm's charged water: deep and dark, lit by bright crackling veins
+  // The citadel's freezing water: deep blue, with floes of white ice drifting in it
   const stops: [number, number, number, number][] = elec
     ? [[0, 6, 16, 30], [0.35, 10, 34, 58], [0.55, 16, 62, 96], [0.72, 30, 120, 170], [0.88, 120, 220, 255], [1, 240, 255, 230]]
-    : [[0, 70, 14, 6], [0.3, 160, 40, 12], [0.5, 230, 95, 24], [0.7, 255, 160, 50], [0.88, 255, 225, 130], [1, 255, 250, 205]]
+    : icy
+      ? [[0, 8, 26, 56], [0.4, 16, 52, 98], [0.6, 34, 96, 150], [0.76, 110, 180, 224], [0.86, 215, 240, 255], [1, 250, 254, 255]]
+      : [[0, 70, 14, 6], [0.3, 160, 40, 12], [0.5, 230, 95, 24], [0.7, 255, 160, 50], [0.88, 255, 225, 130], [1, 255, 250, 205]]
   for (let y = 0; y < s; y++)
     for (let x = 0; x < s; x++) {
       const u = x / s, v = y / s
@@ -1564,8 +1703,7 @@ function lavaTexture() {
       img.data[o + 3] = 255
     }
   g.putImageData(img, 0, 0)
-  if (elec) waterTex = c
-  else lavaTex = c
+  liquidTex[look] = c
   return c
 }
 
@@ -1654,14 +1792,16 @@ export function drawLavaLayer(ctx: CanvasRenderingContext2D, mask: HTMLCanvasEle
   const tex = lavaTexture()
   const pat = b.createPattern(tex, 'repeat')!
   // Slow base flow
-  pat.setTransform(new DOMMatrix([1.5, 0, 0, 1.5, -sx + time * 6, -sy + time * 3.5]))
+  // (Freezing water barely moves)
+  const drift = icy ? time * 0.3 : time
+  pat.setTransform(new DOMMatrix([1.5, 0, 0, 1.5, -sx + drift * 6, -sy + drift * 3.5]))
   b.fillStyle = pat
   b.fillRect(0, 0, W, H)
   // A brighter second layer the other way, shimmering
   const pat2 = b.createPattern(tex, 'repeat')!
-  pat2.setTransform(new DOMMatrix([1.1, 0, 0, 1.1, -sx - time * 9, -sy + time * 5]))
+  pat2.setTransform(new DOMMatrix([1.1, 0, 0, 1.1, -sx - drift * 9, -sy + drift * 5]))
   b.globalCompositeOperation = 'lighter'
-  b.globalAlpha = elec ? 0.3 + 0.35 * flick(time, 1) : 0.35 + 0.08 * Math.sin(time * 1.7)
+  b.globalAlpha = elec ? 0.3 + 0.35 * flick(time, 1) : icy ? 0.2 : 0.35 + 0.08 * Math.sin(time * 1.7)
   b.fillStyle = pat2
   b.fillRect(0, 0, W, H)
   b.globalAlpha = 1
@@ -1695,10 +1835,15 @@ export function propLights(w: World, add: (x: number, y: number, r: number, col:
       case 'pedestal': add(cx, cy - 22, 36, '#7ad8ff', 0.5 + 0.12 * Math.sin(time * 2.4 + p.y)); break
       case 'lthrone': add(cx, cy - 18, 60, '#5ac8ff', 0.45 + 0.2 * flick(time, p.x)); break
       case 'dynamo': add(cx, cy - 8, 56, '#5ac8ff', 0.4 + 0.25 * flick(time, 3)); break
+      // The Citadel: cold blue fires, glittering ice
+      case 'ibrazier': add(cx, cy - 22, 52, '#8ad0ff', 0.6 * fl); break
+      case 'icecrystal': add(cx, cy - 12, 30, '#bfeaff', 0.3 + 0.1 * Math.sin(time * 2 + p.x)); break
+      case 'fountain': add(cx, cy - 16, 44, '#bfeaff', 0.35); break
+      case 'ithrone': add(cx, cy - 18, 56, '#9ad8ff', 0.4 + 0.08 * Math.sin(time * 1.3)); break
     }
   }
   // The lava itself (or the charged water), sampled every few tiles
-  for (const [x, y] of w.lavaLights) add(x * T2, y * T2, 46, lit('#ff6a20'), (elec ? 0.3 : 0.4) + 0.08 * Math.sin(time * 2 + x * 0.7 + y))
+  for (const [x, y] of w.lavaLights) add(x * T2, y * T2, 46, lit('#ff6a20'), (look === 'fire' ? 0.4 : 0.3) + 0.08 * Math.sin(time * 2 + x * 0.7 + y))
 }
 
 /** A crackle: mostly low, jumping high now and then (0..1). */
@@ -1739,7 +1884,8 @@ function zaps(ctx: CanvasRenderingContext2D, x: number, y: number, n: number, le
 
 const CRYSTAL_FIRE: [string, string, string][] = [['#ff9a4a', '#ff7a2a', '#ffe0b0'], ['#ff4a6a', '#ff3050', '#ffd0dc'], ['#b07aff', '#9a5aff', '#e8d8ff']]
 const CRYSTAL_STORM: [string, string, string][] = [['#8ae0ff', '#4ab8ff', '#e0f8ff'], ['#ffe46a', '#e0b820', '#fff8d0'], ['#b07aff', '#9a5aff', '#e8d8ff']]
-const crystal = (v: number) => (elec ? CRYSTAL_STORM : CRYSTAL_FIRE)[v % 3]
+const CRYSTAL_ICE: [string, string, string][] = [['#d8f6ff', '#8ad8ff', '#ffffff'], ['#bfe8ff', '#6ab8f0', '#ffffff'], ['#d0c8ff', '#a090f0', '#f0e8ff']]
+const crystal = (v: number) => (elec ? CRYSTAL_STORM : icy ? CRYSTAL_ICE : CRYSTAL_FIRE)[v % 3]
 
 /** The props that move, every frame (y-sorted by the caller through `drawAnimProp`). */
 export function drawAnimProp(ctx: CanvasRenderingContext2D, p: Prop, time: number) {
@@ -1967,6 +2113,38 @@ export function drawAnimProp(ctx: CanvasRenderingContext2D, p: Prop, time: numbe
       if (!p.art) break
       glow(ctx, x + W / 2 + 8, y + H - 23, 6, `rgba(120,230,255,${0.35 + 0.25 * Math.sin(time * 6)})`)
       if (flick(time, 9) > 0.5) zaps(ctx, x + W / 2 + 4, y + H - 40, 2, 7, time, 11)
+      break
+    }
+    case 'ibrazier': {
+      // A cold blue fire on top of the stand
+      if (!p.art) break
+      ctx.globalCompositeOperation = 'lighter'
+      const top = y + H - 27
+      for (let i = 0; i < 6; i++) {
+        const k = (time * 1.8 + i / 6 + p.x * 0.17) % 1
+        const sz = (1 - k) * 4 + 1
+        ctx.fillStyle = k < 0.3 ? `rgba(${F.hot},${0.9 - k})` : k < 0.6 ? `rgba(${F.mid},${0.85 - k * 0.6})` : `rgba(${F.low},${(1 - k) * 0.9})`
+        ctx.fillRect(x + W / 2 + Math.sin(time * 5 + i * 2.1) * (2 - k) + (i - 2.5) * 0.7 - sz / 2, top - k * 12 - sz / 2, sz, sz)
+      }
+      break
+    }
+    case 'icecrystal':
+    case 'fountain':
+    case 'ithrone': {
+      // Glints running over the ice
+      if (!p.art) break
+      ctx.globalCompositeOperation = 'lighter'
+      const tall = p.kind === 'icecrystal' ? 34 : 44
+      for (let i = 0; i < 2; i++) {
+        const k = (time * 0.7 + i * 0.5 + p.x * 0.13) % 1
+        if (k > 0.25) continue
+        const a = 1 - k / 0.25
+        const gx = x + W / 2 + (hash(p.x + i, Math.floor(time * 0.7 + i * 0.5), 660) - 0.5) * 14
+        const gy = y + H - 6 - hash(p.y + i, Math.floor(time * 0.7 + i * 0.5), 661) * tall
+        ctx.fillStyle = `rgba(255,255,255,${a})`
+        ctx.fillRect(gx, gy - 2, 1, 5)
+        ctx.fillRect(gx - 2, gy, 5, 1)
+      }
       break
     }
     case 'trough': {

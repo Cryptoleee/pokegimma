@@ -20,7 +20,8 @@ import { hasUnseen, maybeShowNews, newsPreview, showNews } from './news'
 import { appEsc as esc, appShell, bar, bindShell, BOLT, DISCORD, discordMe, IC, icon, masteryLine, monChips, monImg, strike, teamCard, teamStage, type AppTab } from './app'
 import { openTeamSheet } from './team'
 import { storm, STORM_TINT } from './storm'
-import { raidPick, shinyPartner } from './menu'
+import { dungeonOpen, raidPick, shinyPartner } from './menu'
+import { local } from '../stats'
 
 /**
  * Play: the home screen (your team on a stage, the three modes) and a screen
@@ -312,11 +313,17 @@ export function showMenu(st: MenuState, on: MenuActions) {
       const pick = raidPick(choice.raid)
       return `
       <div class="n-raidpick" role="radiogroup" aria-label="Raid">
-        ${DUNGEON_LIST.map((dd, i) => `
-        <button class="n-card n-dgcard ${pick === dd.id ? 'on' : ''}" role="radio" aria-checked="${pick === dd.id}" data-raid="${dd.id}">
+        ${DUNGEON_LIST.map((dd, i) => {
+          // Locked until the dungeon before it is beaten (a test build lets you in anyway)
+          const lock = !dungeonOpen(dd.id), prev = DUNGEON_LIST[i - 1]
+          return `
+        <button class="n-card n-dgcard ${pick === dd.id ? 'on' : ''} ${lock ? 'locked' : ''}" role="radio" aria-checked="${pick === dd.id}" data-raid="${dd.id}" ${lock && !local ? 'disabled' : ''} style="--dg:${dd.theme.accent}">
           <img class="px" src="${spriteUrl(BOSSES[dd.boss].species)}" alt="">
-          <span><b>${esc(dd.name)}${i === DUNGEON_LIST.length - 1 ? ` <em class="n-chip acc">${L('NEW', 'NIEUW')}</em>` : ''}</b><small>${esc(dd.blurb)}</small>${raidReward(dd.id)}</span>
-        </button>`).join('')}
+          <span><b>${lock ? '🔒 ' : ''}${esc(dd.name)}${i === DUNGEON_LIST.length - 1 && !lock ? ` <em class="n-chip acc">${L('NEW', 'NIEUW')}</em>` : ''}</b>${lock
+            ? `<small class="n-dglock">${L(`Beat ${prev.name} first to open it.`, `Versla eerst ${prev.name} om hem te openen.`)}${local ? ` <em>${L('Test build: open anyway', 'Testversie: toch open')}</em>` : ''}</small>`
+            : `<small>${esc(dd.blurb)}</small>${raidReward(dd.id)}`}</span>
+        </button>`
+        }).join('')}
         <button class="n-card n-mystery ${pick === 'classic' ? 'on' : ''}" role="radio" aria-checked="${pick === 'classic'}" data-raid="classic">
           <div class="n-sil">${BOSS_LIST.map((b) => `<img class="px" src="${spriteUrl(BOSSES[b].species)}" alt="">`).join('')}</div>
           <span><b>${L('Classic: a random boss', 'Klassiek: een willekeurige baas')}</b><small>${L('Straight into its arena. You see who you face while it loads.', 'Meteen de arena in. Je ziet pas bij het laden tegen wie je vecht.')}</small></span>

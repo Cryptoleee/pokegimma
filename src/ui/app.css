@@ -1183,13 +1183,30 @@
   align-items: center;
   gap: 14px;
   padding: 14px;
-  background: linear-gradient(120deg, rgba(255, 110, 40, 0.16), rgba(255, 110, 40, 0.02) 60%), var(--n-s1);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--dg, #ff6e28) 16%, transparent), color-mix(in srgb, var(--dg, #ff6e28) 2%, transparent) 60%), var(--n-s1);
 }
 .n-dgcard img {
   width: 52px;
   height: 52px;
   flex-shrink: 0;
-  filter: drop-shadow(0 0 10px rgba(255, 120, 40, 0.6));
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--dg, #ff7828) 60%, transparent));
+}
+/* Not open yet: the boss a dark silhouette, the card dimmed */
+.n-dgcard.locked img {
+  filter: brightness(0) drop-shadow(0 0 6px rgba(255, 255, 255, 0.15));
+}
+.n-dgcard.locked {
+  background: var(--n-s1);
+}
+.n-raidpick > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.n-dglock em {
+  display: block;
+  margin-top: 3px;
+  font-style: normal;
+  color: var(--n-acc);
 }
 .n-dgcard span {
   display: flex;

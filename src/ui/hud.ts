@@ -623,7 +623,7 @@ export class Hud {
     const key = `dg:${dg.room}:${dg.stage}:${warden?.id ?? 0}:${dg.relics.join()}`
     if (this.bossKey !== key) {
       this.bossKey = key
-      const title = warden ? warden.name : dg.stage === 1 ? (dd.theme.type === 'fire' ? L('To the crater', 'Naar de krater') : L('To the roof', 'Naar het dak')) : room.name
+      const title = warden ? warden.name : dg.stage === 1 ? dd.theme.toBoss() : room.name
       this.bossBar.style.setProperty('--c', warden ? dd.theme.accent : '#ffb040')
       // Where each room starts on the progress bar
       let acc = 0
@@ -632,7 +632,7 @@ export class Hud {
         acc += fightsIn(r)
         return i ? `<em style="left:${at}%"></em>` : ''
       }).join('')
-      const relics = dg.relics.map((r) => `<i class="bb-relic" title="${dd.theme.relics[r]()}: ${r === 'ember' ? L('+15% damage', '+15% schade') : L('−15% damage taken', '−15% schade')}">${r === 'ember' ? (dd.theme.type === 'fire' ? '🔥' : '⚡') : '🛡️'}</i>`).join('')
+      const relics = dg.relics.map((r) => `<i class="bb-relic" title="${dd.theme.relics[r]()}: ${r === 'ember' ? L('+15% damage', '+15% schade') : L('−15% damage taken', '−15% schade')}">${r === 'ember' ? dd.theme.icon : '🛡️'}</i>`).join('')
       this.bossBar.innerHTML = `
         <div class="bb-top"><b>${esc(title)}</b>${relics}<span class="bb-team"></span><span class="bb-time"></span></div>
         <div class="bb-bar ${warden ? '' : 'dg'}"><i class="bb-lag"></i><i class="bb-fill"></i>${warden ? '' : marks}</div>`

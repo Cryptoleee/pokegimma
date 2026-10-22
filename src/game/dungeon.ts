@@ -9,7 +9,7 @@ import { Mon, type Trainer } from './entities'
 import type { Game } from './game'
 import { preloadMon } from './sprites'
 import { ARENA_C, ARENA_R, T, TILE, type Gate } from './world'
-import { stormLook } from './dungeonArt'
+import { coldLook } from './dungeonArt'
 
 /**
  * Raid dungeons (host and solo): the run through the rooms before the boss.
@@ -279,7 +279,7 @@ export function dungeonTick(g: Game, r: RaidState, dt: number): boolean {
         addHazard(g, { shape: 'circle', x: v.x, y: v.y, ang: 0, r: 2.6, inner: 0, width: 1, t: 1.4, dmg: 0.24, fx: 'earthpower', type: 'fire', freeze: 0, cover: false, both: false, atk: 'vent' })
       }
     }
-    if (d.started && d.def.theme.type === 'electric') stormRoom(g, d, room.deco, dt)
+    if (d.started && d.def.theme.type !== 'fire') roomHazards(g, d, room.deco, dt)
     // Everything down: the gate opens
     const packsLeft = d.packs.some((p) => !p.done)
     const wavesLeft = !!room.waves && d.wave < room.waves.length
@@ -294,17 +294,46 @@ export function dungeonTick(g: Game, r: RaidState, dt: number): boolean {
 }
 
 /**
- * The Storm Tower's rooms fight back: in the flooded halls the charged pools
- * discharge round their edges, in the dynamo hall the coils arc to each other,
- * and on the battlements lightning strikes near whoever's fighting the waves.
+ * The Storm Tower's and the Citadel's rooms fight back. The tower: in the
+ * flooded halls the charged pools discharge round their edges, in the dynamo
+ * hall the coils arc to each other, and on the battlements lightning strikes
+ * near whoever's fighting the waves. The citadel: holes in the ice frost over
+ * and burst, icicles fall from the gallery's ceiling, and icy gusts sweep the
+ * ice walls during the waves.
  */
-function stormRoom(g: Game, d: DungeonRun, deco: string, dt: number) {
+function roomHazards(g: Game, d: DungeonRun, deco: string, dt: number) {
   const { rect } = d.def.rooms[d.room]
   const inRoom = (p: { x: number; y: number }) => p.x >= rect.x && p.x < rect.x + rect.w && p.y >= rect.y && p.y < rect.y + rect.h
   const base = { inner: 0, width: 1, freeze: 0, cover: false, both: false, type: 'electric' as const }
+  const cold = { ...base, type: 'ice' as const }
+  const here = () => g.trainers.filter((t) => t.alive && !t.mon.fainted && inRoom(t))
   d.ventT -= dt
   if (d.ventT > 0) return
-  if (deco === 'flooded' || deco === 'cistern') {
+  if (deco === 'frozen' || deco === 'icelake') {
+    d.ventT = 3.6 + Math.random() * 2
+    const holes = g.world.dsparks.filter((s) => s.k === 'puddle' && inRoom(s))
+    for (let i = 0; i < Math.min(2, holes.length); i++) {
+      const v = holes.splice(Math.floor(Math.random() * holes.length), 1)[0]
+      addHazard(g, { ...cold, shape: 'circle', x: v.x, y: v.y, ang: 0, r: 3, t: 1.5 + i * 0.25, dmg: 0.2, freeze: 0.5, fx: 'blizzard', atk: 'vent' })
+    }
+  } else if (deco === 'icefall') {
+    // Icicles: a shadow grows under each before it lands
+    d.ventT = 3.2 + Math.random() * 1.4
+    const t = here()[Math.floor(Math.random() * here().length)]
+    if (!t) return
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * Math.PI * 2, r = i ? 2 + Math.random() * 3.5 : Math.random()
+      addHazard(g, { ...cold, shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 1.5, t: 1.3 + i * 0.3, dmg: 0.14, fx: 'stoneedge', atk: 'icicle' })
+    }
+  } else if (deco === 'summit' && d.gauntlet) {
+    // An icy gust across the walls, from one side, through whoever's there
+    d.ventT = 3.4 + Math.random() * 1.4
+    const t = here()[Math.floor(Math.random() * here().length)]
+    if (!t) return
+    const west = Math.random() < 0.5
+    const x0 = west ? rect.x + 1 : rect.x + rect.w - 1
+    addHazard(g, { ...cold, shape: 'line', x: x0, y: t.y, ang: west ? 0 : Math.PI, r: rect.w - 2, width: 1.6, t: 1.5, dmg: 0.15, fx: 'icebeam', atk: 'gust' })
+  } else if (deco === 'flooded' || deco === 'cistern') {
     d.ventT = 3.4 + Math.random() * 2
     const pools = g.world.dsparks.filter((s) => s.k === 'puddle' && inRoom(s))
     for (let i = 0; i < Math.min(2, pools.length); i++) {
@@ -323,8 +352,8 @@ function stormRoom(g: Game, d: DungeonRun, deco: string, dt: number) {
     addHazard(g, { ...base, shape: 'line', x: a.x, y: a.y, ang: Math.atan2(b.y - a.y, b.x - a.x), r: Math.hypot(b.x - a.x, b.y - a.y), width: 1.4, t: 1.5, dmg: 0.3, fx: 'discharge', atk: 'arc' })
   } else if (deco === 'ramparts' && d.gauntlet) {
     d.ventT = 3 + Math.random() * 1.4
-    const here = g.trainers.filter((t) => t.alive && !t.mon.fainted && inRoom(t))
-    const t = here[Math.floor(Math.random() * here.length)]
+    const all = here()
+    const t = all[Math.floor(Math.random() * all.length)]
     if (!t) return
     for (let i = 0; i < 2; i++) {
       const a = Math.random() * Math.PI * 2, r = i ? 2 + Math.random() * 3 : Math.random() * 1.5
@@ -564,7 +593,7 @@ function spawnFoe(g: Game, f: FoeSpec, rect: Rect) {
   const th = g.raid!.dg!.def.theme
   g.vfx.mark(best[0], best[1])
   g.vfx.ring(best[0], best[1], f.elite ? 2.2 : 1.4, th.burst[1], 0.5, 5)
-  g.vfx.burst(best[0], best[1] - 0.3, { n: f.elite ? 22 : 12, speed: 5, dir: -Math.PI / 2, spread: 1.4, cols: th.burst, shape: th.type === 'fire' ? 'flame' : 'streak', add: true, s0: 3, s1: 0.6, life: 0.5 })
+  g.vfx.burst(best[0], best[1] - 0.3, { n: f.elite ? 22 : 12, speed: 5, dir: -Math.PI / 2, spread: 1.4, cols: th.burst, shape: th.type === 'fire' ? 'flame' : th.type === 'ice' ? 'shard' : 'streak', add: true, s0: 3, s1: 0.6, life: 0.5 })
   g.soundAt(best[0], best[1], 'boss', ['vent', th.fx, f.elite ? 0.7 : 0.4], { range: 22 })
   if (f.elite) g.callout(m, both(`★ ${m.name}`, `★ ${m.name}`), '#ffb040')
   return m
@@ -831,7 +860,7 @@ export const gateShown = (gt: Gate, time: number) => !gt.open || time - gt.openA
 /** A gate: a slab of dark stone with glowing runes; an opened one sinks into the floor. */
 export function drawGate(ctx: CanvasRenderingContext2D, gt: Gate, time: number) {
   // The Storm Tower's gates hum blue
-  const st = stormLook()
+  const st = coldLook()
   {
     const age = gt.open ? time - gt.openAt : -1
     const sink = gt.open ? Math.min(1, age / 1.1) : 0
@@ -872,7 +901,7 @@ export function drawGate(ctx: CanvasRenderingContext2D, gt: Gate, time: number) 
 export function drawBrazier(ctx: CanvasRenderingContext2D, x: number, y: number, time: number) {
   const px = Math.round(x), py = Math.round(y)
   // The Storm Tower's braziers burn with caught lightning
-  const st = stormLook()
+  const st = coldLook()
   const [c0, c1, c2, c3] = st ? ['#5ac8ff', 'rgba(60,120,255,0.85)', 'rgba(120,215,255,0.9)', 'rgba(235,250,255,0.9)'] : ['#ff6020', 'rgba(255,90,20,0.85)', 'rgba(255,190,60,0.9)', 'rgba(255,250,200,0.9)']
   ctx.fillStyle = 'rgba(0,0,0,0.35)'
   ctx.fillRect(px - 5, py - 1, 10, 3)

@@ -83,7 +83,7 @@ export const REWARD_ROAD: { lv: number; kind: 'partner' | 'trainer'; id: string 
 ]
 
 /** Raid dungeons (ids, as in src/data/dungeons.ts). */
-export const DUNGEON_IDS = ['depths', 'storm']
+export const DUNGEON_IDS = ['depths', 'storm', 'citadel']
 /** Raid dungeon lives (a clean run keeps all of them). */
 export const DUNGEON_LIVES = 3
 
@@ -91,9 +91,10 @@ export const DUNGEON_LIVES = 3
 export const RAID_UNLOCKS: { kind: 'partner'; id: string; dungeon: string }[] = [
   { kind: 'partner', id: '240', dungeon: 'depths' }, // Magby, who grows into Magmortar, the Warden of the Flame
   { kind: 'partner', id: '239', dungeon: 'storm' }, // Elekid, who grows into Electivire, the Warden of Thunder
+  { kind: 'partner', id: '363', dungeon: 'citadel' }, // Spheal, who grows into Walrein, the Terror of the Frozen Lake
 ]
 /** Followers (species) for a flawless clear (no life lost) of a dungeon. */
-export const DUNGEON_PETS: Record<string, number> = { depths: 643, storm: 644 }
+export const DUNGEON_PETS: Record<string, number> = { depths: 643, storm: 644, citadel: 646 }
 export const raidUnlockOf = (kind: 'partner' | 'trainer', id: string | number) => RAID_UNLOCKS.find((r) => r.kind === kind && r.id === String(id))
 
 /** Every partner you can pick: the free ones, those on the reward road and the raid unlocks. */
@@ -295,6 +296,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'raid_flawless', xp: 300, test: (_, r) => !!r && r.kind === 'raid' && r.won && (r.lives ?? 0) >= (r.dungeon ? DUNGEON_LIVES : RAID_LIVES) },
   { id: 'dg_depths', xp: 500, title: 'flametamer', test: (p) => (p.stats.dg ?? []).includes('depths') },
   { id: 'dg_storm', xp: 500, title: 'stormrider', test: (p) => (p.stats.dg ?? []).includes('storm') },
+  { id: 'dg_citadel', xp: 500, title: 'frostbound', test: (p) => (p.stats.dg ?? []).includes('citadel') },
   { id: 'dg_hard', xp: 600, title: 'infernal', test: (p) => (p.stats.dgHard ?? []).length > 0 },
   { id: 'dg_flawless', xp: 500, title: 'unscathed', test: (_, r) => !!r && r.kind === 'raid' && r.won && !!r.dungeon && (r.lives ?? 0) >= DUNGEON_LIVES },
   { id: 'raid_mvp', xp: 250, test: (_, r) => !!r && r.kind === 'raid' && r.won && r.humans >= 2 && (r.share ?? 0) >= 50 },

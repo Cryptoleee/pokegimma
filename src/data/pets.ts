@@ -18,6 +18,7 @@ export interface Pet {
 export const PETS: Pet[] = [
   { id: 'reshiram', sp: 643, dungeon: 'depths', how: () => L('Clear The Burning Depths without losing a life', 'Haal De Brandende Diepten zonder een leven te verliezen') },
   { id: 'zekrom', sp: 644, dungeon: 'storm', how: () => L('Clear The Storm Tower without losing a life', 'Haal De Stormtoren zonder een leven te verliezen') },
+  { id: 'kyurem', sp: 646, dungeon: 'citadel', how: () => L('Clear The Frozen Citadel without losing a life', 'Haal De IJscitadel zonder een leven te verliezen') },
 ]
 
 const KEY = 'sb:pet'

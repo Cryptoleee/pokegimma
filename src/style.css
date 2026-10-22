@@ -9180,6 +9180,10 @@ body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
 .cin.storm .cin-title { color: #fff6c0; }
 .cin.storm .cin-title b { text-shadow: 0 0 24px rgba(90, 190, 255, 0.95), 0 0 60px rgba(60, 120, 255, 0.55), 0 4px 0 #0a1a3a, 0 0 2px #000; }
 .cin.storm .cin-title small { color: #9fdcff; text-shadow: 0 2px 0 #000, 0 0 10px rgba(80, 180, 255, 0.7); }
+/* The Frozen Citadel's cutscenes: titles in frost white and ice blue */
+.cin.ice .cin-title { color: #f4fbff; }
+.cin.ice .cin-title b { text-shadow: 0 0 24px rgba(170, 225, 255, 0.95), 0 0 60px rgba(120, 190, 255, 0.5), 0 4px 0 #12304a, 0 0 2px #000; }
+.cin.ice .cin-title small { color: #bfe6ff; text-shadow: 0 2px 0 #000, 0 0 10px rgba(150, 210, 255, 0.7); }
 .cin-title.tall {
   top: 36%;
 }

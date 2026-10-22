@@ -24,7 +24,7 @@ import { showResults } from './ui/results'
 import { LiveBoard, showFinalBoard } from './ui/scoreboard'
 import { decided, scoreRows } from './game/score'
 import { showEvolution } from './ui/cutscene'
-import { confirmLeaveLobby, shinyPartner, showLobby } from './ui/menu'
+import { confirmLeaveLobby, raidPick, shinyPartner, showLobby } from './ui/menu'
 import { askName, setOnline, showMenu, type MenuState } from './ui/home'
 import { IC, icon, type AppTab } from './ui/app'
 import { showLoading } from './ui/loading'
@@ -215,7 +215,7 @@ function setupFor(c: MatchChoice, humans: LobbyPlayer[]): MatchSetup {
   const startRoom = Number(q.get('room')) || 0
   let boss: BossId
   if (forced && BOSS_LIST.includes(forced)) boss = forced
-  else if (!classic) boss = (DUNGEON_LIST.find((d) => d.id === c.raid) ?? DUNGEON_LIST[0]).boss
+  else if (!classic) boss = (DUNGEON_LIST.find((d) => d.id === raidPick(c.raid)) ?? DUNGEON_LIST[0]).boss
   else {
     const last = store.get<BossId | ''>('lastBoss', '')
     const pool = BOSS_LIST.filter((b) => b !== last)

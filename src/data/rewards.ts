@@ -37,6 +37,7 @@ const TITLES: Record<string, T> = {
   infernal: ['Infernal', 'Hellevuur'],
   unscathed: ['Unscathed', 'Ongeschonden'],
   stormrider: ['Storm Rider', 'Stormrijder'],
+  frostbound: ['Frostbound', 'IJsgeboren'],
 }
 
 export function titleName(id: string) {
@@ -63,7 +64,9 @@ export const ACH_INFO: Record<string, { icon: string; name: T; desc: T }> = {
   crystal: { icon: '💠', name: ['Crystal clear', 'Kristalhelder'], desc: ['Grab the Evolution Crystal', 'Pak het Evolutiekristal'] },
   raid_first: { icon: '🐉', name: ['Raid cleared', 'Raid geslaagd'], desc: ['Defeat a raid boss', 'Versla een raid-baas'] },
   raid_all: { icon: '🌋', name: ['Legend hunter', 'Legendejager'], desc: ['Defeat all 5 raid bosses', 'Versla alle 5 raid-bazen'] },
-  dg_depths: { icon: '🔥', name: ['Out of the Depths', 'Uit de Diepten'], desc: ['Clear The Burning Depths (Reshiram joins you)', 'Versla De Brandende Diepten (Reshiram wordt je partner)'] },
+  dg_depths: { icon: '🔥', name: ['Out of the Depths', 'Uit de Diepten'], desc: ['Clear The Burning Depths (Magby joins you)', 'Versla De Brandende Diepten (Magby wordt je partner)'] },
+  dg_storm: { icon: '⚡', name: ['Eye of the Storm', 'Oog van de Storm'], desc: ['Clear The Storm Tower (Elekid joins you)', 'Versla De Stormtoren (Elekid wordt je partner)'] },
+  dg_citadel: { icon: '❄️', name: ['Through the Ice', 'Door het IJs'], desc: ['Clear The Frozen Citadel (Spheal joins you)', 'Versla De IJscitadel (Spheal wordt je partner)'] },
   dg_hard: { icon: '😈', name: ['Into the inferno', 'Het inferno in'], desc: ['Clear a raid dungeon on hard', 'Versla een raid-dungeon op moeilijk'] },
   dg_flawless: { icon: '🛡️', name: ['Not a scratch', 'Geen schrammetje'], desc: ['Clear a raid dungeon without losing a life', 'Versla een raid-dungeon zonder een leven te verliezen'] },
   raid_flawless: { icon: '🛡️', name: ['Untouchable', 'Onaantastbaar'], desc: ['Clear a raid without losing a life', 'Haal een raid zonder een leven te verliezen'] },

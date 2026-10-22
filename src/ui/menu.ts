@@ -12,6 +12,7 @@ import { DIFFICULTIES, diffName, saveDiff, type Difficulty } from '../data/diffi
 import { L } from '../i18n'
 import { openInvite } from './friends'
 import { progress } from '../progress'
+import { local } from '../stats'
 import { STADIUM_LIST, STADIUMS } from '../data/stadiums'
 import { titleName } from '../data/rewards'
 import { masteryOf, SHINY_AT } from '../../api/_progress'
@@ -31,7 +32,19 @@ export function shinyPartner(id: number) {
 
 const screen = () => document.getElementById('screen')!
 /** Which raid is picked: a dungeon's id ('dungeon' and nothing mean the first one), or 'classic'. */
-export const raidPick = (raid: string | undefined) => (raid === 'classic' ? 'classic' : DUNGEON_LIST.find((d) => d.id === raid)?.id ?? DUNGEON_LIST[0]?.id ?? 'classic')
+/** A dungeon opens once you've beaten the one before it. */
+export const dungeonOpen = (id: string) => {
+  const i = DUNGEON_LIST.findIndex((d) => d.id === id)
+  return i <= 0 || (progress().stats.dg ?? []).includes(DUNGEON_LIST[i - 1].id)
+}
+/** On a test build (a preview, your own machine) a locked dungeon can still be played. */
+export const dungeonPlayable = (id: string) => dungeonOpen(id) || local
+/** The dungeon that's picked: the chosen one if you can play it, else the furthest one that's open. */
+export const raidPick = (raid: string | undefined) => {
+  if (raid === 'classic') return 'classic'
+  const open = DUNGEON_LIST.filter((d) => dungeonOpen(d.id))
+  return (DUNGEON_LIST.find((d) => d.id === raid && dungeonPlayable(d.id)) ?? open[open.length - 1] ?? DUNGEON_LIST[0])?.id ?? 'classic'
+}
 export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
 function gif(id: number, cls = '', shiny = false) {
@@ -77,7 +90,11 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
             const th = t === 'random' ? null : THEMES[t]
             return `<button data-theme="${t}" class="${c.theme === t ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${th ? th.grass[0] : '#5a6a9a'};--c2:${th ? th.tall[0] : '#3a4470'}"><i>${th ? th.icon : '🎲'}</i>${th ? th.name : L('Random', 'Willekeurig')}</button>`
           }).join('')}</div>`
-        : `<div class="cp-worlds cp-raid">${DUNGEON_LIST.map((dd) => `<button data-raid="${dd.id}" class="${raidPick(c.raid) === dd.id ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${dd.theme.type === 'fire' ? '#5a2a1c' : '#1c2a5a'};--c2:${dd.theme.accent}"><i>${dd.theme.type === 'fire' ? '🔥' : '⚡'}</i>${esc(dd.name)}</button>`).join('')}<button data-raid="classic" class="${c.raid === 'classic' ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:#5a6a9a;--c2:#3a4470"><i>🎲</i>${L('Classic: random boss', 'Klassiek: willekeurige baas')}</button></div>`}
+        : `<div class="cp-worlds cp-raid">${DUNGEON_LIST.map((dd) => {
+          // (The host's progress decides: a guest just sees what's picked)
+          const lock = !ro && !dungeonOpen(dd.id)
+          return `<button data-raid="${dd.id}" class="${raidPick(c.raid) === dd.id ? 'on' : ''} ${lock ? 'locked' : ''}" ${ro || (lock && !local) ? 'disabled' : ''} style="--c:${dd.theme.dark};--c2:${dd.theme.accent}"><i>${lock ? '🔒' : dd.theme.icon}</i>${esc(dd.name)}</button>`
+        }).join('')}<button data-raid="classic" class="${c.raid === 'classic' ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:#5a6a9a;--c2:#3a4470"><i>🎲</i>${L('Classic: random boss', 'Klassiek: willekeurige baas')}</button></div>`}
       <div class="cp-diff" role="radiogroup" aria-label="${L('Difficulty', 'Moeilijkheid')}"><span>${c.kind === 'raid' ? L('Boss', 'Baas') : c.kind === 'duel' ? 'CPU' : 'Bots'}</span>${DIFFICULTIES.map((d) => `<button data-diff="${d}" role="radio" aria-checked="${(c.diff ?? 'normal') === d}" class="${(c.diff ?? 'normal') === d ? 'on' : ''}" ${ro ? 'disabled' : ''}>${diffName(d)}</button>`).join('')}</div>`
     el.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
       b.addEventListener('click', () => {

@@ -16,7 +16,8 @@ const PING_MS = 90_000
 const VIA_KEY = 'sb:via'
 const VIA_PLAYED_KEY = 'sb:viaPlayed'
 
-const local = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])|\.local$|\.vercel\.app$/.test(location.hostname)
+/** A test build (preview deployment or your own machine). */
+export const local = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])|\.local$|\.vercel\.app$/.test(location.hostname)
 const forced = new URLSearchParams(location.search).get('stats') === 'force'
 let on = forced || !local
 try {

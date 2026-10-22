@@ -14,7 +14,7 @@ import type { Weather } from '../data/themes'
 import { drawEvents } from './events'
 import { drawHazards, drawHazardsSky } from './boss'
 import { drawBrazier, drawGate, gateShown } from './dungeon'
-import { drawAnimProp, drawEyes, drawLavaEmbers, drawLavaLayer, propLights, stormLook } from './dungeonArt'
+import { drawAnimProp, drawEyes, drawLavaEmbers, drawLavaLayer, propLights, coldLook, dungeonLook } from './dungeonArt'
 import { L, tx } from '../i18n'
 import { BOSSES } from '../data/bosses'
 import { cinematic, drawPhaseScreen, phaseLook, shownPhase, updateCinematic } from './bossFx'
@@ -151,7 +151,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   }
   // Raid dungeon: deep underground, lit by braziers, lava and the fight
   if (g.world.gates.length) {
-    ctx.fillStyle = stormLook() ? 'rgba(2,6,16,0.36)' : 'rgba(10,3,6,0.32)'
+    ctx.fillStyle = dungeonLook() === 'ice' ? 'rgba(6,14,30,0.26)' : coldLook() ? 'rgba(2,6,16,0.36)' : 'rgba(10,3,6,0.32)'
     ctx.fillRect(ox - 2, oy - 2, vw + 4, vh + 4)
   }
 
@@ -1729,7 +1729,7 @@ function drawLights(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, 
   // Raid dungeon: lava, lavafalls, crystals, forges, runes
   if (g.world.props.length) propLights(g.world, add, time)
   // Raid dungeon braziers: warm, flickering pools of light (cold blue in the Storm Tower)
-  const storm = stormLook()
+  const storm = coldLook()
   for (const b of g.world.braziers) {
     const fl = 0.85 + 0.15 * Math.sin(time * 9 + b.x * 3) * Math.sin(time * 13 + b.y)
     add(b.x * T, (b.y - 0.6) * T, 30 * fl, storm ? '#5ac8ff' : '#ff8a30', 0.45 * fl)
