@@ -21,6 +21,8 @@ export interface CineLine {
   title?: boolean
   /** A small line under a title card. */
   kicker?: () => string
+  /** Show the players who did it (their trainers and partners) under the title. */
+  heroes?: boolean
 }
 
 export interface CineShot {
@@ -51,8 +53,15 @@ const FADE = 0.7
  * Get a cutscene ready (its videos start loading) while the tips splash is up;
  * `play` shows it and calls `done` when it ends or is skipped.
  */
+/** A player shown on a cutscene's hero card. */
+export interface CineHero {
+  name: string
+  trainer: string
+  mon: string
+}
+
 export function prepareCinematic(c: Cinematic) {
-  if (skipAll()) return { play: (done: () => void) => done() }
+  if (skipAll()) return { play: (done: () => void, _heroes?: CineHero[]) => done() }
   const vids = c.shots.map((s) => {
     if (!s.src) return null
     const v = document.createElement('video')
@@ -64,10 +73,10 @@ export function prepareCinematic(c: Cinematic) {
     v.load()
     return v
   })
-  return { play: (done: () => void) => run(c, vids, done) }
+  return { play: (done: () => void, heroes: CineHero[] = []) => run(c, vids, done, heroes) }
 }
 
-function run(c: Cinematic, shotVids: (HTMLVideoElement | null)[], done: () => void) {
+function run(c: Cinematic, shotVids: (HTMLVideoElement | null)[], done: () => void, heroes: CineHero[]) {
   const vids = shotVids.filter((v): v is HTMLVideoElement => !!v)
   const app = document.getElementById('app')!
   const el = document.createElement('div')
@@ -172,7 +181,13 @@ function run(c: Cinematic, shotVids: (HTMLVideoElement | null)[], done: () => vo
       typeT = 0
       titleEl.classList.toggle('on', !!line?.title)
       subEl.parentElement!.classList.toggle('on', !!line && !line.title)
-      if (line?.title) titleEl.innerHTML = `<b>${text}</b>${line.kicker ? `<small>${line.kicker()}</small>` : ''}`
+      titleEl.classList.toggle('tall', !!line?.heroes)
+      if (line?.title) {
+        const row = line.heroes && heroes.length
+          ? `<div class="cin-heroes">${heroes.map((h, i) => `<span style="--i:${i}"><img class="px tr" src="${h.trainer}" alt=""><img class="px mon" src="${h.mon}" alt=""><em>${h.name.replace(/[<>&"]/g, '')}</em></span>`).join('')}</div>`
+          : ''
+        titleEl.innerHTML = `<b>${text}</b>${line.kicker ? `<small>${line.kicker()}</small>` : ''}${row}`
+      }
       else subEl.textContent = ''
     }
     if (line && !line.title && typed < text.length) {

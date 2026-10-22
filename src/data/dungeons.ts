@@ -102,6 +102,8 @@ export interface DungeonDef {
   lives: number
   /** The story told before the run starts. */
   intro?: Cinematic
+  /** The scene when its legendary falls (before the victory screen). */
+  outro?: Cinematic
 }
 
 const fire = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'fire', phase: 0, weight: 1, ...a })
@@ -115,14 +117,24 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
     get blurb() { return L('Fight down through the volcano: halls full of fire Pokémon packs, two wardens, a last stand, and Reshiram waiting in the crater.', 'Vecht je een weg door de vulkaan: zalen vol groepen vuur-Pokémon, twee wachters, een laatste stand, en Reshiram wacht in de krater.') },
     start: [21, 117],
     lives: 3,
-    // One flight through the dungeon to its legendary; Dutch only until the cutscene is approved
+    // One flight through the dungeon, past its wardens, to its legendary
     intro: {
       id: 'depths-intro',
       shots: [
         {
           src: 'depths-intro', len: 22.5, lines: [
-            { at: 0.6, until: 3.2, title: true, text: () => 'DE BRANDENDE DIEPTEN', kicker: () => 'Raid-dungeon' },
-            { at: 18.4, until: 22.5, title: true, text: () => 'RESHIRAM', kicker: () => 'Heer van de vulkaankrater' },
+            { at: 0.6, until: 3.2, title: true, text: () => L('THE BURNING DEPTHS', 'DE BRANDENDE DIEPTEN'), kicker: () => L('Raid dungeon', 'Raid-dungeon') },
+            { at: 18.4, until: 22.5, title: true, text: () => 'RESHIRAM', kicker: () => L('Lord of the volcano crater', 'Heer van de vulkaankrater') },
+          ],
+        },
+      ],
+    },
+    outro: {
+      id: 'depths-outro',
+      shots: [
+        {
+          src: 'depths-outro', len: 14, lines: [
+            { at: 8.8, until: 14, title: true, heroes: true, text: () => L('RESHIRAM DEFEATED', 'RESHIRAM VERSLAGEN'), kicker: () => L('The crater falls quiet', 'De krater valt stil') },
           ],
         },
       ],

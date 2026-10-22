@@ -440,8 +440,8 @@ function petFollow(g: Game, tr: Trainer, time: number): PetState | null {
   }
   const dt = Math.min(0.1, Math.max(0, time - st.t))
   st.t = time
-  // Stay about a tile and a half behind, a little higher up the screen
-  const tx = tr.x + (tr.faceRight ? -1.4 : 1.4), ty = tr.y - 0.5
+  // Hover at the trainer's shoulder (the partner walks behind, lower down)
+  const tx = tr.x + (tr.faceRight ? -0.45 : 0.45), ty = tr.y + 0.05
   const dx = tx - st.x, dy = ty - st.y, d = Math.hypot(dx, dy)
   if (d > 0.05) {
     const k = 1 - Math.exp(-dt * (d > 3 ? 6 : 3))
@@ -456,10 +456,11 @@ function drawPet(ctx: CanvasRenderingContext2D, st: PetState, time: number, fade
   const s = liveSprite(st.sp, false, false) ?? monSprite(st.sp, false, false)
   if (!s.ready) return
   const [fx, fy] = frameAt(s, time, st.seed * 1000)
-  const sc = 0.34
+  // Really small: a keychain-sized companion, never mistaken for a real Pokémon in the fight
+  const sc = 0.17
   const dw = s.bw * sc, dh = s.bh * sc
   const px = st.x * TILE, py = st.y * TILE
-  const hover = -7 + Math.sin(time * 2.6 + st.seed) * 2
+  const hover = -20 + Math.sin(time * 2.6 + st.seed) * 2
   shadow(ctx, px, py + 1, dw * 0.35)
   ctx.save()
   ctx.globalAlpha = fade

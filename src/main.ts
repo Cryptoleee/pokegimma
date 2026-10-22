@@ -1,10 +1,10 @@
 import { moveByName } from './data/moves'
 import { preloadVoice, voiceLog } from './voice'
 import './style.css'
-import { ALL_PARTNERS, ROSTER, TEAM_SIZE } from './data/pokemon'
+import { ALL_PARTNERS, ROSTER, spriteUrl, TEAM_SIZE } from './data/pokemon'
 import { DUNGEON_LIST, dungeonOf } from './data/dungeons'
 import { BOSS_LIST, type BossId } from './data/bosses'
-import { TRAINERS, type TrainerDef } from './data/trainers'
+import { TRAINERS, trainerSpriteUrl, type TrainerDef } from './data/trainers'
 import { finalForm } from './game/boss'
 import { pickStadium, STADIUMS, type StadiumId } from './data/stadiums'
 import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
@@ -382,7 +382,13 @@ function loadingThen(setup: MatchSetup, skippable: boolean, start: () => void, g
   // A raid dungeon tells its story first (its videos load while the tips are up)
   const dg = setup.kind === 'raid' && !setup.classic ? dungeonOf(setup.boss) : null
   const intro = dg?.intro ? prepareCinematic(dg.intro) : null
-  showLoading({ seconds: LOADING_TIME, players, skippable, bots: duel ? 0 : Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined, dungeon: !!dg, duel, stadium: setup.stadium, diff: setup.diff }, intro ? () => intro.play(start) : start)
+  outro = null
+  // Its closing scene starts loading once the intro is over
+  const go = () => {
+    if (dg?.outro) outro = prepareCinematic(dg.outro)
+    start()
+  }
+  showLoading({ seconds: LOADING_TIME, players, skippable, bots: duel ? 0 : Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined, dungeon: !!dg, duel, stadium: setup.stadium, diff: setup.diff }, intro ? () => intro.play(go) : go)
 }
 
 function startSolo() {
@@ -396,7 +402,24 @@ function startSolo() {
 const soloAgain = () => wipe(startSolo, { flash: true })
 const soloOtherTeam = () => wipe(() => teamPicker(() => wipe(startSolo, { flash: true }), L('Start the battle', 'Start de battle')))
 
+/** A raid dungeon's closing scene (loaded once the intro is over), played when its legendary falls. */
+let outro: ReturnType<typeof prepareCinematic> | null = null
+
 function onEnd(r: GameResult) {
+  const o = outro
+  outro = null
+  if (o && game && r.won && r.raid?.dungeon) {
+    hud?.destroy()
+    hud = null
+    // The players who did it, each with the partner they fought with
+    const heroes = game.trainers.filter((t) => t.human).map((t) => ({ name: t.name, trainer: trainerSpriteUrl(t.def.sprite), mon: spriteUrl(t.mon?.species.id ?? team[0], { shiny: !!t.mon?.shiny }) }))
+    o.play(() => endNow(r), heroes)
+    return
+  }
+  endNow(r)
+}
+
+function endNow(r: GameResult) {
   if (game) trackEnd({ k: statsKind(game), m: statsMode(), r: r.raid ? (r.won ? 'clear' : 'fail') : r.won ? 'win' : 'lose', boss: r.raid?.boss })
   hud?.destroy()
   hud = null

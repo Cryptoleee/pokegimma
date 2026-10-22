@@ -9135,3 +9135,47 @@ body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
 .pf-pet.locked img {
   filter: brightness(0) opacity(0.45);
 }
+/* A cutscene's hero card: the players who did it, each trainer with their partner */
+.cin-heroes {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin-top: 14px;
+}
+.cin-heroes span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  animation: cinHero 0.5s calc(0.5s + var(--i) * 0.18s) cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.cin-heroes {
+  padding: 8px 18px 6px;
+  border-radius: 16px;
+  background: radial-gradient(ellipse at 50% 60%, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0) 70%);
+}
+.cin-heroes .tr {
+  height: clamp(72px, 12vw, 150px);
+}
+.cin-heroes .mon {
+  position: absolute;
+  left: 62%;
+  bottom: 18px;
+  height: clamp(56px, 9vw, 116px);
+}
+.cin-heroes em {
+  font-style: normal;
+  font-size: clamp(12px, 1.6vw, 18px);
+  color: #fff4e4;
+  text-shadow: 0 2px 0 #000;
+}
+@keyframes cinHero {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.8);
+  }
+}
+.cin-title.tall {
+  top: 36%;
+}
