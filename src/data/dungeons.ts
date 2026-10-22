@@ -120,9 +120,9 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
       id: 'depths-intro',
       shots: [
         {
-          src: 'depths-intro', len: 21.6, lines: [
-            { at: 1, until: 5.5, title: true, text: () => 'DE BRANDENDE DIEPTEN', kicker: () => 'Raid-dungeon' },
-            { at: 17.6, until: 21.6, title: true, text: () => 'RESHIRAM', kicker: () => 'Heer van de vulkaankrater' },
+          src: 'depths-intro', len: 22.1, lines: [
+            { at: 0.6, until: 3.6, title: true, text: () => 'DE BRANDENDE DIEPTEN', kicker: () => 'Raid-dungeon' },
+            { at: 18.2, until: 22.1, title: true, text: () => 'RESHIRAM', kicker: () => 'Heer van de vulkaankrater' },
           ],
         },
       ],
