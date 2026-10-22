@@ -5,8 +5,8 @@ export default defineConfig({
   base: './',
   build: {
     rollupOptions: {
-      // The game, plus the creator stats panel at /stats
-      input: { main: resolve(__dirname, 'index.html'), stats: resolve(__dirname, 'stats.html') },
+      // The game, the creator stats panel at /stats and the second screen at /duo/ (its own app scope)
+      input: { main: resolve(__dirname, 'index.html'), stats: resolve(__dirname, 'stats.html'), duo: resolve(__dirname, 'duo.html') },
     },
   },
 })

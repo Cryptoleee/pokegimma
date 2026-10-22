@@ -24,6 +24,7 @@ import type { Command } from '../net/protocol'
 import type { ClientState } from '../net/sync'
 import type { VoiceLine } from '../voice'
 import { both, type Txt } from '../i18n'
+import { BOT_SKILL, CPU_SKILL, TAKEN, type Difficulty } from '../data/difficulty'
 
 /** 'evolve' = the Evolution Crystal: walk over it and your Pokémon is fully evolved with every move. */
 /** 1 vs 1 power-ups: xatk, xspd, xdef (a few seconds' edge) and heal (Hyper Potion). */
@@ -112,14 +113,18 @@ export interface ZonePhase {
   dps: number
 }
 
+// Storm damage: share of max HP per second (rising the longer you stay out, see STORM_RAMP)
 const PHASES: ZonePhase[] = [
-  { wait: 55, shrink: 35, r: 46, dps: 0.02 },
-  { wait: 40, shrink: 30, r: 30, dps: 0.035 },
-  { wait: 35, shrink: 28, r: 18, dps: 0.05 },
-  { wait: 30, shrink: 24, r: 9, dps: 0.08 },
-  { wait: 25, shrink: 20, r: 3.5, dps: 0.12 },
-  { wait: 20, shrink: 20, r: 0, dps: 0.2 },
+  { wait: 55, shrink: 35, r: 46, dps: 0.045 },
+  { wait: 40, shrink: 30, r: 30, dps: 0.06 },
+  { wait: 35, shrink: 28, r: 18, dps: 0.085 },
+  { wait: 30, shrink: 24, r: 9, dps: 0.12 },
+  { wait: 25, shrink: 20, r: 3.5, dps: 0.17 },
+  { wait: 20, shrink: 20, r: 0, dps: 0.25 },
 ]
+/** Every second you stay in the storm it bites 10% harder, up to 2.5×; it eases off again once you're back in. */
+const STORM_RAMP = 0.1
+const STORM_RAMP_MAX = 1.5
 
 export class Zone {
   x = MAP / 2
@@ -238,6 +243,8 @@ export interface MatchSetup {
   boost?: boolean
   /** 1 vs 1 stadium (already resolved from "random"). */
   stadium?: StadiumId
+  /** How hard the bots, the CPU or the boss play (default normal). */
+  diff?: Difficulty
 }
 
 /** solo = everything local; host = simulates for remote players too; client = renders the host's state. */
@@ -355,8 +362,11 @@ export class Game {
   private netT = 0
 
   kind: MatchKind
+  /** How hard the bots, the CPU or the boss play. */
+  diff: Difficulty = 'normal'
   constructor(public setup: MatchSetup, me: number, public hooks: GameHooks, public mode: GameMode = 'solo') {
     this.kind = setup.kind ?? 'royale'
+    this.diff = setup.diff ?? 'normal'
     this.rng = new Rng(setup.seed)
     this.world = new World(this.rng, this.kind === 'raid' ? { arena: BOSSES[setup.boss ?? 'reshiram'].arena } : this.kind === 'duel' ? { stadium: setup.stadium ?? 'classic' } : { theme: setup.theme })
     // The client only needs the world: everything else comes from the host.
@@ -393,7 +403,7 @@ export class Game {
         const pool = ALL_PARTNERS.filter((id) => id !== this.player.party[0]?.species.id)
         bot.party = [this.ownMon(new Mon(pool[Math.floor(this.rng.next() * pool.length)], 5), bot)]
         this.giveBrain(bot)
-        bot.brain!.skill = 0.72
+        bot.brain!.skill = CPU_SKILL[this.diff]
         this.trainers.push(bot)
       }
       this.trainers = this.trainers.slice(0, 2)
@@ -444,7 +454,7 @@ export class Game {
   /** AI takes over a trainer (bots, or a player who disconnected). */
   giveBrain(tr: Trainer) {
     tr.brain = {
-      skill: this.rng.range(0.3, 0.85), thinkT: 0, goalX: 0, goalY: 0, target: null,
+      skill: this.rng.range(...BOT_SKILL[this.diff]), thinkT: 0, goalX: 0, goalY: 0, target: null,
       lastX: 0, lastY: 0, stuckT: 0, mode: 'wander', strafe: this.rng.chance(0.5) ? 1 : -1,
     }
   }
@@ -677,10 +687,12 @@ export class Game {
     if (this.kind === 'royale') this.regen(tr, dt)
 
     // Storm
-    if (this.kind === 'royale' && this.zone.outside(tr.x, tr.y) && !m.fainted) {
+    const outside = this.kind === 'royale' && this.zone.outside(tr.x, tr.y)
+    tr.stormT = outside ? tr.stormT + dt : Math.max(0, tr.stormT - dt * 2)
+    if (outside && !m.fainted) {
       m.combatT = 0
       this.vOf(tr)?.sfx('stormTick')
-      m.hp -= m.maxHp * this.zone.dps * dt
+      m.hp -= m.maxHp * this.zone.dps * (1 + Math.min(STORM_RAMP_MAX, tr.stormT * STORM_RAMP)) * dt
       if (m.hp <= 0) {
         m.hp = 0
         this.onFaint(m, null)
@@ -1411,6 +1423,8 @@ export class Game {
   /** Damage that doesn't come from a move (boss hazards, lava). */
   applyDamage(m: Mon, dmg: number, by: Mon | null, quiet = false) {
     if (m.fainted) return
+    // Difficulty: people take more or less damage from bots, wild Pokémon and the raid boss (never from each other)
+    if (this.diff !== 'normal' && m.owner?.human && (by ? !by.owner?.human : this.kind === 'raid')) dmg *= TAKEN[this.diff]
     m.hp -= dmg
     m.combatT = 0
     m.revealT = Math.max(m.revealT, HIT_REVEAL)

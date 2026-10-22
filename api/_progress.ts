@@ -35,6 +35,8 @@ export interface Report {
   legend?: number
   evolved?: number
   crystal?: boolean
+  /** How hard the bots, CPU or boss played (scales PvE ranking points). */
+  diff?: 'easy' | 'normal' | 'hard'
 }
 
 /** The 24 free partners (same list as ROSTER in src/data/pokemon.ts). */
@@ -349,6 +351,7 @@ export function sanitize(raw: Partial<Report>, maxTime = 1800): Report | null {
     legend: int(raw.legend, 0, 3),
     evolved: int(raw.evolved, 0, 6),
     crystal: kind === 'br' && !!raw.crystal,
+    diff: raw.diff === 'easy' || raw.diff === 'hard' ? raw.diff : 'normal',
   }
   if (kind === 'raid') {
     if (!BOSS_IDS.includes(String(raw.boss))) return null
@@ -375,6 +378,7 @@ function sanitizeDuel(raw: Partial<Report>, mode: Mode, maxTime: number, int: (v
     won, place: won ? 1 : 2, total: 2, time, kos, lost, caught: 0,
     partner: PARTNERS.includes(Number(raw.partner)) ? Number(raw.partner) : 0,
     legend: 0, evolved: 0, crystal: false,
+    diff: raw.diff === 'easy' || raw.diff === 'hard' ? raw.diff : 'normal',
   }
 }
 
@@ -411,11 +415,14 @@ export function matchXp(r: Report): XpLine[] {
 
 /** Ranking points: PvP = battle royale with other people; PvE = raids and battle royale against bots. */
 export function pointsFor(r: Report): { pvp: number; pve: number } {
-  if (r.kind === 'raid') return { pvp: 0, pve: r.won ? 25 + Math.round(Math.min(100, r.share ?? 0) / 4) : Math.round((r.share ?? 0) / 10) }
-  if (r.kind === 'duel') return r.humans >= 2 ? { pvp: (r.won ? 20 : 3) + 4 * r.kos, pve: 0 } : { pvp: 0, pve: (r.won ? 6 : 1) + r.kos }
+  // Against the computer: easy is worth half, hard one and a half times as much
+  const k = r.diff === 'easy' ? 0.5 : r.diff === 'hard' ? 1.5 : 1
+  const pve = (n: number) => ({ pvp: 0, pve: Math.round(n * k) })
+  if (r.kind === 'raid') return pve(r.won ? 25 + Math.round(Math.min(100, r.share ?? 0) / 4) : Math.round((r.share ?? 0) / 10))
+  if (r.kind === 'duel') return r.humans >= 2 ? { pvp: (r.won ? 20 : 3) + 4 * r.kos, pve: 0 } : pve((r.won ? 6 : 1) + r.kos)
   const place = r.won ? 30 : r.place === 2 ? 20 : r.place === 3 ? 15 : r.place <= Math.ceil(r.total / 2) ? 8 : 3
   if (r.humans >= 2) return { pvp: place + 4 * Math.min(10, r.kos), pve: 0 }
-  return { pvp: 0, pve: (r.won ? 10 : r.place <= 3 ? 5 : 1) + Math.min(10, r.kos) }
+  return pve((r.won ? 10 : r.place <= 3 ? 5 : 1) + Math.min(10, r.kos))
 }
 
 /** Yesterday's date for a YYYY-MM-DD day. */

@@ -15,6 +15,7 @@ import { esc, QUICK_CHAT } from './menu'
 import { BOSSES, RAID_LIVES } from '../data/bosses'
 import { DUEL_WINS, ROUND_TIME } from '../game/duel'
 import { L, tx, type Txt } from '../i18n'
+import { keyName, keyOf } from '../keys'
 
 const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = '') => {
   const el = document.createElement(tag)
@@ -53,7 +54,7 @@ export class Hud {
   private respawnSec = 0
   private timerWarned = new Set<number>()
   private itemBtns: Record<string, HTMLDivElement> = {}
-  private catchBtn = h('button', 'catch2 hidden', `<span>${L('CATCH!', 'VANG!')}</span><kbd data-pad="B">${L('Space', 'Spatie')}</kbd>`)
+  private catchBtn = h('button', 'catch2 hidden', `<span>${L('CATCH!', 'VANG!')}</span><kbd data-pad="B">${keyName(keyOf('catch'))}</kbd>`)
   private knob = h('div', 'stick-knob')
   private base = h('div', 'stick-base hidden')
   private vLow = h('div', 'vign low')
@@ -149,7 +150,7 @@ export class Hud {
     // Items
     const items = h('div', 'items2')
     for (const [key, sprite, label] of [['master', 'master-ball', 'Master'], ['potion', 'potion', 'Potion'], ['revive', 'revive', 'Revive']] as const) {
-      const kb = { master: '1', potion: '2', revive: '3' }[key]
+      const kb = keyName(keyOf(key))
       const b = h('div', `ib ${key}`, `<img class="px" src="${itemUrl(sprite)}" alt="${label}"><b>0</b><kbd data-pad="${{ master: '◀', potion: '▲', revive: '▶' }[key]}">${kb}</kbd>`) as HTMLDivElement
       b.onpointerdown = (e) => {
         e.preventDefault()
@@ -482,7 +483,7 @@ export class Hud {
         const locked = !m.unlocked(s)
         b.classList.toggle('locked', locked)
         b.style.setProperty('--tc', TYPE_COLOR[mv.type])
-        b.innerHTML = `<div class="ring"></div><div class="cd"></div><div class="lbl">${locked ? `<span class="lock">🔒</span><small>Lv ${SLOT_UNLOCK[s]}</small>` : `<span>${mv.name}</span><small>${TYPE_NL[mv.type]}</small>`}</div><div class="secs"></div><div class="aimknob"></div><kbd data-pad="${['A', 'X', 'Y', 'RT'][s]}">${[L('Click', 'Klik'), 'Q', 'E', 'R'][s]}</kbd>`
+        b.innerHTML = `<div class="ring"></div><div class="cd"></div><div class="lbl">${locked ? `<span class="lock">🔒</span><small>Lv ${SLOT_UNLOCK[s]}</small>` : `<span>${mv.name}</span><small>${TYPE_NL[mv.type]}</small>`}</div><div class="secs"></div><div class="aimknob"></div><kbd data-pad="${['A', 'X', 'Y', 'RT'][s]}">${s === 0 ? L('Click', 'Klik') : keyName(keyOf((['move1', 'move2', 'move3', 'move4'] as const)[s]))}</kbd>`
       })
     }
     m.moves.forEach((mv, s) => {
@@ -793,7 +794,7 @@ export function chatWidget(say: (text: string) => void) {
       <div class="hchat-quick">${QUICK_CHAT.map((q) => `<button type="button">${tx(q)}</button>`).join('')}</div>
       <div class="hchat-row"><input maxlength="80" placeholder="${L('Say something…', 'Zeg iets…')}" autocomplete="off" enterkeyhint="send" aria-label="${L('Message', 'Bericht')}"><button type="submit" aria-label="${L('Send', 'Verstuur')}">${SEND_ICON}</button></div>
     </form>
-    <div class="hchat-hint"><kbd>Enter</kbd>${L('to chat', 'om te chatten')}</div>`)
+    <div class="hchat-hint"><kbd>${keyName(keyOf('chat'))}</kbd>${L('to chat', 'om te chatten')}</div>`)
   const log = panel.querySelector('.hchat-log') as HTMLElement
   const bar = panel.querySelector('.hchat-bar') as HTMLFormElement
   const input = bar.querySelector('input') as HTMLInputElement

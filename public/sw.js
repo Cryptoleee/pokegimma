@@ -6,7 +6,7 @@
  * - The API and anything from other sites are never touched.
  * Bump VERSION to drop everything cached by an older worker.
  */
-const VERSION = 'v1'
+const VERSION = 'v2'
 const PAGES = `sb-pages-${VERSION}`
 const STATIC = `sb-static-${VERSION}`
 
@@ -30,18 +30,19 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url)
   if (url.origin !== location.origin || url.pathname.startsWith('/api/')) return
 
-  // Pages: network first, the cached shell when offline
+  // Pages: network first, the cached shell when offline (the game and the second screen each their own)
   if (req.mode === 'navigate') {
+    const shell = url.pathname.startsWith('/duo') ? '/duo/' : '/'
     e.respondWith(
       fetch(req)
         .then((res) => {
-          if (res.ok) {
+          if (res.ok && !res.redirected) {
             const copy = res.clone()
-            caches.open(PAGES).then((c) => c.put('/', copy))
+            caches.open(PAGES).then((c) => c.put(shell, copy))
           }
           return res
         })
-        .catch(() => caches.match('/').then((r) => r || Response.error())),
+        .catch(() => caches.match(shell).then((r) => r || Response.error())),
     )
     return
   }

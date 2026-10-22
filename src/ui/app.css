@@ -5964,3 +5964,148 @@ body.duo-view #hud {
   border: 1px solid var(--n-line);
   font-size: 13px;
 }
+
+/* Difficulty: in the lobby's match picker (host picks, guests see it) */
+.nl .cp-diff,
+.cp-diff {
+  display: grid;
+  grid-template-columns: auto repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cp-diff span {
+  padding-right: 4px;
+  color: var(--n-mute);
+  font: 800 11px var(--n-font);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.nl .cp-diff button,
+.cp-diff button {
+  all: unset;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  min-height: 40px;
+  border-radius: 12px;
+  background: var(--n-s2);
+  border: 1px solid var(--n-line);
+  color: var(--n-dim);
+  font: 700 13px var(--n-font);
+  cursor: pointer;
+}
+.nl .cp-diff button.on,
+.cp-diff button.on {
+  border-color: var(--n-acc);
+  box-shadow: 0 0 0 1px var(--n-acc) inset;
+  color: var(--n-text);
+}
+.cp-diff button:disabled {
+  cursor: default;
+}
+.n-diff {
+  margin-top: 2px;
+}
+
+/* Options → Controls */
+.n-ui #modal .keys-panel {
+  max-height: calc(100dvh - 40px);
+  display: flex;
+  flex-direction: column;
+}
+.n-ui #modal .kb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+.n-ui #modal .kb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--n-line);
+  background: var(--n-s2);
+  color: var(--n-text);
+  font: 700 14px var(--n-font);
+  text-align: left;
+  cursor: pointer;
+}
+.n-ui #modal .kb-row:hover {
+  border-color: var(--n-line2);
+}
+.n-ui #modal .kb-row kbd {
+  min-width: 34px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+.n-ui #modal .kb-row.wait {
+  border-color: var(--n-acc);
+}
+.n-ui #modal .kb-row.wait kbd {
+  background: var(--n-acc);
+  color: var(--n-acc-ink);
+  border-color: var(--n-acc);
+  animation: kb-blink 1s ease-in-out infinite;
+}
+@keyframes kb-blink {
+  50% {
+    opacity: 0.55;
+  }
+}
+/* Second screen: tap to go full screen (browsers want a tap first) */
+.dv-start {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 0;
+  background: radial-gradient(ellipse 90% 60% at 50% 40%, rgba(255, 214, 10, 0.12), rgba(255, 214, 10, 0) 70%), rgba(10, 10, 11, 0.97);
+  color: var(--n-text);
+  font-family: var(--n-font);
+  cursor: pointer;
+}
+.dv-start img {
+  width: min(260px, 70%);
+}
+.dv-start b {
+  margin-top: 8px;
+  padding: 14px 26px;
+  border-radius: 18px;
+  background: var(--n-acc);
+  color: var(--n-acc-ink);
+  font-size: 17px;
+  font-weight: 800;
+}
+.dv-start small {
+  color: var(--n-mute);
+  font-size: 13px;
+  font-weight: 700;
+}
+.dv-fs {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--safe-b) + 12px);
+  z-index: 40;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid var(--n-line2);
+  background: rgba(20, 20, 22, 0.9);
+  color: var(--n-text);
+  cursor: pointer;
+}

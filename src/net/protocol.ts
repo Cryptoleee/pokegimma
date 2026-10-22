@@ -1,3 +1,4 @@
+import type { Difficulty } from '../data/difficulty'
 import type { StadiumId } from '../data/stadiums'
 import type { AimDir, Dir } from '../game/entities'
 import type { MatchKind, MatchSetup } from '../game/game'
@@ -23,6 +24,8 @@ export interface MatchChoice {
   theme: ThemeId | 'random'
   /** 1 vs 1 stadium. */
   stadium?: StadiumId | 'random'
+  /** How hard the bots, the CPU or the boss play. */
+  diff?: Difficulty
 }
 
 /** A chat line (lobby and in-game). */

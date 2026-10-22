@@ -9,6 +9,7 @@ import { pickStadium, STADIUMS, type StadiumId } from './data/stadiums'
 import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
 import { chatBubble, render, view } from './game/render'
 import { padTick, type PadHooks } from './pad'
+import { actionOf, keyOf, type Action } from './keys'
 import { duoInit, duoNow, duoTick, isDuoPage, type DuoState } from './duo'
 import { startDuoView } from './ui/duoView'
 import { TILE } from './game/world'
@@ -194,21 +195,23 @@ let choice: MatchChoice = { kind: saved.kind ?? 'royale', theme: saved.theme ?? 
  */
 function setupFor(c: MatchChoice, humans: LobbyPlayer[]): MatchSetup {
   const seed = Date.now() % 1e9
+  // Public lobbies always play normal: the bots there are for everyone
+  const diff = room?.quick ? 'normal' : c.diff ?? 'normal'
   // Dev/testing: ?theme=<id> fixes the world
   const forcedTheme = new URLSearchParams(location.search).get('theme') as ThemeId | null
   if (c.kind === 'duel') {
     // Dev/testing: ?stadium=<id> fixes the stadium
     const forced = new URLSearchParams(location.search).get('stadium') as StadiumId | null
-    return { seed, humans, kind: 'duel', stadium: forced && forced in STADIUMS ? forced : pickStadium(c.stadium, seed) }
+    return { seed, humans, kind: 'duel', diff, stadium: forced && forced in STADIUMS ? forced : pickStadium(c.stadium, seed) }
   }
-  if (c.kind !== 'raid') return { seed, humans, kind: c.kind, theme: forcedTheme && forcedTheme in THEMES ? forcedTheme : pickTheme(c.theme, seed) }
+  if (c.kind !== 'raid') return { seed, humans, kind: c.kind, diff, theme: forcedTheme && forcedTheme in THEMES ? forcedTheme : pickTheme(c.theme, seed) }
   const last = store.get<BossId | ''>('lastBoss', '')
   const pool = BOSS_LIST.filter((b) => b !== last)
   // Dev/testing: ?boss=<id> fixes the boss
   const forced = new URLSearchParams(location.search).get('boss') as BossId | null
   const boss = forced && BOSS_LIST.includes(forced) ? forced : pool[Math.floor(Math.random() * pool.length)] ?? BOSS_LIST[0]
   store.set('lastBoss', boss)
-  return { seed, humans, kind: c.kind, theme: pickTheme(c.theme, seed), boss }
+  return { seed, humans, kind: c.kind, diff, theme: pickTheme(c.theme, seed), boss }
 }
 
 /** Lobby: you picked a team and tapped "Klaar". */
@@ -365,7 +368,7 @@ function loadingThen(setup: MatchSetup, skippable: boolean, start: () => void, g
       sprite: (TRAINERS.find((t) => t.key === h.trainer) ?? TRAINERS[0]).sprite,
       mon: duel ? finalForm(h.team[0]) : h.team[0],
     }))
-  showLoading({ seconds: LOADING_TIME, players, skippable, bots: duel ? 0 : Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined, duel, stadium: setup.stadium }, start)
+  showLoading({ seconds: LOADING_TIME, players, skippable, bots: duel ? 0 : Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined, duel, stadium: setup.stadium, diff: setup.diff }, start)
 }
 
 function startSolo() {
@@ -388,7 +391,7 @@ function onEnd(r: GameResult) {
     kind: statsKind(game), mode: statsMode(), humans: r.extra?.humans ?? 1,
     won: r.won, place: r.place, total: r.total, time: r.time, kos: r.duel ? r.duel.mine : r.kos, lost: r.duel?.theirs, caught: r.caught, partner: team[0],
     boss: r.raid?.boss, share: r.raid?.share, lives: r.raid?.lives,
-    legend: r.extra?.legend, evolved: r.extra?.evolved, crystal: r.extra?.crystal,
+    legend: r.extra?.legend, evolved: r.extra?.evolved, crystal: r.extra?.crystal, diff: game?.diff,
   }) : undefined
   // The match goes on without you (bots or other players still in it): you can watch
   const watch = r.final ? [] : [{ label: L('Keep watching', 'Kijk verder'), run: () => spectate(), icon: IC.eye }]
@@ -947,50 +950,55 @@ if (desktop) document.body.classList.add('desk')
 
 const keys = new Set<string>()
 /**
- * Desktop layout (left hand on WASD, right hand on the mouse):
+ * Desktop layout (left hand on WASD, right hand on the mouse), by default:
  * LMB = attack 1, Q/E/R = attacks 2/3/4 (R = ultimate), RMB hold = walk to cursor,
  * Space = catch, F = switch Pokémon, 1/2/3 = Master Ball / Potion / Revive.
+ * Every key can be changed in Options (see keys.ts); Escape always pauses.
  */
-const ATTACK_KEYS: Record<string, number> = { q: 1, e: 2, r: 3 }
+/** Moves on the keyboard: slot per action. */
+const ATTACKS: Partial<Record<Action, number>> = { move1: 0, move2: 1, move3: 2, move4: 3 }
 window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase()
   keys.add(k)
   if (e.key === 'Escape') return confirmLeave()
-  if (e.key === 'Enter' && viewing && hud?.openChat()) return e.preventDefault()
-  if (e.key === 'Enter' && spec && specChat) {
+  const a = actionOf(k)
+  if (a === 'chat' && viewing && hud?.openChat()) return e.preventDefault()
+  if (a === 'chat' && spec && specChat) {
     specChat.open()
     return e.preventDefault()
   }
-  if (e.key === 'Tab' && viewing && (hud || spec)) {
+  if (a === 'board' && viewing && (hud || spec)) {
     e.preventDefault()
     if (!e.repeat) (spec?.board ?? hud?.board)?.toggle()
     return
   }
   if (!game || !hud || game.paused) return
-  if (k === ' ' || k === 'tab' || k.startsWith('arrow')) e.preventDefault()
+  if (a || k.startsWith('arrow')) e.preventDefault()
   const g = game, p = g.player
-  if (k in ATTACK_KEYS) {
-    const slot = ATTACK_KEYS[k]
+  const slot = a ? ATTACKS[a] : undefined
+  if (slot !== undefined) {
     // Fire on press (a quick tap must never be lost), keep firing while held
     if (!e.repeat && p.alive && g.introT <= 0 && !g.useMove(p.mon, slot, undefined, g.cursorDir(p.mon)) && (p.mon.cds[slot] > 0 || !p.mon.unlocked(slot))) sfx.denied()
     g.held[slot] = true
   }
   if (e.repeat) return
-  if (k === 'f') {
+  if (a === 'switch') {
     for (let i = 1; i <= p.party.length; i++) if (g.switchTo(p, (p.active + i) % p.party.length)) break
   }
-  if (k === ' ') {
+  if (a === 'catch') {
     const w = g.catchable(p)
     if (w) g.throwBall(p, w, false)
   }
-  if (k === '1') hud.useItem('master')
-  if (k === '2') hud.useItem('potion')
-  if (k === '3') hud.useItem('revive')
+  if (a === 'master') hud.useItem('master')
+  if (a === 'potion') hud.useItem('potion')
+  if (a === 'revive') hud.useItem('revive')
 })
 window.addEventListener('keyup', (e) => {
   const k = e.key.toLowerCase()
   keys.delete(k)
-  if (game && k in ATTACK_KEYS) game.held[ATTACK_KEYS[k]] = false
+  const a = actionOf(k)
+  const slot = a ? ATTACKS[a] : undefined
+  if (game && slot !== undefined) game.held[slot] = false
 })
 window.addEventListener('blur', () => {
   keys.clear()
@@ -1078,10 +1086,11 @@ function updateAim(g: Game) {
 
 function desktopInput(g: Game) {
   let x = 0, y = 0
-  if (keys.has('a') || keys.has('arrowleft')) x--
-  if (keys.has('d') || keys.has('arrowright')) x++
-  if (keys.has('w') || keys.has('arrowup')) y--
-  if (keys.has('s') || keys.has('arrowdown')) y++
+  const held = (a: Action, arrow: string) => keys.has(arrow) || (!!keyOf(a) && keys.has(keyOf(a)))
+  if (held('left', 'arrowleft')) x--
+  if (held('right', 'arrowright')) x++
+  if (held('up', 'arrowup')) y--
+  if (held('down', 'arrowdown')) y++
 
   const { wx, wy } = updateAim(g)
 

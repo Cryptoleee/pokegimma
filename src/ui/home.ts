@@ -10,6 +10,7 @@ import { sfx } from '../audio'
 import { L } from '../i18n'
 import { profile, setName, NAME_MAX } from '../profile'
 import { cleanCode, MAX_PLAYERS } from '../net/room'
+import { DIFFICULTIES, diffName, diffNote, saveDiff, savedDiff, type Difficulty } from '../data/difficulty'
 import type { MatchChoice } from '../net/protocol'
 import { progress, onProgress, today } from '../progress'
 import { dailyOf, levelCost, levelOf, nextUnlock } from '../../api/_progress'
@@ -127,7 +128,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
   const mon = st.team[0]
   const shiny = !!mon && shinyPartner(mon)
   let view: MenuView = st.view ?? 'home'
-  let choice: MatchChoice = { ...st.choice }
+  let choice: MatchChoice = { ...st.choice, diff: st.choice.diff ?? savedDiff() }
   let msg = st.error ?? st.busy ?? ''
   let msgCls = st.error ? 'err' : st.busy ? 'busy' : ''
   let code = st.code ?? ''
@@ -322,6 +323,15 @@ export function showMenu(st: MenuState, on: MenuActions) {
         : L('You land in a public lobby; when the timer runs out, bots fill the empty spots.', 'Je komt in een openbare lobby; als de timer om is, vullen bots de lege plekken.')}</p>`
   }
 
+  /** Against the computer: how hard it plays. */
+  const diffPicker = () => {
+    const d = choice.diff ?? 'normal'
+    return `
+      <div class="n-sec"><b class="n-h3">${L('Difficulty', 'Moeilijkheid')}</b></div>
+      <div class="n-seg n-diff" role="radiogroup" aria-label="${L('Difficulty', 'Moeilijkheid')}">${DIFFICULTIES.map((x) => `<button role="radio" aria-checked="${x === d}" class="${x === d ? 'on' : ''}" data-diff="${x}">${diffName(x)}</button>`).join('')}</div>
+      <p class="n-note">${diffNote(d)}</p>`
+  }
+
   const cta = (kind: MatchChoice['kind'], opt: Opt) =>
     opt === 'friends' ? (kind === 'duel' ? L('Create duel', 'Maak duel') : L('Create lobby', 'Maak lobby'))
       : opt === 'quick' ? L('Find a match', 'Zoek een potje')
@@ -343,6 +353,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
             <p class="n-desc">${m.desc}</p>
             <div class="n-seg" role="tablist" aria-label="${L('How do you want to play?', 'Hoe wil je spelen?')}">${m.opts.map(([o, t]) => `<button role="tab" aria-selected="${o === opt}" class="${o === opt ? 'on' : ''}" data-opt="${o}">${t}</button>`).join('')}</div>
             <div class="n-optpanel">${optPanel(kind, opt)}</div>
+            ${opt === 'solo' || opt === 'cpu' ? diffPicker() : ''}
           </div>
           <aside class="n-mside">
             ${teamCard(st.trainer, mon, shiny, note)}
@@ -417,6 +428,12 @@ export function showMenu(st: MenuState, on: MenuActions) {
     })
     act('[data-theme]', (b) => {
       choice = { ...choice, theme: b.dataset.theme as MatchChoice['theme'] }
+      paint()
+    })
+    act('[data-diff]', (b) => {
+      const d = b.dataset.diff as Difficulty
+      saveDiff(d)
+      choice = { ...choice, diff: d }
       paint()
     })
     act('[data-stadium]', (b) => {

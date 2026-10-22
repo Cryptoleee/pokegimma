@@ -213,6 +213,8 @@ export class Trainer {
   /** Current velocity (tiles/s): momentum on ice. */
   slideX = 0
   slideY = 0
+  /** Seconds spent in the storm (its damage ramps up with it). */
+  stormT = 0
   /** Raid: lives left and seconds until you're back after going down. */
   lives = 0
   respawnT = 0

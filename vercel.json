@@ -1,15 +1,16 @@
 {
+  "redirects": [{ "source": "/duo", "destination": "/duo/", "permanent": false }],
   "rewrites": [
     { "source": "/stats", "destination": "/stats.html" },
-    { "source": "/duo", "destination": "/index.html" }
+    { "source": "/duo/", "destination": "/duo.html" }
   ],
   "headers": [
     {
-      "source": "/",
+      "source": "/(duo/)?",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
     },
     {
-      "source": "/index.html",
+      "source": "/(index|duo).html",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
     },
     {
@@ -27,7 +28,7 @@
       ]
     },
     {
-      "source": "/manifest.webmanifest",
+      "source": "/(duo/)?manifest.webmanifest",
       "headers": [
         { "key": "Content-Type", "value": "application/manifest+json" },
         { "key": "Cache-Control", "value": "no-cache, must-revalidate" }

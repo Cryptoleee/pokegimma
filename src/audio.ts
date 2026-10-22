@@ -13,6 +13,19 @@ export function unlockAudio() {
   if (ctx.state === 'suspended') void ctx.resume()
 }
 
+/**
+ * Keep the sound going. Browsers may suspend (or "interrupt") the AudioContext
+ * when the window loses focus: on a dual-screen handheld, tapping the second
+ * screen (/duo) did exactly that. Resume it whenever this window is visible
+ * again, gets focus or input, and check every moment just in case.
+ */
+function wake() {
+  if (ctx && document.visibilityState === 'visible' && (ctx.state as string) !== 'running' && ctx.state !== 'closed') void ctx.resume().catch(() => {})
+}
+for (const ev of ['focus', 'pageshow', 'pointerdown', 'keydown', 'touchend'] as const) addEventListener(ev, wake, { passive: true, capture: true })
+document.addEventListener('visibilitychange', wake)
+setInterval(wake, 1500)
+
 /** Sound channels the player can switch on and off in the options. */
 export type Channel = 'music' | 'voice' | 'sfx'
 const PREFS_KEY = 'battlemon:audio'

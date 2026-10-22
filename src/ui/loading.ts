@@ -4,6 +4,7 @@ import { itemUrl } from '../game/sprites'
 import { sfx } from '../audio'
 import { esc } from './menu'
 import { MODE_RGB } from './results'
+import { diffName, type Difficulty } from '../data/difficulty'
 import { BOSSES, RESPAWN_TIME, type BossDef, type BossId } from '../data/bosses'
 import { L, tx } from '../i18n'
 import { STADIUMS, type StadiumId } from '../data/stadiums'
@@ -64,7 +65,7 @@ export interface LoadingPlayer {
  * Shows the splash for `seconds`, then calls `done`. With `skippable` a button
  * lets you start right away (solo); in multiplayer everyone waits together.
  */
-export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; skippable: boolean; bots: number; raid?: BossId; duel?: boolean; stadium?: StadiumId }, done: () => void) {
+export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; skippable: boolean; bots: number; raid?: BossId; duel?: boolean; stadium?: StadiumId; diff?: Difficulty }, done: () => void) {
   const app = document.getElementById('app')!
   const el = document.createElement('div')
   // Legendary + Master Ball first (most asked), then a random mix
@@ -74,6 +75,8 @@ export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; s
   const stadium = opts.stadium ? STADIUMS[opts.stadium] : null
   const tips = boss ? raidTips(boss) : opts.duel ? [...(stadium ? [{ icon: `<i class="ld-up">${stadium.icon}</i>`, title: stadium.name, text: stadium.tip }] : []), ...duelTips()] : [TIPS[Math.random() < 0.5 ? 0 : 1], TIPS[2], ...rest]
   const kind = boss ? 'raid' : opts.duel ? 'duel' : 'royale'
+  // Not the standard game: say so up top
+  const dl = opts.diff && opts.diff !== 'normal' ? ` · ${diffName(opts.diff)}` : ''
   el.className = `nld nld-${kind}`
   el.style.setProperty('--mc', MODE_RGB[kind])
   el.innerHTML = `
@@ -81,11 +84,11 @@ export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; s
     <div class="nld-in">
       <section class="nld-l">
         ${boss
-          ? `<div class="nld-head"><span class="n-label">Raid · ${esc(tx(boss.title))}</span><h1>${boss.name}</h1></div>
+          ? `<div class="nld-head"><span class="n-label">Raid · ${esc(tx(boss.title))}${dl}</span><h1>${boss.name}</h1></div>
         <div class="nld-boss"><img class="px" src="${animatedUrl(boss.species)}" onerror="this.onerror=null;this.src='${spriteUrl(boss.species)}'" alt=""></div>`
           : opts.duel
-            ? `<div class="nld-head"><span class="n-label">1 vs 1 · best of 3</span><h1>${stadium ? `${stadium.icon} ${stadium.name}` : L('Duel', 'Duel')}</h1></div>`
-            : `<div class="nld-head"><span class="n-label">Battle Royale</span><h1>${L('Loading match', 'Potje wordt geladen')}</h1></div>`}
+            ? `<div class="nld-head"><span class="n-label">1 vs 1 · best of 3${dl}</span><h1>${stadium ? `${stadium.icon} ${stadium.name}` : L('Duel', 'Duel')}</h1></div>`
+            : `<div class="nld-head"><span class="n-label">Battle Royale${dl}</span><h1>${L('Loading match', 'Potje wordt geladen')}</h1></div>`}
         <div class="nld-players ${opts.duel ? 'vs' : ''}">
           ${opts.players.map((p, i) => `${opts.duel && i === 1 ? '<em class="nld-vs">VS</em>' : ''}<div class="nld-p" style="--d:${i * 70}ms"><span class="nld-pic"><img class="px" src="${trainerSpriteUrl(p.sprite)}" alt="">${p.mon ? `<img class="px nld-mon" src="${spriteUrl(p.mon)}" alt="">` : ''}</span><b>${esc(p.name)}</b></div>`).join('')}
           ${opts.bots && !boss && !opts.duel ? `<div class="nld-p bots" style="--d:${opts.players.length * 70}ms"><span class="nld-pic"><i>+${opts.bots}</i></span><b>bots</b></div>` : ''}

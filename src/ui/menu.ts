@@ -8,6 +8,7 @@ import { ROYALE_THEMES, THEMES } from '../data/themes'
 import { BOSS_LIST, BOSSES } from '../data/bosses'
 import { SEATS } from '../game/game'
 import { accountStatus } from '../account'
+import { DIFFICULTIES, diffName, saveDiff, type Difficulty } from '../data/difficulty'
 import { L } from '../i18n'
 import { openInvite } from './friends'
 import { progress } from '../progress'
@@ -74,7 +75,8 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
             const th = t === 'random' ? null : THEMES[t]
             return `<button data-theme="${t}" class="${c.theme === t ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${th ? th.grass[0] : '#5a6a9a'};--c2:${th ? th.tall[0] : '#3a4470'}"><i>${th ? th.icon : '🎲'}</i>${th ? th.name : L('Random', 'Willekeurig')}</button>`
           }).join('')}</div>`
-        : `<div class="cp-mystery"><div class="cp-sil">${BOSS_LIST.map((b) => `<img class="px" src="${spriteUrl(BOSSES[b].species)}" alt="">`).join('')}<i>?</i></div><span><b>${L('Random boss', 'Willekeurige baas')}</b><small>${L('You find out who you face while it loads', 'Je ziet pas bij het laden tegen wie je vecht')}</small></span></div>`}`
+        : `<div class="cp-mystery"><div class="cp-sil">${BOSS_LIST.map((b) => `<img class="px" src="${spriteUrl(BOSSES[b].species)}" alt="">`).join('')}<i>?</i></div><span><b>${L('Random boss', 'Willekeurige baas')}</b><small>${L('You find out who you face while it loads', 'Je ziet pas bij het laden tegen wie je vecht')}</small></span></div>`}
+      <div class="cp-diff" role="radiogroup" aria-label="${L('Difficulty', 'Moeilijkheid')}"><span>${c.kind === 'raid' ? L('Boss', 'Baas') : c.kind === 'duel' ? 'CPU' : 'Bots'}</span>${DIFFICULTIES.map((d) => `<button data-diff="${d}" role="radio" aria-checked="${(c.diff ?? 'normal') === d}" class="${(c.diff ?? 'normal') === d ? 'on' : ''}" ${ro ? 'disabled' : ''}>${diffName(d)}</button>`).join('')}</div>`
     el.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
       b.addEventListener('click', () => {
         if (!set) return
@@ -83,6 +85,10 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
         if (b.dataset.kind) c.kind = b.dataset.kind as MatchChoice['kind']
         if (b.dataset.theme) c.theme = b.dataset.theme as MatchChoice['theme']
         if (b.dataset.stadium) c.stadium = b.dataset.stadium as MatchChoice['stadium']
+        if (b.dataset.diff) {
+          c.diff = b.dataset.diff as Difficulty
+          saveDiff(c.diff)
+        }
         set(c)
         paint()
       }),

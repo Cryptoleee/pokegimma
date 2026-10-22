@@ -200,4 +200,33 @@ export function startDuoView() {
   }
 
   paint()
+  fullscreenGate(() => state?.lang ?? (navigator.language.startsWith('nl') ? 'nl' : 'en'))
+}
+
+/**
+ * Full screen needs a tap (browsers only allow it after one): a "tap to start"
+ * cover the first time, and a small button to go back to full screen after
+ * leaving it. Not needed when installed as an app that opens full screen.
+ */
+function fullscreenGate(lang: () => 'en' | 'nl') {
+  const el = document.documentElement
+  if (!el.requestFullscreen || matchMedia('(display-mode: fullscreen)').matches) return
+  const t = (en: string, nl: string) => (lang() === 'nl' ? nl : en)
+  const go = () => el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {})
+  const cover = document.createElement('button')
+  cover.className = 'dv-start'
+  cover.innerHTML = `<img src="${logoUrl}" alt=""><b>${t('Tap to start', 'Tik om te starten')}</b><small>${t('Full screen on this display', 'Schermvullend op dit scherm')}</small>`
+  cover.addEventListener('click', () => {
+    void go()
+    cover.remove()
+  })
+  const again = document.createElement('button')
+  again.className = 'dv-fs hidden'
+  again.setAttribute('aria-label', t('Full screen', 'Schermvullend'))
+  again.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>'
+  again.addEventListener('click', () => void go())
+  document.addEventListener('fullscreenchange', () => again.classList.toggle('hidden', !!document.fullscreenElement || cover.isConnected))
+  document.body.append(cover, again)
+  // Shown once the cover is gone and we're not full screen
+  cover.addEventListener('click', () => setTimeout(() => again.classList.toggle('hidden', !!document.fullscreenElement), 400))
 }

@@ -37,6 +37,11 @@ Vercel herkent het project automatisch als Vite-app (build: `npm run build`, out
 | Master Ball / Potion / Revive | Itemknoppen | 1 / 2 / 3 |
 | Pauze / game verlaten | ❚❚-knop of de terugknop van je telefoon (vraagt eerst om bevestiging) | Esc |
 
+- **Eigen toetsen:** Opties → Besturing. Tik op een actie en druk op de nieuwe toets; een toets die al in gebruik is, wisselt van plek. Esc pauzeert altijd en de pijltjes lopen altijd ook. Aanval 1 kan naast de linkermuisknop ook een toets krijgen. Bewaard in de browser (`keys.ts`).
+- **Controller** (ook handhelds zoals de AYN Thor): linkerstick lopen, rechterstick richten, A / X / Y aanval 1-3, RT of RB ultimate, B vangen, LB wissel, D-pad items, Start pauze, Select scorebord, LT chat. In menu's: D-pad of stick navigeert, A kiest, B terug, LB/RB tabbladen (`pad.ts`).
+- **Tweede scherm** (`/duo/`, bijvoorbeeld het onderscherm van de AYN Thor): kaart, baas of score, je team (tik = wissel), items, scorebord, pauze en de chat. Verbindt vanzelf met het spel in dezelfde browser; installeerbaar als eigen app ("Stormbreak Duo"). Opties → Tweede scherm probeert het via de browser op het andere scherm te zetten (`duo.ts`, `ui/duoView.ts`).
+- **Moeilijkheid** (Makkelijk / Normaal / Moeilijk) bij solo, tegen de CPU en in je eigen lobby: hoe scherp de bots, de CPU of de baas spelen en hoeveel schade je van ze krijgt (×0,7 / ×1 / ×1,3). PvE-rankingpunten tellen half (makkelijk) of 1,5× (moeilijk). Openbare lobby's spelen altijd normaal (`data/difficulty.ts`).
+
 ## Samen spelen
 
 Zit je naast iemand? Dan heb je zo een potje:
@@ -74,7 +79,7 @@ Lokaal testen zonder internet: start een eigen PeerJS-server (`npx peer --port 9
 - **Evolutiekristal:** één per potje, vroeg (rond 30–45 s) ergens in de zone. Iedereen krijgt een melding, maar niet waar: hij staat niet op de kaart en er is geen pijl. Alleen een lichtzuil verraadt de plek als je in de buurt bent. Loop eroverheen en je actieve Pokémon evolueert meteen volledig, met het level dat daarbij hoort (minstens Lv 25) en alle vier de aanvallen. Alleen echte spelers kunnen hem pakken, bots niet. Je kans om vroeg de jacht te openen.
 - **Legendarisch alarm:** als er een legendarische Pokémon verschijnt, flitst het scherm goud. Een gouden balk bovenin toont de naam, de afstand, een pijl in de juiste richting en hoe je hem vangt.
 - **Eerlijk vangen:** wie een wilde Pokémon verslaat, mag hem eerst vangen: 3 seconden, bij een legendarische 8. Daarna mag iedereen een poging doen.
-- **Zone:** de storm krimpt in 6 fases. Daarbuiten verliest je actieve Pokémon HP.
+- **Zone:** de storm krimpt in 6 fases. Daarbuiten verliest je actieve Pokémon HP: 4,5% per seconde in de eerste fase, oplopend tot 25% in de laatste. Hoe langer je erin blijft, hoe harder het gaat (+10% per seconde, tot 2,5×).
 - **Bots:** AI-trainers met verschillende skill. Ze farmen wilde Pokémon, vangen, rapen items op, vluchten de zone in en vallen aan of vluchten afhankelijk van hun HP en level.
   - Ze hebben een reactietijd, richten niet altijd perfect en kiezen niet altijd hun beste aanval.
   - Ze krijgen iets minder XP.

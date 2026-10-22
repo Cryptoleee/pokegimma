@@ -70,7 +70,7 @@ type PresentationRequestCtor = new (urls: string[]) => { start(): Promise<Presen
 // ---------------------------------------------------------------- the game's side
 
 /** This window is the second screen itself (/duo), not the game. */
-export const isDuoPage = location.pathname.replace(/\/$/, '') === '/duo' || new URLSearchParams(location.search).get('screen') === '2'
+export const isDuoPage = /^\/duo(\/|\.html)?$/.test(location.pathname) || new URLSearchParams(location.search).get('screen') === '2'
 
 const channel = !isDuoPage && typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(DUO_CHANNEL) : null
 const conns: PresentationConnection[] = []
@@ -145,7 +145,7 @@ export async function presentDuo(): Promise<'presented' | 'unavailable' | 'cance
   const Req = (window as unknown as { PresentationRequest?: PresentationRequestCtor }).PresentationRequest
   if (!Req) return 'unavailable'
   try {
-    const conn = await new Req(['/duo']).start()
+    const conn = await new Req(['/duo/']).start()
     wire(conn)
     return 'presented'
   } catch (e) {
