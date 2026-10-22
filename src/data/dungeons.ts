@@ -115,32 +115,16 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
     get blurb() { return L('Fight down through the volcano: halls full of fire Pokémon packs, two wardens, a last stand, and Reshiram waiting in the crater.', 'Vecht je een weg door de vulkaan: zalen vol groepen vuur-Pokémon, twee wachters, een laatste stand, en Reshiram wacht in de krater.') },
     start: [21, 117],
     lives: 3,
-    // The story is Dutch only until the cutscene is approved; English follows then
+    // One flight through the dungeon to its legendary; Dutch only until the cutscene is approved
     intro: {
       id: 'depths-intro',
       shots: [
         {
-          src: 'depths-intro-1', len: 12, lines: [
-            { at: 0.6, until: 4.2, title: true, text: () => 'DE BRANDENDE DIEPTEN' },
-            { at: 4.4, until: 8, text: () => 'Eeuwenlang sliep er iets onder de vulkaan.' },
-            { at: 8.2, until: 11.6, text: () => 'De Orde van de Vlam bewaakte de poort, en hield de diepte stil.' },
+          src: 'depths-intro', len: 21.6, lines: [
+            { at: 1, until: 5.5, title: true, text: () => 'DE BRANDENDE DIEPTEN', kicker: () => 'Raid-dungeon' },
+            { at: 17.6, until: 21.6, title: true, text: () => 'RESHIRAM', kicker: () => 'Heer van de vulkaankrater' },
           ],
         },
-        {
-          src: 'depths-intro-2', len: 12, lines: [
-            { at: 0.5, until: 4.4, text: () => 'Tot het Laatste Bastion viel.' },
-            { at: 4.6, until: 8.2, text: () => 'Het vuur werd wild. De wachters ontwaakten.' },
-            { at: 8.4, until: 11.6, text: () => 'Wie afdaalde, kwam nooit meer terug.' },
-          ],
-        },
-        {
-          src: 'depths-intro-3', len: 12, lines: [
-            { at: 0.6, until: 4.2, text: () => 'Diep in de krater roert de Witte Vlam zich.' },
-            { at: 4.4, until: 7.9, text: () => 'Als hij ontwaakt, brandt de wereld.' },
-            { at: 8.8, until: 12, title: true, text: () => 'RESHIRAM' },
-          ],
-        },
-        { len: 4, lines: [{ at: 0.4, until: 3.8, text: () => 'Daal af. Versla de wachters. Bereik de krater.' }] },
       ],
     },
     arenaEntry: [76, 64],

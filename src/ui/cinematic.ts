@@ -19,6 +19,8 @@ export interface CineLine {
   text: () => string
   /** A big title card in the middle instead of a subtitle. */
   title?: boolean
+  /** A small line under a title card. */
+  kicker?: () => string
 }
 
 export interface CineShot {
@@ -170,7 +172,7 @@ function run(c: Cinematic, shotVids: (HTMLVideoElement | null)[], done: () => vo
       typeT = 0
       titleEl.classList.toggle('on', !!line?.title)
       subEl.parentElement!.classList.toggle('on', !!line && !line.title)
-      if (line?.title) titleEl.textContent = text
+      if (line?.title) titleEl.innerHTML = `<b>${text}</b>${line.kicker ? `<small>${line.kicker()}</small>` : ''}`
       else subEl.textContent = ''
     }
     if (line && !line.title && typed < text.length) {

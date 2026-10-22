@@ -8989,21 +8989,68 @@ body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
   position: absolute;
   left: 0;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%) scale(0.96);
+  top: 70%;
+  transform: translateY(-50%);
   text-align: center;
-  font-size: clamp(30px, 6vw, 72px);
-  letter-spacing: 0.14em;
-  color: #ffe2b0;
-  text-shadow: 0 0 18px rgba(255, 120, 40, 0.85), 0 3px 0 #3a1408, 0 0 2px #000;
+  color: #ffe6b8;
   opacity: 0;
-  transition: opacity 1s ease, transform 3s ease-out;
   pointer-events: none;
   padding: 0 16px;
+  transition: opacity 0.6s ease;
+}
+.cin-title b {
+  display: block;
+  font-weight: 400;
+  font-size: clamp(26px, 5.2vw, 88px);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  line-height: 1;
+  text-shadow: 0 0 24px rgba(255, 110, 30, 0.9), 0 0 60px rgba(255, 70, 10, 0.5), 0 4px 0 #3a1408, 0 0 2px #000;
+}
+.cin-title small {
+  display: block;
+  margin-top: 10px;
+  font-size: clamp(13px, 1.9vw, 24px);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #ffc98a;
+  text-shadow: 0 2px 0 #000, 0 0 10px rgba(255, 100, 30, 0.6);
 }
 .cin-title.on {
   opacity: 1;
-  transform: translateY(-50%) scale(1);
+}
+/* The title shoots in: from big and blurred, it slams into place with a flash, then drifts closer */
+.cin-title.on b {
+  animation: cinSlam 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both, cinDrift 5s 0.55s ease-out both;
+}
+.cin-title.on small {
+  animation: cinKicker 0.8s 0.35s ease-out both;
+}
+@keyframes cinSlam {
+  0% {
+    transform: scale(2.6);
+    filter: blur(14px) brightness(3);
+    opacity: 0;
+  }
+  60% {
+    filter: blur(0) brightness(1.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    filter: none;
+  }
+}
+@keyframes cinDrift {
+  to {
+    transform: scale(1.06);
+  }
+}
+@keyframes cinKicker {
+  from {
+    opacity: 0;
+    letter-spacing: 0.9em;
+  }
 }
 .cin-sub {
   position: absolute;
