@@ -26,14 +26,16 @@ export function unlockAudio() {
  * bottom one went completely silent (both AudioContexts "running", nothing
  * heard). A playing <audio> element with a media session is what Android
  * treats as real media, so the same sound goes out that way instead.
- * 'auto' does that while a second screen is connected.
+ * 'auto' does that while a second screen is connected. Off by default: on the
+ * Thor itself it didn't bring the sound back (Chrome mutes everything there as
+ * soon as both screens have a Chrome window), and it adds a little latency.
  */
 export type OutMode = 'auto' | 'on' | 'off'
 const OUT_KEY = 'sb:audioOut'
-let outMode: OutMode = 'auto'
+let outMode: OutMode = 'off'
 try {
   const m = localStorage.getItem(OUT_KEY)
-  if (m === 'on' || m === 'off') outMode = m
+  if (m === 'on' || m === 'auto') outMode = m
 } catch {
   /* private mode */
 }
