@@ -15,7 +15,7 @@ import { progress } from '../progress'
 import { STADIUM_LIST, STADIUMS } from '../data/stadiums'
 import { titleName } from '../data/rewards'
 import { masteryOf, SHINY_AT } from '../../api/_progress'
-import { icon, IC, teamCard } from './app'
+import { discordAvatar, icon, IC, teamCard } from './app'
 import { openTeamSheet } from './team'
 import { storm, STORM_TINT } from './storm'
 
@@ -184,6 +184,7 @@ export function showLobby(room: Room, on: LobbyActions) {
           <header class="nl-head">
             <button class="n-icon nl-leave" data-act="leave" aria-label="${L('Leave the lobby', 'Lobby verlaten')}">${icon(IC.back)}</button>
             <div class="nl-title"><b>${title}</b><small class="nl-sub"></small></div>
+            <span class="nl-me" data-acct-slot>${discordAvatar('n-av-chip')}</span>
             ${quick ? '' : `<button class="nl-pill nl-share" aria-label="${L(`Share code ${room.code}`, `Code ${room.code} delen`)}">${esc(room.code)}${icon(IC.share, 16)}</button>`}
           </header>
           <div class="nl-body">

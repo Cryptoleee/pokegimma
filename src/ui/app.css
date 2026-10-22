@@ -6109,3 +6109,421 @@ body.duo-view #hud {
   color: var(--n-text);
   cursor: pointer;
 }
+
+/* ---------------------------------------------------------------- short landscape (handhelds like the AYN Thor) */
+
+/*
+ * A wide but short screen (a handheld's top display, a phone on its side):
+ * the menus go side by side so everything you need fits without scrolling.
+ * Lists that can grow (players, chat, world tiles) scroll inside their own
+ * column instead of the whole page.
+ */
+@media (min-width: 640px) and (max-width: 1099px) and (max-height: 600px) and (orientation: landscape) {
+  /* Home: your team on the left, the modes on the right */
+  .n-home {
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: 'top top' 'rejoin rejoin' 'team play';
+    gap: 10px 14px;
+    padding: calc(var(--safe-t) + 10px) 14px calc(var(--safe-b) + 10px);
+  }
+  .n-home > .n-top {
+    grid-area: top;
+  }
+  .n-home .n-rejoin {
+    grid-area: rejoin;
+    padding: 8px 14px;
+  }
+  .n-home .n-stage {
+    grid-area: team;
+    height: auto;
+    min-height: 0;
+    padding-bottom: 46px;
+  }
+  .n-home .n-playcol {
+    grid-area: play;
+    min-height: 0;
+    gap: 8px;
+  }
+  .n-home .n-playcol > .n-sec {
+    display: none;
+  }
+  .n-home .n-modes {
+    flex: 1;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+  .n-home .n-mode,
+  .n-home .n-mode-royale {
+    height: auto;
+    min-height: 0;
+  }
+  .n-home .n-joincode {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px 8px 14px;
+  }
+  .n-home .n-jc-txt {
+    flex: 1;
+  }
+  .n-home .n-jc-txt small {
+    display: none;
+  }
+  .n-home .n-joincode .n-field {
+    flex: 0 0 min(260px, 58%);
+  }
+  .n-home .n-joincode .n-field input,
+  .n-home .n-joincode .n-field .n-btn2 {
+    height: 40px;
+  }
+  .n-home .n-msg:empty {
+    display: none;
+  }
+
+  /* A mode: a short banner, the options left, your team and the start button right */
+  .n-modepage {
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    padding-bottom: calc(var(--safe-b) + 10px);
+  }
+  .n-banner {
+    height: calc(var(--safe-t) + 104px);
+  }
+  .n-mbody {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.62fr);
+    gap: 14px;
+    min-height: 0;
+    padding: 10px 14px 0;
+  }
+  .n-mopts {
+    min-height: 0;
+    overflow-y: auto;
+    gap: 10px;
+    padding-bottom: 4px;
+  }
+  .n-mopts .n-desc {
+    display: none;
+  }
+  .n-mopts .n-seg button {
+    height: 38px;
+  }
+  .n-mopts .n-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .n-mopts .n-tile {
+    min-height: 38px;
+    padding: 6px;
+  }
+  .n-mopts .n-note {
+    margin: 0;
+  }
+  .n-mside {
+    align-self: start;
+    gap: 8px;
+  }
+  .n-mside .n-go {
+    min-height: 50px;
+  }
+
+  /* Lobby: team, match and players left, the chat (and the code while alone) right, start at the bottom */
+  .nl .nl-page {
+    height: 100%;
+    min-height: 0;
+    padding: calc(var(--safe-t) + 8px) 14px 0;
+    gap: 8px;
+  }
+  .nl-head .nl-pill {
+    height: 38px;
+  }
+  .nl-body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 12px;
+  }
+  .nl-col {
+    display: flex;
+    min-height: 0;
+    overflow-y: auto;
+    gap: 8px;
+    padding-bottom: 6px;
+  }
+  .nl[data-page] .nl-left,
+  .nl[data-page] .nl-chat {
+    display: flex;
+  }
+  .nl.alone[data-page] .nl-code {
+    display: flex;
+  }
+  .nl-chat {
+    flex: 1;
+    min-height: 0;
+  }
+  .nl-log {
+    flex: 1;
+    min-height: 60px;
+  }
+  .nl-chatbtn {
+    display: none;
+  }
+  .nl-dock {
+    position: static;
+    margin: 0;
+    padding: 6px 0 calc(var(--safe-b) + 8px);
+    background: none;
+  }
+  .nl-start {
+    min-height: 48px;
+  }
+  .nl-teamslot .n-teamcard {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'pic info go';
+    padding: 8px 10px;
+    gap: 10px;
+  }
+  .nl-teamslot .n-tc-pic {
+    width: 96px;
+    height: 72px;
+  }
+  .nl .cp-modes button {
+    min-height: 44px;
+  }
+  .nl .cp-worlds button {
+    min-height: 38px;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1099px) and (max-height: 600px) and (orientation: landscape) {
+  /* The title moves right of the back button; the team card on the side keeps to name and switch */
+  .n-banner .n-bn-foot {
+    left: 70px;
+  }
+  .n-mside .n-teamcard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'pic go' 'info info';
+    align-items: center;
+    gap: 8px;
+  }
+  .n-mside .n-tc-pic {
+    grid-area: pic;
+    width: 96px;
+  }
+  .n-mside .n-tc-info {
+    grid-area: info;
+  }
+  .n-mside .n-tc-go {
+    grid-area: go;
+  }
+  .n-mside .n-tc-info small {
+    display: none;
+  }
+  .nl-qr {
+    width: 96px;
+    height: 96px;
+  }
+  .nl-code {
+    padding: 10px 12px;
+    gap: 12px;
+  }
+  .nl-codetext small {
+    display: none;
+  }
+}
+
+/* Narrow and short (a 640×360 screen): the essentials only */
+@media (min-width: 640px) and (max-width: 799px) and (max-height: 600px) and (orientation: landscape) {
+  .n-home .n-jc-txt {
+    display: none;
+  }
+  .n-home .n-joincode .n-field {
+    flex: 1;
+  }
+  .n-mopts .n-optpanel .n-note {
+    display: none;
+  }
+  .n-mbody {
+    grid-template-columns: minmax(0, 1fr) minmax(200px, 0.72fr);
+  }
+}
+
+/* Very short (a 360-px-high screen): smaller art, tighter cards */
+@media (min-width: 640px) and (max-width: 1099px) and (max-height: 430px) and (orientation: landscape) {
+  .n-home .n-stage .n-tr,
+  .n-home .n-stage .n-mon {
+    zoom: 1;
+  }
+  .n-home .n-stage {
+    padding-bottom: 40px;
+  }
+  .n-home .n-top .n-hello small {
+    display: none;
+  }
+  .n-banner {
+    height: calc(var(--safe-t) + 76px);
+  }
+  .n-banner .n-bn-mon,
+  .n-banner .n-bn-boss,
+  .n-banner .n-bn-group {
+    zoom: 0.75;
+  }
+  .nl-teamslot .n-tc-pic {
+    height: 56px;
+  }
+  .n-home .n-stage-chips {
+    display: none;
+  }
+  .n-home .n-mode small,
+  .n-home .n-mode-txt small {
+    display: none;
+  }
+  .n-mopts .n-tile {
+    min-height: 34px;
+  }
+  .n-mopts .n-seg button {
+    height: 34px;
+  }
+  .nl-qr {
+    width: 72px;
+    height: 72px;
+  }
+  .nl-codetext b {
+    font-size: 26px;
+  }
+  .nl-choice .n-sec,
+  .nl-left > .n-sec small {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- signed in with Discord */
+
+.n-av {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+}
+.n-av img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 2px var(--n-bg);
+}
+.n-av .n-dc {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  width: 13px;
+  height: 13px;
+  padding: 2px;
+  border-radius: 50%;
+  background: #5865f2;
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--n-bg);
+}
+.n-tab .n-av {
+  width: 24px;
+  height: 24px;
+}
+.n-tab.on .n-av img {
+  box-shadow: 0 0 0 2px var(--n-acc);
+}
+/* The card at the bottom of the rail: hidden in the phone tab bar */
+.n-acct {
+  display: none;
+}
+@media (min-width: 900px) {
+  .n-nav .n-acct {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: auto;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid var(--n-line);
+    background: var(--n-s1);
+    color: var(--n-text);
+    font-family: var(--n-font);
+    text-align: left;
+    cursor: pointer;
+  }
+  .n-acct .n-av {
+    width: 34px;
+    height: 34px;
+  }
+  .n-acct-t {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .n-acct-t small {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #8f99ff;
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .n-acct-t small .n-dc {
+    width: 12px;
+    height: 12px;
+  }
+  .n-acct-t b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 800;
+  }
+}
+/* The icon rail on sideways phones and handhelds: just the avatar */
+@media (min-width: 640px) and (max-height: 560px) {
+  .n-nav .n-acct {
+    display: grid;
+    place-items: center;
+    margin-top: auto;
+    padding: 8px 0;
+    border: 0;
+    background: none;
+  }
+  .n-acct .n-acct-t {
+    display: none;
+  }
+}
+/* Home: a small Discord mark next to your name */
+.n-hello-dc {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: #5865f2;
+  color: #fff;
+  vertical-align: 2px;
+}
+.n-hello-dc .n-dc {
+  width: 12px;
+  height: 12px;
+}
+/* Lobby header */
+.nl-me:empty {
+  display: none;
+}
+.n-av-chip {
+  width: 34px;
+  height: 34px;
+}

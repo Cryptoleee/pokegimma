@@ -9,6 +9,7 @@ import { sfx } from '../audio'
 import { L } from '../i18n'
 import { progress } from '../progress'
 import { masteryOf, MAX_MASTERY, SHINY_AT } from '../../api/_progress'
+import { accountState, accountStatus, onAccount } from '../account'
 
 /**
  * The menu app: a dark shell with four tabs (Play, Team, Friends, Profile) as a
@@ -57,6 +58,48 @@ const TAB_NAMES: Record<AppTab, () => string> = {
   profile: () => L('Profile', 'Profiel'),
 }
 
+// ---------------------------------------------------------------- signed in with Discord
+
+const DISCORD_PATH = 'M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.86-.61 1.25a18.27 18.27 0 0 0-5.49 0 12.6 12.6 0 0 0-.62-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.88 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 5.99 3.03.08.08 0 0 0 .09-.03c.46-.63.87-1.3 1.22-1.99a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.89.08.08 0 0 1-.01-.13l.37-.29a.07.07 0 0 1 .08-.01c3.93 1.79 8.18 1.79 12.06 0a.07.07 0 0 1 .08.01l.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.64-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.36 1.22 1.99a.08.08 0 0 0 .09.03 19.84 19.84 0 0 0 6-3.03.08.08 0 0 0 .03-.06c.5-5.18-.84-9.67-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.09-2.16-2.42s.96-2.42 2.16-2.42c1.21 0 2.18 1.1 2.16 2.42 0 1.33-.96 2.42-2.16 2.42zm7.97 0c-1.18 0-2.16-1.09-2.16-2.42s.96-2.42 2.16-2.42c1.21 0 2.18 1.1 2.16 2.42 0 1.33-.95 2.42-2.16 2.42z'
+/** The Discord mark (for "signed in with Discord"). */
+export const DISCORD = `<svg class="n-dc" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="${DISCORD_PATH}"/></svg>`
+
+/** You, when signed in with Discord (null as a guest). */
+export function discordMe() {
+  return accountStatus() === 'in' ? accountState()?.me ?? null : null
+}
+
+/** Your avatar with a small Discord mark on it. */
+export function discordAvatar(cls = '') {
+  const me = discordMe()
+  return me ? `<span class="n-av ${cls}" title="${appEsc(L(`Signed in with Discord as ${me.dname || me.name}`, `Ingelogd met Discord als ${me.dname || me.name}`))}"><img src="${appEsc(me.avatar)}" alt="">${DISCORD}</span>` : ''
+}
+
+/** The account card at the bottom of the rail (desktop and sideways phones). */
+function accountCard() {
+  const me = discordMe()
+  if (!me) return ''
+  return `<button class="n-acct" data-acct aria-label="${appEsc(L(`Signed in with Discord as ${me.dname || me.name}`, `Ingelogd met Discord als ${me.dname || me.name}`))}">${discordAvatar()}<span class="n-acct-t"><small>${DISCORD}${L('Discord', 'Discord')}</small><b>${appEsc(me.dname || me.name)}</b></span></button>`
+}
+
+/** Signing in or out updates the shell already on screen. */
+onAccount(() => {
+  document.querySelectorAll<HTMLElement>('.n-nav').forEach((nav) => {
+    nav.querySelector('.n-acct')?.remove()
+    nav.insertAdjacentHTML('beforeend', accountCard())
+    bindAcct(nav)
+    const prof = nav.querySelector<HTMLElement>('.n-tab[data-tab="profile"]')
+    if (prof) {
+      prof.querySelector('.n-av, svg')?.remove()
+      prof.insertAdjacentHTML('afterbegin', discordAvatar() || icon(ICONS.profile, 22))
+    }
+  })
+  document.querySelectorAll<HTMLElement>('[data-acct-slot]').forEach((slot) => (slot.innerHTML = discordAvatar('n-av-chip')))
+})
+function bindAcct(root: ParentNode) {
+  root.querySelector<HTMLElement>('.n-acct')?.addEventListener('click', () => root.querySelector<HTMLElement>('.n-tab[data-tab="profile"]')?.click())
+}
+
 /**
  * The shell around a menu page. `focus` hides the tab bar on phones (a mode
  * screen or a picker you came to from somewhere else); the rail stays on desktop.
@@ -65,13 +108,16 @@ const TAB_NAMES: Record<AppTab, () => string> = {
 export function appShell(tab: AppTab, page: string, o: { focus?: boolean; bare?: boolean; badge?: Partial<Record<AppTab, number>>; cls?: string } = {}) {
   const tabs = (Object.keys(ICONS) as AppTab[]).map((t) => {
     const n = o.badge?.[t] ?? 0
-    return `<button class="n-tab ${t === tab ? 'on' : ''}" data-tab="${t}" ${t === tab ? 'aria-current="page"' : ''}>${icon(ICONS[t], 22)}<span>${TAB_NAMES[t]()}</span>${n ? `<b class="n-badge">${n}</b>` : ''}</button>`
+    // Profile: your Discord avatar when you're signed in
+    const ic = (t === 'profile' && discordAvatar()) || icon(ICONS[t], 22)
+    return `<button class="n-tab ${t === tab ? 'on' : ''}" data-tab="${t}" ${t === tab ? 'aria-current="page"' : ''}>${ic}<span>${TAB_NAMES[t]()}</span>${n ? `<b class="n-badge">${n}</b>` : ''}</button>`
   }).join('')
   return `
     <div class="n-app ${o.focus ? 'n-focus' : ''} ${o.cls ?? ''}" data-tab="${tab}">
       ${o.bare ? '' : `<nav class="n-nav" aria-label="${L('Main menu', 'Hoofdmenu')}">
         <div class="n-brand"><img class="n-logo" src="${logoUrl}" alt="Stormbreak Royale">${BOLT}</div>
         ${tabs}
+        ${accountCard()}
       </nav>`}
       <main class="n-main">${page}</main>
     </div>`
@@ -79,6 +125,7 @@ export function appShell(tab: AppTab, page: string, o: { focus?: boolean; bare?:
 
 /** Tab presses go to `go`; the current tab is a no-op. */
 export function bindShell(root: ParentNode, go: (t: AppTab) => void) {
+  root.querySelectorAll<HTMLElement>('.n-nav').forEach(bindAcct)
   root.querySelectorAll<HTMLElement>('.n-nav .n-tab').forEach((b) =>
     b.addEventListener('click', () => {
       if (b.classList.contains('on')) return
