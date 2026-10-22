@@ -275,6 +275,7 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
     lives: 3,
     intro: {
       id: 'storm-intro',
+      look: 'storm',
       shots: [
         {
           src: 'storm-intro', len: 22.5, lines: [
@@ -286,10 +287,11 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
     },
     outro: {
       id: 'storm-outro',
+      look: 'storm',
       shots: [
         {
-          src: 'storm-outro', len: 14, lines: [
-            { at: 8.8, until: 14, title: true, heroes: true, text: () => L('ZEKROM DEFEATED', 'ZEKROM VERSLAGEN'), kicker: () => L('The storm breaks', 'De storm breekt') },
+          src: 'storm-outro', len: 12.2, lines: [
+            { at: 8.2, until: 12.2, title: true, heroes: true, text: () => L('ZEKROM DEFEATED', 'ZEKROM VERSLAGEN'), kicker: () => L('The storm breaks', 'De storm breekt') },
           ],
         },
       ],
@@ -323,7 +325,7 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
           sp: 466, lv: 48, hp: 6, at: ma(32, [16, 7]), enrage: 120, relic: 'ember', get title() { return L('Warden of Thunder', 'Wachter van de Donder') },
           calls: [{ at: 0.6, foes: [f(125, 1, 43, 'caster'), f(310, 1, 42)] }, { at: 0.3, foes: [f(125, 1, 44, 'brute'), f(181, 1, 43, 'mender')] }],
           attacks: [
-            el({ id: 'e_punch', name: 'Thunder Punch', shape: 'cone', warn: 1.0, cd: 4, dmg: 0.32, target: 'nearest', len: 6, width: 0.6, weight: 3, fx: 'discharge' }),
+            el({ id: 'e_punch', name: 'Thunder Punch', shape: 'cone', warn: 1.1, cd: 4, dmg: 0.32, target: 'nearest', len: 7, width: 0.45, weight: 3, fx: 'discharge' }),
             el({ id: 'e_static', get name() { return L('Static Charge', 'Statische Lading') }, shape: 'circle', warn: 3.6, cd: 11, dmg: 0.4, target: 'random', r: 2.6, weight: 3, follow: true, linger: { dur: 7, dps: 0.12 }, fx: 'thunder' }),
             el({ id: 'e_thunder', name: 'Thunder', shape: 'circle', warn: 1.3, cd: 6, dmg: 0.3, target: 'players', r: 2.1, extra: 2, stagger: 0.15, weight: 2, fx: 'thunder' }),
             el({ id: 'e_discharge', name: 'Discharge', shape: 'circle', warn: 1.4, cd: 9, dmg: 0.34, target: 'self', r: 3.8, weight: 2, fx: 'discharge' }),
@@ -350,7 +352,7 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
           calls: [{ at: 0.65, foes: [f(602, 3, 44)] }, { at: 0.35, foes: [f(596, 1, 46, 'brute', true), f(603, 1, 44, 'mender')] }],
           attacks: [
             el({ id: 'x_ring', name: 'Discharge', shape: 'ring', warn: 1.4, cd: 7, dmg: 0.34, target: 'self', inner: 3.2, r: 8, weight: 2, fx: 'discharge' }),
-            el({ id: 'x_zap', name: 'Zap Cannon', shape: 'line', warn: 1.25, cd: 7, dmg: 0.38, target: 'nearest', len: 13, width: 1.8, weight: 3, fx: 'discharge' }),
+            el({ id: 'x_zap', name: 'Zap Cannon', shape: 'line', warn: 1.35, cd: 7, dmg: 0.34, target: 'nearest', len: 13, width: 1.5, weight: 3, fx: 'discharge' }),
             el({ id: 'x_pool', get name() { return L('Electric Terrain', 'Elektrisch Veld') }, shape: 'circle', warn: 1.5, cd: 9, dmg: 0.22, target: 'players', r: 2.4, extra: 2, stagger: 0.2, weight: 3, linger: { dur: 9, dps: 0.1 }, fx: 'thunder' }),
             el({ id: 'x_wave', name: 'Thunder Wave', shape: 'circle', warn: 1.25, cd: 6, dmg: 0.25, target: 'players', r: 2, extra: 3, stagger: 0.12, weight: 2, fx: 'thunder' }),
           ],

@@ -36,6 +36,8 @@ export interface CineShot {
 export interface Cinematic {
   id: string
   shots: CineShot[]
+  /** A look for the titles (class on the cutscene, e.g. 'storm'). */
+  look?: string
 }
 
 const SKIP_KEY = 'sb:skipCutscenes'
@@ -80,7 +82,7 @@ function run(c: Cinematic, shotVids: (HTMLVideoElement | null)[], done: () => vo
   const vids = shotVids.filter((v): v is HTMLVideoElement => !!v)
   const app = document.getElementById('app')!
   const el = document.createElement('div')
-  el.className = 'cin'
+  el.className = 'cin' + (c.look ? ` ${c.look}` : '')
   el.innerHTML = `
     <div class="cin-stage"></div>
     <div class="cin-title"></div>

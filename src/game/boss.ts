@@ -203,8 +203,12 @@ export function updateRaid(g: Game, dt: number) {
     if (!m.fainted && g.world.at(Math.floor(m.x), Math.floor(m.y)) === T.LAVA) {
       // The dungeon's lava rivers and pools burn less than the crater (you have to cross them)
       g.applyDamage(m, m.maxHp * (inDungeon ? 0.05 : 0.1) * dt, null, true)
+      // (In the Storm Tower it's charged water: it shocks instead)
+      const zap = inDungeon && r.dg!.def.theme.type === 'electric'
       g.vOf(tr)?.sfx('burn')
-      if (Math.random() < dt * 8) g.vfx.burst(m.x, m.y - 0.2, { n: 2, speed: 2, dir: -Math.PI / 2, spread: 0.6, cols: ['#ffb030', '#ff6020'], shape: 'flame', s0: 2.5, s1: 0.5, life: 0.4 })
+      if (Math.random() < dt * 8) g.vfx.burst(m.x, m.y - 0.2, zap
+        ? { n: 2, speed: 3, dir: -Math.PI / 2, spread: 1.4, cols: ['#ffffff', '#8ae0ff'], shape: 'streak', s0: 2.5, s1: 0.5, life: 0.3 }
+        : { n: 2, speed: 2, dir: -Math.PI / 2, spread: 0.6, cols: ['#ffb030', '#ff6020'], shape: 'flame', s0: 2.5, s1: 0.5, life: 0.4 })
     }
     if (m.fainted && tr.respawnT > 0) {
       tr.respawnT -= dt
@@ -1094,10 +1098,12 @@ function drawPool(ctx: CanvasRenderingContext2D, h: Hazard, time: number) {
   ctx.save()
   ctx.globalAlpha = fade
   const grd = ctx.createRadialGradient(x, y, R * 0.1, x, y, R)
-  grd.addColorStop(0, 'rgba(255,230,140,0.9)')
-  grd.addColorStop(0.45, 'rgba(255,120,30,0.8)')
-  grd.addColorStop(0.85, 'rgba(160,40,10,0.7)')
-  grd.addColorStop(1, 'rgba(40,10,6,0)')
+  // Molten fire, or a crackling electric field
+  const zap = h.type === 'electric'
+  grd.addColorStop(0, zap ? 'rgba(235,250,255,0.85)' : 'rgba(255,230,140,0.9)')
+  grd.addColorStop(0.45, zap ? 'rgba(80,190,255,0.7)' : 'rgba(255,120,30,0.8)')
+  grd.addColorStop(0.85, zap ? 'rgba(30,70,170,0.6)' : 'rgba(160,40,10,0.7)')
+  grd.addColorStop(1, zap ? 'rgba(10,20,60,0)' : 'rgba(40,10,6,0)')
   ctx.fillStyle = grd
   ctx.beginPath()
   for (let i = 0; i <= 24; i++) {
@@ -1114,7 +1120,7 @@ function drawPool(ctx: CanvasRenderingContext2D, h: Hazard, time: number) {
   for (let i = 0; i < 5; i++) {
     const k = (time * 0.8 + i / 5 + h.id * 0.13) % 1
     const a = i * 2.4 + h.id
-    ctx.fillStyle = `rgba(255,240,170,${(1 - k) * 0.8})`
+    ctx.fillStyle = zap ? `rgba(255,245,140,${(1 - k) * 0.9})` : `rgba(255,240,170,${(1 - k) * 0.8})`
     ctx.beginPath()
     ctx.arc(x + Math.cos(a) * R * 0.5, y + Math.sin(a) * R * 0.3, 1 + k * 2.5, 0, Math.PI * 2)
     ctx.fill()
@@ -1292,10 +1298,11 @@ export function drawHazards(g: Game, ctx: CanvasRenderingContext2D, time: number
     }
     // Vents glow and bubble before they blow
     if (h.atk === 'vent' || h.atk === 'eruption') {
-      drawGlow(ctx, x, y, 14 + 34 * k, '#ff8020', 0.4 + 0.5 * k)
+      const zap = h.type === 'electric'
+      drawGlow(ctx, x, y, 14 + 34 * k, zap ? '#4ab8ff' : '#ff8020', 0.4 + 0.5 * k)
       for (let i = 0; i < 6; i++) {
         const f = (time * 2.2 + i * 0.37) % 1
-        disc(ctx, x + Math.sin(i * 2.7) * R * 0.45, y + Math.cos(i * 1.9) * R * 0.3, 1 + f * 3 * (0.5 + k), f < 0.8 ? '#ffb040' : '#fff0a0')
+        disc(ctx, x + Math.sin(i * 2.7) * R * 0.45, y + Math.cos(i * 1.9) * R * 0.3, 1 + f * 3 * (0.5 + k), zap ? (f < 0.8 ? '#8ae0ff' : '#ffffff') : f < 0.8 ? '#ffb040' : '#fff0a0')
       }
     }
     // Lightning rods: sparks crawl along the line between them
@@ -1418,7 +1425,7 @@ export function drawHazardsSky(g: Game, ctx: CanvasRenderingContext2D, time: num
       // Embers and smoke rising out of the vent
       for (let i = 0; i < 6; i++) {
         const f = (time * 1.4 + i / 6) % 1
-        drawGlow(ctx, x + Math.sin(i * 5 + time * 3) * 6, y - f * (20 + 40 * k), 4 + 3 * k, '#ff9030', (1 - f) * (0.4 + 0.5 * k))
+        drawGlow(ctx, x + Math.sin(i * 5 + time * 3) * 6, y - f * (20 + 40 * k), 4 + 3 * k, h.type === 'electric' ? '#7ad8ff' : '#ff9030', (1 - f) * (0.4 + 0.5 * k))
       }
       continue
     }

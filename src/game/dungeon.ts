@@ -9,6 +9,7 @@ import { Mon, type Trainer } from './entities'
 import type { Game } from './game'
 import { preloadMon } from './sprites'
 import { ARENA_C, ARENA_R, T, TILE, type Gate } from './world'
+import { stormLook } from './dungeonArt'
 
 /**
  * Raid dungeons (host and solo): the run through the rooms before the boss.
@@ -278,6 +279,7 @@ export function dungeonTick(g: Game, r: RaidState, dt: number): boolean {
         addHazard(g, { shape: 'circle', x: v.x, y: v.y, ang: 0, r: 2.6, inner: 0, width: 1, t: 1.4, dmg: 0.24, fx: 'earthpower', type: 'fire', freeze: 0, cover: false, both: false, atk: 'vent' })
       }
     }
+    if (d.started && d.def.theme.type === 'electric') stormRoom(g, d, room.deco, dt)
     // Everything down: the gate opens
     const packsLeft = d.packs.some((p) => !p.done)
     const wavesLeft = !!room.waves && d.wave < room.waves.length
@@ -289,6 +291,46 @@ export function dungeonTick(g: Game, r: RaidState, dt: number): boolean {
 
   g.raidView = { timeLeft: r.timeLeft, phase: 0, dg: viewOf(g, d) }
   return (d.stage as string) !== 'boss'
+}
+
+/**
+ * The Storm Tower's rooms fight back: in the flooded halls the charged pools
+ * discharge round their edges, in the dynamo hall the coils arc to each other,
+ * and on the battlements lightning strikes near whoever's fighting the waves.
+ */
+function stormRoom(g: Game, d: DungeonRun, deco: string, dt: number) {
+  const { rect } = d.def.rooms[d.room]
+  const inRoom = (p: { x: number; y: number }) => p.x >= rect.x && p.x < rect.x + rect.w && p.y >= rect.y && p.y < rect.y + rect.h
+  const base = { inner: 0, width: 1, freeze: 0, cover: false, both: false, type: 'electric' as const }
+  d.ventT -= dt
+  if (d.ventT > 0) return
+  if (deco === 'flooded' || deco === 'cistern') {
+    d.ventT = 3.4 + Math.random() * 2
+    const pools = g.world.dsparks.filter((s) => s.k === 'puddle' && inRoom(s))
+    for (let i = 0; i < Math.min(2, pools.length); i++) {
+      const v = pools.splice(Math.floor(Math.random() * pools.length), 1)[0]
+      addHazard(g, { ...base, shape: 'circle', x: v.x, y: v.y, ang: 0, r: 3, t: 1.4 + i * 0.25, dmg: 0.22, fx: 'discharge', atk: 'vent' })
+    }
+  } else if (deco === 'dynamo') {
+    d.ventT = 3.2 + Math.random() * 1.8
+    const coils = g.world.dsparks.filter((s) => s.k === 'coil' && inRoom(s))
+    if (coils.length < 2) return
+    // Two neighbouring coils (along one side of the square, never across it)
+    const a = coils[Math.floor(Math.random() * coils.length)]
+    const near = coils.filter((c) => c !== a && (Math.abs(c.x - a.x) < 1 || Math.abs(c.y - a.y) < 1))
+    const b = near[Math.floor(Math.random() * near.length)]
+    if (!b) return
+    addHazard(g, { ...base, shape: 'line', x: a.x, y: a.y, ang: Math.atan2(b.y - a.y, b.x - a.x), r: Math.hypot(b.x - a.x, b.y - a.y), width: 1.4, t: 1.5, dmg: 0.3, fx: 'discharge', atk: 'arc' })
+  } else if (deco === 'ramparts' && d.gauntlet) {
+    d.ventT = 3 + Math.random() * 1.4
+    const here = g.trainers.filter((t) => t.alive && !t.mon.fainted && inRoom(t))
+    const t = here[Math.floor(Math.random() * here.length)]
+    if (!t) return
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * Math.PI * 2, r = i ? 2 + Math.random() * 3 : Math.random() * 1.5
+      addHazard(g, { ...base, shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 1.8, t: 1.25 + i * 0.3, dmg: 0.15, fx: 'thunder', atk: 'vent' })
+    }
+  } else d.ventT = 1
 }
 
 export function viewOf(g: Game, d: DungeonRun): DungeonView {
@@ -827,6 +869,9 @@ export function drawGate(ctx: CanvasRenderingContext2D, gt: Gate, time: number) 
 /** A brazier: an iron bowl on a stand with a fire that never goes out. */
 export function drawBrazier(ctx: CanvasRenderingContext2D, x: number, y: number, time: number) {
   const px = Math.round(x), py = Math.round(y)
+  // The Storm Tower's braziers burn with caught lightning
+  const st = stormLook()
+  const [c0, c1, c2, c3] = st ? ['#5ac8ff', 'rgba(60,120,255,0.85)', 'rgba(120,215,255,0.9)', 'rgba(235,250,255,0.9)'] : ['#ff6020', 'rgba(255,90,20,0.85)', 'rgba(255,190,60,0.9)', 'rgba(255,250,200,0.9)']
   ctx.fillStyle = 'rgba(0,0,0,0.35)'
   ctx.fillRect(px - 5, py - 1, 10, 3)
   // Stand and bowl
@@ -838,7 +883,7 @@ export function drawBrazier(ctx: CanvasRenderingContext2D, x: number, y: number,
   ctx.fillStyle = '#54464a'
   ctx.fillRect(px - 6, py - 10, 12, 1)
   // Coals
-  ctx.fillStyle = '#ff6020'
+  ctx.fillStyle = c0
   ctx.fillRect(px - 5, py - 11, 10, 2)
   // Flames: three tongues licking up, the middle one tallest
   ctx.save()
@@ -846,16 +891,16 @@ export function drawBrazier(ctx: CanvasRenderingContext2D, x: number, y: number,
   for (let i = -1; i <= 1; i++) {
     const h = (i ? 7 : 11) + Math.sin(time * 11 + i * 2 + px) * 2.5
     const sway = Math.sin(time * 6 + i + py) * 1.2
-    ctx.fillStyle = 'rgba(255,90,20,0.85)'
+    ctx.fillStyle = c1
     ctx.fillRect(px + i * 3 - 2 + sway * 0.5, py - 11 - h, 4, h)
-    ctx.fillStyle = 'rgba(255,190,60,0.9)'
+    ctx.fillStyle = c2
     ctx.fillRect(px + i * 3 - 1 + sway, py - 11 - h * 0.7, 2, h * 0.7)
-    ctx.fillStyle = 'rgba(255,250,200,0.9)'
+    ctx.fillStyle = c3
     ctx.fillRect(px + i * 3 - 0.5 + sway, py - 11 - h * 0.35, 1, h * 0.35)
   }
   // A spark drifting up now and then
   const k = (time * 0.9 + px * 0.13) % 1
-  ctx.fillStyle = `rgba(255,200,90,${1 - k})`
+  ctx.fillStyle = st ? `rgba(255,240,120,${1 - k})` : `rgba(255,200,90,${1 - k})`
   ctx.fillRect(px + Math.sin(time * 3 + px) * 3, py - 18 - k * 14, 1, 1)
   ctx.restore()
 }

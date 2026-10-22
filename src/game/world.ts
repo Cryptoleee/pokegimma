@@ -2,7 +2,7 @@ import { Rng } from './rng'
 import { THEMES, type ThemeId, type WorldTheme } from '../data/themes'
 import { STADIUMS, type StadiumDef, type StadiumId } from '../data/stadiums'
 import type { DungeonDef, Rect } from '../data/dungeons'
-import { ANIMATED, bakeEdges, bakeGrime, bakeProps, bakeStones, bakeTile, buildLavaMask, carveRoom, FM, furnishHall, furnishRoom, hallTest, type Prop } from './dungeonArt'
+import { ANIMATED, setDungeonLook, bakeEdges, bakeGrime, bakeProps, bakeStones, bakeTile, buildLavaMask, carveRoom, FM, furnishHall, furnishRoom, hallTest, type Prop } from './dungeonArt'
 import { hash, mix, paintGrass, shade, tallBed, tileArt, tone } from './tiles'
 
 export const TILE = 16
@@ -97,6 +97,8 @@ export class World {
   gates: Gate[] = []
   /** Dungeon vents in the forge rooms: they erupt now and then. */
   dvents: { x: number; y: number }[] = []
+  /** Storm Tower: charged pools that pulse and tesla coils that arc to each other (tile centres). */
+  dsparks: { x: number; y: number; k: 'puddle' | 'coil' }[] = []
   /** Dungeon braziers along the walls (drawn and lit every frame). */
   braziers: { x: number; y: number }[] = []
   /** Raid dungeon: floor material per tile (see dungeonArt FM), set pieces, the ones that move, lava glow spots, the lava's shape. */
@@ -294,6 +296,7 @@ export class World {
    */
   private generateDungeon(def: DungeonDef, kind: ArenaKind) {
     const rng = this.rng
+    setDungeonLook(def.theme.type)
     this.tiles.fill(T.TREE)
     const nearHall = hallTest(def)
     // Halls: old mine shafts
