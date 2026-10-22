@@ -215,7 +215,7 @@ function setupFor(c: MatchChoice, humans: LobbyPlayer[]): MatchSetup {
   const startRoom = Number(q.get('room')) || 0
   let boss: BossId
   if (forced && BOSS_LIST.includes(forced)) boss = forced
-  else if (!classic) boss = DUNGEON_LIST[Math.floor(Math.random() * DUNGEON_LIST.length)].boss
+  else if (!classic) boss = (DUNGEON_LIST.find((d) => d.id === c.raid) ?? DUNGEON_LIST[0]).boss
   else {
     const last = store.get<BossId | ''>('lastBoss', '')
     const pool = BOSS_LIST.filter((b) => b !== last)

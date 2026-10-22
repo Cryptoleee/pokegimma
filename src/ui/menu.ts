@@ -30,6 +30,8 @@ export function shinyPartner(id: number) {
  */
 
 const screen = () => document.getElementById('screen')!
+/** Which raid is picked: a dungeon's id ('dungeon' and nothing mean the first one), or 'classic'. */
+export const raidPick = (raid: string | undefined) => (raid === 'classic' ? 'classic' : DUNGEON_LIST.find((d) => d.id === raid)?.id ?? DUNGEON_LIST[0]?.id ?? 'classic')
 export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
 function gif(id: number, cls = '', shiny = false) {
@@ -75,7 +77,7 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
             const th = t === 'random' ? null : THEMES[t]
             return `<button data-theme="${t}" class="${c.theme === t ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${th ? th.grass[0] : '#5a6a9a'};--c2:${th ? th.tall[0] : '#3a4470'}"><i>${th ? th.icon : '🎲'}</i>${th ? th.name : L('Random', 'Willekeurig')}</button>`
           }).join('')}</div>`
-        : `<div class="cp-worlds cp-raid">${DUNGEON_LIST.map((dd) => `<button data-raid="dungeon" class="${(c.raid ?? 'dungeon') === 'dungeon' ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:#5a2a1c;--c2:#ff7a30"><i>🔥</i>${esc(dd.name)}</button>`).join('')}<button data-raid="classic" class="${c.raid === 'classic' ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:#5a6a9a;--c2:#3a4470"><i>🎲</i>${L('Classic: random boss', 'Klassiek: willekeurige baas')}</button></div>`}
+        : `<div class="cp-worlds cp-raid">${DUNGEON_LIST.map((dd) => `<button data-raid="${dd.id}" class="${raidPick(c.raid) === dd.id ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${dd.theme.type === 'fire' ? '#5a2a1c' : '#1c2a5a'};--c2:${dd.theme.accent}"><i>${dd.theme.type === 'fire' ? '🔥' : '⚡'}</i>${esc(dd.name)}</button>`).join('')}<button data-raid="classic" class="${c.raid === 'classic' ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:#5a6a9a;--c2:#3a4470"><i>🎲</i>${L('Classic: random boss', 'Klassiek: willekeurige baas')}</button></div>`}
       <div class="cp-diff" role="radiogroup" aria-label="${L('Difficulty', 'Moeilijkheid')}"><span>${c.kind === 'raid' ? L('Boss', 'Baas') : c.kind === 'duel' ? 'CPU' : 'Bots'}</span>${DIFFICULTIES.map((d) => `<button data-diff="${d}" role="radio" aria-checked="${(c.diff ?? 'normal') === d}" class="${(c.diff ?? 'normal') === d ? 'on' : ''}" ${ro ? 'disabled' : ''}>${diffName(d)}</button>`).join('')}</div>`
     el.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
       b.addEventListener('click', () => {
@@ -296,7 +298,7 @@ export function showLobby(room: Room, on: LobbyActions) {
   /** "Battle Royale · Forest": what this lobby is going to play. */
   const matchLine = () => {
     const c = room.choice
-    if (c.kind === 'raid') return c.raid === 'classic' || !DUNGEON_LIST.length ? `Raid · ${L('random boss', 'willekeurige baas')}` : `Raid · ${DUNGEON_LIST[0].name}`
+    if (c.kind === 'raid') return c.raid === 'classic' || !DUNGEON_LIST.length ? `Raid · ${L('random boss', 'willekeurige baas')}` : `Raid · ${DUNGEON_LIST.find((d) => d.id === raidPick(c.raid))?.name ?? ''}`
     if (c.kind === 'duel') return `1 vs 1 · ${c.stadium && c.stadium !== 'random' ? STADIUMS[c.stadium].name : L('random stadium', 'willekeurig stadion')}`
     return `Battle Royale · ${c.theme && c.theme !== 'random' ? THEMES[c.theme].name : L('random world', 'willekeurige wereld')}`
   }

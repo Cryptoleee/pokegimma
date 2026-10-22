@@ -169,6 +169,17 @@ const ROWS: Row[] = [
   [218, 'Slugma', 'fire', 40, 55, 40, 20],
   [219, 'Magcargo', 'fire/rock', 60, 70, 100, 30],
   [228, 'Houndour', 'dark/fire', 45, 70, 40, 65],
+  // Dungeon foes (the Storm Tower), and its raid reward: Elekid grows into the warden Electivire
+  [239, 'Elekid', 'electric', 45, 63, 37, 95, 125, 20],
+  [125, 'Electabuzz', 'electric', 65, 83, 57, 105, 466, 34],
+  [466, 'Electivire', 'electric', 75, 123, 67, 95],
+  [523, 'Zebstrika', 'electric', 75, 100, 63, 116],
+  [479, 'Rotom', 'electric/ghost', 50, 65, 77, 91],
+  [602, 'Tynamo', 'electric', 35, 55, 40, 60],
+  [603, 'Eelektrik', 'electric', 65, 85, 70, 40],
+  [604, 'Eelektross', 'electric', 85, 115, 80, 50],
+  [181, 'Ampharos', 'electric', 90, 75, 85, 55],
+  [310, 'Manectric', 'electric', 70, 75, 60, 105],
   [229, 'Houndoom', 'dark/fire', 75, 100, 65, 95],
   [322, 'Numel', 'fire/ground', 60, 62, 42, 35],
   [323, 'Camerupt', 'fire/ground', 70, 102, 72, 40],
@@ -203,7 +214,7 @@ for (const [id, name, types, hp, atk, def, spe, evo, evoLevel] of ROWS) {
 /** The 24 Pokémon you pick your starting partner from. */
 export const ROSTER = [25, 4, 7, 1, 133, 495, 498, 501, 447, 443, 570, 610, 92, 66, 63, 147, 246, 446, 374, 123, 258, 255, 403, 633]
 /** Extra partners you unlock on the reward road (trainer level), and the raid unlocks (clear a dungeon). */
-export const UNLOCK_PARTNERS = [81, 390, 138, 220, 359, 111, 280, 607, 371, 142, 636, 144, 145, 146, 382, 383, 151, 240]
+export const UNLOCK_PARTNERS = [81, 390, 138, 220, 359, 111, 280, 607, 371, 142, 636, 144, 145, 146, 382, 383, 151, 240, 239]
 /** Everything you can pick: the free roster plus the unlockable ones. */
 export const ALL_PARTNERS = [...ROSTER, ...UNLOCK_PARTNERS]
 /** You start with one partner and can catch more in the world, up to PARTY_MAX. */

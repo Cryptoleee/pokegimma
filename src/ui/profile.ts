@@ -13,7 +13,7 @@ import { esc } from './menu'
 import { appShell, bindShell, type AppTab } from './app'
 import { askName } from './home'
 import { profile } from '../profile'
-import { PETS, petOff, petUnlocked, setPetOn } from '../data/pets'
+import { PETS, petOn, petUnlocked, setPet } from '../data/pets'
 
 /**
  * Your profile: trainer level and title, today's quests and streak, lifetime
@@ -45,7 +45,7 @@ function untilReset() {
 /** Followers you've earned (on or off), and the ones still to earn. */
 function petCard(p: Progress) {
   return `<div class="pf-card"><h4>${L('Followers', 'Volgers')}</h4><div class="pf-pets">${PETS.map((pet) => {
-    const got = petUnlocked(p, pet), on = got && !petOff(pet)
+    const got = petUnlocked(p, pet), on = petOn(p, pet)
     const name = L(`Mini ${SPECIES[pet.sp].name}`, `Mini-${SPECIES[pet.sp].name}`)
     return `<div class="pf-pet ${got ? '' : 'locked'}">
       <img class="px" src="${spriteUrl(pet.sp)}" alt="">
@@ -273,7 +273,7 @@ export function showProfile(o: { trainerSprite: string; name: string; tab?: Tab;
       sfx.select()
       const pet = PETS.find((x) => x.id === b.dataset.pet)
       if (!pet) return
-      setPetOn(pet, petOff(pet))
+      setPet(petOn(progress(), pet) ? null : pet)
       paint()
     }))
     el.querySelectorAll<HTMLElement>('.pf-seg button').forEach((b) => b.addEventListener('click', () => {

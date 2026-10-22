@@ -337,7 +337,7 @@ export function pullPack(g: Game, d: DungeonRun, p: Pack, by: Trainer | null) {
   const lead = p.members[0]
   if (lead) {
     g.callout(lead, both('!', '!'), '#ff5040')
-    g.soundAt(lead.x, lead.y, 'boss', ['charge', 'fireblast', 0.4, 0.4], { range: 20 })
+    g.soundAt(lead.x, lead.y, 'boss', ['charge', d.def.theme.fx, 0.4, 0.4], { range: 20 })
   }
   // An overpull: the linked pack joins in
   const linked = d.packs.find((x) => x.id === p.link) ?? d.packs.find((x) => x.link === p.id)
@@ -408,12 +408,13 @@ export function roleTick(g: Game, w: Mon, target: Mon | null, dt: number): boole
     w.roleT = 4.5 + Math.random() * 2
     const warn = 1.6
     const dmg = 0.2 * (g.diff === 'hard' ? 1.25 : g.diff === 'easy' ? 0.8 : 1)
-    addHazard(g, { shape: 'circle', x: target.x, y: target.y, ang: 0, r: 1.7, inner: 0, width: 1, t: warn, dmg, fx: 'fireblast', type: 'fire', freeze: 0, cover: false, both: false, atk: 'f_bolt' })
+    const th = g.raid!.dg!.def.theme
+    addHazard(g, { shape: 'circle', x: target.x, y: target.y, ang: 0, r: 1.7, inner: 0, width: 1, t: warn, dmg, fx: th.fx, type: th.type, freeze: 0, cover: false, both: false, atk: 'f_bolt' })
     w.cast = { kind: 'bolt', t: warn, total: warn, hits: 0, tgt: target, hz: g.hazards[g.hazards.length - 1].id }
     w.aimX = target.x - w.x
     w.aimY = target.y - w.y
     w.aimT = warn
-    g.soundAt(w.x, w.y, 'moveCharge', ['fireblast', 2, warn], { range: 18 })
+    g.soundAt(w.x, w.y, 'moveCharge', [th.fx, 2, warn], { range: 18 })
     return true
   }
   // Mender: heal the packmate that needs it most
@@ -518,10 +519,11 @@ function spawnFoe(g: Game, f: FoeSpec, rect: Rect) {
     if (score > bd) { bd = score; best = [x, y] }
   }
   place(g, m, best[0], best[1])
+  const th = g.raid!.dg!.def.theme
   g.vfx.mark(best[0], best[1])
-  g.vfx.ring(best[0], best[1], f.elite ? 2.2 : 1.4, '#ff8a3a', 0.5, 5)
-  g.vfx.burst(best[0], best[1] - 0.3, { n: f.elite ? 22 : 12, speed: 5, dir: -Math.PI / 2, spread: 1.4, cols: ['#fff2a0', '#ffc840', '#ff7020'], shape: 'flame', add: true, s0: 3, s1: 0.6, life: 0.5 })
-  g.soundAt(best[0], best[1], 'boss', ['vent', 'fireblast', f.elite ? 0.7 : 0.4], { range: 22 })
+  g.vfx.ring(best[0], best[1], f.elite ? 2.2 : 1.4, th.burst[1], 0.5, 5)
+  g.vfx.burst(best[0], best[1] - 0.3, { n: f.elite ? 22 : 12, speed: 5, dir: -Math.PI / 2, spread: 1.4, cols: th.burst, shape: th.type === 'fire' ? 'flame' : 'streak', add: true, s0: 3, s1: 0.6, life: 0.5 })
+  g.soundAt(best[0], best[1], 'boss', ['vent', th.fx, f.elite ? 0.7 : 0.4], { range: 22 })
   if (f.elite) g.callout(m, both(`★ ${m.name}`, `★ ${m.name}`), '#ffb040')
   return m
 }
@@ -556,14 +558,15 @@ function pullWarden(g: Game, d: DungeonRun) {
   // Everything else in the room joins in too
   for (const p of d.packs) if (p.idle && !p.done) pullPack(g, d, p, null)
   g.vfx.mark(m.x, m.y)
-  g.vfx.ring(m.x, m.y, 4, '#ff7a30', 0.8, 8)
-  g.vfx.glow(m.x, m.y - 1, 90, '#ff7a30', 0.6)
+  const th = d.def.theme
+  g.vfx.ring(m.x, m.y, 4, th.accent, 0.8, 8)
+  g.vfx.glow(m.x, m.y - 1, 90, th.accent, 0.6)
   g.vfx.shakeBy(6)
   for (const v of g.viewers) {
     v.cry(wd.sp, 0.5)
-    v.hooks.banner({ kind: 'legendary', kicker: both('⚔ WARDEN ⚔', '⚔ WACHTER ⚔'), title: both(`${m.name} blocks the way!`, `${m.name} verspert de weg!`), sub: inBoth(() => `${wd.title} · ${L('enrages in', 'woedend over')} ${Math.round(d.enrageT)} s`), mon: wd.sp, color: '#ff7a30' })
+    v.hooks.banner({ kind: 'legendary', kicker: both('⚔ WARDEN ⚔', '⚔ WACHTER ⚔'), title: both(`${m.name} blocks the way!`, `${m.name} verspert de weg!`), sub: inBoth(() => `${wd.title} · ${L('enrages in', 'woedend over')} ${Math.round(d.enrageT)} s`), mon: wd.sp, color: th.accent })
   }
-  g.soundAt(m.x, m.y, 'boss', ['intro', 'fireblast'], { global: true })
+  g.soundAt(m.x, m.y, 'boss', ['intro', th.fx], { global: true })
 }
 
 /** The warden is down: a relic for the team, a life back, potions. */
@@ -572,14 +575,15 @@ function wardenDown(g: Game, m: Mon) {
   g.vfx.flash(0.4, '255,200,140')
   g.vfx.shakeBy(8)
   g.vfx.ring(m.x, m.y, 5, '#ffd060', 0.9, 9)
-  g.soundAt(m.x, m.y, 'boss', ['down', 'fireblast'], { global: true })
   if (!d || !d.wardenDef) return
+  g.soundAt(m.x, m.y, 'boss', ['down', d.def.theme.fx], { global: true })
   const relic = d.wardenDef.relic
   d.relics.push(relic)
   for (let k = 0; k < humansOf(g); k++) g.items.push({ x: m.x + (k - (humansOf(g) - 1) / 2) * 1.2, y: m.y + 1, kind: 'potion', bob: 0 })
   for (const tr of g.trainers)
     if (tr.alive && tr.lives < d.def.lives) tr.lives++
-  const name = relic === 'ember' ? both('Ember of the Flame', 'Sintel van de Vlam') : both('Shell of the Volcano', 'Pantser van de Vulkaan')
+  const named = d.def.theme.relics[relic]
+  const name = inBoth(named)
   const what = relic === 'ember' ? both('+15% damage for the team', '+15% schade voor het team') : both('15% less damage taken by the team', '15% minder schade voor het team')
   for (const v of g.viewers) {
     v.hooks.banner({ kind: 'win', kicker: both('LOOT', 'BUIT'), title: name, sub: inBoth(() => `${tx(what)} · ${L('+1 life', '+1 leven')}`), mon: m.species.id, color: '#ffd040' })
@@ -654,12 +658,13 @@ function castWarden(g: Game, d: DungeonRun, w: Mon, a: BossAttack, foes: Mon[]) 
     addHazard(g, { ...base, shape: 'circle', x: tgt.x, y: tgt.y, t: a.warn })
     d.bombs.push({ hz: g.hazards[g.hazards.length - 1].id, tgt, x: tgt.x, y: tgt.y, linger: a.linger })
     const v = g.vOf(tgt.owner)
-    v?.hooks.toast(both('Living Bomb on you: get away from the others!', 'Levende Bom op jou: weg bij de anderen!'), '#ff5030')
+    v?.hooks.toast(inBoth(() => L(`${a.name} on you: get away from the others!`, `${a.name} op jou: weg bij de anderen!`)), '#ff5030')
     v?.sfx('siren')
     return
   }
   if (a.shape === 'cone') addHazard(g, { ...base, shape: 'cone', x: w.x, y: w.y, ang, r: a.len ?? 8, t: a.warn })
   else if (a.shape === 'ring') addHazard(g, { ...base, shape: 'ring', x: w.x, y: w.y, t: a.warn })
+  else if (a.shape === 'line') addHazard(g, { ...base, shape: 'line', x: w.x, y: w.y, ang, r: a.len ?? 12, t: a.warn })
   else if (a.target === 'self') addHazard(g, { ...base, shape: 'circle', x: w.x, y: w.y, t: a.warn })
   else {
     const rect = d.def.rooms[d.room].rect
@@ -680,7 +685,8 @@ function tickBombs(g: Game, d: DungeonRun) {
       }
       return true
     }
-    if (b.linger) addHazard(g, { shape: 'circle', x: b.x, y: b.y, ang: 0, r: 2.2, inner: 0, width: 1, t: 0.05, dmg: 0, fx: 'fireblast', type: 'fire', freeze: 0, cover: false, both: false, atk: 'pool', dur: b.linger.dur, dps: b.linger.dps })
+    const th = d.def.theme
+    if (b.linger) addHazard(g, { shape: 'circle', x: b.x, y: b.y, ang: 0, r: 2.2, inner: 0, width: 1, t: 0.05, dmg: 0, fx: th.fx, type: th.type, freeze: 0, cover: false, both: false, atk: 'pool', dur: b.linger.dur, dps: b.linger.dps })
     return false
   })
 }

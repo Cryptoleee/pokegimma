@@ -10,13 +10,14 @@ export interface Pet {
   id: string
   /** Species shown. */
   sp: number
-  /** Achievement that unlocks it. */
-  ach: string
+  /** Dungeon whose flawless clear unlocks it. */
+  dungeon: string
   how: () => string
 }
 
 export const PETS: Pet[] = [
-  { id: 'reshiram', sp: 643, ach: 'dg_flawless', how: () => L('Clear The Burning Depths without losing a life', 'Haal De Brandende Diepten zonder een leven te verliezen') },
+  { id: 'reshiram', sp: 643, dungeon: 'depths', how: () => L('Clear The Burning Depths without losing a life', 'Haal De Brandende Diepten zonder een leven te verliezen') },
+  { id: 'zekrom', sp: 644, dungeon: 'storm', how: () => L('Clear The Storm Tower without losing a life', 'Haal De Stormtoren zonder een leven te verliezen') },
 ]
 
 const KEY = 'sb:pet'
@@ -28,18 +29,26 @@ const read = () => {
   }
 }
 
-export const petUnlocked = (p: Progress, pet: Pet) => p.ach.includes(pet.ach)
-/** Whether you've switched this follower off (they're on once unlocked). */
-export const petOff = (pet: Pet) => read() === `off:${pet.id}`
-export function setPetOn(pet: Pet, on: boolean) {
+export const petUnlocked = (p: Progress, pet: Pet) =>
+  (p.stats.dgFlawless ?? []).includes(pet.dungeon) || (pet.dungeon === 'depths' && p.ach.includes('dg_flawless'))
+/** The follower you picked ('none' = none; unset = the first one you have). */
+const picked = () => read() ?? ''
+/** Whether this follower is the one walking with you. */
+export const petOn = (p: Progress, pet: Pet) => {
+  const pick = picked()
+  if (pick === 'none' || !petUnlocked(p, pet)) return false
+  const chosen = PETS.find((x) => x.id === pick && petUnlocked(p, x))
+  return chosen ? chosen === pet : PETS.find((x) => petUnlocked(p, x)) === pet
+}
+/** Take this follower along (or none). One at a time. */
+export function setPet(pet: Pet | null) {
   try {
-    if (on) localStorage.removeItem(KEY)
-    else localStorage.setItem(KEY, `off:${pet.id}`)
+    localStorage.setItem(KEY, pet ? pet.id : 'none')
   } catch {
     /* private mode */
   }
 }
 /** The follower you bring into a match (its species), if any. */
 export function myPet(p: Progress): number | undefined {
-  return PETS.find((pet) => petUnlocked(p, pet) && !petOff(pet))?.sp
+  return PETS.find((pet) => petOn(p, pet))?.sp
 }

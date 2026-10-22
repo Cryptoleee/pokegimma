@@ -20,7 +20,7 @@ import { hasUnseen, maybeShowNews, newsPreview, showNews } from './news'
 import { appEsc as esc, appShell, bar, bindShell, BOLT, DISCORD, discordMe, IC, icon, masteryLine, monChips, monImg, strike, teamCard, teamStage, type AppTab } from './app'
 import { openTeamSheet } from './team'
 import { storm, STORM_TINT } from './storm'
-import { shinyPartner } from './menu'
+import { raidPick, shinyPartner } from './menu'
 
 /**
  * Play: the home screen (your team on a stage, the three modes) and a screen
@@ -309,13 +309,13 @@ export function showMenu(st: MenuState, on: MenuActions) {
         return `<button class="n-tile ${on ? 'on' : ''}" role="radio" aria-checked="${on}" data-stadium="${s}">${sd ? sd.name : L('Random', 'Willekeurig')}</button>`
       }).join('')}</div>`
     if (kind === 'raid') {
-      const pick = choice.raid ?? 'dungeon'
+      const pick = raidPick(choice.raid)
       return `
       <div class="n-raidpick" role="radiogroup" aria-label="Raid">
-        ${DUNGEON_LIST.map((dd) => `
-        <button class="n-card n-dgcard ${pick === 'dungeon' ? 'on' : ''}" role="radio" aria-checked="${pick === 'dungeon'}" data-raid="dungeon">
+        ${DUNGEON_LIST.map((dd, i) => `
+        <button class="n-card n-dgcard ${pick === dd.id ? 'on' : ''}" role="radio" aria-checked="${pick === dd.id}" data-raid="${dd.id}">
           <img class="px" src="${spriteUrl(BOSSES[dd.boss].species)}" alt="">
-          <span><b>${esc(dd.name)} <em class="n-chip acc">${L('NEW', 'NIEUW')}</em></b><small>${esc(dd.blurb)}</small>${raidReward(dd.id)}</span>
+          <span><b>${esc(dd.name)}${i === DUNGEON_LIST.length - 1 ? ` <em class="n-chip acc">${L('NEW', 'NIEUW')}</em>` : ''}</b><small>${esc(dd.blurb)}</small>${raidReward(dd.id)}</span>
         </button>`).join('')}
         <button class="n-card n-mystery ${pick === 'classic' ? 'on' : ''}" role="radio" aria-checked="${pick === 'classic'}" data-raid="classic">
           <div class="n-sil">${BOSS_LIST.map((b) => `<img class="px" src="${spriteUrl(BOSSES[b].species)}" alt="">`).join('')}</div>

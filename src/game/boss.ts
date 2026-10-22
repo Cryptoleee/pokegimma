@@ -434,7 +434,7 @@ function spawnTornado(g: Game, tw: { n: number; speed: number; dur: number; dps:
 
 /** A tornado on the move: turns (slowly) toward the closest Pokémon and hurts anyone inside. */
 /** Pools of magma that stay a while (raid dungeons): they don't move, they burn whoever stands in them. */
-export const isPool = (h: Hazard) => h.atk === 'pool' || h.atk === 'w_pool'
+export const isPool = (h: Hazard) => h.atk === 'pool' || h.atk.endsWith('_pool')
 
 function updatePool(g: Game, h: Hazard, dt: number) {
   if (Math.random() < dt * 6) g.vfx.burst(h.x + (Math.random() - 0.5) * h.r * 1.4, h.y + (Math.random() - 0.5) * h.r * 0.8, { n: 1, speed: 1.5, dir: -Math.PI / 2, spread: 0.5, cols: ['#ffd060', '#ff8030'], shape: 'flame', add: true, s0: 2.5, s1: 0.5, life: 0.5 })

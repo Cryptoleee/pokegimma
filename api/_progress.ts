@@ -83,14 +83,17 @@ export const REWARD_ROAD: { lv: number; kind: 'partner' | 'trainer'; id: string 
 ]
 
 /** Raid dungeons (ids, as in src/data/dungeons.ts). */
-export const DUNGEON_IDS = ['depths']
+export const DUNGEON_IDS = ['depths', 'storm']
 /** Raid dungeon lives (a clean run keeps all of them). */
 export const DUNGEON_LIVES = 3
 
 /** Raid unlocks: clear a dungeon and one of its wardens joins you as a partner. */
 export const RAID_UNLOCKS: { kind: 'partner'; id: string; dungeon: string }[] = [
   { kind: 'partner', id: '240', dungeon: 'depths' }, // Magby, who grows into Magmortar, the Warden of the Flame
+  { kind: 'partner', id: '239', dungeon: 'storm' }, // Elekid, who grows into Electivire, the Warden of Thunder
 ]
+/** Followers (species) for a flawless clear (no life lost) of a dungeon. */
+export const DUNGEON_PETS: Record<string, number> = { depths: 643, storm: 644 }
 export const raidUnlockOf = (kind: 'partner' | 'trainer', id: string | number) => RAID_UNLOCKS.find((r) => r.kind === kind && r.id === String(id))
 
 /** Every partner you can pick: the free ones, those on the reward road and the raid unlocks. */
@@ -142,9 +145,10 @@ export interface Stats {
   /** 1 vs 1 duels won, and won against a person. */
   dw: number
   dpw: number
-  /** Raid dungeons cleared, and cleared on hard (ids). */
+  /** Raid dungeons cleared, cleared on hard, and cleared without losing a life (ids). */
   dg?: string[]
   dgHard?: string[]
+  dgFlawless?: string[]
 }
 
 export interface Daily {
@@ -195,7 +199,7 @@ export function normalize(p: Partial<Progress> | null | undefined): Progress {
     ...n, ...p, v: 1,
     partners: { ...(p.partners ?? {}) },
     ach: Array.isArray(p.ach) ? p.ach.filter((a) => ACH_IDS.has(a)) : [],
-    stats: { ...s, bosses: Array.isArray(s.bosses) ? s.bosses : [], used: Array.isArray(s.used) ? s.used : [], dg: Array.isArray(s.dg) ? s.dg : [], dgHard: Array.isArray(s.dgHard) ? s.dgHard : [] },
+    stats: { ...s, bosses: Array.isArray(s.bosses) ? s.bosses : [], used: Array.isArray(s.used) ? s.used : [], dg: Array.isArray(s.dg) ? s.dg : [], dgHard: Array.isArray(s.dgHard) ? s.dgHard : [], dgFlawless: Array.isArray(s.dgFlawless) ? s.dgFlawless : [] },
     daily: { ...n.daily, ...(p.daily ?? {}) },
     shiny: Array.isArray(p.shiny) ? p.shiny : [],
   }
@@ -290,6 +294,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'raid_all', xp: 600, title: 'legendhunter', test: (p) => BOSS_IDS.every((b) => p.stats.bosses.includes(b)) },
   { id: 'raid_flawless', xp: 300, test: (_, r) => !!r && r.kind === 'raid' && r.won && (r.lives ?? 0) >= (r.dungeon ? DUNGEON_LIVES : RAID_LIVES) },
   { id: 'dg_depths', xp: 500, title: 'flametamer', test: (p) => (p.stats.dg ?? []).includes('depths') },
+  { id: 'dg_storm', xp: 500, title: 'stormrider', test: (p) => (p.stats.dg ?? []).includes('storm') },
   { id: 'dg_hard', xp: 600, title: 'infernal', test: (p) => (p.stats.dgHard ?? []).length > 0 },
   { id: 'dg_flawless', xp: 500, title: 'unscathed', test: (_, r) => !!r && r.kind === 'raid' && r.won && !!r.dungeon && (r.lives ?? 0) >= DUNGEON_LIVES },
   { id: 'raid_mvp', xp: 250, test: (_, r) => !!r && r.kind === 'raid' && r.won && r.humans >= 2 && (r.share ?? 0) >= 50 },
@@ -492,6 +497,7 @@ export function applyMatch(p: Progress, r: Report, day: string): Outcome {
   const before = { lv: levelOf(p.xp).lv, titles: new Set(titlesOf(p)) }
   const s = p.stats
   let newDungeon = ''
+  let newFlawless = ''
   // Streak: days in a row with at least one match
   if (p.day !== day) {
     p.streak = p.day === prevDay(day) ? p.streak + 1 : 1
@@ -528,6 +534,12 @@ export function applyMatch(p: Progress, r: Report, day: string): Outcome {
         newDungeon = r.dungeon
       }
       if (r.diff === 'hard' && !s.dgHard.includes(r.dungeon)) s.dgHard.push(r.dungeon)
+      // A flawless clear earns the dungeon's follower (once)
+      s.dgFlawless = s.dgFlawless ?? []
+      if ((r.lives ?? 0) >= DUNGEON_LIVES && !s.dgFlawless.includes(r.dungeon)) {
+        s.dgFlawless.push(r.dungeon)
+        newFlawless = r.dungeon
+      }
     }
   }
   if (r.partner && !s.used.includes(r.partner)) s.used.push(r.partner)
@@ -582,7 +594,7 @@ export function applyMatch(p: Progress, r: Report, day: string): Outcome {
 
   const unlocks: string[] = []
   // A flawless dungeon clear earns its legendary as a follower (src/data/pets.ts)
-  if (ach.some((a) => a.id === 'dg_flawless')) unlocks.push('pet:643')
+  if (newFlawless && DUNGEON_PETS[newFlawless]) unlocks.push(`pet:${DUNGEON_PETS[newFlawless]}`)
   if (r.partner) {
     for (const [lv, key] of [[SHINY_AT, 'shiny'], [3, 'emblem'], [7, 'emblem'], [10, 'emblem']] as const) {
       if (mFrom < lv && mTo >= lv) unlocks.push(key === 'shiny' ? `shiny:${r.partner}` : `emblem:${r.partner}:${emblemOf(lv)}`)

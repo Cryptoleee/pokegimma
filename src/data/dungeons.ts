@@ -1,4 +1,5 @@
 import type { BossAttack, BossId } from './bosses'
+import type { MoveFx } from './moves'
 import { L } from '../i18n'
 import type { Cinematic } from '../ui/cinematic'
 
@@ -72,7 +73,27 @@ export interface Wave {
   final?: boolean
 }
 
-export type RoomDeco = 'gate' | 'river' | 'hall' | 'forge' | 'den' | 'bastion'
+export type RoomDeco =
+  // The Burning Depths
+  | 'gate' | 'river' | 'hall' | 'forge' | 'den' | 'bastion'
+  // The Storm Tower
+  | 'sgate' | 'flooded' | 'chapel' | 'dynamo' | 'cistern' | 'ramparts'
+
+/** A dungeon's element: what its casters throw, how its foes arrive, what its relics are called. */
+export interface DungeonTheme {
+  /** Hazard type of its casters' bolts, pools and room hazards. */
+  type: 'fire' | 'electric'
+  /** Effect (and sound) of its casters' bolts and its foes' arrival. */
+  fx: MoveFx
+  /** Colours of a foe's arrival burst, hot to cool. */
+  burst: string[]
+  /** Accent colour for its banners and rings. */
+  accent: string
+  /** Its casters' bolts, in a tip ("fire bolts"). */
+  bolts: () => string
+  /** The relics its wardens drop: the damage one and the defence one. */
+  relics: { ember: () => string; shell: () => string }
+}
 
 export interface Room {
   name: string
@@ -87,6 +108,7 @@ export interface Room {
 export interface DungeonDef {
   id: string
   boss: BossId
+  theme: DungeonTheme
   name: string
   blurb: string
   /** Where everyone starts (tiles). */
@@ -109,10 +131,22 @@ export interface DungeonDef {
 const fire = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'fire', phase: 0, weight: 1, ...a })
 const f = (sp: number, n: number, lv: number, role?: FoeRole, elite?: boolean): FoeSpec => ({ sp, n, lv, ...(role ? { role } : {}), ...(elite ? { elite } : {}) })
 
+/** The Storm Tower winds the other way round the arena: rooms mirrored left to right. */
+const MAPW = 128
+const mx = (r: Rect): Rect => ({ x: MAPW - r.x - r.w, y: r.y, w: r.w, h: r.h })
+/** A spot inside a room of width w, mirrored. */
+const ma = (w: number, at: [number, number]): [number, number] => [w - 1 - at[0], at[1]]
+const el = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'electric', phase: 0, weight: 1, ...a })
+
 export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
   reshiram: {
     id: 'depths',
     boss: 'reshiram',
+    theme: {
+      type: 'fire', fx: 'fireblast', burst: ['#fff2a0', '#ffc840', '#ff7020'], accent: '#ff7a30',
+      bolts: () => L('fire bolts', 'vuurballen'),
+      relics: { ember: () => L('Ember of the Flame', 'Sintel van de Vlam'), shell: () => L('Shell of the Volcano', 'Pantser van de Vulkaan') },
+    },
     get name() { return L('The Burning Depths', 'De Brandende Diepten') },
     get blurb() { return L('Fight down through the volcano: halls full of fire Pokémon packs, two wardens, a last stand, and Reshiram waiting in the crater.', 'Vecht je een weg door de vulkaan: zalen vol groepen vuur-Pokémon, twee wachters, een laatste stand, en Reshiram wacht in de krater.') },
     start: [21, 117],
@@ -225,6 +259,127 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
       { x: 81, y: 18, w: 2, h: 5 },
       { x: 106, y: 36, w: 5, h: 2 },
       { x: 89, y: 62, w: 2, h: 5 },
+    ],
+  },
+  zekrom: {
+    id: 'storm',
+    boss: 'zekrom',
+    theme: {
+      type: 'electric', fx: 'thunder', burst: ['#ffffff', '#fff27a', '#5ab8ff'], accent: '#ffd23a',
+      bolts: () => L('lightning bolts', 'bliksemschichten'),
+      relics: { ember: () => L('Spark of the Storm', 'Vonk van de Storm'), shell: () => L('Coil of the Deep', 'Spoel van de Diepte') },
+    },
+    get name() { return L('The Storm Tower', 'De Stormtoren') },
+    get blurb() { return L('Climb the ruined tower through the storm: flooded halls that come alive with current, a thunder chapel, a hall of humming dynamos, a drowned cistern, the battlements, and Zekrom waiting on the roof.', 'Beklim de verwoeste toren door de storm: ondergelopen zalen waar stroom door het water jaagt, een donderkapel, een zaal vol zoemende dynamo\'s, een verdronken cisterne, de kantelen, en Zekrom wacht op het dak.') },
+    start: [106, 117],
+    lives: 3,
+    intro: {
+      id: 'storm-intro',
+      shots: [
+        {
+          src: 'storm-intro', len: 22.5, lines: [
+            { at: 0.6, until: 3.2, title: true, text: () => L('THE STORM TOWER', 'DE STORMTOREN'), kicker: () => L('Raid dungeon', 'Raid-dungeon') },
+            { at: 18.4, until: 22.5, title: true, text: () => 'ZEKROM', kicker: () => L('Ruler of Storm Peak', 'Heerser van de Stormtop') },
+          ],
+        },
+      ],
+    },
+    outro: {
+      id: 'storm-outro',
+      shots: [
+        {
+          src: 'storm-outro', len: 14, lines: [
+            { at: 8.8, until: 14, title: true, heroes: true, text: () => L('ZEKROM DEFEATED', 'ZEKROM VERSLAGEN'), kicker: () => L('The storm breaks', 'De storm breekt') },
+          ],
+        },
+      ],
+    },
+    arenaEntry: [52, 64],
+    rooms: [
+      {
+        get name() { return L('The Broken Gate', 'De Gebroken Poort') }, deco: 'sgate', rect: mx({ x: 8, y: 98, w: 26, h: 24 }),
+        packs: [
+          { at: ma(26, [13, 10]), foes: [f(522, 2, 41), f(595, 1, 41, 'caster')] },
+          { at: ma(26, [5, 4]), foes: [f(125, 1, 42, 'brute'), f(181, 1, 41, 'mender'), f(81, 1, 41)] },
+          { at: ma(26, [20, 4]), foes: [f(522, 1, 41), f(595, 2, 41, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('The Flooded Hall', 'De Ondergelopen Hal') }, deco: 'flooded', rect: mx({ x: 8, y: 60, w: 26, h: 24 }),
+        packs: [
+          { at: ma(26, [7, 18]), foes: [f(602, 2, 42), f(603, 1, 42, 'mender')] },
+          { at: ma(26, [20, 18]), foes: [f(479, 1, 44, 'caster', true), f(522, 2, 42)] },
+          { at: ma(26, [5, 6]), patrol: ma(26, [21, 6]), foes: [f(523, 1, 43), f(522, 1, 42)] },
+          { at: ma(26, [13, 3]), link: 2, foes: [f(125, 1, 43, 'brute'), f(82, 1, 42, 'guard'), f(81, 1, 42, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('The Thunder Chapel', 'De Donderkapel') }, deco: 'chapel', rect: mx({ x: 5, y: 16, w: 32, h: 30 }),
+        packs: [
+          { at: ma(32, [8, 22]), foes: [f(310, 2, 43), f(181, 1, 43, 'mender')] },
+          { at: ma(32, [24, 22]), foes: [f(125, 1, 44, 'brute'), f(479, 1, 43, 'caster')] },
+        ],
+        warden: {
+          sp: 466, lv: 48, hp: 6, at: ma(32, [16, 7]), enrage: 120, relic: 'ember', get title() { return L('Warden of Thunder', 'Wachter van de Donder') },
+          calls: [{ at: 0.6, foes: [f(125, 1, 43, 'caster'), f(310, 1, 42)] }, { at: 0.3, foes: [f(125, 1, 44, 'brute'), f(181, 1, 43, 'mender')] }],
+          attacks: [
+            el({ id: 'e_punch', name: 'Thunder Punch', shape: 'cone', warn: 1.0, cd: 4, dmg: 0.32, target: 'nearest', len: 6, width: 0.6, weight: 3, fx: 'discharge' }),
+            el({ id: 'e_static', get name() { return L('Static Charge', 'Statische Lading') }, shape: 'circle', warn: 3.6, cd: 11, dmg: 0.4, target: 'random', r: 2.6, weight: 3, follow: true, linger: { dur: 7, dps: 0.12 }, fx: 'thunder' }),
+            el({ id: 'e_thunder', name: 'Thunder', shape: 'circle', warn: 1.3, cd: 6, dmg: 0.3, target: 'players', r: 2.1, extra: 2, stagger: 0.15, weight: 2, fx: 'thunder' }),
+            el({ id: 'e_discharge', name: 'Discharge', shape: 'circle', warn: 1.4, cd: 9, dmg: 0.34, target: 'self', r: 3.8, weight: 2, fx: 'discharge' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Dynamo Hall', 'De Dynamozaal') }, deco: 'dynamo', rect: mx({ x: 53, y: 8, w: 28, h: 28 }),
+        packs: [
+          { at: ma(28, [7, 13]), foes: [f(81, 2, 44, 'caster'), f(82, 1, 44)] },
+          { at: ma(28, [14, 22]), foes: [f(462, 1, 46, 'guard', true), f(125, 1, 44, 'brute'), f(81, 1, 44, 'caster')] },
+          { at: ma(28, [14, 5]), foes: [f(595, 2, 44), f(596, 1, 44, 'mender')] },
+          { at: ma(28, [22, 14]), link: 2, foes: [f(523, 1, 45, 'brute'), f(522, 1, 44), f(181, 1, 44, 'mender')] },
+        ],
+      },
+      {
+        get name() { return L('The Drowned Cistern', 'De Verdronken Cisterne') }, deco: 'cistern', rect: mx({ x: 96, y: 6, w: 26, h: 30 }),
+        packs: [
+          { at: ma(26, [5, 6]), foes: [f(595, 3, 44)] },
+          { at: ma(26, [5, 24]), foes: [f(596, 1, 46, 'brute', true), f(603, 1, 44, 'mender')] },
+        ],
+        warden: {
+          sp: 604, lv: 49, hp: 6.5, at: ma(26, [14, 16]), enrage: 130, relic: 'shell', get title() { return L('Terror of the Deep', 'Verschrikking van de Diepte') },
+          calls: [{ at: 0.65, foes: [f(602, 3, 44)] }, { at: 0.35, foes: [f(596, 1, 46, 'brute', true), f(603, 1, 44, 'mender')] }],
+          attacks: [
+            el({ id: 'x_ring', name: 'Discharge', shape: 'ring', warn: 1.4, cd: 7, dmg: 0.34, target: 'self', inner: 3.2, r: 8, weight: 2, fx: 'discharge' }),
+            el({ id: 'x_zap', name: 'Zap Cannon', shape: 'line', warn: 1.25, cd: 7, dmg: 0.38, target: 'nearest', len: 13, width: 1.8, weight: 3, fx: 'discharge' }),
+            el({ id: 'x_pool', get name() { return L('Electric Terrain', 'Elektrisch Veld') }, shape: 'circle', warn: 1.5, cd: 9, dmg: 0.22, target: 'players', r: 2.4, extra: 2, stagger: 0.2, weight: 3, linger: { dur: 9, dps: 0.1 }, fx: 'thunder' }),
+            el({ id: 'x_wave', name: 'Thunder Wave', shape: 'circle', warn: 1.25, cd: 6, dmg: 0.25, target: 'players', r: 2, extra: 3, stagger: 0.12, weight: 2, fx: 'thunder' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Battlements', 'De Kantelen') }, deco: 'ramparts', rect: mx({ x: 92, y: 54, w: 30, h: 28 }),
+        waves: [
+          { foes: [f(523, 2, 45), f(82, 1, 44, 'guard'), f(479, 1, 44, 'caster')] },
+          { foes: [f(405, 1, 46, 'brute', true), f(479, 2, 45, 'caster'), f(181, 1, 45, 'mender')] },
+          { final: true, foes: [f(523, 1, 47, 'brute', true), f(462, 1, 47, 'caster', true), f(181, 1, 45, 'mender'), f(310, 2, 45), f(82, 1, 45, 'guard')] },
+        ],
+      },
+    ],
+    halls: [
+      mx({ x: 18, y: 84, w: 5, h: 14 }),
+      mx({ x: 18, y: 46, w: 5, h: 14 }),
+      mx({ x: 37, y: 26, w: 16, h: 5 }),
+      mx({ x: 81, y: 18, w: 15, h: 5 }),
+      mx({ x: 106, y: 36, w: 5, h: 18 }),
+      mx({ x: 76, y: 62, w: 16, h: 5 }),
+    ],
+    gates: [
+      mx({ x: 18, y: 96, w: 5, h: 2 }),
+      mx({ x: 18, y: 58, w: 5, h: 2 }),
+      mx({ x: 37, y: 26, w: 2, h: 5 }),
+      mx({ x: 81, y: 18, w: 2, h: 5 }),
+      mx({ x: 106, y: 36, w: 5, h: 2 }),
+      mx({ x: 89, y: 62, w: 2, h: 5 }),
     ],
   },
 }
