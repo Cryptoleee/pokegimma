@@ -8947,3 +8947,113 @@ body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
 .home > .sheet {
   width: auto;
 }
+
+/* Story cutscenes: filmed shots in letterbox, the story typed out underneath */
+.cin {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #000;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  overflow: hidden;
+}
+.cin.in {
+  opacity: 1;
+}
+.cin.out {
+  opacity: 0;
+  pointer-events: none;
+}
+.cin-stage {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.7s ease;
+}
+.cin.ending .cin-stage {
+  opacity: 0;
+}
+.cin-v {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+.cin-v.on:not(.broken) {
+  opacity: 1;
+}
+.cin-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%) scale(0.96);
+  text-align: center;
+  font-size: clamp(30px, 6vw, 72px);
+  letter-spacing: 0.14em;
+  color: #ffe2b0;
+  text-shadow: 0 0 18px rgba(255, 120, 40, 0.85), 0 3px 0 #3a1408, 0 0 2px #000;
+  opacity: 0;
+  transition: opacity 1s ease, transform 3s ease-out;
+  pointer-events: none;
+  padding: 0 16px;
+}
+.cin-title.on {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+.cin-sub {
+  position: absolute;
+  left: 50%;
+  bottom: calc(5vh + var(--safe-b, 0px));
+  transform: translateX(-50%);
+  width: min(880px, calc(100vw - 32px));
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+.cin-sub.on {
+  opacity: 1;
+}
+.cin-sub p {
+  display: inline-block;
+  margin: 0;
+  padding: 10px 18px;
+  font-size: clamp(16px, 2.3vw, 24px);
+  line-height: 1.35;
+  color: #fff4e4;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 10px;
+  text-shadow: 0 2px 0 #000;
+  min-height: 1.35em;
+}
+.cin-skip {
+  position: absolute;
+  top: calc(14px + var(--safe-t, 0px));
+  right: calc(14px + var(--safe-r, 0px));
+  z-index: 3;
+  padding: 8px 14px;
+  font-size: 15px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.cin-tap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+.cin.card .cin-sub {
+  bottom: 50%;
+  transform: translate(-50%, 50%);
+}
+.cin.card .cin-sub p {
+  background: none;
+  font-size: clamp(18px, 2.8vw, 30px);
+  color: #ffd9a8;
+  text-shadow: 0 0 14px rgba(255, 110, 30, 0.7), 0 2px 0 #000;
+}

@@ -28,6 +28,7 @@ import { confirmLeaveLobby, shinyPartner, showLobby } from './ui/menu'
 import { askName, setOnline, showMenu, type MenuState } from './ui/home'
 import { IC, icon, type AppTab } from './ui/app'
 import { showLoading } from './ui/loading'
+import { prepareCinematic } from './ui/cinematic'
 import { wipe } from './ui/transition'
 import { currentMusic, playMusic, setTempo } from './music'
 import { sfx } from './audio'
@@ -377,7 +378,10 @@ function loadingThen(setup: MatchSetup, skippable: boolean, start: () => void, g
       sprite: (TRAINERS.find((t) => t.key === h.trainer) ?? TRAINERS[0]).sprite,
       mon: duel ? finalForm(h.team[0]) : h.team[0],
     }))
-  showLoading({ seconds: LOADING_TIME, players, skippable, bots: duel ? 0 : Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined, dungeon: setup.kind === 'raid' && !setup.classic && !!dungeonOf(setup.boss), duel, stadium: setup.stadium, diff: setup.diff }, start)
+  // A raid dungeon tells its story first (its videos load while the tips are up)
+  const dg = setup.kind === 'raid' && !setup.classic ? dungeonOf(setup.boss) : null
+  const intro = dg?.intro ? prepareCinematic(dg.intro) : null
+  showLoading({ seconds: LOADING_TIME, players, skippable, bots: duel ? 0 : Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined, dungeon: !!dg, duel, stadium: setup.stadium, diff: setup.diff }, intro ? () => intro.play(start) : start)
 }
 
 function startSolo() {
