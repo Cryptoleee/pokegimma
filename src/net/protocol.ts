@@ -12,8 +12,9 @@ export interface LobbyPlayer {
   team: number[]
   /** Picked a team and tapped "Klaar". */
   ready?: boolean
-  /** Progress cosmetics: partner shown shiny, trainer level, title id. */
+  /** Progress cosmetics: partner shown shiny, follower (species), trainer level, title id. */
   shiny?: boolean
+  pet?: number
   lv?: number
   title?: string
 }

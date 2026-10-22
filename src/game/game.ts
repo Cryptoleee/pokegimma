@@ -230,6 +230,8 @@ export interface HumanSetup {
   team: number[]
   /** Partner in its shiny form (unlocked with mastery). */
   shiny?: boolean
+  /** A follower (species) trotting after the trainer, for show only. */
+  pet?: number
 }
 
 /** Battle royale (last trainer standing) or raid (everyone against a boss). */

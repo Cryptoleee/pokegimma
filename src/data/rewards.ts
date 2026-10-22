@@ -134,6 +134,7 @@ export function unlockText(u: string) {
   }
   const [kind, a, b] = u.split(':')
   const name = SPECIES[Number(a)]?.name ?? '?'
+  if (kind === 'pet') return { icon: '🐉', text: L(`New follower: mini ${name}!`, `Nieuwe volger: mini-${name}!`) }
   if (kind === 'shiny') return { icon: '✨', text: L(`Shiny ${name} unlocked!`, `Shiny ${name} vrijgespeeld!`) }
   if (kind === 'partner') return { icon: '🎁', text: L(`New partner: ${name}!`, `Nieuwe partner: ${name}!`) }
   if (kind === 'trainer') return { icon: '🧢', text: L(`New trainer: ${trainerName(a)}!`, `Nieuwe trainer: ${trainerName(a)}!`) }

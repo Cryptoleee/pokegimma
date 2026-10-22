@@ -9104,3 +9104,34 @@ body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
   color: #ffd9a8;
   text-shadow: 0 0 14px rgba(255, 110, 30, 0.7), 0 2px 0 #000;
 }
+
+/* Profile: followers */
+.pf-pets {
+  display: grid;
+  gap: 8px;
+}
+.pf-pet {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.pf-pet img {
+  width: 48px;
+  height: 48px;
+}
+.pf-pet span {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pf-pet small {
+  font-size: 11px;
+  color: #8890b0;
+}
+.pf-pet.locked img {
+  filter: brightness(0) opacity(0.45);
+}

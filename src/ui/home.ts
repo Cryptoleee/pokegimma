@@ -1,5 +1,5 @@
 import { DUNGEON_LIST } from '../data/dungeons'
-import { SPECIES, spriteUrl } from '../data/pokemon'
+import { finalLine, SPECIES, spriteUrl } from '../data/pokemon'
 import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
 import { questText, trainerName } from '../data/rewards'
 import { ROYALE_THEMES, THEMES } from '../data/themes'
@@ -337,7 +337,8 @@ export function showMenu(st: MenuState, on: MenuActions) {
   /** A dungeon's reward: its legendary as a partner (ticked once you have it). */
   const raidReward = (id: string) => RAID_UNLOCKS.filter((u) => u.dungeon === id).map((u) => {
     const has = isUnlocked(progress(), u.kind, u.id)
-    return `<small class="n-dgreward ${has ? 'got' : ''}">${has ? '✓' : '🎁'} ${L('Reward', 'Beloning')}: <b>${SPECIES[Number(u.id)]?.name ?? ''}</b> ${L('as your partner', 'als partner')}</small>`
+    const line = finalLine(Number(u.id))
+    return `<small class="n-dgreward ${has ? 'got' : ''}">${has ? '✓' : '🎁'} ${L('Reward', 'Beloning')}: <b>${line}</b> ${L('as your partner', 'als partner')}</small>`
   }).join('')
 
   /** Against the computer: how hard it plays. */

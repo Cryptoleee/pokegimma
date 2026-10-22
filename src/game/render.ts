@@ -114,6 +114,8 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   for (const tr of g.trainers) {
     const tv = vis(g, tr, tr.isPlayer)
     if (tr.alive && inView(tr.x, tr.y) && tv > 0) ents.push({ y: tr.y, draw: () => drawTrainer(g, ctx, tr, time, tv) })
+    const pet = petFollow(g, tr, time)
+    if (pet && inView(pet.x, pet.y) && tv > 0) ents.push({ y: pet.y, draw: () => drawPet(ctx, pet, time, tv) })
     const m = tr.mon
     if (tr.isPlayer && !g.partnerOut) continue
     const mvis = vis(g, m, tr.isPlayer)
@@ -423,6 +425,49 @@ function drawBubbles(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: num
 function trainerHeight(tr: Trainer) {
   const s = getSprite(trainerSpriteUrl(tr.def.sprite))
   return s.ready ? s.bh * TRAINER_SCALE : 28
+}
+
+/** Followers (cosmetic): each one trails its trainer on a loose leash, floating a little off the ground. */
+interface PetState { sp: number; x: number; y: number; faceRight: boolean; t: number; seed: number }
+const petStates = new WeakMap<Trainer, PetState>()
+function petFollow(g: Game, tr: Trainer, time: number): PetState | null {
+  const sp = tr.human ? g.setup.humans.find((h) => h.pid === tr.pid)?.pet : undefined
+  if (!sp || !tr.alive) return null
+  let st = petStates.get(tr)
+  if (!st || Math.hypot(st.x - tr.x, st.y - tr.y) > 8) {
+    st = { sp, x: tr.x - 1, y: tr.y - 0.4, faceRight: false, t: time, seed: Math.random() * 10 }
+    petStates.set(tr, st)
+  }
+  const dt = Math.min(0.1, Math.max(0, time - st.t))
+  st.t = time
+  // Stay about a tile and a half behind, a little higher up the screen
+  const tx = tr.x + (tr.faceRight ? -1.4 : 1.4), ty = tr.y - 0.5
+  const dx = tx - st.x, dy = ty - st.y, d = Math.hypot(dx, dy)
+  if (d > 0.05) {
+    const k = 1 - Math.exp(-dt * (d > 3 ? 6 : 3))
+    st.x += dx * k
+    st.y += dy * k
+    if (Math.abs(dx) > 0.15) st.faceRight = dx > 0
+  }
+  return st
+}
+
+function drawPet(ctx: CanvasRenderingContext2D, st: PetState, time: number, fade: number) {
+  const s = liveSprite(st.sp, false, false) ?? monSprite(st.sp, false, false)
+  if (!s.ready) return
+  const [fx, fy] = frameAt(s, time, st.seed * 1000)
+  const sc = 0.34
+  const dw = s.bw * sc, dh = s.bh * sc
+  const px = st.x * TILE, py = st.y * TILE
+  const hover = -7 + Math.sin(time * 2.6 + st.seed) * 2
+  shadow(ctx, px, py + 1, dw * 0.35)
+  ctx.save()
+  ctx.globalAlpha = fade
+  ctx.translate(Math.round(px), Math.round(py + hover))
+  // BW sprites face left
+  if (st.faceRight) ctx.scale(-1, 1)
+  ctx.drawImage(s.img, fx + s.bx, fy + s.by, s.bw, s.bh, -dw / 2, -dh, dw, dh)
+  ctx.restore()
 }
 
 function drawTrainer(g: Game, ctx: CanvasRenderingContext2D, tr: Trainer, _time: number, fade = 1) {

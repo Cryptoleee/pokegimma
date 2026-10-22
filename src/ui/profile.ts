@@ -13,6 +13,7 @@ import { esc } from './menu'
 import { appShell, bindShell, type AppTab } from './app'
 import { askName } from './home'
 import { profile } from '../profile'
+import { PETS, petOff, petUnlocked, setPetOn } from '../data/pets'
 
 /**
  * Your profile: trainer level and title, today's quests and streak, lifetime
@@ -41,6 +42,19 @@ function untilReset() {
   return left >= 60 ? `${Math.floor(left / 60)}${L('h', 'u')}` : `${left}m`
 }
 
+/** Followers you've earned (on or off), and the ones still to earn. */
+function petCard(p: Progress) {
+  return `<div class="pf-card"><h4>${L('Followers', 'Volgers')}</h4><div class="pf-pets">${PETS.map((pet) => {
+    const got = petUnlocked(p, pet), on = got && !petOff(pet)
+    const name = L(`Mini ${SPECIES[pet.sp].name}`, `Mini-${SPECIES[pet.sp].name}`)
+    return `<div class="pf-pet ${got ? '' : 'locked'}">
+      <img class="px" src="${spriteUrl(pet.sp)}" alt="">
+      <span><b>${name}</b><small>${got ? L('Follows you in every match', 'Loopt in elk potje achter je aan') : `🔒 ${pet.how()}`}</small></span>
+      ${got ? `<button class="pf-shiny pf-petbtn ${on ? 'on' : ''}" data-pet="${pet.id}">${on ? L('On', 'Aan') : L('Off', 'Uit')}</button>` : ''}
+    </div>`
+  }).join('')}</div></div>`
+}
+
 function meTab(p: Progress, trainerSprite: string, name: string) {
   const lv = levelOf(p.xp)
   const s = p.stats
@@ -55,6 +69,7 @@ function meTab(p: Progress, trainerSprite: string, name: string) {
         <div class="pf-lv"><em>Lv ${lv.lv}</em>${bar(lv.k)}<small>${lv.need ? `${lv.into}/${lv.need} XP` : 'MAX'}</small></div>
       </div>
     </div>
+    ${petCard(p)}
     ${guest ? `<div class="pf-card pf-guest"><span>💾 ${L('Your progress is saved on this device. Log in with Discord to keep it everywhere and join the world rankings.', 'Je voortgang staat op dit apparaat. Log in met Discord om hem overal te bewaren en mee te doen in de wereldranglijst.')}</span><button class="rw-login pf-login">${L('Log in', 'Inloggen')}</button></div>` : ''}
     <div class="pf-card">
       <h4>${L('Daily quests', 'Dagopdrachten')} <small>${L(`new in ${untilReset()}`, `nieuw over ${untilReset()}`)}</small></h4>
@@ -253,6 +268,13 @@ export function showProfile(o: { trainerSprite: string; name: string; tab?: Tab;
       const id = Number(b.dataset.id)
       const on = p.shiny.includes(id)
       void setCosmetics({ shiny: on ? p.shiny.filter((x) => x !== id) : [...p.shiny, id] })
+    }))
+    el.querySelectorAll<HTMLElement>('.pf-petbtn').forEach((b) => b.addEventListener('click', () => {
+      sfx.select()
+      const pet = PETS.find((x) => x.id === b.dataset.pet)
+      if (!pet) return
+      setPetOn(pet, petOff(pet))
+      paint()
     }))
     el.querySelectorAll<HTMLElement>('.pf-seg button').forEach((b) => b.addEventListener('click', () => {
       sfx.select()

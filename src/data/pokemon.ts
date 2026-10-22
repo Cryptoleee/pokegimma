@@ -162,8 +162,9 @@ const ROWS: Row[] = [
   [59, 'Arcanine', 'fire', 90, 105, 80, 95],
 
   // Dungeon foes (the Burning Depths): never in the open world
-  [240, 'Magby', 'fire', 45, 72, 46, 83],
-  [126, 'Magmar', 'fire', 65, 97, 71, 93],
+  // (Magby is also the Burning Depths' raid reward: it grows into the warden)
+  [240, 'Magby', 'fire', 45, 72, 46, 83, 126, 20],
+  [126, 'Magmar', 'fire', 65, 97, 71, 93, 467, 34],
   [467, 'Magmortar', 'fire', 75, 110, 81, 83],
   [218, 'Slugma', 'fire', 40, 55, 40, 20],
   [219, 'Magcargo', 'fire/rock', 60, 70, 100, 30],
@@ -202,7 +203,7 @@ for (const [id, name, types, hp, atk, def, spe, evo, evoLevel] of ROWS) {
 /** The 24 Pokémon you pick your starting partner from. */
 export const ROSTER = [25, 4, 7, 1, 133, 495, 498, 501, 447, 443, 570, 610, 92, 66, 63, 147, 246, 446, 374, 123, 258, 255, 403, 633]
 /** Extra partners you unlock on the reward road (trainer level), and the raid unlocks (clear a dungeon). */
-export const UNLOCK_PARTNERS = [81, 390, 138, 220, 359, 111, 280, 607, 371, 142, 636, 144, 145, 146, 382, 383, 151, 643]
+export const UNLOCK_PARTNERS = [81, 390, 138, 220, 359, 111, 280, 607, 371, 142, 636, 144, 145, 146, 382, 383, 151, 240]
 /** Everything you can pick: the free roster plus the unlockable ones. */
 export const ALL_PARTNERS = [...ROSTER, ...UNLOCK_PARTNERS]
 /** You start with one partner and can catch more in the world, up to PARTY_MAX. */
@@ -248,3 +249,14 @@ export function spriteUrl(id: number, opts: { back?: boolean; shiny?: boolean } 
 export function animatedUrl(id: number, shiny = false): string {
   return `${SPRITE_BASE}/animated/${shiny ? 'shiny/' : ''}${id}.gif`
 }
+
+/** The evolution line from a first stage to its last: [Magby, Magmar, Magmortar] (first branch). */
+export function lineOf(id: number): number[] {
+  const out = [id]
+  for (let sp = SPECIES[id]; sp?.evo?.length && out.length < 4; sp = SPECIES[sp.evo[0]]) out.push(sp.evo[0])
+  return out
+}
+/** Name of the last stage of a line. */
+export const finalName = (id: number) => SPECIES[lineOf(id).at(-1)!]?.name ?? ''
+/** "Magby → Magmar → Magmortar". */
+export const finalLine = (id: number) => lineOf(id).map((s) => SPECIES[s]?.name ?? '').join(' → ')

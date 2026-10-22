@@ -29,6 +29,7 @@ import { askName, setOnline, showMenu, type MenuState } from './ui/home'
 import { IC, icon, type AppTab } from './ui/app'
 import { showLoading } from './ui/loading'
 import { prepareCinematic } from './ui/cinematic'
+import { myPet } from './data/pets'
 import { wipe } from './ui/transition'
 import { currentMusic, playMusic, setTempo } from './music'
 import { sfx } from './audio'
@@ -229,7 +230,7 @@ let ready = false
 
 function me(): LobbyPlayer {
   const p = progress()
-  return { pid: profile().id, name: profile().name || trainer.name, trainer: trainer.key, team, ready, shiny: !!team[0] && shinyPartner(team[0]), lv: levelOf(p.xp).lv, title: titleOf(p) }
+  return { pid: profile().id, name: profile().name || trainer.name, trainer: trainer.key, team, ready, shiny: !!team[0] && shinyPartner(team[0]), pet: myPet(p), lv: levelOf(p.xp).lv, title: titleOf(p) }
 }
 
 // ---------- Menus ----------

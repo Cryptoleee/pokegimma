@@ -87,9 +87,9 @@ export const DUNGEON_IDS = ['depths']
 /** Raid dungeon lives (a clean run keeps all of them). */
 export const DUNGEON_LIVES = 3
 
-/** Raid unlocks: clear a dungeon and its legendary joins you as a partner. */
+/** Raid unlocks: clear a dungeon and one of its wardens joins you as a partner. */
 export const RAID_UNLOCKS: { kind: 'partner'; id: string; dungeon: string }[] = [
-  { kind: 'partner', id: '643', dungeon: 'depths' }, // Reshiram
+  { kind: 'partner', id: '240', dungeon: 'depths' }, // Magby, who grows into Magmortar, the Warden of the Flame
 ]
 export const raidUnlockOf = (kind: 'partner' | 'trainer', id: string | number) => RAID_UNLOCKS.find((r) => r.kind === kind && r.id === String(id))
 
@@ -581,6 +581,8 @@ export function applyMatch(p: Progress, r: Report, day: string): Outcome {
   p.pve += points.pve
 
   const unlocks: string[] = []
+  // A flawless dungeon clear earns its legendary as a follower (src/data/pets.ts)
+  if (ach.some((a) => a.id === 'dg_flawless')) unlocks.push('pet:643')
   if (r.partner) {
     for (const [lv, key] of [[SHINY_AT, 'shiny'], [3, 'emblem'], [7, 'emblem'], [10, 'emblem']] as const) {
       if (mFrom < lv && mTo >= lv) unlocks.push(key === 'shiny' ? `shiny:${r.partner}` : `emblem:${r.partner}:${emblemOf(lv)}`)
