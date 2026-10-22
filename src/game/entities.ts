@@ -25,6 +25,19 @@ let nextId = 1
 
 export type WildState = 'roam' | 'aggro' | 'weak'
 
+/** Dungeon foe roles (see src/game/dungeon.ts). */
+export type FoeRole = 'brute' | 'caster' | 'mender' | 'guard'
+export interface FoeCast {
+  kind: 'bolt' | 'heal'
+  t: number
+  total: number
+  /** Hits taken while casting (two break it). */
+  hits: number
+  /** Heal: who gets it. Bolt: the hazard it laid (removed when interrupted). */
+  tgt: Mon | null
+  hz: number
+}
+
 export interface Dash {
   vx: number
   vy: number
@@ -112,6 +125,17 @@ export class Mon {
   dmgMul = 1
   /** Holds still (a warden winding up an attack). */
   holdT = 0
+  /** Dungeon foe's job in its pack: hits hard, casts from afar, heals the pack, or shields it. */
+  role: FoeRole | '' = ''
+  /** A spell being cast (cast bar): a fire bolt on someone or a heal on a packmate. Hits can interrupt it. */
+  cast: FoeCast | null = null
+  /** Dungeon pack it belongs to (0 = none), and whether that pack still waits to be pulled. */
+  pack = 0
+  idle = false
+  /** Seconds until its next role spell. */
+  roleT = 0
+  /** Host only: who it's angry at (damage done, a Defender counts triple). */
+  threat: Map<Trainer, number> | null = null
   /** Frozen in place (Kyurem's ice) for this many seconds. */
   frozenT = 0
   /** Weakened wild: reserved for this trainer (who knocked it out) for claimT seconds. */

@@ -159,14 +159,18 @@ Een raid is PvE: jij (en tot 11 vrienden) tegen één legendarische baas, in een
 
 ### Raid-dungeons
 
-Standaard is een raid een **dungeon**: eerst vecht je je door een reeks zalen, en pas aan het eind gaat de poort naar de arena van de legende open. In het raidmenu kies je de dungeon of **Klassiek** (meteen de arena in, willekeurige baas). De eerste dungeon is **De Brandende Diepten** (Reshiram, `src/data/dungeons.ts`).
+Standaard is een raid een **dungeon**, in de geest van WoW-dungeons: eerst vecht je je door een reeks zalen, en pas aan het eind gaat de poort naar de arena van de legende open. In het raidmenu kies je de dungeon of **Klassiek** (meteen de arena in, willekeurige baas). De eerste dungeon is **De Brandende Diepten** (Reshiram, `src/data/dungeons.ts`, logica in `src/game/dungeon.ts`).
 
-- **Zalen en waves:** zes zalen rond de kraterarena, verbonden door gangen. Een zaal begint zodra iemand erin loopt; de waves komen na elkaar (vijanden komen in een vuurstoot uit de grond). De poort uit de zaal (een basalt plaat met gloeiende runen) gaat pas open als alle vijanden verslagen zijn. Vijanden jagen op de dichtstbijzijnde speler, vallen om beurten aan en kunnen niet gevangen worden.
-- **Elites en wachters:** elites (★) zijn groter en taaier. Twee keer verspert een **wachter** de weg (Magmortar, Camerupt): een mini-baas met eigen levensbalk, getelegrafeerde aanvallen (kegel, cirkels, ring) en die hulp roept bij 60/30% HP. Een wachter verslaan geeft +1 leven.
-- **Laatste wave:** in het Laatste Bastion; daarna gaat de arenapoort open en ontwaakt Reshiram zodra iemand de krater in loopt. Vanaf daar is het een gewone raid (4 minuten, fases, alle bekende aanvallen).
-- **Levens en checkpoints:** 3 levens voor de hele run. Ga je neer, dan kom je na 10 s terug bij de laatste poort. Levens op? Als je team een zaal verovert, ben je terug met één leven. Elke veroverde zaal geneest iedereen 35% en legt een Potion per speler bij de poort; elites en wachters laten een Potion vallen.
-- **Omgeving:** lava brandt (in de dungeon 5%/s, in de krater 10%/s), de Vuurrivier heeft twee bruggen, in de Smeltovens barsten vulkaanspleten uit.
-- **Schaal:** meer spelers = meer vijanden (+50% per speler) en meer HP voor wachters; moeilijkheid past aantallen, levels en schade aan. Vuur-zwakke partners krijgen maximaal 1,5× schade van dungeonvijanden.
+- **Groepen en pulls:** in elke zaal staan groepen vijanden klaar (sommige patrouilleren). Kom je binnen 5,5 tegel of raak je er een, dan komt de hele groep op je af, en een gekoppelde groep doet mee (overpull). De poort uit een zaal (basalt plaat met gloeiende runen) gaat pas open als alles erin verslagen is.
+- **Rollen in een groep** (symbool op het naamplaatje): ⚔ brute (meer HP, slaat hard, trager), ✦ caster (houdt afstand, cast een vuurbal: rode cirkel onder je met castbalk), ✚ healer (geneest de zwakste uit de groep, 30%), ◆ schildwacht (vijanden binnen 4,5 tegel nemen 40% minder schade; gele stippelcirkel). Elites (★) zijn groter en taaier.
+- **Interrupts:** een vijand met een castbalk breek je met een melee-, dash- of ultimate-treffer, of met twee treffers van wat dan ook: de spreuk mislukt ("Onderbroken!").
+- **Aggro / tank:** vijanden gaan op wie hen het meest schade deed; schade van een Verdediger telt ×3, van een Allrounder ×1,3.
+- **Wachters:** Magmortar (kegel, Levende Bom die een speler volgt en een magmapoel achterlaat, vuurballen, hittegolf) en Camerupt (uitbarstingsring, aardbeving, Magmavloed: poelen die 9 s blijven branden). Ze roepen hulp bij 60/30% HP en worden na 2 min (Camerupt 2:10) **woedend** (sneller, harder). Een wachter lokt bij de pull de rest van de zaal mee.
+- **Buit:** een verslagen wachter geeft het team een **reliek** (Sintel van de Vlam: +15% schade; Pantser van de Vulkaan: −15% schade), +1 leven en een Potion per speler.
+- **Laatste Bastion:** een gauntlet van 3 waves; daarna gaat de arenapoort open en ontwaakt Reshiram zodra iemand de krater in loopt (gewone raid, 4 minuten).
+- **Levens en checkpoints:** 3 levens voor de hele run; neer = na 10 s terug bij de laatste poort. Levens op? Als je team een zaal verovert ben je terug met één leven. Een veroverde zaal geneest 15%.
+- **Types:** dungeonvijanden doen en krijgen tussen 0,75× en 1,5× typeschade, zodat geen partner je erdoorheen sleept.
+- **Schaal:** meer spelers = grotere groepen (+50% per speler) en meer HP voor wachters; moeilijkheid past aantallen, levels, schade en de enrage-timer aan.
 - **Testen:** `?boss=reshiram&room=N` start in zaal N (poorten ervoor open; `room=6` = voor de arena), `?classic=1` slaat de dungeon over.
 
 - **Jouw team:** je partner is in de raid volledig geëvolueerd en Lv 50 met alle vier de aanvallen (Pikachu wordt Raichu, Charmander Charizard, enzovoort). Je hebt 2 Potions en HP herstelt niet vanzelf. Er verschijnen wel geregeld Potions in de arena.

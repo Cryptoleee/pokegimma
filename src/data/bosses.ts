@@ -62,6 +62,10 @@ export interface BossAttack {
   wind?: { dur: number; force: number }
   /** Every lightning rod in the arena fires as well. */
   rods?: boolean
+  /** Leaves a pool that keeps burning (seconds, share of max HP per second). */
+  linger?: { dur: number; dps: number }
+  /** Living Bomb: the circle follows the marked player until just before it goes off, then leaves a pool. */
+  follow?: boolean
   fx: MoveFx
   type: PType
 }

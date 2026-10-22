@@ -8,6 +8,9 @@ import type { Vfx } from '../game/vfx'
 import type { Command, NetEvent, RosterEntry } from './protocol'
 import { bossAttack, cloneMon, type Hazard } from '../game/boss'
 import type { DungeonView } from '../game/dungeon'
+
+/** Dungeon foe roles, by index on the wire ('' = -1). */
+const FOE_ROLES: string[] = ['brute', 'caster', 'mender', 'guard']
 import { BOSSES } from '../data/bosses'
 import { duelFrozen, type DuelView } from '../game/duel'
 
@@ -95,7 +98,7 @@ export function recordVfx(g: Game) {
 
 /** Bare minimum for things far off-screen: who it is and roughly where. */
 function farMon(m: Mon) {
-  return { i: m.id, s: m.species.id, l: m.level, hp: r1(m.hp), x: r1(m.x), y: r1(m.y), ...(m.shiny ? { sh: 1 } : {}), ...(m.awaken ? { aw: m.awaken } : {}), ...(m.foe ? { fo: [m.foe, r2(m.bossMul)] } : {}) }
+  return { i: m.id, s: m.species.id, l: m.level, hp: r1(m.hp), x: r1(m.x), y: r1(m.y), ...(m.shiny ? { sh: 1 } : {}), ...(m.awaken ? { aw: m.awaken } : {}), ...(m.foe ? { fo: [m.foe, r2(m.bossMul), FOE_ROLES.indexOf(m.role), m.idle ? 1 : 0] } : {}) }
 }
 
 function monState(m: Mon, own: boolean) {
@@ -115,7 +118,8 @@ function monState(m: Mon, own: boolean) {
   if (m.claimT > 0 && m.claim) o.cl = [m.claim.id, r1(m.claimT)]
   if (m.catching) o.ca = 1
   if (m.boss) o.bs = m.bossMul
-  if (m.foe) o.fo = [m.foe, r2(m.bossMul)]
+  if (m.foe) o.fo = [m.foe, r2(m.bossMul), FOE_ROLES.indexOf(m.role), m.idle ? 1 : 0]
+  if (m.cast) o.cs = [m.cast.kind === 'heal' ? 1 : 0, r2(m.cast.t), m.cast.total]
   if (m.frozenT > 0) o.fz = r2(m.frozenT)
   if (m.dash) o.ds = [r2(m.dash.vx), r2(m.dash.vy), r2(m.dash.t), m.dash.move.name, m.dash.strike ? 1 : 0]
   if (m.charging) o.ch = [m.charging.move.name, r2(m.charging.t), m.charging.total]
@@ -311,12 +315,17 @@ function getMon(cs: ClientState, o: Record<string, number & string & unknown[]>,
     m.bossMul = o.bs
   }
   // Raid dungeon foes: their kind and HP scale (so the HP bar matches the host)
-  const fo = o.fo as unknown as [1 | 2 | 3, number] | undefined
+  const fo = o.fo as unknown as [1 | 2 | 3, number, number, number] | undefined
   if (fo) {
     m.foe = fo[0]
     m.bossMul = fo[1]
+    m.role = (FOE_ROLES[fo[2]] ?? '') as Mon['role']
+    m.idle = !!fo[3]
     m.legendary = false
   }
+  // A dungeon foe's cast bar
+  const ca = o.cs as unknown as [number, number, number] | undefined
+  m.cast = ca ? { kind: ca[0] ? 'heal' : 'bolt', t: ca[1], total: ca[2], hits: 0, tgt: null, hz: 0 } : null
   m.frozenT = o.fz ?? 0
   const ds = o.ds as unknown as [number, number, number, string, number] | undefined
   m.dash = ds ? { vx: ds[0], vy: ds[1], t: ds[2], move: moveByName(ds[3]), hit: new Set(), strike: !!ds[4] } : null

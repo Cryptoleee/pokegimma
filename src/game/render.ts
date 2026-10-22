@@ -84,6 +84,24 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
 
   // Team rings on the ground + target reticle base + aim preview (under actors)
   drawRings(g, ctx, inView, time)
+  // Raid dungeon guards: the shield they hold over their pack
+  for (const w of g.wilds) {
+    if (w.role !== 'guard' || w.fainted || !inView(w.x, w.y, 6)) continue
+    const R = 4.5 * TILE
+    ctx.save()
+    ctx.globalAlpha = w.idle ? 0.25 : 0.55
+    ctx.strokeStyle = '#ffd860'
+    ctx.lineWidth = 1.4
+    ctx.setLineDash([6, 5])
+    ctx.lineDashOffset = -time * 14
+    ctx.beginPath()
+    ctx.ellipse(w.x * TILE, w.y * TILE, R, R * 0.6, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.globalAlpha *= 0.25
+    ctx.fillStyle = '#ffd860'
+    ctx.fill()
+    ctx.restore()
+  }
   drawAimPreview(g, ctx)
   drawMouseTarget(g, ctx, time)
 
@@ -185,6 +203,12 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   const p = g.player
   for (const w of g.wilds) {
     if (!inView(w.x, w.y) || w.state === 'weak' || w.catching || w.boss) continue
+    // Raid dungeon foes: their job on the nameplate (so you can plan the pull), and a cast bar
+    if (w.foe) {
+      plate(ctx, w, 'wild', `${ROLE_GLYPH[w.role] ?? ''}${w.foe >= 2 ? '★' : ''}Lv${w.level}`)
+      if (w.cast) castBar(ctx, w, time)
+      continue
+    }
     const near = Math.hypot(w.x - p.x, w.y - p.y) < 7
     if (w.state === 'aggro' || w.hp < w.maxHp || w.rarity !== 'common' || near || g.playerTarget === w)
       plate(ctx, w, 'wild', `${w.shiny ? '✦' : ''}Lv${w.level}${w.legendary ? ' ★' : w.rarity === 'rare' ? ' ◆' : ''}`)
@@ -833,6 +857,31 @@ const TEAM_COL: Record<Team, { bar: string; dark: string; name: string; ring: st
 function spriteTop(m: Mon) {
   const s = spriteOf(cur!, m)
   return m.y * TILE - (s.ready ? s.bh * m.scale : 16)
+}
+
+const ROLE_GLYPH: Record<string, string> = { brute: '⚔ ', caster: '✦ ', mender: '✚ ', guard: '◆ ' }
+
+/** A dungeon foe casting: a bar under its nameplate that fills up; hit it to break the spell. */
+function castBar(ctx: CanvasRenderingContext2D, m: Mon, time: number) {
+  const c = m.cast!
+  const w = 32, h = 4
+  const x = m.x * TILE - w / 2
+  const y = spriteTop(m) - 1
+  const k = Math.max(0, Math.min(1, 1 - c.t / c.total))
+  const col = c.kind === 'heal' ? '#60f090' : '#ffb030'
+  ctx.fillStyle = '#16121e'
+  ctx.fillRect(x - 1, y - 1, w + 2, h + 2)
+  ctx.fillStyle = '#3a3448'
+  ctx.fillRect(x, y, w, h)
+  ctx.fillStyle = col
+  ctx.fillRect(x, y, w * k, h)
+  // A blinking edge: interrupt me!
+  if (Math.sin(time * 16) > 0) {
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 0.8
+    ctx.strokeRect(x - 1.5, y - 1.5, w + 3, h + 3)
+  }
+  label(ctx, c.kind === 'heal' ? '✚' : '✦', x - 4, y + h, col)
 }
 
 /** Nameplate: name, HP number on a chunky team-coloured bar with a trailing damage strip. */

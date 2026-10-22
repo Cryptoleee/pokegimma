@@ -354,11 +354,12 @@ function tickHazards(g: Game, dt: number) {
       continue
     }
     if (was > 0) resolveHazard(g, h)
-    updateTornado(g, h, dt)
+    if (isPool(h)) updatePool(g, h, dt)
+    else updateTornado(g, h, dt)
     h.dur -= dt
     if (h.dur <= 0) {
       g.hazards.splice(g.hazards.indexOf(h), 1)
-      g.vfx.burst(h.x, h.y - 0.5, { n: 14, speed: 4, cols: PAL.flying.cols, shape: 'smoke', s0: 4, s1: 9, life: 0.6, flat: 0.5 })
+      if (!isPool(h)) g.vfx.burst(h.x, h.y - 0.5, { n: 14, speed: 4, cols: PAL.flying.cols, shape: 'smoke', s0: 4, s1: 9, life: 0.6, flat: 0.5 })
     }
   }
 }
@@ -432,6 +433,20 @@ function spawnTornado(g: Game, tw: { n: number; speed: number; dur: number; dps:
 }
 
 /** A tornado on the move: turns (slowly) toward the closest Pokémon and hurts anyone inside. */
+/** Pools of magma that stay a while (raid dungeons): they don't move, they burn whoever stands in them. */
+export const isPool = (h: Hazard) => h.atk === 'pool' || h.atk === 'w_pool'
+
+function updatePool(g: Game, h: Hazard, dt: number) {
+  if (Math.random() < dt * 6) g.vfx.burst(h.x + (Math.random() - 0.5) * h.r * 1.4, h.y + (Math.random() - 0.5) * h.r * 0.8, { n: 1, speed: 1.5, dir: -Math.PI / 2, spread: 0.5, cols: ['#ffd060', '#ff8030'], shape: 'flame', add: true, s0: 2.5, s1: 0.5, life: 0.5 })
+  h.tick = (h.tick ?? 0) - dt
+  if (h.tick > 0) return
+  h.tick = 0.5
+  for (const m of targets(g)) if (Math.hypot(m.x - h.x, m.y - h.y) <= h.r) {
+    g.applyDamage(m, m.maxHp * h.dps * 0.5, null)
+    g.vOf(m.owner)?.sfx('burn')
+  }
+}
+
 function updateTornado(g: Game, h: Hazard, dt: number) {
   const foes = targets(g)
   let best: Mon | null = null, bd = Infinity
@@ -666,7 +681,7 @@ function resolveHazard(g: Game, h: Hazard) {
   // The boss's attacks land with the heaviest version of their move's sound
   const r = g.raid
   const a = r?.def.attacks.find((x) => x.id === h.atk)
-  const kind = h.atk === 'vent' ? 'vent' : h.atk === 'arc' ? 'arc' : h.atk === 'grid' ? 'grid' : h.dur > 0 ? 'tornado' : a?.move === 'land' ? 'quake' : a?.move === 'dash' ? 'dash' : 'impact'
+  const kind = h.atk === 'vent' || isPool(h) ? 'vent' : h.atk === 'arc' ? 'arc' : h.atk === 'grid' ? 'grid' : h.dur > 0 ? 'tornado' : a?.move === 'land' ? 'quake' : a?.move === 'dash' ? 'dash' : 'impact'
   const size = h.shape === 'circle' && h.r < 2.5 ? 0.75 : 1
   // Tornados and the floor grid are heard where they are; the boss's blows fill the arena
   g.soundAt(h.x, h.y, 'boss', [kind, h.fx, size, h.dur > 0 ? h.dur : 1], kind === 'tornado' || kind === 'vent' || kind === 'arc' ? { range: 24 } : { global: true })
@@ -908,7 +923,7 @@ function impactFx(g: Game, h: Hazard) {
         return
       }
       const r = h.r
-      if (h.dur > 0) {
+      if (h.dur > 0 && !isPool(h)) {
         // A tornado touches down: a gust and a ring of dust
         v.burst(h.x, h.y - 0.3, { n: 20, speed: 6, cols: p.cols, shape: 'smoke', s0: 5, s1: 10, life: 0.7, flat: 0.5, drag: 2 })
         v.burst(h.x, h.y - 0.6, { n: 14, dir: -Math.PI / 2, spread: 0.6, speed: 9, cols: p.cols, shape: 'streak', add: true, s0: 4, s1: 1, life: 0.5 })
@@ -1072,6 +1087,41 @@ function hazardPath(ctx: CanvasRenderingContext2D, h: Hazard) {
 }
 
 /** A whirlwind on the ground: dust spinning round, darker in the middle. */
+/** A pool of magma: a glowing, bubbling puddle that cools at the edges as it runs out. */
+function drawPool(ctx: CanvasRenderingContext2D, h: Hazard, time: number) {
+  const x = h.x * TILE, y = h.y * TILE, R = h.r * TILE
+  const fade = Math.min(1, h.dur / 1.2)
+  ctx.save()
+  ctx.globalAlpha = fade
+  const grd = ctx.createRadialGradient(x, y, R * 0.1, x, y, R)
+  grd.addColorStop(0, 'rgba(255,230,140,0.9)')
+  grd.addColorStop(0.45, 'rgba(255,120,30,0.8)')
+  grd.addColorStop(0.85, 'rgba(160,40,10,0.7)')
+  grd.addColorStop(1, 'rgba(40,10,6,0)')
+  ctx.fillStyle = grd
+  ctx.beginPath()
+  for (let i = 0; i <= 24; i++) {
+    const a = (i / 24) * Math.PI * 2
+    const rr = R * (0.88 + 0.1 * Math.sin(a * 3 + h.id + time * 1.5))
+    const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr * 0.62
+    if (i) ctx.lineTo(px, py)
+    else ctx.moveTo(px, py)
+  }
+  ctx.closePath()
+  ctx.fill()
+  // Bubbles popping
+  ctx.globalCompositeOperation = 'lighter'
+  for (let i = 0; i < 5; i++) {
+    const k = (time * 0.8 + i / 5 + h.id * 0.13) % 1
+    const a = i * 2.4 + h.id
+    ctx.fillStyle = `rgba(255,240,170,${(1 - k) * 0.8})`
+    ctx.beginPath()
+    ctx.arc(x + Math.cos(a) * R * 0.5, y + Math.sin(a) * R * 0.3, 1 + k * 2.5, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.restore()
+}
+
 function drawTornadoGround(ctx: CanvasRenderingContext2D, h: Hazard, time: number) {
   const x = h.x * TILE, y = h.y * TILE, R = h.r * TILE
   ctx.save()
@@ -1121,7 +1171,8 @@ function drawTornadoFunnel(ctx: CanvasRenderingContext2D, h: Hazard, time: numbe
 export function drawHazards(g: Game, ctx: CanvasRenderingContext2D, time: number) {
   for (const h of g.hazards) {
     if (h.dur > 0 && h.t <= 0) {
-      drawTornadoGround(ctx, h, time)
+      if (isPool(h)) drawPool(ctx, h, time)
+      else drawTornadoGround(ctx, h, time)
       continue
     }
     // A sweep (Cross Flame) lays all its beams at once; only the next ones show in
@@ -1336,7 +1387,7 @@ export function drawHazardsSky(g: Game, ctx: CanvasRenderingContext2D, time: num
     const p = palOf(h.type, h.atk)
     const x = h.x * TILE, y = h.y * TILE
     const a = bossAttack(g, h.atk)
-    if (h.dur > 0) {
+    if (h.dur > 0 && !isPool(h)) {
       // A tornado forming, then roaming
       drawTornadoFunnel(ctx, h, time, h.t > 0 ? k * 0.6 : Math.min(1, h.dur / 0.4))
       continue

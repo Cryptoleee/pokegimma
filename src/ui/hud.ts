@@ -9,7 +9,7 @@ import { xpNeeded } from '../game/entities'
 import { INTRO_TIME, type Banner, type FeedIcon, type Game } from '../game/game'
 import { itemUrl } from '../game/sprites'
 import { ARENA_C, MAP } from '../game/world'
-import { dungeonOf } from '../data/dungeons'
+import { dungeonOf, fightsIn } from '../data/dungeons'
 import type { DungeonView } from '../game/dungeon'
 import type { Mon } from '../game/entities'
 import type { ChatLine } from '../net/protocol'
@@ -620,14 +620,22 @@ export class Hud {
     const warden = dg.warden ? g.wilds.find((w) => w.id === dg.warden) : undefined
     this.bossBar.classList.toggle('hidden', g.introT > INTRO_TIME * 0.45)
     const room = dd.rooms[dg.room]
-    const key = `dg:${dg.room}:${dg.stage}:${warden?.id ?? 0}`
+    const key = `dg:${dg.room}:${dg.stage}:${warden?.id ?? 0}:${dg.relics.join()}`
     if (this.bossKey !== key) {
       this.bossKey = key
       const title = warden ? warden.name : dg.stage === 1 ? L('To the crater', 'Naar de krater') : room.name
       this.bossBar.style.setProperty('--c', warden ? '#ff7a30' : '#ffb040')
+      // Where each room starts on the progress bar
+      let acc = 0
+      const marks = dd.rooms.map((r, i) => {
+        const at = (acc / dg.total) * 100
+        acc += fightsIn(r)
+        return i ? `<em style="left:${at}%"></em>` : ''
+      }).join('')
+      const relics = dg.relics.map((r) => `<i class="bb-relic" title="${r === 'ember' ? L('Ember of the Flame: +15% damage', 'Sintel van de Vlam: +15% schade') : L('Shell of the Volcano: −15% damage taken', 'Pantser van de Vulkaan: −15% schade')}">${r === 'ember' ? '🔥' : '🛡️'}</i>`).join('')
       this.bossBar.innerHTML = `
-        <div class="bb-top"><b>${esc(title)}</b><span class="bb-team"></span><span class="bb-time"></span></div>
-        <div class="bb-bar ${warden ? '' : 'dg'}"><i class="bb-lag"></i><i class="bb-fill"></i>${warden ? '' : dd.rooms.map((_, i) => (i ? `<em style="left:${(dd.rooms.slice(0, i).reduce((s, r) => s + r.waves.length, 0) / dg.totalWaves) * 100}%"></em>` : '')).join('')}</div>`
+        <div class="bb-top"><b>${esc(title)}</b>${relics}<span class="bb-team"></span><span class="bb-time"></span></div>
+        <div class="bb-bar ${warden ? '' : 'dg'}"><i class="bb-lag"></i><i class="bb-fill"></i>${warden ? '' : marks}</div>`
     }
     const fill = this.bossBar.querySelector('.bb-fill') as HTMLElement
     const lag = this.bossBar.querySelector('.bb-lag') as HTMLElement
@@ -635,21 +643,27 @@ export class Hud {
       fill.style.width = `${Math.max(0, warden.hp / warden.maxHp) * 100}%`
       lag.style.width = `${Math.max(0, warden.hpLag / warden.maxHp) * 100}%`
     } else {
-      // How far through the dungeon: waves behind you
-      const done = dg.stage === 1 ? dg.totalWaves : Math.max(0, dg.waveNo - (dg.left || dg.next ? 1 : 0))
-      fill.style.width = `${(done / dg.totalWaves) * 100}%`
+      // How far through the dungeon: fights won
+      fill.style.width = `${(Math.min(dg.total, dg.stage === 1 ? dg.total : dg.fights) / dg.total) * 100}%`
       lag.style.width = '0'
     }
     const time = this.bossBar.querySelector('.bb-time') as HTMLElement
+    const mmss = (t: number) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
     const txt = dg.stage === 1
       ? L('Enter the arena →', 'Ga de arena in →')
-      : !dg.wave
-        ? L(`Room ${dg.room + 1}/${dd.rooms.length}`, `Kamer ${dg.room + 1}/${dd.rooms.length}`)
-        : dg.next
-          ? L(`Wave ${dg.wave}/${dg.waves} in ${dg.next}`, `Wave ${dg.wave}/${dg.waves} over ${dg.next}`)
-          : L(`Wave ${dg.wave}/${dg.waves} · ${dg.left} left`, `Wave ${dg.wave}/${dg.waves} · nog ${dg.left}`)
+      : warden
+        ? dg.enrage < 0 ? L('ENRAGED', 'WOEDEND') : L(`Enrage ${mmss(dg.enrage)}`, `Woede ${mmss(dg.enrage)}`)
+        : dg.waves
+          ? !dg.wave
+            ? L('Step in…', 'Loop de zaal in…')
+            : dg.next
+              ? L(`Wave ${dg.wave}/${dg.waves} in ${dg.next}`, `Wave ${dg.wave}/${dg.waves} over ${dg.next}`)
+              : L(`Wave ${dg.wave}/${dg.waves} · ${dg.left} left`, `Wave ${dg.wave}/${dg.waves} · nog ${dg.left}`)
+          : dg.packs
+            ? L(`${dg.packs} ${dg.packs === 1 ? 'pack' : 'packs'} left${dg.left ? ` · ${dg.left} fighting` : ''}`, `${dg.packs} ${dg.packs === 1 ? 'groep' : 'groepen'} over${dg.left ? ` · ${dg.left} in gevecht` : ''}`)
+            : room?.warden ? L('The warden waits…', 'De wachter wacht…') : L(`Room ${dg.room + 1}/${dd.rooms.length}`, `Kamer ${dg.room + 1}/${dd.rooms.length}`)
+    time.classList.toggle('low', !!warden && (dg.enrage < 0 || dg.enrage <= 15))
     if (time.textContent !== txt) time.textContent = txt
-    time.classList.remove('low')
     const humans = g.trainers.filter((t) => t.human).sort((a, b) => (b === p ? 1 : 0) - (a === p ? 1 : 0))
     const hearts = (t: typeof p) => '♥'.repeat(Math.max(0, t.lives)) + '♡'.repeat(Math.max(0, dg.lives - t.lives))
     const team = humans.length < 2

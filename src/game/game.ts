@@ -19,7 +19,7 @@ import { MAP, T, World } from './world'
 import type { ThemeId } from '../data/themes'
 import { BOSSES, type BossId } from '../data/bosses'
 import { dungeonOf } from '../data/dungeons'
-import { foeDown } from './dungeon'
+import { castHit, foeDown, foeHit, foeTarget, guardShield, relicMul, roleTick } from './dungeon'
 import { botThink } from './ai'
 import type { Dir } from './entities'
 import type { Command } from '../net/protocol'
@@ -1309,16 +1309,21 @@ export class Game {
       return
     }
     // Raid bosses never fully resist: every partner can win the fight
-    // and a dungeon full of one type is hard on the partners weak to it, but never hopeless
-    const eff = tgt.boss ? Math.max(0.8, effectiveness(mv.type, tgt.species.types)) : src.foe ? Math.min(1.5, effectiveness(mv.type, tgt.species.types)) : effectiveness(mv.type, tgt.species.types)
+    // and in a dungeon full of one type, types count but never more than 0.75–1.5× (no partner carries you)
+    const eff = tgt.boss ? Math.max(0.8, effectiveness(mv.type, tgt.species.types)) : src.foe || tgt.foe ? Math.max(0.75, Math.min(1.5, effectiveness(mv.type, tgt.species.types))) : effectiveness(mv.type, tgt.species.types)
     const L = src.level
     const raw = (((2 * L) / 5 + 2) * mv.power * (src.atk / tgt.def)) / 50 + 2
     // The boss's ordinary moves are chip damage (a share of your HP); its telegraphed attacks are the real threat
     const dmg = src.boss
       ? Math.max(1, Math.round(tgt.maxHp * (0.02 + mv.tier * 0.012) * mult * (eff > 1 ? 1.3 : eff < 1 ? 0.75 : 1)))
-      : Math.max(1, Math.round(raw * eff * mult * src.dmgMul * roleInfo(src.species.id).dmg * DMG_SCALE * (this.duel ? DUEL_DMG * buffDamage(src, tgt) : 1) * this.rng.range(0.9, 1.05)))
+      : Math.max(1, Math.round(raw * eff * mult * src.dmgMul * (this.raid?.dg ? dungeonMul(this, src, tgt) : 1) * roleInfo(src.species.id).dmg * DMG_SCALE * (this.duel ? DUEL_DMG * buffDamage(src, tgt) : 1) * this.rng.range(0.9, 1.05)))
     tgt.hp -= dmg
     if (tgt.boss && src.owner) src.owner.bossDmg += Math.min(dmg, tgt.hp + dmg)
+    // Raid dungeon: wakes a waiting pack, builds threat, can break a cast
+    if (tgt.foe) {
+      foeHit(this, tgt, src.owner, dmg)
+      if (tgt.cast && src.owner) castHit(this, tgt, mv.kind, mv.tier)
+    }
     if (src.owner && tgt.owner && tgt.owner !== src.owner) src.owner.dmg += Math.min(dmg, tgt.hp + dmg)
     tgt.flash = 0.12
     tgt.revealT = Math.max(tgt.revealT, HIT_REVEAL)
@@ -1435,6 +1440,7 @@ export class Game {
     if (m.fainted) return
     // Difficulty: people take more or less damage from bots, wild Pokémon and the raid boss (never from each other)
     if (this.diff !== 'normal' && m.owner?.human && (by ? !by.owner?.human : this.kind === 'raid')) dmg *= TAKEN[this.diff]
+    if (m.owner && this.raid?.dg && !by?.owner) dmg *= relicMul(this, 'def')
     m.hp -= dmg
     m.combatT = 0
     m.revealT = Math.max(m.revealT, HIT_REVEAL)
@@ -2046,27 +2052,44 @@ export class Game {
    */
   private foeAi(w: Mon, dt: number) {
     w.holdT = Math.max(0, w.holdT - dt)
-    let t: Mon | null = null, td = 24
-    for (const tr of this.trainers) {
-      if (!tr.alive || tr.mon.fainted) continue
-      const d = Math.hypot(tr.mon.x - w.x, tr.mon.y - w.y)
-      if (d < td) { td = d; t = tr.mon }
-    }
-    w.aggro = t
     let mx = 0, my = 0
-    if (t && w.holdT <= 0) {
-      const slot = this.bestSlot(w, td)
-      const range = slot >= 0 ? w.moves[slot].range : w.moves[0].range
-      if (td > range * 0.8) {
-        mx = (t.x - w.x) / td
-        my = (t.y - w.y) / td
+    if (w.idle) {
+      // Waiting to be pulled: stand guard, or walk the patrol route
+      const dx = w.goalX - w.x, dy = w.goalY - w.y, d = Math.hypot(dx, dy)
+      if (d > 0.4) {
+        mx = dx / d
+        my = dy / d
       }
-      w.thinkT -= dt
-      if (w.thinkT <= 0) {
-        // A pack attacks in turns, not all at once: common foes take their time
-        w.thinkT = w.foe === 3 ? this.rng.range(1, 1.5) : w.foe === 2 ? this.rng.range(0.75, 1.25) : this.rng.range(1, 1.7)
-        if (slot >= 0) this.useMove(w, slot, t)
+      w.aggro = null
+    } else {
+      const t = foeTarget(this, w)
+      w.aggro = t
+      const busy = roleTick(this, w, t, dt)
+      if (t && w.holdT <= 0 && !busy) {
+        const td = Math.hypot(t.x - w.x, t.y - w.y) || 0.01
+        const slot = this.bestSlot(w, td)
+        const range = slot >= 0 ? w.moves[slot].range : w.moves[0].range
+        if (w.role === 'caster' || w.role === 'mender') {
+          // Keep their distance: back off when you come close, close in when too far
+          if (td < 4.5) {
+            mx = (w.x - t.x) / td
+            my = (w.y - t.y) / td
+          } else if (td > Math.max(6.5, range * 0.9)) {
+            mx = (t.x - w.x) / td
+            my = (t.y - w.y) / td
+          }
+        } else if (td > range * 0.8) {
+          mx = (t.x - w.x) / td
+          my = (t.y - w.y) / td
+        }
+        w.thinkT -= dt
+        if (w.thinkT <= 0) {
+          // A pack attacks in turns, not all at once: common foes take their time
+          w.thinkT = w.foe === 3 ? this.rng.range(1, 1.5) : w.foe === 2 ? this.rng.range(0.75, 1.25) : this.rng.range(1, 1.7)
+          if (slot >= 0) this.useMove(w, slot, t)
+        }
       }
+      if (busy) mx = my = 0
     }
     // Don't pile up on one spot
     for (const o of this.wilds) {
@@ -2082,7 +2105,8 @@ export class Game {
       mx /= len
       my /= len
     }
-    const speed = (w.foe === 3 ? 1.5 : 2 + w.species.spe / 70) * (w.holdT > 0 ? 0 : 1)
+    const base = w.idle ? 1.3 : w.foe === 3 ? 1.5 : (2 + w.species.spe / 70) * (w.role === 'brute' ? 0.85 : 1)
+    const speed = base * (w.holdT > 0 || w.cast ? 0 : 1)
     w.mvx = mx
     w.mvy = my
     if ((mx || my) && speed > 0) {
@@ -2307,4 +2331,12 @@ function segDist(px: number, py: number, ax: number, ay: number, bx: number, by:
   const dx = bx - ax, dy = by - ay
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
   return Math.hypot(px - (ax + dx * t), py - (ay + dy * t))
+}
+
+/** Raid dungeon damage: guards shield their pack, relics make the team hit harder or take less. */
+function dungeonMul(g: Game, src: Mon, tgt: Mon) {
+  let k = guardShield(g, tgt)
+  if (src.owner) k *= relicMul(g, 'dmg')
+  if (tgt.owner && !src.owner) k *= relicMul(g, 'def')
+  return k
 }
