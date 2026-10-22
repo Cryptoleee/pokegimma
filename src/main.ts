@@ -399,7 +399,7 @@ function onEnd(r: GameResult) {
   const reward = game ? matchEnded({
     kind: statsKind(game), mode: statsMode(), humans: r.extra?.humans ?? 1,
     won: r.won, place: r.place, total: r.total, time: r.time, kos: r.duel ? r.duel.mine : r.kos, lost: r.duel?.theirs, caught: r.caught, partner: team[0],
-    boss: r.raid?.boss, share: r.raid?.share, lives: r.raid?.lives,
+    boss: r.raid?.boss, share: r.raid?.share, lives: r.raid?.lives, dungeon: r.raid?.dungeon,
     legend: r.extra?.legend, evolved: r.extra?.evolved, crystal: r.extra?.crystal, diff: game?.diff,
   }) : undefined
   // The match goes on without you (bots or other players still in it): you can watch

@@ -8,9 +8,10 @@ import { L } from '../i18n'
 import { AWAKENS } from '../game/entities'
 import { progress } from '../progress'
 import { isUnlocked, unlockLevel } from '../../api/_progress'
+import { lockText } from '../data/rewards'
 
 const owned = (kind: 'partner' | 'trainer', id: string | number) => isUnlocked(progress(), kind, id)
-const lockChip = (kind: 'partner' | 'trainer', id: string | number) => owned(kind, id) ? '' : `<em class="lock">🔒 Lv ${unlockLevel(kind, id)}</em>`
+const lockChip = (kind: 'partner' | 'trainer', id: string | number) => owned(kind, id) ? '' : `<em class="lock">🔒 ${lockText(kind, id).short}</em>`
 
 /**
  * Selection screens built like a character-select in a fighting game: a big
@@ -97,7 +98,7 @@ export function showTrainerSelect(current: string | null, onBack: () => void, on
     hero.classList.toggle('locked', !ok)
     const cta = el.querySelector('.cta') as HTMLButtonElement
     cta.disabled = !ok
-    cta.innerHTML = ok ? L('Next ▶', 'Verder ▶') : L(`🔒 Unlocks at trainer level ${unlockLevel('trainer', sel.key)}`, `🔒 Vrij bij trainerlevel ${unlockLevel('trainer', sel.key)}`)
+    cta.innerHTML = ok ? L('Next ▶', 'Verder ▶') : `🔒 ${lockText('trainer', sel.key).long}`
     if (animate) {
       hero.classList.remove('swap')
       void hero.offsetWidth
@@ -200,7 +201,7 @@ export function showRoster(initial: number[], onBack: () => void, onGo: (team: n
     hero.classList.toggle('locked', !ok)
     const cta = el.querySelector('.cta') as HTMLButtonElement
     cta.disabled = !ok
-    cta.innerHTML = ok ? cta.dataset.label! : L(`🔒 Unlocks at trainer level ${unlockLevel('partner', pick)}`, `🔒 Vrij bij trainerlevel ${unlockLevel('partner', pick)}`)
+    cta.innerHTML = ok ? cta.dataset.label! : `🔒 ${lockText('partner', pick).long}`
     if (animate) {
       hero.classList.remove('swap')
       void hero.offsetWidth

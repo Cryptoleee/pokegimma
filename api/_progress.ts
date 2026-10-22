@@ -29,6 +29,8 @@ export interface Report {
   /** Raid: your share of the boss's HP (%), lives left. */
   share?: number
   lives?: number
+  /** Raid dungeon you went through (id), if any. */
+  dungeon?: string
   /** Duel: rounds you lost (rounds won are `kos`). */
   lost?: number
   /** Legendaries caught, evolutions, grabbed the Evolution Crystal. */
@@ -80,16 +82,32 @@ export const REWARD_ROAD: { lv: number; kind: 'partner' | 'trainer'; id: string 
   { lv: 50, kind: 'partner', id: '151' }, // Mew
 ]
 
-/** Every partner you can pick: the free ones and those on the reward road. */
-export const PARTNERS = [...BASE_PARTNERS, ...REWARD_ROAD.filter((r) => r.kind === 'partner').map((r) => Number(r.id))]
+/** Raid dungeons (ids, as in src/data/dungeons.ts). */
+export const DUNGEON_IDS = ['depths']
+/** Raid dungeon lives (a clean run keeps all of them). */
+export const DUNGEON_LIVES = 3
 
-/** Trainer level that unlocks a partner or trainer (1 = free from the start). */
+/** Raid unlocks: clear a dungeon and its legendary joins you as a partner. */
+export const RAID_UNLOCKS: { kind: 'partner'; id: string; dungeon: string }[] = [
+  { kind: 'partner', id: '643', dungeon: 'depths' }, // Reshiram
+]
+export const raidUnlockOf = (kind: 'partner' | 'trainer', id: string | number) => RAID_UNLOCKS.find((r) => r.kind === kind && r.id === String(id))
+
+/** Every partner you can pick: the free ones, those on the reward road and the raid unlocks. */
+export const PARTNERS = [...BASE_PARTNERS, ...REWARD_ROAD.filter((r) => r.kind === 'partner').map((r) => Number(r.id)), ...RAID_UNLOCKS.map((r) => Number(r.id))]
+
+/** Trainer level that unlocks a partner or trainer (1 = free from the start; raid unlocks sort after the road). */
 export function unlockLevel(kind: 'partner' | 'trainer', id: string | number) {
+  if (raidUnlockOf(kind, id)) return MAX_LEVEL + 1
   return REWARD_ROAD.find((r) => r.kind === kind && r.id === String(id))?.lv ?? 1
 }
 
 /** Can you play with this partner or trainer yet? */
-export const isUnlocked = (p: Progress, kind: 'partner' | 'trainer', id: string | number) => levelOf(p.xp).lv >= unlockLevel(kind, id)
+export function isUnlocked(p: Progress, kind: 'partner' | 'trainer', id: string | number) {
+  const raid = raidUnlockOf(kind, id)
+  if (raid) return (p.stats.dg ?? []).includes(raid.dungeon)
+  return levelOf(p.xp).lv >= unlockLevel(kind, id)
+}
 
 /** The next thing on the reward road for you (null when you have everything). */
 export function nextUnlock(p: Progress) {
@@ -124,6 +142,9 @@ export interface Stats {
   /** 1 vs 1 duels won, and won against a person. */
   dw: number
   dpw: number
+  /** Raid dungeons cleared, and cleared on hard (ids). */
+  dg?: string[]
+  dgHard?: string[]
 }
 
 export interface Daily {
@@ -174,7 +195,7 @@ export function normalize(p: Partial<Progress> | null | undefined): Progress {
     ...n, ...p, v: 1,
     partners: { ...(p.partners ?? {}) },
     ach: Array.isArray(p.ach) ? p.ach.filter((a) => ACH_IDS.has(a)) : [],
-    stats: { ...s, bosses: Array.isArray(s.bosses) ? s.bosses : [], used: Array.isArray(s.used) ? s.used : [] },
+    stats: { ...s, bosses: Array.isArray(s.bosses) ? s.bosses : [], used: Array.isArray(s.used) ? s.used : [], dg: Array.isArray(s.dg) ? s.dg : [], dgHard: Array.isArray(s.dgHard) ? s.dgHard : [] },
     daily: { ...n.daily, ...(p.daily ?? {}) },
     shiny: Array.isArray(p.shiny) ? p.shiny : [],
   }
@@ -267,7 +288,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'crystal', xp: 150, test: (p) => p.stats.crystal >= 1 },
   { id: 'raid_first', xp: 150, test: (p) => p.stats.raids >= 1 },
   { id: 'raid_all', xp: 600, title: 'legendhunter', test: (p) => BOSS_IDS.every((b) => p.stats.bosses.includes(b)) },
-  { id: 'raid_flawless', xp: 300, test: (_, r) => !!r && r.kind === 'raid' && r.won && (r.lives ?? 0) >= RAID_LIVES },
+  { id: 'raid_flawless', xp: 300, test: (_, r) => !!r && r.kind === 'raid' && r.won && (r.lives ?? 0) >= (r.dungeon ? DUNGEON_LIVES : RAID_LIVES) },
+  { id: 'dg_depths', xp: 500, title: 'flametamer', test: (p) => (p.stats.dg ?? []).includes('depths') },
+  { id: 'dg_hard', xp: 600, title: 'infernal', test: (p) => (p.stats.dgHard ?? []).length > 0 },
+  { id: 'dg_flawless', xp: 500, title: 'unscathed', test: (_, r) => !!r && r.kind === 'raid' && r.won && !!r.dungeon && (r.lives ?? 0) >= DUNGEON_LIVES },
   { id: 'raid_mvp', xp: 250, test: (_, r) => !!r && r.kind === 'raid' && r.won && r.humans >= 2 && (r.share ?? 0) >= 50 },
   { id: 'duel_first', xp: 150, test: (p) => p.stats.dw >= 1 },
   { id: 'duel_10', xp: 400, title: 'gladiator', test: (p) => p.stats.dw >= 10 },
@@ -357,7 +381,12 @@ export function sanitize(raw: Partial<Report>, maxTime = 1800): Report | null {
     if (!BOSS_IDS.includes(String(raw.boss))) return null
     r.boss = String(raw.boss)
     r.share = int(raw.share, 0, 100)
-    r.lives = int(raw.lives, 0, RAID_LIVES)
+    // A dungeon: three lives, and nobody gets through six halls and the boss in under three minutes
+    if (DUNGEON_IDS.includes(String(raw.dungeon))) {
+      r.dungeon = String(raw.dungeon)
+      if (time < 180) r.won = false
+    }
+    r.lives = int(raw.lives, 0, r.dungeon ? DUNGEON_LIVES : RAID_LIVES)
   }
   return r
 }
@@ -462,6 +491,7 @@ export interface Outcome {
 export function applyMatch(p: Progress, r: Report, day: string): Outcome {
   const before = { lv: levelOf(p.xp).lv, titles: new Set(titlesOf(p)) }
   const s = p.stats
+  let newDungeon = ''
   // Streak: days in a row with at least one match
   if (p.day !== day) {
     p.streak = p.day === prevDay(day) ? p.streak + 1 : 1
@@ -490,6 +520,15 @@ export function applyMatch(p: Progress, r: Report, day: string): Outcome {
   } else if (r.won) {
     s.raids++
     if (r.boss && !s.bosses.includes(r.boss)) s.bosses.push(r.boss)
+    if (r.dungeon) {
+      s.dg = s.dg ?? []
+      s.dgHard = s.dgHard ?? []
+      if (!s.dg.includes(r.dungeon)) {
+        s.dg.push(r.dungeon)
+        newDungeon = r.dungeon
+      }
+      if (r.diff === 'hard' && !s.dgHard.includes(r.dungeon)) s.dgHard.push(r.dungeon)
+    }
   }
   if (r.partner && !s.used.includes(r.partner)) s.used.push(r.partner)
 
@@ -552,6 +591,8 @@ export function applyMatch(p: Progress, r: Report, day: string): Outcome {
   for (const t of titlesOf(p)) if (!before.titles.has(t)) unlocks.push(`title:${t}`)
   const lvNow = levelOf(p.xp).lv
   for (const u of REWARD_ROAD) if (u.lv > before.lv && u.lv <= lvNow) unlocks.push(`${u.kind}:${u.id}`)
+  // A dungeon cleared for the first time: its legendary joins you
+  for (const u of RAID_UNLOCKS) if (u.dungeon === newDungeon) unlocks.push(`raid:${u.kind}:${u.id}`)
 
   return {
     lines, quests, ach,

@@ -208,7 +208,7 @@ export interface GameResult {
   caught: number
   best: Pick<Mon, 'name' | 'level' | 'shiny'> & { species: { id: number } }
   /** Raid results: your damage to the boss and lives left. */
-  raid?: { boss: BossId; dmg: number; share: number; lives: number }
+  raid?: { boss: BossId; dmg: number; share: number; lives: number; dungeon?: string }
   /** 1 vs 1: rounds won by you and by them, and who they were. */
   duel?: { mine: number; theirs: number; opp: string; oppSprite: string; oppMon: number; dmg: number }
   /** Every trainer's stats when your match ended. */
@@ -1526,7 +1526,7 @@ export class Game {
       won: r ? r.result === 'won' : p.alive, place: p.alive ? 1 : p.place, total: this.total,
       time: r ? this.time : this.duel ? this.duel.endAt || this.time : p.alive ? this.time : p.diedAt, kos: p.kos, caught: p.caught,
       best: { name: b.name, level: b.level, shiny: b.shiny, species: { id: b.species.id } },
-      raid: r ? { boss: r.def.id, dmg: Math.round(p.bossDmg), share: Math.round((p.bossDmg / r.boss.maxHp) * 100), lives: p.lives } : undefined,
+      raid: r ? { boss: r.def.id, dmg: Math.round(p.bossDmg), share: Math.round((p.bossDmg / r.boss.maxHp) * 100), lives: p.lives, ...(r.dg ? { dungeon: r.dg.def.id } : {}) } : undefined,
       duel: opp ? { mine: p.kos, theirs: opp.kos, opp: opp.name, oppSprite: opp.def.sprite, oppMon: opp.mon.species.id, dmg: Math.round(p.dmg) } : undefined,
       board: scoreRows(this), final: decided(this), me: p.id,
       extra: { legend: p.legends, evolved: p.evolutions, crystal: p.crystal, humans: this.setup.humans.length },

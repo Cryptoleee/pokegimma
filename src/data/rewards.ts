@@ -3,7 +3,8 @@ import { SPECIES } from './pokemon'
 import { TRAINERS } from './trainers'
 
 export const trainerName = (key: string) => TRAINERS.find((t) => t.key === key)?.name ?? key
-import { QUESTS } from '../../api/_progress'
+import { QUESTS, raidUnlockOf, unlockLevel } from '../../api/_progress'
+import { DUNGEON_LIST } from './dungeons'
 
 /** Names and descriptions for everything in api/_progress.ts (which only knows ids). */
 
@@ -32,6 +33,9 @@ const TITLES: Record<string, T> = {
   dedicated: ['Dedicated', 'Toegewijd'],
   regular: ['Regular', 'Vaste klant'],
   gladiator: ['Gladiator', 'Gladiator'],
+  flametamer: ['Flame Tamer', 'Vlammentemmer'],
+  infernal: ['Infernal', 'Hellevuur'],
+  unscathed: ['Unscathed', 'Ongeschonden'],
 }
 
 export function titleName(id: string) {
@@ -58,6 +62,9 @@ export const ACH_INFO: Record<string, { icon: string; name: T; desc: T }> = {
   crystal: { icon: '💠', name: ['Crystal clear', 'Kristalhelder'], desc: ['Grab the Evolution Crystal', 'Pak het Evolutiekristal'] },
   raid_first: { icon: '🐉', name: ['Raid cleared', 'Raid geslaagd'], desc: ['Defeat a raid boss', 'Versla een raid-baas'] },
   raid_all: { icon: '🌋', name: ['Legend hunter', 'Legendejager'], desc: ['Defeat all 5 raid bosses', 'Versla alle 5 raid-bazen'] },
+  dg_depths: { icon: '🔥', name: ['Out of the Depths', 'Uit de Diepten'], desc: ['Clear The Burning Depths (Reshiram joins you)', 'Versla De Brandende Diepten (Reshiram wordt je partner)'] },
+  dg_hard: { icon: '😈', name: ['Into the inferno', 'Het inferno in'], desc: ['Clear a raid dungeon on hard', 'Versla een raid-dungeon op moeilijk'] },
+  dg_flawless: { icon: '🛡️', name: ['Not a scratch', 'Geen schrammetje'], desc: ['Clear a raid dungeon without losing a life', 'Versla een raid-dungeon zonder een leven te verliezen'] },
   raid_flawless: { icon: '🛡️', name: ['Untouchable', 'Onaantastbaar'], desc: ['Clear a raid without losing a life', 'Haal een raid zonder een leven te verliezen'] },
   raid_mvp: { icon: '🎖️', name: ['Raid MVP', 'Raid-MVP'], desc: ['Do half the boss damage in a raid with others', 'Doe de helft van de baasschade in een raid met anderen'] },
   duel_first: { icon: '⚔️', name: ['En garde!', 'En garde!'], desc: ['Win a 1 vs 1 duel', 'Win een 1 tegen 1-duel'] },
@@ -121,6 +128,10 @@ export function xpLabel(key: string) {
 
 /** "Unlocked!" lines for 'shiny:25', 'title:veteran', 'emblem:25:silver'. */
 export function unlockText(u: string) {
+  if (u.startsWith('raid:')) {
+    const sp = SPECIES[Number(u.split(':')[2])]
+    return { icon: '🔥', text: L(`Raid reward: ${sp?.name ?? '?'} joins you!`, `Raidbeloning: ${sp?.name ?? '?'} wordt je partner!`) }
+  }
   const [kind, a, b] = u.split(':')
   const name = SPECIES[Number(a)]?.name ?? '?'
   if (kind === 'shiny') return { icon: '✨', text: L(`Shiny ${name} unlocked!`, `Shiny ${name} vrijgespeeld!`) }
@@ -131,4 +142,15 @@ export function unlockText(u: string) {
     return { icon: b === 'gold' ? '🥇' : b === 'silver' ? '🥈' : '🥉', text: L(`${t(col[b] ?? ['', ''])} ${name} emblem`, `${t(col[b] ?? ['', ''])} ${name}-embleem`) }
   }
   return { icon: '🏷️', text: `${L('New title', 'Nieuwe titel')}: ${titleName(u.slice(6))}` }
+}
+
+/** Why a partner or trainer is still locked: short (on a tile) and in a sentence. */
+export function lockText(kind: 'partner' | 'trainer', id: string | number) {
+  const raid = raidUnlockOf(kind, id)
+  if (raid) {
+    const dd = DUNGEON_LIST.find((d) => d.id === raid.dungeon)
+    return { short: L('🔥 Raid', '🔥 Raid'), long: L(`Clear ${dd?.name ?? 'the raid dungeon'} to unlock`, `Versla ${dd?.name ?? 'de raid-dungeon'} om vrij te spelen`) }
+  }
+  const lv = unlockLevel(kind, id)
+  return { short: `Lv ${lv}`, long: L(`Unlocks at trainer level ${lv}`, `Vrij bij trainerlevel ${lv}`) }
 }

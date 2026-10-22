@@ -4,11 +4,11 @@ import { ALL_PARTNERS, SPECIES, spriteUrl } from '../data/pokemon'
 import { TRAINERS, trainerSpriteUrl } from '../data/trainers'
 import { accountState, accountStatus, login } from '../account'
 import { inShowcase, progress, onProgress, setCosmetics, signedIn, today } from '../progress'
-import { ACHIEVEMENTS, BOSS_IDS, dailyOf, isUnlocked, levelCost, nextUnlock, REWARD_ROAD, unlockLevel, emblemOf, levelOf, masteryOf, MAX_MASTERY, prevDay, SHINY_AT, titleOf, titlesOf, type Progress } from '../../api/_progress'
+import { ACHIEVEMENTS, BOSS_IDS, dailyOf, isUnlocked, levelCost, nextUnlock, raidUnlockOf, REWARD_ROAD, unlockLevel, emblemOf, levelOf, masteryOf, MAX_MASTERY, prevDay, SHINY_AT, titleOf, titlesOf, type Progress } from '../../api/_progress'
 
 /** Days in a row, still alive when you last played yesterday. */
 const liveStreak = (p: Progress) => (p.day === today() || p.day === prevDay(today()) ? p.streak : 0)
-import { achDesc, achName, ACH_INFO, questText, titleName, trainerName } from '../data/rewards'
+import { achDesc, achName, ACH_INFO, lockText, questText, titleName, trainerName } from '../data/rewards'
 import { esc } from './menu'
 import { appShell, bindShell, type AppTab } from './app'
 import { askName } from './home'
@@ -90,7 +90,7 @@ function monsTab(p: Progress) {
         <div class="pf-mon locked">
           <img class="px" src="${spriteUrl(id)}" alt="" loading="lazy">
           <b>${SPECIES[id].name}</b>
-          <small>🔒 ${L(`Trainer Lv ${unlockLevel('partner', id)}`, `Trainerlevel ${unlockLevel('partner', id)}`)}</small>
+          <small>🔒 ${raidUnlockOf('partner', id) ? lockText('partner', id).short : L(`Trainer Lv ${unlockLevel('partner', id)}`, `Trainerlevel ${unlockLevel('partner', id)}`)}</small>
         </div>`
       const xp = p.partners[id] ?? 0
       const m = masteryOf(xp)

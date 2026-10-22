@@ -14,7 +14,7 @@ import { cleanCode, MAX_PLAYERS } from '../net/room'
 import { DIFFICULTIES, diffName, diffNote, saveDiff, savedDiff, type Difficulty } from '../data/difficulty'
 import type { MatchChoice } from '../net/protocol'
 import { progress, onProgress, today } from '../progress'
-import { dailyOf, levelCost, levelOf, nextUnlock } from '../../api/_progress'
+import { dailyOf, isUnlocked, levelCost, levelOf, nextUnlock, RAID_UNLOCKS } from '../../api/_progress'
 import { showOptions } from './screens'
 import { hasUnseen, maybeShowNews, newsPreview, showNews } from './news'
 import { appEsc as esc, appShell, bar, bindShell, BOLT, DISCORD, discordMe, IC, icon, masteryLine, monChips, monImg, strike, teamCard, teamStage, type AppTab } from './app'
@@ -315,7 +315,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
         ${DUNGEON_LIST.map((dd) => `
         <button class="n-card n-dgcard ${pick === 'dungeon' ? 'on' : ''}" role="radio" aria-checked="${pick === 'dungeon'}" data-raid="dungeon">
           <img class="px" src="${spriteUrl(BOSSES[dd.boss].species)}" alt="">
-          <span><b>${esc(dd.name)} <em class="n-chip acc">${L('NEW', 'NIEUW')}</em></b><small>${esc(dd.blurb)}</small></span>
+          <span><b>${esc(dd.name)} <em class="n-chip acc">${L('NEW', 'NIEUW')}</em></b><small>${esc(dd.blurb)}</small>${raidReward(dd.id)}</span>
         </button>`).join('')}
         <button class="n-card n-mystery ${pick === 'classic' ? 'on' : ''}" role="radio" aria-checked="${pick === 'classic'}" data-raid="classic">
           <div class="n-sil">${BOSS_LIST.map((b) => `<img class="px" src="${spriteUrl(BOSSES[b].species)}" alt="">`).join('')}</div>
@@ -333,6 +333,12 @@ export function showMenu(st: MenuState, on: MenuActions) {
         ? L('Nobody shows up? Then you face the CPU.', 'Komt er niemand? Dan speel je tegen de CPU.')
         : L('You land in a public lobby; when the timer runs out, bots fill the empty spots.', 'Je komt in een openbare lobby; als de timer om is, vullen bots de lege plekken.')}</p>`
   }
+
+  /** A dungeon's reward: its legendary as a partner (ticked once you have it). */
+  const raidReward = (id: string) => RAID_UNLOCKS.filter((u) => u.dungeon === id).map((u) => {
+    const has = isUnlocked(progress(), u.kind, u.id)
+    return `<small class="n-dgreward ${has ? 'got' : ''}">${has ? '✓' : '🎁'} ${L('Reward', 'Beloning')}: <b>${SPECIES[Number(u.id)]?.name ?? ''}</b> ${L('as your partner', 'als partner')}</small>`
+  }).join('')
 
   /** Against the computer: how hard it plays. */
   const diffPicker = () => {

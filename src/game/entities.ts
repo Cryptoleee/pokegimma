@@ -7,7 +7,7 @@ import { roleInfo } from '../data/roles'
 export const AWAKEN_LEGEND = 0.85
 export const AWAKEN_PLAIN = 1
 /** Partners that awaken instead of evolving (species id → cap). */
-export const AWAKENS: Record<number, number> = { 144: AWAKEN_LEGEND, 145: AWAKEN_LEGEND, 146: AWAKEN_LEGEND, 382: AWAKEN_LEGEND, 383: AWAKEN_LEGEND, 151: AWAKEN_LEGEND, 359: AWAKEN_PLAIN, 142: AWAKEN_PLAIN }
+export const AWAKENS: Record<number, number> = { 643: AWAKEN_LEGEND, 144: AWAKEN_LEGEND, 145: AWAKEN_LEGEND, 146: AWAKEN_LEGEND, 382: AWAKEN_LEGEND, 383: AWAKEN_LEGEND, 151: AWAKEN_LEGEND, 359: AWAKEN_PLAIN, 142: AWAKEN_PLAIN }
 
 export type Dir = 'down' | 'up' | 'left' | 'right'
 

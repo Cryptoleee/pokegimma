@@ -1,4 +1,5 @@
-import { animatedUrl, spriteUrl } from '../data/pokemon'
+import { animatedUrl, SPECIES, spriteUrl } from '../data/pokemon'
+import { RAID_UNLOCKS } from '../../api/_progress'
 import { trainerSpriteUrl } from '../data/trainers'
 import { itemUrl } from '../game/sprites'
 import { sfx } from '../audio'
@@ -51,6 +52,7 @@ function raidTips(boss: BossDef): Tip[] {
 function dungeonTips(dd: DungeonDef, boss: BossDef): Tip[] {
   const waves = dd.rooms.reduce((s, r) => s + r.waves.length, 0)
   return [
+    ...RAID_UNLOCKS.filter((u) => u.dungeon === dd.id).map((u) => ({ icon: `<img class="px" src="${spriteUrl(Number(u.id))}" alt="">`, title: L('Raid reward', 'Raidbeloning'), text: L(`Clear the dungeon for the first time and ${SPECIES[Number(u.id)]?.name} joins you as a partner, in every mode.`, `Versla de dungeon voor het eerst en ${SPECIES[Number(u.id)]?.name} wordt je partner, in elke modus.`) })),
     { icon: '<i class="ld-up">▲</i>', title: L('Room by room', 'Kamer voor kamer'), text: L(`${dd.rooms.length} halls, ${waves} waves. A hall's gate opens once every foe in it is down: then on to the next.`, `${dd.rooms.length} zalen, ${waves} waves. De poort van een zaal gaat pas open als alle vijanden erin verslagen zijn: dan door naar de volgende.`) },
     { icon: '<i class="ld-warn">⚠</i>', title: L('Red on the ground = get out!', 'Rood op de grond = wegwezen!'), text: L('Wardens and the legendary show their big attacks first as a red shape on the ground. Get out before it fills up.', 'Wachters en de legende laten hun grote aanvallen eerst zien als rode vorm op de grond. Loop eruit voordat hij volloopt.') },
     { icon: '<i class="ld-warn">⚔</i>', title: L('Wardens', 'Wachters'), text: L('Twice a warden blocks the way: a big Pokémon with its own health bar that calls in help as it weakens. Beat it for an extra life.', 'Twee keer verspert een wachter de weg: een grote Pokémon met een eigen levensbalk die hulp roept als hij zwakker wordt. Versla hem voor een extra leven.') },

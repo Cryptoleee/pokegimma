@@ -201,8 +201,8 @@ for (const [id, name, types, hp, atk, def, spe, evo, evoLevel] of ROWS) {
 
 /** The 24 Pokémon you pick your starting partner from. */
 export const ROSTER = [25, 4, 7, 1, 133, 495, 498, 501, 447, 443, 570, 610, 92, 66, 63, 147, 246, 446, 374, 123, 258, 255, 403, 633]
-/** Extra partners you unlock on the reward road (trainer level). */
-export const UNLOCK_PARTNERS = [81, 390, 138, 220, 359, 111, 280, 607, 371, 142, 636, 144, 145, 146, 382, 383, 151]
+/** Extra partners you unlock on the reward road (trainer level), and the raid unlocks (clear a dungeon). */
+export const UNLOCK_PARTNERS = [81, 390, 138, 220, 359, 111, 280, 607, 371, 142, 636, 144, 145, 146, 382, 383, 151, 643]
 /** Everything you can pick: the free roster plus the unlockable ones. */
 export const ALL_PARTNERS = [...ROSTER, ...UNLOCK_PARTNERS]
 /** You start with one partner and can catch more in the world, up to PARTY_MAX. */

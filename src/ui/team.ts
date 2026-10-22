@@ -9,7 +9,7 @@ import { cry, sfx } from '../audio'
 import { L } from '../i18n'
 import { progress } from '../progress'
 import { isUnlocked, masteryOf, nextUnlock, levelOf, unlockLevel } from '../../api/_progress'
-import { trainerName } from '../data/rewards'
+import { lockText, trainerName } from '../data/rewards'
 import { appEsc as esc, appShell, bar, bindShell, IC, icon, masteryLine, monChips, teamStage, type AppTab } from './app'
 import { shinyPartner } from './menu'
 
@@ -212,8 +212,8 @@ export function showTeam(o: TeamPageOpts) {
     const showMon = peekMon ?? mon
     const locked = peekMon != null || peekTr != null
     const lockLine = peekMon != null
-      ? L(`Unlocks at trainer level ${unlockLevel('partner', peekMon)}`, `Vrij bij trainerlevel ${unlockLevel('partner', peekMon)}`)
-      : peekTr ? L(`Unlocks at trainer level ${unlockLevel('trainer', peekTr.key)}`, `Vrij bij trainerlevel ${unlockLevel('trainer', peekTr.key)}`) : ''
+      ? lockText('partner', peekMon).long
+      : peekTr ? lockText('trainer', peekTr.key).long : ''
     if (pane === 'trainer') {
       const info = TRAINER_INFO[showTr.key]
       return `
@@ -259,7 +259,7 @@ export function showTeam(o: TeamPageOpts) {
       <div class="n-grid n-grid-tr">${TRAINERS.map((t) => {
         const ok = isUnlocked(p, 'trainer', t.key)
         const on = t.key === (peekTr ?? tr).key
-        return `<button class="n-pick ${on ? 'on' : ''} ${ok ? '' : 'locked'}" data-tr="${t.key}" aria-pressed="${on}" aria-label="${esc(t.name)}${ok ? '' : L(', locked', ', vergrendeld')}"><img class="px" src="${trainerSpriteUrl(t.sprite)}" alt=""><span>${ok ? esc(t.name) : `Lv ${unlockLevel('trainer', t.key)}`}</span></button>`
+        return `<button class="n-pick ${on ? 'on' : ''} ${ok ? '' : 'locked'}" data-tr="${t.key}" aria-pressed="${on}" aria-label="${esc(t.name)}${ok ? '' : L(', locked', ', vergrendeld')}"><img class="px" src="${trainerSpriteUrl(t.sprite)}" alt=""><span>${ok ? esc(t.name) : lockText('trainer', t.key).short}</span></button>`
       }).join('')}</div>`
     const list = [...ALL_PARTNERS]
       .sort((a, b) => Number(isUnlocked(p, 'partner', b)) - Number(isUnlocked(p, 'partner', a)) || unlockLevel('partner', a) - unlockLevel('partner', b))
@@ -280,7 +280,7 @@ export function showTeam(o: TeamPageOpts) {
       <div class="n-grid">${list.length ? list.map((id) => {
         const ok = isUnlocked(p, 'partner', id)
         const on = id === (peekMon ?? mon)
-        return `<button class="n-pick ${on ? 'on' : ''} ${ok ? '' : 'locked'}" data-mon="${id}" aria-pressed="${on}" aria-label="${SPECIES[id].name}${ok ? '' : L(', locked', ', vergrendeld')}"><img class="px" src="${spriteUrl(id)}" alt=""><span>${ok ? `★${masteryOf(p.partners[id] ?? 0).lv}` : `Lv ${unlockLevel('partner', id)}`}</span></button>`
+        return `<button class="n-pick ${on ? 'on' : ''} ${ok ? '' : 'locked'}" data-mon="${id}" aria-pressed="${on}" aria-label="${SPECIES[id].name}${ok ? '' : L(', locked', ', vergrendeld')}"><img class="px" src="${spriteUrl(id)}" alt=""><span>${ok ? `★${masteryOf(p.partners[id] ?? 0).lv}` : lockText('partner', id).short}</span></button>`
       }).join('') : `<p class="n-note">${L('No partners match these filters', 'Geen partners met deze filters')}</p>`}</div>`
   }
 
