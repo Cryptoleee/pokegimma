@@ -134,10 +134,17 @@ export function showOptions() {
     const r = await presentDuo()
     if (r === 'presented') return close()
     help.classList.remove('hidden')
-    help.innerHTML = L(
-      `Open <b>${location.host}/duo/</b> on the other screen, in the same browser (you can install it as its own app, “Stormbreak Duo”). On the AYN Thor: put that window on the lower screen with the dual-screen button. It connects by itself.`,
-      `Open <b>${location.host}/duo/</b> op het andere scherm, in dezelfde browser (je kunt het als eigen app installeren: “Stormbreak Duo”). Op de AYN Thor: zet dat venster met de dual-screen-knop op het onderste scherm. Het verbindt vanzelf.`,
-    )
+    // On the real site the second screen has its own address (duo.<site>), so it installs as a separate app
+    const own = location.hostname.startsWith('www.') ? location.host.replace(/^www\./, 'duo.') : ''
+    help.innerHTML = own
+      ? L(
+          `Open <b>${own}</b> on the other screen, in the same browser, and install it as its own app (“Stormbreak Duo”) if you like. On the AYN Thor: put that window on the lower screen with the dual-screen button. It connects by itself.`,
+          `Open <b>${own}</b> op het andere scherm, in dezelfde browser, en installeer het eventueel als eigen app (“Stormbreak Duo”). Op de AYN Thor: zet dat venster met de dual-screen-knop op het onderste scherm. Het verbindt vanzelf.`,
+        )
+      : L(
+          `Open <b>${location.host}/duo/</b> on the other screen, in the same browser. On the AYN Thor: put that window on the lower screen with the dual-screen button. It connects by itself.`,
+          `Open <b>${location.host}/duo/</b> op het andere scherm, in dezelfde browser. Op de AYN Thor: zet dat venster met de dual-screen-knop op het onderste scherm. Het verbindt vanzelf.`,
+        )
   })
   // New language: rebuild this panel (the screen behind it follows via onLangChange)
   bindLangSwitch(modal, () => {
