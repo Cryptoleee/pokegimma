@@ -2,6 +2,7 @@ import { spriteUrl } from '../data/pokemon'
 import { channelPref, setChannel, sfx, type Channel } from '../audio'
 import { say } from '../voice'
 import { bindLangSwitch, L, langSwitch } from '../i18n'
+import { presentDuo } from '../duo'
 import type { Mon } from '../game/entities'
 
 const screen = () => document.getElementById('screen')!
@@ -89,6 +90,8 @@ export function showOptions() {
           </button>`).join('')}
       </div>
       <div class="opt-row opt-lang"><i>🌐</i><span><b>${L('Language', 'Taal')}</b><small>${L('English or Dutch', 'Engels of Nederlands')}</small></span>${langSwitch()}</div>
+      <button class="opt-row opt-duo"><i>🖥️</i><span><b>${L('Second screen', 'Tweede scherm')}</b><small>${L('Map, team, items and chat on a second display (like the AYN Thor’s lower screen)', 'Kaart, team, items en chat op een tweede scherm (zoals het onderscherm van de AYN Thor)')}</small></span><em class="opt-go">${L('Open', 'Open')}</em></button>
+      <p class="opt-duo-help hidden"></p>
       <button class="btn" id="opt-done">${L('Done', 'Klaar')}</button>
     </div>`
   modal.querySelectorAll<HTMLElement>('.opt-row[data-c]').forEach((b) =>
@@ -103,6 +106,19 @@ export function showOptions() {
       if (on && c === 'voice') say('go')
     }),
   )
+  // Second screen: let the browser put it on the other display, or explain how to open it there
+  const duoBtn = modal.querySelector('.opt-duo') as HTMLElement
+  duoBtn.addEventListener('click', async () => {
+    sfx.select()
+    const help = modal.querySelector('.opt-duo-help') as HTMLElement
+    const r = await presentDuo()
+    if (r === 'presented') return close()
+    help.classList.remove('hidden')
+    help.innerHTML = L(
+      `Open <b>${location.host}/duo</b> on the other screen, in the same browser. On the AYN Thor: open it in Chrome and move that window to the lower screen with the dual-screen button. It connects by itself.`,
+      `Open <b>${location.host}/duo</b> op het andere scherm, in dezelfde browser. Op de AYN Thor: open het in Chrome en zet dat venster met de dual-screen-knop op het onderste scherm. Het verbindt vanzelf.`,
+    )
+  })
   // New language: rebuild this panel (the screen behind it follows via onLangChange)
   bindLangSwitch(modal, () => {
     sfx.select()

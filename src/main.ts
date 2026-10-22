@@ -9,6 +9,8 @@ import { pickStadium, STADIUMS, type StadiumId } from './data/stadiums'
 import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
 import { chatBubble, render, view } from './game/render'
 import { padTick, type PadHooks } from './pad'
+import { duoInit, duoNow, duoTick, isDuoPage, type DuoState } from './duo'
+import { startDuoView } from './ui/duoView'
 import { TILE } from './game/world'
 import { chatWidget, feedLine, Hud } from './ui/hud'
 import { clearScreen, showLeaveConfirm, showPartyFull } from './ui/screens'
@@ -534,6 +536,9 @@ function roomEvents() {
       lobbyUi?.refresh()
     },
     chat: (m: ChatLine) => {
+      duoChat.push({ name: m.name, text: m.text, mine: m.pid === profile().id })
+      if (duoChat.length > 20) duoChat.shift()
+      duoNow()
       lobbyUi?.chat(m)
       if (viewing) hud?.chatLine(m, m.pid === profile().id)
       if (spec && specChat) specChat.line(m, m.pid === profile().id)
@@ -1109,12 +1114,80 @@ const padHooks: PadHooks = {
   chat: () => !!hud?.openChat(),
 }
 
+// ---------- A second screen (AYN Thor's lower display, or /duo in another window) ----------
+
+/** The chat so far (this room), for the second screen. */
+const duoChat: DuoState['chat'] = []
+
+function duoState(withMini: boolean): DuoState {
+  const lang = L('en', 'nl') as 'en' | 'nl'
+  const base = { t: 'state' as const, lang, chat: room ? duoChat : [], canChat: !!room }
+  const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec) % 60).padStart(2, '0')}`
+  const g = game
+  if (g && (viewing || spec)) {
+    const p = g.player
+    const kind = g.kind
+    const label = kind === 'raid' ? 'Raid' : kind === 'duel' ? '1 vs 1' : 'Battle Royale'
+    if (spec || !p.alive) {
+      const left = g.trainers.filter((t) => t.alive).length
+      return { ...base, scene: 'watch', kind, label, title: L('Spectating', 'Toeschouwer'), sub: kind === 'royale' ? L(`${left} trainers left`, `${left} trainers over`) : clock(g.time) }
+    }
+    const party = p.party.map((m, i) => ({ id: m.species.id, name: m.name, lv: m.level, hp: Math.max(0, m.hp), max: m.maxHp, active: i === p.active, fainted: m.fainted, shiny: !!m.shiny }))
+    const st: DuoState = { ...base, scene: 'match', kind, label, title: '', sub: clock(g.time), party, items: { master: p.masterBalls, potion: p.potions, revive: p.revives } }
+    if (kind === 'royale') {
+      const left = g.trainers.filter((t) => t.alive).length
+      st.title = L(`${left} trainers left`, `${left} trainers over`)
+      if (withMini && hud) st.mini = hud.miniUrl()
+    } else if (kind === 'raid') {
+      const b = g.wilds.find((w) => w.boss)
+      st.title = b?.name ?? 'Raid'
+      if (b) st.boss = { name: b.name, species: b.species.id, k: Math.max(0, b.hp / b.maxHp), phase: g.raidView?.phase ?? 0, lives: p.lives }
+      if (g.raidView) st.sub = clock(g.raidView.timeLeft)
+    } else {
+      const opp = g.trainers.find((t) => t !== p)
+      st.title = L(`Round ${g.duel?.round ?? 1}`, `Ronde ${g.duel?.round ?? 1}`)
+      st.duel = { mine: p.kos, theirs: opp?.kos ?? 0, opp: opp?.name ?? '' }
+    }
+    return st
+  }
+  const inLobby = !!room && !!lobbyUi
+  return {
+    ...base,
+    scene: inLobby ? 'lobby' : 'menu',
+    label: inLobby ? L(`Lobby ${room!.code}`, `Lobby ${room!.code}`) : 'Stormbreak Royale',
+    title: inLobby ? L(`${room!.players.length} players`, `${room!.players.length} spelers`) : L('Second screen ready', 'Tweede scherm klaar'),
+    sub: L('Play on the other screen', 'Speel op het andere scherm'),
+    trainer: trainer.sprite,
+    mon: team[0],
+  }
+}
+
+duoInit({
+  state: duoState,
+  cmd: (c) => {
+    const g = game
+    if (c.c === 'say') {
+      if (room && c.text.trim()) room.say(c.text.slice(0, 80))
+      return
+    }
+    if (!g || !viewing || spec || !hud) return
+    const p = g.player
+    if (c.c === 'item') hud.useItem(c.key)
+    else if (c.c === 'switch') {
+      if (!g.paused && c.i !== p.active) g.switchTo(p, c.i)
+    } else if (c.c === 'board') hud.board.toggle()
+    else if (c.c === 'pause') confirmLeave()
+    duoNow()
+  },
+})
+
 let last = performance.now()
 function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000)
   last = now
   if (game && viewing) desktopInput(game)
   padTick(padHooks)
+  duoTick()
   if (game) {
     const g = game
     const steps = spec && spec.g === g && g.mode === 'solo' ? spec.speed : 1
@@ -1162,4 +1235,6 @@ ticker.onmessage = () => {
 if ('serviceWorker' in navigator && import.meta.env.PROD)
   addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
 
-toTitle()
+// This window is the second screen (/duo): no game here, just the companion view
+if (isDuoPage) startDuoView()
+else toTitle()

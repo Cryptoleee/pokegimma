@@ -5573,3 +5573,394 @@ body.pad :is(button, a, input, [role='button'], [tabindex], .title2):focus {
 .pad-toast.out {
   opacity: 0;
 }
+
+/* ---------------------------------------------------------------- second screen (/duo) */
+
+/*
+ * The AYN Thor's lower display (1080×1240) or any window beside the game:
+ * map / boss / score and your team on top, items in the middle, the chat at
+ * the bottom. Big targets: it's played with thumbs.
+ */
+body.duo-view #game,
+body.duo-view #hud {
+  display: none;
+}
+.dv {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: calc(var(--safe-t) + 12px) 12px calc(var(--safe-b) + 12px);
+  box-sizing: border-box;
+  overflow: hidden;
+  background: radial-gradient(ellipse 90% 50% at 50% 0%, rgba(255, 214, 10, 0.08), rgba(255, 214, 10, 0) 70%), var(--n-bg);
+  color: var(--n-text);
+  font-family: var(--n-font);
+  -webkit-font-smoothing: antialiased;
+}
+.dv button {
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.dv-raid {
+  background: radial-gradient(ellipse 90% 50% at 50% 0%, rgba(255, 64, 88, 0.12), rgba(255, 64, 88, 0) 70%), var(--n-bg);
+}
+.dv-duel {
+  background: radial-gradient(ellipse 90% 50% at 50% 0%, rgba(80, 145, 255, 0.12), rgba(80, 145, 255, 0) 70%), var(--n-bg);
+}
+.dv-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dv-htxt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dv-label {
+  color: var(--n-acc);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.dv-title {
+  font-size: 18px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dv-sub {
+  color: var(--n-mute);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.dv-ic {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  border: 1px solid var(--n-line2);
+  background: var(--n-s2);
+  font-size: 18px;
+}
+.dv-top {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.dv-map,
+.dv-boss,
+.dv-duel {
+  min-height: 0;
+  border-radius: 18px;
+  background: var(--n-s1);
+  border: 1px solid var(--n-line);
+  overflow: hidden;
+}
+.dv-map {
+  display: grid;
+  place-items: center;
+}
+.dv-map img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.dv-boss {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  text-align: center;
+}
+.dv-boss img {
+  max-width: 90%;
+  max-height: 55%;
+  image-rendering: pixelated;
+}
+.dv-boss > span {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+.dv-boss small {
+  color: var(--n-mute);
+  font-weight: 700;
+}
+.dv-boss .dv-bar i {
+  background: #ff4058 !important;
+}
+.dv-duel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.dv-score {
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+.dv-opp {
+  color: var(--n-dim);
+  font-size: 13px;
+  font-weight: 700;
+}
+.dv-team {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+.dv-mon {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 104px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 4px;
+  border-radius: 16px;
+  border: 1px solid var(--n-line);
+  background: var(--n-s2);
+  text-align: left;
+}
+.dv-mon img {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.dv-mon > span {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.dv-mon b {
+  font-size: 14px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dv-mon small {
+  color: var(--n-mute);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.dv-mon.on {
+  border-color: var(--n-acc);
+  background: radial-gradient(ellipse 80% 120% at 0% 50%, rgba(255, 214, 10, 0.14), rgba(255, 214, 10, 0) 70%), var(--n-s2);
+}
+.dv-mon.out {
+  opacity: 0.45;
+}
+.dv-mon.out img {
+  filter: grayscale(1);
+}
+.dv-bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--n-s3);
+  overflow: hidden;
+}
+.dv-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  background: var(--n-green);
+  transition: width 0.25s;
+}
+.dv-items {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.dv-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 16px;
+  border: 1px solid var(--n-line2);
+  background: var(--n-s2);
+  font-size: 11px;
+  font-weight: 700;
+}
+.dv-item img {
+  width: 34px;
+  height: 34px;
+  image-rendering: pixelated;
+}
+.dv-item b {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--n-acc);
+  color: var(--n-acc-ink);
+  font-size: 12px;
+  line-height: 20px;
+}
+.dv-item.none {
+  opacity: 0.4;
+}
+.dv-item.none b {
+  background: var(--n-s3);
+  color: var(--n-mute);
+}
+.dv-item:active,
+.dv-mon:active,
+.dv-quick button:active {
+  transform: scale(0.97);
+}
+.dv-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dv-log {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.dv-log div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dv-log b {
+  color: #8fb4ff;
+  margin-right: 4px;
+}
+.dv-log .mine b {
+  color: var(--n-acc);
+}
+.dv-quick {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.dv-quick::-webkit-scrollbar {
+  display: none;
+}
+.dv-quick button {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 20px;
+  border: 1px solid var(--n-line2);
+  background: var(--n-s3);
+  font-size: 13px;
+  font-weight: 700;
+}
+/* Waiting, menus and the lobby: the logo and your team */
+.dv-wait {
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  padding: 24px;
+}
+.dv-wait p {
+  margin: 0;
+  max-width: 320px;
+  color: var(--n-dim);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.dv-logo {
+  width: min(260px, 70%);
+}
+.dv-hero {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.dv-duo {
+  display: flex;
+  align-items: flex-end;
+}
+.dv-duo img {
+  zoom: 2;
+  image-rendering: pixelated;
+}
+.dv-duo img + img {
+  margin-left: -10px;
+}
+/* A window wider than tall: everything side by side */
+@media (min-aspect-ratio: 4/3) {
+  .dv-match {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'head head' 'top items' 'top chat';
+  }
+  .dv-match .dv-head {
+    grid-area: head;
+  }
+  .dv-match .dv-top {
+    grid-area: top;
+  }
+  .dv-match .dv-items {
+    grid-area: items;
+    align-content: start;
+  }
+  .dv-match .dv-chat {
+    grid-area: chat;
+  }
+}
+
+/* Options: second screen */
+.n-ui #modal .opt-go {
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: var(--n-acc);
+  color: var(--n-acc-ink);
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 800;
+}
+.n-ui #modal .opt-duo-help {
+  margin: 0 0 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--n-s2);
+  border: 1px solid var(--n-line);
+  font-size: 13px;
+}

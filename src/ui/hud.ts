@@ -702,6 +702,11 @@ export class Hud {
     this.legend.classList.toggle('near', d < 6)
   }
 
+  /** The minimap as a picture (for a second screen). */
+  miniUrl() {
+    return this.mini.toDataURL()
+  }
+
   private drawMini() {
     const g = this.g
     const c = this.mini.getContext('2d')!
