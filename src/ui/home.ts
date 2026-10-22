@@ -1,3 +1,4 @@
+import { DUNGEON_LIST } from '../data/dungeons'
 import { SPECIES, spriteUrl } from '../data/pokemon'
 import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
 import { questText, trainerName } from '../data/rewards'
@@ -261,7 +262,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
     },
     raid: {
       title: 'Raid',
-      desc: L(`Up to ${MAX_PLAYERS} trainers against a legendary boss with its own arena. Get out of the red shapes on the ground!`, `Tot ${MAX_PLAYERS} trainers tegen een legendarische baas met eigen arena. Loop weg uit de rode vormen op de grond!`),
+      desc: L(`Up to ${MAX_PLAYERS} trainers fight through a dungeon to a legendary boss. Get out of the red shapes on the ground!`, `Tot ${MAX_PLAYERS} trainers vechten zich door een dungeon naar een legendarische baas. Loop weg uit de rode vormen op de grond!`),
       opts: [['solo', 'Solo'], ['friends', L('With friends', 'Met vrienden')]],
     },
   }
@@ -307,11 +308,21 @@ export function showMenu(st: MenuState, on: MenuActions) {
         const on = (choice.stadium ?? 'random') === s
         return `<button class="n-tile ${on ? 'on' : ''}" role="radio" aria-checked="${on}" data-stadium="${s}">${sd ? sd.name : L('Random', 'Willekeurig')}</button>`
       }).join('')}</div>`
-    if (kind === 'raid') return `
-      <div class="n-card n-mystery">
-        <div class="n-sil">${BOSS_LIST.map((b) => `<img class="px" src="${spriteUrl(BOSSES[b].species)}" alt="">`).join('')}</div>
-        <span><b>${L('A random boss', 'Een willekeurige baas')}</b><small>${L('You see who you face while it loads. Every boss has its own arena and attacks.', 'Je ziet pas bij het laden tegen wie je vecht. Elke baas heeft een eigen arena en aanvallen.')}</small></span>
+    if (kind === 'raid') {
+      const pick = choice.raid ?? 'dungeon'
+      return `
+      <div class="n-raidpick" role="radiogroup" aria-label="Raid">
+        ${DUNGEON_LIST.map((dd) => `
+        <button class="n-card n-dgcard ${pick === 'dungeon' ? 'on' : ''}" role="radio" aria-checked="${pick === 'dungeon'}" data-raid="dungeon">
+          <img class="px" src="${spriteUrl(BOSSES[dd.boss].species)}" alt="">
+          <span><b>${esc(dd.name)} <em class="n-chip acc">${L('NEW', 'NIEUW')}</em></b><small>${esc(dd.blurb)}</small></span>
+        </button>`).join('')}
+        <button class="n-card n-mystery ${pick === 'classic' ? 'on' : ''}" role="radio" aria-checked="${pick === 'classic'}" data-raid="classic">
+          <div class="n-sil">${BOSS_LIST.map((b) => `<img class="px" src="${spriteUrl(BOSSES[b].species)}" alt="">`).join('')}</div>
+          <span><b>${L('Classic: a random boss', 'Klassiek: een willekeurige baas')}</b><small>${L('Straight into its arena. You see who you face while it loads.', 'Meteen de arena in. Je ziet pas bij het laden tegen wie je vecht.')}</small></span>
+        </button>
       </div>`
+    }
     // Online
     return `
       <div class="n-stats2">
@@ -434,6 +445,10 @@ export function showMenu(st: MenuState, on: MenuActions) {
       const d = b.dataset.diff as Difficulty
       saveDiff(d)
       choice = { ...choice, diff: d }
+      paint()
+    })
+    act('[data-raid]', (b) => {
+      choice = { ...choice, raid: b.dataset.raid as MatchChoice['raid'] }
       paint()
     })
     act('[data-stadium]', (b) => {

@@ -18,6 +18,8 @@ import { preloadMon } from './sprites'
 import { MAP, T, World } from './world'
 import type { ThemeId } from '../data/themes'
 import { BOSSES, type BossId } from '../data/bosses'
+import { dungeonOf } from '../data/dungeons'
+import { foeDown } from './dungeon'
 import { botThink } from './ai'
 import type { Dir } from './entities'
 import type { Command } from '../net/protocol'
@@ -164,6 +166,8 @@ export interface Banner {
   shiny?: boolean
   trainer?: string
   color?: string
+  /** The small line above the title (instead of the kind's own). */
+  kicker?: Txt
 }
 
 /** What a feed line is about (its colour and icon) and who's in it. */
@@ -245,6 +249,10 @@ export interface MatchSetup {
   stadium?: StadiumId
   /** How hard the bots, the CPU or the boss play (default normal). */
   diff?: Difficulty
+  /** Raid: the boss alone in its arena, without the dungeon before it. */
+  classic?: boolean
+  /** Raid dungeon, dev/testing: start in this room (the gates before it open). */
+  room?: number
 }
 
 /** solo = everything local; host = simulates for remote players too; client = renders the host's state. */
@@ -368,7 +376,7 @@ export class Game {
     this.kind = setup.kind ?? 'royale'
     this.diff = setup.diff ?? 'normal'
     this.rng = new Rng(setup.seed)
-    this.world = new World(this.rng, this.kind === 'raid' ? { arena: BOSSES[setup.boss ?? 'reshiram'].arena } : this.kind === 'duel' ? { stadium: setup.stadium ?? 'classic' } : { theme: setup.theme })
+    this.world = new World(this.rng, this.kind === 'raid' ? { arena: BOSSES[setup.boss ?? 'reshiram'].arena, dungeon: setup.classic ? undefined : dungeonOf(setup.boss) ?? undefined } : this.kind === 'duel' ? { stadium: setup.stadium ?? 'classic' } : { theme: setup.theme })
     // The client only needs the world: everything else comes from the host.
     if (mode === 'client') return
     this.pickNextZone()
@@ -1301,13 +1309,14 @@ export class Game {
       return
     }
     // Raid bosses never fully resist: every partner can win the fight
-    const eff = tgt.boss ? Math.max(0.8, effectiveness(mv.type, tgt.species.types)) : effectiveness(mv.type, tgt.species.types)
+    // and a dungeon full of one type is hard on the partners weak to it, but never hopeless
+    const eff = tgt.boss ? Math.max(0.8, effectiveness(mv.type, tgt.species.types)) : src.foe ? Math.min(1.5, effectiveness(mv.type, tgt.species.types)) : effectiveness(mv.type, tgt.species.types)
     const L = src.level
     const raw = (((2 * L) / 5 + 2) * mv.power * (src.atk / tgt.def)) / 50 + 2
     // The boss's ordinary moves are chip damage (a share of your HP); its telegraphed attacks are the real threat
     const dmg = src.boss
       ? Math.max(1, Math.round(tgt.maxHp * (0.02 + mv.tier * 0.012) * mult * (eff > 1 ? 1.3 : eff < 1 ? 0.75 : 1)))
-      : Math.max(1, Math.round(raw * eff * mult * roleInfo(src.species.id).dmg * DMG_SCALE * (this.duel ? DUEL_DMG * buffDamage(src, tgt) : 1) * this.rng.range(0.9, 1.05)))
+      : Math.max(1, Math.round(raw * eff * mult * src.dmgMul * roleInfo(src.species.id).dmg * DMG_SCALE * (this.duel ? DUEL_DMG * buffDamage(src, tgt) : 1) * this.rng.range(0.9, 1.05)))
     tgt.hp -= dmg
     if (tgt.boss && src.owner) src.owner.bossDmg += Math.min(dmg, tgt.hp + dmg)
     if (src.owner && tgt.owner && tgt.owner !== src.owner) src.owner.dmg += Math.min(dmg, tgt.hp + dmg)
@@ -1322,7 +1331,7 @@ export class Game {
     const dx = tgt.x - src.x, dy = tgt.y - src.y
     const d = Math.hypot(dx, dy) || 1
     const kb = 0.12 * roleInfo(tgt.species.id).knock
-    if (!tgt.legendary) this.tryMove(tgt, (dx / d) * kb, (dy / d) * kb, 0.2)
+    if (!tgt.legendary && tgt.foe !== 3) this.tryMove(tgt, (dx / d) * kb, (dy / d) * kb, 0.2)
 
     // Impact sound for everyone in earshot, even if the target is hidden in the grass.
     // Novas already boomed where they landed.
@@ -1378,6 +1387,7 @@ export class Game {
     m.charging = null
     // Raid: the boss is down (the raid tick ends the match), or a player loses a life
     if (m.boss) return
+    if (m.foe) return foeDown(this, m)
     if (this.raid && m.owner) return raidDown(this, m.owner)
     if (this.duel && m.owner) return duelDown(this, m.owner)
     // Knocking out something weaker than you is worth less, something stronger more (no runaway snowball)
@@ -1958,6 +1968,10 @@ export class Game {
       this.updateCharge(w, dt)
       // The raid boss has its own brain (boss.ts)
       if (w.boss) continue
+      if (w.foe) {
+        this.foeAi(w, dt)
+        continue
+      }
       let mx = 0, my = 0, speed = 1.1
       if (w.state === 'aggro' && w.aggro) {
         let t = w.aggro
@@ -2025,6 +2039,59 @@ export class Game {
       }
   }
 
+  /**
+   * Raid dungeon foe: goes for the nearest player (no leash, they're locked in
+   * the room with you), keeps a little room from the rest of its pack, and
+   * holds still while a warden winds up an attack.
+   */
+  private foeAi(w: Mon, dt: number) {
+    w.holdT = Math.max(0, w.holdT - dt)
+    let t: Mon | null = null, td = 24
+    for (const tr of this.trainers) {
+      if (!tr.alive || tr.mon.fainted) continue
+      const d = Math.hypot(tr.mon.x - w.x, tr.mon.y - w.y)
+      if (d < td) { td = d; t = tr.mon }
+    }
+    w.aggro = t
+    let mx = 0, my = 0
+    if (t && w.holdT <= 0) {
+      const slot = this.bestSlot(w, td)
+      const range = slot >= 0 ? w.moves[slot].range : w.moves[0].range
+      if (td > range * 0.8) {
+        mx = (t.x - w.x) / td
+        my = (t.y - w.y) / td
+      }
+      w.thinkT -= dt
+      if (w.thinkT <= 0) {
+        // A pack attacks in turns, not all at once: common foes take their time
+        w.thinkT = w.foe === 3 ? this.rng.range(1, 1.5) : w.foe === 2 ? this.rng.range(0.75, 1.25) : this.rng.range(1, 1.7)
+        if (slot >= 0) this.useMove(w, slot, t)
+      }
+    }
+    // Don't pile up on one spot
+    for (const o of this.wilds) {
+      if (o === w || !o.foe) continue
+      const dx = w.x - o.x, dy = w.y - o.y, d = Math.hypot(dx, dy)
+      if (d > 0 && d < 0.9) {
+        mx += (dx / d) * 0.6
+        my += (dy / d) * 0.6
+      }
+    }
+    const len = Math.hypot(mx, my)
+    if (len > 1) {
+      mx /= len
+      my /= len
+    }
+    const speed = (w.foe === 3 ? 1.5 : 2 + w.species.spe / 70) * (w.holdT > 0 ? 0 : 1)
+    w.mvx = mx
+    w.mvy = my
+    if ((mx || my) && speed > 0) {
+      this.tryMove(w, mx * speed * dt, my * speed * dt, 0.3)
+      if (w.aimT <= 0) w.dir = dirOf(mx, my)
+    }
+    if (w.aimT > 0) w.dir = dirOf(w.aimX, w.aimY)
+  }
+
   private tickHpLag(dt: number) {
     const tick = (m: Mon) => {
       if (m.hpLag < m.hp) m.hpLag = m.hp
@@ -2065,7 +2132,7 @@ export class Game {
       p.y += p.vy * dt
       p.life -= dt
       const t = this.world.at(Math.floor(p.x), Math.floor(p.y + 0.4))
-      let dead = p.life <= 0 || t === T.TREE || t === T.ROCK || t === T.HOUSE
+      let dead = p.life <= 0 || t === T.TREE || t === T.ROCK || t === T.HOUSE || this.world.gateAt(Math.floor(p.x), Math.floor(p.y + 0.4)) >= 0
       let hit = false
       if (!dead)
         for (const e of this.enemiesOf(p.src)) {

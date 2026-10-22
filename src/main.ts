@@ -2,6 +2,7 @@ import { moveByName } from './data/moves'
 import { preloadVoice, voiceLog } from './voice'
 import './style.css'
 import { ALL_PARTNERS, ROSTER, TEAM_SIZE } from './data/pokemon'
+import { DUNGEON_LIST, dungeonOf } from './data/dungeons'
 import { BOSS_LIST, type BossId } from './data/bosses'
 import { TRAINERS, type TrainerDef } from './data/trainers'
 import { finalForm } from './game/boss'
@@ -205,13 +206,21 @@ function setupFor(c: MatchChoice, humans: LobbyPlayer[]): MatchSetup {
     return { seed, humans, kind: 'duel', diff, stadium: forced && forced in STADIUMS ? forced : pickStadium(c.stadium, seed) }
   }
   if (c.kind !== 'raid') return { seed, humans, kind: c.kind, diff, theme: forcedTheme && forcedTheme in THEMES ? forcedTheme : pickTheme(c.theme, seed) }
-  const last = store.get<BossId | ''>('lastBoss', '')
-  const pool = BOSS_LIST.filter((b) => b !== last)
-  // Dev/testing: ?boss=<id> fixes the boss
-  const forced = new URLSearchParams(location.search).get('boss') as BossId | null
-  const boss = forced && BOSS_LIST.includes(forced) ? forced : pool[Math.floor(Math.random() * pool.length)] ?? BOSS_LIST[0]
-  store.set('lastBoss', boss)
-  return { seed, humans, kind: c.kind, diff, theme: pickTheme(c.theme, seed), boss }
+  const q = new URLSearchParams(location.search)
+  // Dev/testing: ?boss=<id> fixes the boss, ?classic=1 skips the dungeon, ?room=N starts further in
+  const forced = q.get('boss') as BossId | null
+  const classic = q.get('classic') === '1' || c.raid === 'classic' || !DUNGEON_LIST.length
+  const startRoom = Number(q.get('room')) || 0
+  let boss: BossId
+  if (forced && BOSS_LIST.includes(forced)) boss = forced
+  else if (!classic) boss = DUNGEON_LIST[Math.floor(Math.random() * DUNGEON_LIST.length)].boss
+  else {
+    const last = store.get<BossId | ''>('lastBoss', '')
+    const pool = BOSS_LIST.filter((b) => b !== last)
+    boss = pool[Math.floor(Math.random() * pool.length)] ?? BOSS_LIST[0]
+    store.set('lastBoss', boss)
+  }
+  return { seed, humans, kind: c.kind, diff, theme: pickTheme(c.theme, seed), boss, ...(classic ? { classic: true } : {}), ...(startRoom > 0 ? { room: startRoom } : {}) }
 }
 
 /** Lobby: you picked a team and tapped "Klaar". */
@@ -368,7 +377,7 @@ function loadingThen(setup: MatchSetup, skippable: boolean, start: () => void, g
       sprite: (TRAINERS.find((t) => t.key === h.trainer) ?? TRAINERS[0]).sprite,
       mon: duel ? finalForm(h.team[0]) : h.team[0],
     }))
-  showLoading({ seconds: LOADING_TIME, players, skippable, bots: duel ? 0 : Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined, duel, stadium: setup.stadium, diff: setup.diff }, start)
+  showLoading({ seconds: LOADING_TIME, players, skippable, bots: duel ? 0 : Math.max(0, SEATS - players.length), raid: setup.kind === 'raid' ? setup.boss : undefined, dungeon: setup.kind === 'raid' && !setup.classic && !!dungeonOf(setup.boss), duel, stadium: setup.stadium, diff: setup.diff }, start)
 }
 
 function startSolo() {

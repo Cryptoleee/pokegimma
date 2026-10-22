@@ -8,7 +8,9 @@ import { say, type VoiceLine } from '../voice'
 import { xpNeeded } from '../game/entities'
 import { INTRO_TIME, type Banner, type FeedIcon, type Game } from '../game/game'
 import { itemUrl } from '../game/sprites'
-import { MAP } from '../game/world'
+import { ARENA_C, MAP } from '../game/world'
+import { dungeonOf } from '../data/dungeons'
+import type { DungeonView } from '../game/dungeon'
 import type { Mon } from '../game/entities'
 import type { ChatLine } from '../net/protocol'
 import { esc, QUICK_CHAT } from './menu'
@@ -114,7 +116,7 @@ export class Hud {
     const frame = h('div', 'mapframe')
     this.mini.width = MAP * 2
     this.mini.height = MAP * 2
-    frame.append(this.mini, h('span', 'maplabel', 'UNOVA'))
+    frame.append(this.mini, h('span', 'maplabel', g.kind === 'raid' && g.world.gates.length ? 'DUNGEON' : 'UNOVA'))
     const chips = h('div', 'chips')
     chips.append(this.aliveChip, this.stormChip)
     tr.append(frame, chips, this.feedEl)
@@ -138,6 +140,7 @@ export class Hud {
     this.board = new LiveBoard(root, g, () => g.player.id)
     if (g.kind === 'raid') root.classList.add('raid-mode')
     else root.classList.remove('raid-mode')
+    root.classList.toggle('dungeon-mode', g.kind === 'raid' && g.world.gates.length > 0)
     root.classList.toggle('duel-mode', g.kind === 'duel')
 
     // Multiplayer chat: the conversation bottom left, a button (or Enter) to talk
@@ -377,7 +380,7 @@ export class Hud {
     const kicker: Partial<Record<Banner['kind'], string>> = {
       levelup: 'LEVEL UP', move: L('NEW MOVE', 'NIEUWE AANVAL'), legendary: L('★ LEGENDARY ★', '★ LEGENDARISCH ★'), ko: 'K.O.', caught: 'POKÉ BALL', storm: L('WARNING', 'WAARSCHUWING'), fainted: L('OOPS', 'OEPS'), win: 'BATTLE ROYALE',
     }
-    el.innerHTML = `${art}<div class="txt"><small>${kicker[b.kind] ?? ''}</small><b>${tx(b.title)}</b>${b.sub ? `<span>${tx(b.sub)}</span>` : ''}</div>`
+    el.innerHTML = `${art}<div class="txt"><small>${b.kicker ? tx(b.kicker) : kicker[b.kind] ?? ''}</small><b>${tx(b.title)}</b>${b.sub ? `<span>${tx(b.sub)}</span>` : ''}</div>`
     // Only one big banner at a time; small ones stack
     const big = b.kind === 'legendary' || b.kind === 'win' || b.kind === 'storm'
     if (b.kind === 'legendary') {
@@ -557,6 +560,8 @@ export class Hud {
     const boss = g.wilds.find((w) => w.boss)
     const def = BOSSES[g.setup.boss ?? 'reshiram']
     this.legend.classList.add('hidden')
+    const dg = g.raidView?.dg
+    if (dg && dg.stage < 2) return this.updateDungeon(dg)
     this.bossBar.classList.toggle('hidden', !boss || g.introT > INTRO_TIME * 0.45)
     if (boss) {
       // The bar follows the boss into its next form (Black Kyurem, Mega Rayquaza, …)
@@ -586,7 +591,8 @@ export class Hud {
       // Lives: just your hearts solo; with friends a short name before each row of hearts
       // Your own hearts first, then the others
       const humans = g.trainers.filter((t) => t.human).sort((a, b) => (b === p ? 1 : 0) - (a === p ? 1 : 0))
-      const hearts = (t: typeof p) => '♥'.repeat(Math.max(0, t.lives)) + '♡'.repeat(Math.max(0, RAID_LIVES - t.lives))
+      const max = g.raidView?.dg?.lives ?? RAID_LIVES
+      const hearts = (t: typeof p) => '♥'.repeat(Math.max(0, t.lives)) + '♡'.repeat(Math.max(0, max - t.lives))
       const team = humans.length < 2
         ? `<span class="mine">${hearts(p)}</span>`
         : humans.map((t) => `<span class="${t === p ? 'mine' : ''} ${t.alive ? '' : 'out'}">${esc(t.name.slice(0, 6))} ${hearts(t)}</span>`).join('')
@@ -600,6 +606,65 @@ export class Hud {
     this.respawnSec = sec
     this.respawnEl.classList.toggle('hidden', !down)
     if (down) this.respawnEl.innerHTML = `<small>${L(`${p.mon.name} fainted`, `${p.mon.name} is verslagen`)}</small><b>${Math.ceil(p.respawnT)}</b><span>${L(`${p.lives} ${p.lives === 1 ? 'life' : 'lives'} left`, `nog ${p.lives} ${p.lives === 1 ? 'leven' : 'levens'}`)}</span>`
+    if (g.raidView?.dg) this.drawMini()
+  }
+
+  /**
+   * Raid dungeon: the bar shows the room and its wave (or the warden's health
+   * while one stands), how far you are through the dungeon, and everyone's lives.
+   */
+  private updateDungeon(dg: DungeonView) {
+    const g = this.g, p = g.player
+    const dd = dungeonOf(g.setup.boss)
+    if (!dd) return
+    const warden = dg.warden ? g.wilds.find((w) => w.id === dg.warden) : undefined
+    this.bossBar.classList.toggle('hidden', g.introT > INTRO_TIME * 0.45)
+    const room = dd.rooms[dg.room]
+    const key = `dg:${dg.room}:${dg.stage}:${warden?.id ?? 0}`
+    if (this.bossKey !== key) {
+      this.bossKey = key
+      const title = warden ? warden.name : dg.stage === 1 ? L('To the crater', 'Naar de krater') : room.name
+      this.bossBar.style.setProperty('--c', warden ? '#ff7a30' : '#ffb040')
+      this.bossBar.innerHTML = `
+        <div class="bb-top"><b>${esc(title)}</b><span class="bb-team"></span><span class="bb-time"></span></div>
+        <div class="bb-bar ${warden ? '' : 'dg'}"><i class="bb-lag"></i><i class="bb-fill"></i>${warden ? '' : dd.rooms.map((_, i) => (i ? `<em style="left:${(dd.rooms.slice(0, i).reduce((s, r) => s + r.waves.length, 0) / dg.totalWaves) * 100}%"></em>` : '')).join('')}</div>`
+    }
+    const fill = this.bossBar.querySelector('.bb-fill') as HTMLElement
+    const lag = this.bossBar.querySelector('.bb-lag') as HTMLElement
+    if (warden) {
+      fill.style.width = `${Math.max(0, warden.hp / warden.maxHp) * 100}%`
+      lag.style.width = `${Math.max(0, warden.hpLag / warden.maxHp) * 100}%`
+    } else {
+      // How far through the dungeon: waves behind you
+      const done = dg.stage === 1 ? dg.totalWaves : Math.max(0, dg.waveNo - (dg.left || dg.next ? 1 : 0))
+      fill.style.width = `${(done / dg.totalWaves) * 100}%`
+      lag.style.width = '0'
+    }
+    const time = this.bossBar.querySelector('.bb-time') as HTMLElement
+    const txt = dg.stage === 1
+      ? L('Enter the arena →', 'Ga de arena in →')
+      : !dg.wave
+        ? L(`Room ${dg.room + 1}/${dd.rooms.length}`, `Kamer ${dg.room + 1}/${dd.rooms.length}`)
+        : dg.next
+          ? L(`Wave ${dg.wave}/${dg.waves} in ${dg.next}`, `Wave ${dg.wave}/${dg.waves} over ${dg.next}`)
+          : L(`Wave ${dg.wave}/${dg.waves} · ${dg.left} left`, `Wave ${dg.wave}/${dg.waves} · nog ${dg.left}`)
+    if (time.textContent !== txt) time.textContent = txt
+    time.classList.remove('low')
+    const humans = g.trainers.filter((t) => t.human).sort((a, b) => (b === p ? 1 : 0) - (a === p ? 1 : 0))
+    const hearts = (t: typeof p) => '♥'.repeat(Math.max(0, t.lives)) + '♡'.repeat(Math.max(0, dg.lives - t.lives))
+    const team = humans.length < 2
+      ? `<span class="mine">${hearts(p)}</span>`
+      : humans.map((t) => `<span class="${t === p ? 'mine' : ''} ${t.alive ? '' : 'out'}">${esc(t.name.slice(0, 6))} ${hearts(t)}</span>`).join('')
+    const tEl = this.bossBar.querySelector('.bb-team') as HTMLElement
+    if (tEl.innerHTML !== team) tEl.innerHTML = team
+    // Down: big countdown until you're back
+    const down = p.alive && p.mon.fainted && p.respawnT > 0
+    const sec = down ? Math.ceil(p.respawnT) : 0
+    if (sec !== this.respawnSec && sec > 0) sfx.countdown(false)
+    this.respawnSec = sec
+    this.respawnEl.classList.toggle('hidden', !down)
+    this.drawMini()
+    if (down) this.respawnEl.innerHTML = `<small>${L(`${p.mon.name} fainted`, `${p.mon.name} is verslagen`)}</small><b>${Math.ceil(p.respawnT)}</b><span>${L(`${p.lives} ${p.lives === 1 ? 'life' : 'lives'} left · back at the last gate`, `nog ${p.lives} ${p.lives === 1 ? 'leven' : 'levens'} · terug bij de laatste poort`)}</span>`
   }
 
   /** 1 vs 1: rounds won (pips), both HP bars, the round and ring timer, your power-ups; big countdown between rounds. */
@@ -746,6 +811,36 @@ export class Hud {
         c.arc(w.x * s, w.y * s, 5, 0, Math.PI * 2)
         c.fill()
       }
+    // Raid dungeon: closed gates, foes, teammates and where to go next
+    const dg = g.raidView?.dg
+    if (dg && dg.stage < 2) {
+      for (const gt of g.world.gates) {
+        if (gt.open) continue
+        c.fillStyle = '#ff5030'
+        c.fillRect(gt.x * s - 1, gt.y * s - 1, gt.w * s + 2, gt.h * s + 2)
+      }
+      for (const w of g.wilds) {
+        if (!w.foe) continue
+        c.fillStyle = w.foe === 3 ? '#ffb040' : '#ff4040'
+        c.beginPath()
+        c.arc(w.x * s, w.y * s, w.foe === 3 ? 5 : 2.5, 0, Math.PI * 2)
+        c.fill()
+      }
+      const [ox, oy] = objective(g)
+      const pulse = 7 + 4 * Math.sin(performance.now() / 250)
+      c.strokeStyle = '#ffd040'
+      c.lineWidth = 2.5
+      c.beginPath()
+      c.arc(ox * s, oy * s, pulse, 0, Math.PI * 2)
+      c.stroke()
+      for (const t of g.trainers) {
+        if (t === g.player || !t.alive) continue
+        c.fillStyle = '#58c8ff'
+        c.beginPath()
+        c.arc(t.x * s, t.y * s, 3.5, 0, Math.PI * 2)
+        c.fill()
+      }
+    }
     const p = g.player
     if (p.alive) {
       // Player arrow pointing the way you walk
@@ -880,4 +975,12 @@ export function feedLine(feed: HTMLElement, text: string, icon?: FeedIcon) {
   const all = feed.querySelectorAll('.ev')
   for (let i = 0; i < all.length - FEED_KEEP; i++) all[i].remove()
   setTimeout(() => d.classList.add('old'), 7000)
+}
+
+/** Raid dungeon: where to head now (the room being fought, the next room, or the arena). */
+export function objective(g: Game): [number, number] {
+  const dd = dungeonOf(g.setup.boss), dg = g.raidView?.dg
+  if (!dd || !dg || dg.stage >= 1 || !dd.rooms[dg.room]) return [ARENA_C, ARENA_C]
+  const r = dd.rooms[dg.room].rect
+  return [r.x + r.w / 2, r.y + r.h / 2]
 }

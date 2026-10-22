@@ -1,3 +1,4 @@
+import { DUNGEON_LIST } from '../data/dungeons'
 import qrcode from 'qrcode-generator'
 import { animatedUrl, SPECIES, spriteUrl } from '../data/pokemon'
 import { TRAINERS, trainerSpriteUrl, type TrainerDef } from '../data/trainers'
@@ -5,7 +6,6 @@ import { sfx } from '../audio'
 import { CHAT_MAX, type Room } from '../net/room'
 import type { ChatLine, MatchChoice } from '../net/protocol'
 import { ROYALE_THEMES, THEMES } from '../data/themes'
-import { BOSS_LIST, BOSSES } from '../data/bosses'
 import { SEATS } from '../game/game'
 import { accountStatus } from '../account'
 import { DIFFICULTIES, diffName, saveDiff, type Difficulty } from '../data/difficulty'
@@ -75,7 +75,7 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
             const th = t === 'random' ? null : THEMES[t]
             return `<button data-theme="${t}" class="${c.theme === t ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:${th ? th.grass[0] : '#5a6a9a'};--c2:${th ? th.tall[0] : '#3a4470'}"><i>${th ? th.icon : '🎲'}</i>${th ? th.name : L('Random', 'Willekeurig')}</button>`
           }).join('')}</div>`
-        : `<div class="cp-mystery"><div class="cp-sil">${BOSS_LIST.map((b) => `<img class="px" src="${spriteUrl(BOSSES[b].species)}" alt="">`).join('')}<i>?</i></div><span><b>${L('Random boss', 'Willekeurige baas')}</b><small>${L('You find out who you face while it loads', 'Je ziet pas bij het laden tegen wie je vecht')}</small></span></div>`}
+        : `<div class="cp-worlds cp-raid">${DUNGEON_LIST.map((dd) => `<button data-raid="dungeon" class="${(c.raid ?? 'dungeon') === 'dungeon' ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:#5a2a1c;--c2:#ff7a30"><i>🔥</i>${esc(dd.name)}</button>`).join('')}<button data-raid="classic" class="${c.raid === 'classic' ? 'on' : ''}" ${ro ? 'disabled' : ''} style="--c:#5a6a9a;--c2:#3a4470"><i>🎲</i>${L('Classic: random boss', 'Klassiek: willekeurige baas')}</button></div>`}
       <div class="cp-diff" role="radiogroup" aria-label="${L('Difficulty', 'Moeilijkheid')}"><span>${c.kind === 'raid' ? L('Boss', 'Baas') : c.kind === 'duel' ? 'CPU' : 'Bots'}</span>${DIFFICULTIES.map((d) => `<button data-diff="${d}" role="radio" aria-checked="${(c.diff ?? 'normal') === d}" class="${(c.diff ?? 'normal') === d ? 'on' : ''}" ${ro ? 'disabled' : ''}>${diffName(d)}</button>`).join('')}</div>`
     el.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
       b.addEventListener('click', () => {
@@ -85,6 +85,7 @@ export function choicePicker(el: HTMLElement, get: () => MatchChoice, set: ((c: 
         if (b.dataset.kind) c.kind = b.dataset.kind as MatchChoice['kind']
         if (b.dataset.theme) c.theme = b.dataset.theme as MatchChoice['theme']
         if (b.dataset.stadium) c.stadium = b.dataset.stadium as MatchChoice['stadium']
+        if (b.dataset.raid) c.raid = b.dataset.raid as MatchChoice['raid']
         if (b.dataset.diff) {
           c.diff = b.dataset.diff as Difficulty
           saveDiff(c.diff)
@@ -295,7 +296,7 @@ export function showLobby(room: Room, on: LobbyActions) {
   /** "Battle Royale · Forest": what this lobby is going to play. */
   const matchLine = () => {
     const c = room.choice
-    if (c.kind === 'raid') return `Raid · ${L('random boss', 'willekeurige baas')}`
+    if (c.kind === 'raid') return c.raid === 'classic' || !DUNGEON_LIST.length ? `Raid · ${L('random boss', 'willekeurige baas')}` : `Raid · ${DUNGEON_LIST[0].name}`
     if (c.kind === 'duel') return `1 vs 1 · ${c.stadium && c.stadium !== 'random' ? STADIUMS[c.stadium].name : L('random stadium', 'willekeurig stadion')}`
     return `Battle Royale · ${c.theme && c.theme !== 'random' ? THEMES[c.theme].name : L('random world', 'willekeurige wereld')}`
   }

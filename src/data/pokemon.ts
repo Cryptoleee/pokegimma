@@ -161,6 +161,20 @@ const ROWS: Row[] = [
   [65, 'Alakazam', 'psychic', 55, 93, 70, 120],
   [59, 'Arcanine', 'fire', 90, 105, 80, 95],
 
+  // Dungeon foes (the Burning Depths): never in the open world
+  [240, 'Magby', 'fire', 45, 72, 46, 83],
+  [126, 'Magmar', 'fire', 65, 97, 71, 93],
+  [467, 'Magmortar', 'fire', 75, 110, 81, 83],
+  [218, 'Slugma', 'fire', 40, 55, 40, 20],
+  [219, 'Magcargo', 'fire/rock', 60, 70, 100, 30],
+  [228, 'Houndour', 'dark/fire', 45, 70, 40, 65],
+  [229, 'Houndoom', 'dark/fire', 75, 100, 65, 95],
+  [322, 'Numel', 'fire/ground', 60, 62, 42, 35],
+  [323, 'Camerupt', 'fire/ground', 70, 102, 72, 40],
+  [324, 'Torkoal', 'fire', 70, 85, 105, 20],
+  [555, 'Darmanitan', 'fire', 105, 85, 55, 95],
+  [631, 'Heatmor', 'fire', 85, 101, 66, 65],
+
   // Wild: legendary
   [150, 'Mewtwo', 'psychic', 106, 132, 90, 130],
   [643, 'Reshiram', 'dragon/fire', 100, 135, 110, 90],

@@ -157,6 +157,18 @@ Een duel tussen twee trainers in een stadion, best of 3.
 
 Een raid is PvE: jij (en tot 11 vrienden) tegen één legendarische baas, in een eigen arena. Er is geen storm en er zijn geen bots of wilde Pokémon. De baas is een verrassing: hij wordt willekeurig gekozen (nooit twee keer dezelfde na elkaar) en je ziet hem pas op het laadscherm.
 
+### Raid-dungeons
+
+Standaard is een raid een **dungeon**: eerst vecht je je door een reeks zalen, en pas aan het eind gaat de poort naar de arena van de legende open. In het raidmenu kies je de dungeon of **Klassiek** (meteen de arena in, willekeurige baas). De eerste dungeon is **De Brandende Diepten** (Reshiram, `src/data/dungeons.ts`).
+
+- **Zalen en waves:** zes zalen rond de kraterarena, verbonden door gangen. Een zaal begint zodra iemand erin loopt; de waves komen na elkaar (vijanden komen in een vuurstoot uit de grond). De poort uit de zaal (een basalt plaat met gloeiende runen) gaat pas open als alle vijanden verslagen zijn. Vijanden jagen op de dichtstbijzijnde speler, vallen om beurten aan en kunnen niet gevangen worden.
+- **Elites en wachters:** elites (★) zijn groter en taaier. Twee keer verspert een **wachter** de weg (Magmortar, Camerupt): een mini-baas met eigen levensbalk, getelegrafeerde aanvallen (kegel, cirkels, ring) en die hulp roept bij 60/30% HP. Een wachter verslaan geeft +1 leven.
+- **Laatste wave:** in het Laatste Bastion; daarna gaat de arenapoort open en ontwaakt Reshiram zodra iemand de krater in loopt. Vanaf daar is het een gewone raid (4 minuten, fases, alle bekende aanvallen).
+- **Levens en checkpoints:** 3 levens voor de hele run. Ga je neer, dan kom je na 10 s terug bij de laatste poort. Levens op? Als je team een zaal verovert, ben je terug met één leven. Elke veroverde zaal geneest iedereen 35% en legt een Potion per speler bij de poort; elites en wachters laten een Potion vallen.
+- **Omgeving:** lava brandt (in de dungeon 5%/s, in de krater 10%/s), de Vuurrivier heeft twee bruggen, in de Smeltovens barsten vulkaanspleten uit.
+- **Schaal:** meer spelers = meer vijanden (+50% per speler) en meer HP voor wachters; moeilijkheid past aantallen, levels en schade aan. Vuur-zwakke partners krijgen maximaal 1,5× schade van dungeonvijanden.
+- **Testen:** `?boss=reshiram&room=N` start in zaal N (poorten ervoor open; `room=6` = voor de arena), `?classic=1` slaat de dungeon over.
+
 - **Jouw team:** je partner is in de raid volledig geëvolueerd en Lv 50 met alle vier de aanvallen (Pikachu wordt Raichu, Charmander Charizard, enzovoort). Je hebt 2 Potions en HP herstelt niet vanzelf. Er verschijnen wel geregeld Potions in de arena.
 - **Ontwijken:** elke grote aanval zie je eerst als rode vorm op de grond die langzaam volloopt: een cirkel, kegel, lijn of ring. Sta je erin als hij vol is, dan kost dat een groot deel van je HP. Elke waarschuwing is lang genoeg om eruit te lopen als je meteen reageert.
 - **Fases:** op 66% en 33% HP wordt de baas woedend. Dat is een korte cinematic: de camera zwenkt naar de baas, de wereld wordt donker, hij brult (een eigen animatie), en op een flits met schokgolf verschijnt zijn nieuwe vorm. Hij brult iedereen weg, krijgt nieuwe aanvallen en valt sneller aan, en er vallen Potions.

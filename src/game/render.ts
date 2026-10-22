@@ -13,6 +13,7 @@ import { FLOWER_FRAMES, hash, TALL_FRAMES, TALL_TOP, tileArt, WATER_FRAMES } fro
 import type { Weather } from '../data/themes'
 import { drawEvents } from './events'
 import { drawHazards, drawHazardsSky } from './boss'
+import { drawBrazier, drawGate, gateShown } from './dungeon'
 import { L, tx } from '../i18n'
 import { BOSSES } from '../data/bosses'
 import { cinematic, drawPhaseScreen, phaseLook, shownPhase, updateCinematic } from './bossFx'
@@ -103,6 +104,10 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
     if (inView(w.x, w.y)) ents.push({ y: w.y, draw: () => (w.boss && air > 0 ? drawMon(g, ctx, w, time, 1 - air * 0.9, air * 150) : drawMon(g, ctx, w, time)) })
   for (const c of g.clones)
     if (inView(c.x, c.y)) ents.push({ y: c.y, draw: () => drawMon(g, ctx, c, time, 0.5 + 0.12 * Math.sin(time * 5 + c.x)) })
+  // Raid dungeon gates stand up like walls; braziers burn along the walls
+  for (const gt of g.world.gates)
+    if (gateShown(gt, time) && inView(gt.x + gt.w / 2, gt.y + gt.h / 2, 6)) ents.push({ y: gt.y + gt.h, draw: () => drawGate(ctx, gt, time) })
+  for (const b of g.world.braziers) if (inView(b.x, b.y)) ents.push({ y: b.y, draw: () => drawBrazier(ctx, b.x * TILE, b.y * TILE, time) })
   ents.sort((a, b) => a.y - b.y)
   for (const e of ents) e.draw()
 
@@ -116,6 +121,11 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // World mood: night darkness, heat haze, cold light (under the effects, so attacks light up the dark)
   if (theme.tint) {
     ctx.fillStyle = theme.tint
+    ctx.fillRect(ox - 2, oy - 2, vw + 4, vh + 4)
+  }
+  // Raid dungeon: deep underground, lit by braziers, lava and the fight
+  if (g.world.gates.length) {
+    ctx.fillStyle = 'rgba(10,3,6,0.32)'
     ctx.fillRect(ox - 2, oy - 2, vw + 4, vh + 4)
   }
 
@@ -1612,6 +1622,11 @@ function drawLights(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, 
   for (const h of g.hazards) {
     const k = h.total > 0 ? 1 - Math.max(0, h.t) / h.total : 1
     if (k > 0.6 && h.shape !== 'grid') add(h.x * T, h.y * T, Math.min(6, h.r) * T * 0.9, TYPE_COLOR[h.type], (k - 0.6) * 0.9)
+  }
+  // Raid dungeon braziers: warm, flickering pools of light
+  for (const b of g.world.braziers) {
+    const fl = 0.85 + 0.15 * Math.sin(time * 9 + b.x * 3) * Math.sin(time * 13 + b.y)
+    add(b.x * T, (b.y - 0.6) * T, 30 * fl, '#ff8a30', 0.45 * fl)
   }
   if (!pool.length) return
   const lw = Math.ceil(cw / LIGHT_RES), lh = Math.ceil(ch / LIGHT_RES)

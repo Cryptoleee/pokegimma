@@ -7,6 +7,7 @@ import { preloadMon } from '../game/sprites'
 import type { Vfx } from '../game/vfx'
 import type { Command, NetEvent, RosterEntry } from './protocol'
 import { bossAttack, cloneMon, type Hazard } from '../game/boss'
+import type { DungeonView } from '../game/dungeon'
 import { BOSSES } from '../data/bosses'
 import { duelFrozen, type DuelView } from '../game/duel'
 
@@ -94,7 +95,7 @@ export function recordVfx(g: Game) {
 
 /** Bare minimum for things far off-screen: who it is and roughly where. */
 function farMon(m: Mon) {
-  return { i: m.id, s: m.species.id, l: m.level, hp: r1(m.hp), x: r1(m.x), y: r1(m.y), ...(m.shiny ? { sh: 1 } : {}), ...(m.awaken ? { aw: m.awaken } : {}) }
+  return { i: m.id, s: m.species.id, l: m.level, hp: r1(m.hp), x: r1(m.x), y: r1(m.y), ...(m.shiny ? { sh: 1 } : {}), ...(m.awaken ? { aw: m.awaken } : {}), ...(m.foe ? { fo: [m.foe, r2(m.bossMul)] } : {}) }
 }
 
 function monState(m: Mon, own: boolean) {
@@ -114,6 +115,7 @@ function monState(m: Mon, own: boolean) {
   if (m.claimT > 0 && m.claim) o.cl = [m.claim.id, r1(m.claimT)]
   if (m.catching) o.ca = 1
   if (m.boss) o.bs = m.bossMul
+  if (m.foe) o.fo = [m.foe, r2(m.bossMul)]
   if (m.frozenT > 0) o.fz = r2(m.frozenT)
   if (m.dash) o.ds = [r2(m.dash.vx), r2(m.dash.vy), r2(m.dash.t), m.dash.move.name, m.dash.strike ? 1 : 0]
   if (m.charging) o.ch = [m.charging.move.name, r2(m.charging.t), m.charging.total]
@@ -308,6 +310,13 @@ function getMon(cs: ClientState, o: Record<string, number & string & unknown[]>,
     m.boss = true
     m.bossMul = o.bs
   }
+  // Raid dungeon foes: their kind and HP scale (so the HP bar matches the host)
+  const fo = o.fo as unknown as [1 | 2 | 3, number] | undefined
+  if (fo) {
+    m.foe = fo[0]
+    m.bossMul = fo[1]
+    m.legendary = false
+  }
   m.frozenT = o.fz ?? 0
   const ds = o.ds as unknown as [number, number, number, string, number] | undefined
   m.dash = ds ? { vx: ds[0], vy: ds[1], t: ds[2], move: moveByName(ds[3]), hit: new Set(), strike: !!ds[4] } : null
@@ -430,7 +439,14 @@ export function applySnapshot(g: Game, raw: unknown) {
   })
   if (s.rv) {
     const rv = s.rv
-    g.raidView = { timeLeft: rv.t, phase: rv.p, wind: rv.w, clones: rv.c, air: rv.a ?? 0 }
+    g.raidView = { timeLeft: rv.t, phase: rv.p, wind: rv.w, clones: rv.c, air: rv.a ?? 0, dg: rv.dg }
+    // Dungeon gates: open the ones the host opened (they crumble from now on)
+    if (rv.dg) g.world.gates.forEach((gt, i) => {
+      if (!gt.open && rv.dg!.gates & (1 << i)) {
+        gt.open = true
+        gt.openAt = g.time
+      }
+    })
     rv.pl.forEach((hp, i) => { if (!hp) g.world.breakPillar(i) })
     // Mirror images: create or drop them to match, then put them where the host has them
     const cl = rv.c ?? []
@@ -471,6 +487,8 @@ interface RaidViewState {
   a?: number
   /** Ice pillars' HP (0 = broken). */
   pl: number[]
+  /** Raid dungeon: rooms, waves, gates. */
+  dg?: DungeonView
 }
 
 function raidViewState(g: Game): RaidViewState {
@@ -479,6 +497,7 @@ function raidViewState(g: Game): RaidViewState {
   if (rv.wind) o.w = [r2(rv.wind[0]), r2(rv.wind[1])]
   if (rv.clones) o.c = rv.clones.map(([x, y]) => [r2(x), r2(y)])
   if (rv.air) o.a = r2(rv.air)
+  if (rv.dg) o.dg = rv.dg
   return o
 }
 

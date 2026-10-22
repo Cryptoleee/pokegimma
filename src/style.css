@@ -5644,6 +5644,13 @@ button:disabled {
 .raid-mode .hparty {
   display: none;
 }
+/* Raid dungeon: the map is back (rooms, gates, foes and where to go) */
+.raid-mode.dungeon-mode .topright .mapframe {
+  display: block;
+}
+.bb-bar.dg .bb-fill {
+  background: linear-gradient(#ffe08a, #ffa030 55%, #c86010);
+}
 /* Slim boss bar: name, lives and timer on one line, HP underneath */
 .bossbar {
   --c: #ff7a30;

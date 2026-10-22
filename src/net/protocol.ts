@@ -26,6 +26,8 @@ export interface MatchChoice {
   stadium?: StadiumId | 'random'
   /** How hard the bots, the CPU or the boss play. */
   diff?: Difficulty
+  /** Raid: through a dungeon to its boss (default), or a classic raid against a random boss. */
+  raid?: 'dungeon' | 'classic'
 }
 
 /** A chat line (lobby and in-game). */

@@ -9,6 +9,8 @@ import { disc, drawGlow, drawShape, type DecalKind, type Shape } from './vfx'
 import { preloadMon } from './sprites'
 import { ARENA_C, ARENA_R, T, TILE, World } from './world'
 import { both, inBoth, L } from '../i18n'
+import { dungeonOf, WARDEN_ATTACKS } from '../data/dungeons'
+import { dungeonTick, respawnAt, setupDungeon, viewOf, type DungeonRun, type DungeonView } from './dungeon'
 
 /**
  * Raid mode: a boss in the middle of an arena, everyone else against it.
@@ -82,6 +84,8 @@ export interface RaidState {
   wind: { dx: number; dy: number; delay: number; t: number } | null
   /** Mirror images that cast along (Mewtwo's last phase). */
   clones: { x: number; y: number; a: number }[]
+  /** Raid dungeon: the run through the rooms before the boss (null for a classic raid). */
+  dg?: DungeonRun
 }
 
 /** What every player sees of the raid (host and clients): synced as `rv`. */
@@ -94,6 +98,8 @@ export interface RaidView {
   clones?: [number, number][]
   /** How far up the boss flew (0 on the ground, 1 out of sight). */
   air?: number
+  /** Raid dungeon: rooms, waves, gates. */
+  dg?: DungeonView
 }
 
 let hazardId = 1
@@ -151,13 +157,16 @@ export function setupRaid(g: Game, id: keyof typeof BOSSES) {
   boss.y = boss.homeY = ARENA_C - 2
   boss.aggressive = true
   preloadMon(def.species)
-  g.wilds.push(boss)
+  const dungeon = g.world.gates.length ? dungeonOf(id) : null
+  // A dungeon first: the boss waits out of sight until you reach its arena
+  if (!dungeon) g.wilds.push(boss)
   g.raid = {
     def, boss, phase: 0, nextT: 3, cds: {}, moveT: 2, invulnT: 0, bannerT: 0, timeLeft: RAID_TIME, result: null,
     goalX: boss.x, goalY: boss.y, envT: def.arena === 'crater' ? 6 : 7, potionT: 20,
     busyT: 0, air: null, wind: null, clones: [],
   }
   g.clones = []
+  if (dungeon) setupDungeon(g, g.raid, dungeon, g.setup.room ?? 0)
   // The arena has no storm: park the zone far outside it
   g.zone.x = g.zone.nx = ARENA_C
   g.zone.y = g.zone.ny = ARENA_C
@@ -179,7 +188,9 @@ function targets(g: Game): Mon[] {
 export function updateRaid(g: Game, dt: number) {
   const r = g.raid!
   if (r.result) return
-  r.timeLeft -= dt
+  // A dungeon run first: rooms and waves; the boss fight starts in its arena
+  const inDungeon = !!r.dg && dungeonTick(g, r, dt)
+  if (!inDungeon) r.timeLeft -= dt
   const boss = r.boss
   r.invulnT = Math.max(0, r.invulnT - dt)
   if (r.bannerT > 0 && (r.bannerT -= dt) <= 0) phaseBanner(g, r)
@@ -190,7 +201,8 @@ export function updateRaid(g: Game, dt: number) {
     if (!tr.alive) continue
     const m = tr.mon
     if (!m.fainted && g.world.at(Math.floor(m.x), Math.floor(m.y)) === T.LAVA) {
-      g.applyDamage(m, m.maxHp * 0.1 * dt, null, true)
+      // The dungeon's lava rivers and pools burn less than the crater (you have to cross them)
+      g.applyDamage(m, m.maxHp * (inDungeon ? 0.05 : 0.1) * dt, null, true)
       g.vOf(tr)?.sfx('burn')
       if (Math.random() < dt * 8) g.vfx.burst(m.x, m.y - 0.2, { n: 2, speed: 2, dir: -Math.PI / 2, spread: 0.6, cols: ['#ffb030', '#ff6020'], shape: 'flame', s0: 2.5, s1: 0.5, life: 0.4 })
     }
@@ -198,6 +210,15 @@ export function updateRaid(g: Game, dt: number) {
       tr.respawnT -= dt
       if (tr.respawnT <= 0) respawn(g, tr)
     }
+  }
+
+  if (inDungeon) {
+    tickHazards(g, dt)
+    if (g.trainers.every((t) => !t.alive)) {
+      r.result = 'lost'
+      endRaid(g, r)
+    }
+    return
   }
 
   // Every ~22 s a potion shows up somewhere in the arena (keeps everyone moving)
@@ -310,9 +331,19 @@ export function updateRaid(g: Game, dt: number) {
     timeLeft: Math.max(0, r.timeLeft), phase: r.phase, wind,
     clones: r.clones.length ? r.clones.map((c) => [c.x, c.y] as [number, number]) : undefined,
     air: r.air ? airLift(r.air.total - r.air.t, r.air.t) : 0,
+    dg: r.dg ? viewOf(g, r.dg) : undefined,
   }
 
-  // Hazards land; tornados then stay a while and roam
+  tickHazards(g, dt)
+
+  // How does it end?
+  if (boss.fainted) r.result = 'won'
+  else if (r.timeLeft <= 0 || g.trainers.every((t) => !t.alive)) r.result = 'lost'
+  if (r.result) endRaid(g, r)
+}
+
+/** Hazards land; tornados then stay a while and roam. */
+function tickHazards(g: Game, dt: number) {
   for (const h of [...g.hazards]) {
     const was = h.t
     h.t -= dt
@@ -330,11 +361,6 @@ export function updateRaid(g: Game, dt: number) {
       g.vfx.burst(h.x, h.y - 0.5, { n: 14, speed: 4, cols: PAL.flying.cols, shape: 'smoke', s0: 4, s1: 9, life: 0.6, flat: 0.5 })
     }
   }
-
-  // How does it end?
-  if (boss.fainted) r.result = 'won'
-  else if (r.timeLeft <= 0 || g.trainers.every((t) => !t.alive)) r.result = 'lost'
-  if (r.result) endRaid(g, r)
 }
 
 /** Seconds the phase change takes (the roar and form change on screen). */
@@ -462,7 +488,7 @@ function pickAttack(r: RaidState): BossAttack | null {
 }
 
 type NewHazard = Omit<Hazard, 'id' | 'total' | 'vx' | 'vy' | 'dur' | 'dps'> & Partial<Pick<Hazard, 'vx' | 'vy' | 'dur' | 'dps'>>
-function addHazard(g: Game, h: NewHazard) {
+export function addHazard(g: Game, h: NewHazard) {
   g.hazards.push({ vx: 0, vy: 0, dur: 0, dps: 0, ...h, id: hazardId++, total: h.t })
   g.vfx.mark(h.x, h.y)
 }
@@ -689,7 +715,8 @@ function resolveHazard(g: Game, h: Hazard) {
 /** The fight is about to start: the boss roars and the ground shakes. */
 export function raidIntro(g: Game) {
   const r = g.raid
-  if (!r) return
+  // In a dungeon the boss wakes when you reach its arena (dungeon.ts calls this then)
+  if (!r || (r.dg && r.dg.stage !== 'boss')) return
   const b = r.boss
   for (const v of g.viewers) v.cry(b.species.id, 0.5)
   g.soundAt(b.x, b.y, 'boss', ['intro', r.def.attacks[0].fx], { global: true })
@@ -783,6 +810,11 @@ export function raidDown(g: Game, tr: Trainer) {
 }
 
 function respawn(g: Game, tr: Trainer) {
+  if (g.raid?.dg) {
+    respawnAt(g, tr, g.raid.dg.checkpoint)
+    g.vOf(tr)?.hooks.toast(both(`Back in the fight! ${tr.lives} ${tr.lives === 1 ? 'life' : 'lives'} left`, `Terug in de strijd! Nog ${tr.lives} ${tr.lives === 1 ? 'leven' : 'levens'}`), '#80f080')
+    return
+  }
   const i = g.trainers.indexOf(tr)
   const [x, y] = spawnPoint(g, i, g.trainers.length)
   tr.x = x
@@ -843,7 +875,7 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a)
 
 /** The boss attack behind a hazard (none for the crater's own vents). */
 export function bossAttack(g: Game, atk: string): BossAttack | undefined {
-  return BOSSES[g.setup.boss ?? 'reshiram'].attacks.find((a) => a.id === atk)
+  return BOSSES[g.setup.boss ?? 'reshiram'].attacks.find((a) => a.id === atk) ?? WARDEN_ATTACKS.find((a) => a.id === atk)
 }
 
 /** Particle shape and ground mark that go with an attack type. */

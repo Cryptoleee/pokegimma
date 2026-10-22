@@ -106,6 +106,12 @@ export class Mon {
   /** Raid boss: huge, can't be caught, HP scaled by bossMul. */
   boss = false
   bossMul = 1
+  /** Raid dungeon foe: 1 = wave foe, 2 = elite, 3 = warden (mini-boss). Never caught, HP scaled by bossMul. */
+  foe: 0 | 1 | 2 | 3 = 0
+  /** Damage this Pokémon's moves do (dungeon foes hit softer than their level suggests). */
+  dmgMul = 1
+  /** Holds still (a warden winding up an attack). */
+  holdT = 0
   /** Frozen in place (Kyurem's ice) for this many seconds. */
   frozenT = 0
   /** Weakened wild: reserved for this trainer (who knocked it out) for claimT seconds. */
@@ -130,7 +136,7 @@ export class Mon {
     return this.awaken ? Math.min(this.awaken, this.awaken === AWAKEN_LEGEND ? 0.43 + this.level / 65 : 0.65 + this.level / 60) : 1
   }
   get maxHp() {
-    if (this.boss) return statHp(this.species, this.level) * this.bossMul
+    if (this.boss || this.foe) return Math.round(statHp(this.species, this.level) * this.bossMul)
     if (this.legendary && !this.owner) return statHp(this.species, this.level) * 2.2
     // Defenders and all-rounders get a little extra HP
     return Math.round(statHp(this.species, this.level) * roleInfo(this.species.id).hp * this.power)
@@ -152,7 +158,7 @@ export class Mon {
   }
   /** Scale in world px per sprite px. */
   get scale() {
-    return this.boss ? 1.3 : this.legendary || this.awaken === AWAKEN_LEGEND ? 0.68 : 0.55
+    return this.boss ? 1.3 : this.foe === 3 ? 0.95 : this.foe === 2 ? 0.72 : this.legendary || this.awaken === AWAKEN_LEGEND ? 0.68 : 0.55
   }
 }
 

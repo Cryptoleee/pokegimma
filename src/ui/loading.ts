@@ -6,6 +6,7 @@ import { esc } from './menu'
 import { MODE_RGB } from './results'
 import { diffName, type Difficulty } from '../data/difficulty'
 import { BOSSES, RESPAWN_TIME, type BossDef, type BossId } from '../data/bosses'
+import { dungeonOf, type DungeonDef } from '../data/dungeons'
 import { L, tx } from '../i18n'
 import { STADIUMS, type StadiumId } from '../data/stadiums'
 import { ROUND_TIME } from '../game/duel'
@@ -46,6 +47,20 @@ function raidTips(boss: BossDef): Tip[] {
   ]
 }
 
+/** Raid dungeon tips: rooms and waves, wardens, lives, then the legendary. */
+function dungeonTips(dd: DungeonDef, boss: BossDef): Tip[] {
+  const waves = dd.rooms.reduce((s, r) => s + r.waves.length, 0)
+  return [
+    { icon: '<i class="ld-up">▲</i>', title: L('Room by room', 'Kamer voor kamer'), text: L(`${dd.rooms.length} halls, ${waves} waves. A hall's gate opens once every foe in it is down: then on to the next.`, `${dd.rooms.length} zalen, ${waves} waves. De poort van een zaal gaat pas open als alle vijanden erin verslagen zijn: dan door naar de volgende.`) },
+    { icon: '<i class="ld-warn">⚠</i>', title: L('Red on the ground = get out!', 'Rood op de grond = wegwezen!'), text: L('Wardens and the legendary show their big attacks first as a red shape on the ground. Get out before it fills up.', 'Wachters en de legende laten hun grote aanvallen eerst zien als rode vorm op de grond. Loop eruit voordat hij volloopt.') },
+    { icon: '<i class="ld-warn">⚔</i>', title: L('Wardens', 'Wachters'), text: L('Twice a warden blocks the way: a big Pokémon with its own health bar that calls in help as it weakens. Beat it for an extra life.', 'Twee keer verspert een wachter de weg: een grote Pokémon met een eigen levensbalk die hulp roept als hij zwakker wordt. Versla hem voor een extra leven.') },
+    { icon: '<i class="ld-heart">♥</i>', title: L(`${dd.lives} lives`, `${dd.lives} levens`), text: L(`Go down and you're back at the last gate after ${RESPAWN_TIME} seconds. Out of lives? Your team clears the room and you're back in.`, `Ga je neer, dan sta je na ${RESPAWN_TIME} seconden weer bij de laatste poort. Levens op? Als je team de zaal verovert, ben je terug.`) },
+    { icon: `<img class="px" src="${itemUrl('potion')}" alt="">`, title: L('Lava and Potions', 'Lava en Potions'), text: L('Lava burns: cross the rivers at the bridges. Every cleared hall heals you a bit and leaves a Potion by the gate; elites and wardens drop one too.', 'Lava brandt: steek rivieren over bij de bruggen. Elke veroverde zaal geneest je een beetje en laat een Potion bij de poort achter; elites en wachters laten er ook een vallen.') },
+    { icon: '<i class="ld-aim">◎</i>', title: L('Pick your partner', 'Kies je partner'), text: L('Almost everything down here is fire: water, rock and ground partners have the edge, grass and bug have a hard time.', 'Bijna alles hier beneden is vuur: water-, rots- en grondpartners hebben een voordeel, gras en insect hebben het zwaar.') },
+    { icon: `<img class="px" src="${spriteUrl(boss.species)}" alt="">`, title: boss.name, text: L(`At the end the gate to the crater opens. Step in and ${boss.name} wakes: you have 4 minutes. `, `Aan het eind gaat de poort naar de krater open. Stap erin en ${boss.name} ontwaakt: je hebt 4 minuten. `) + tx(boss.envTip) },
+  ]
+}
+
 /** 1 vs 1 tips: rounds, power-ups, grass and the ring. */
 const duelTips = (): Tip[] => [
   { icon: '<i class="ld-up">▲</i>', title: L('Best of three', 'Best of three'), text: L('Win two rounds to take the duel. Both Pokémon are fully evolved at Lv 50 with all four moves: pick your partner for the match-up!', 'Win twee rondes en het duel is van jou. Beide Pokémon zijn volledig geëvolueerd op Lv 50 met alle vier de aanvallen: kies je partner op de match-up!') },
@@ -65,15 +80,16 @@ export interface LoadingPlayer {
  * Shows the splash for `seconds`, then calls `done`. With `skippable` a button
  * lets you start right away (solo); in multiplayer everyone waits together.
  */
-export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; skippable: boolean; bots: number; raid?: BossId; duel?: boolean; stadium?: StadiumId; diff?: Difficulty }, done: () => void) {
+export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; skippable: boolean; bots: number; raid?: BossId; dungeon?: boolean; duel?: boolean; stadium?: StadiumId; diff?: Difficulty }, done: () => void) {
   const app = document.getElementById('app')!
   const el = document.createElement('div')
   // Legendary + Master Ball first (most asked), then a random mix
   const TIPS = battleTips()
   const rest = TIPS.slice(2).sort(() => Math.random() - 0.5)
   const boss = opts.raid ? BOSSES[opts.raid] : null
+  const dd = opts.dungeon ? dungeonOf(opts.raid) : null
   const stadium = opts.stadium ? STADIUMS[opts.stadium] : null
-  const tips = boss ? raidTips(boss) : opts.duel ? [...(stadium ? [{ icon: `<i class="ld-up">${stadium.icon}</i>`, title: stadium.name, text: stadium.tip }] : []), ...duelTips()] : [TIPS[Math.random() < 0.5 ? 0 : 1], TIPS[2], ...rest]
+  const tips = boss && dd ? dungeonTips(dd, boss) : boss ? raidTips(boss) : opts.duel ? [...(stadium ? [{ icon: `<i class="ld-up">${stadium.icon}</i>`, title: stadium.name, text: stadium.tip }] : []), ...duelTips()] : [TIPS[Math.random() < 0.5 ? 0 : 1], TIPS[2], ...rest]
   const kind = boss ? 'raid' : opts.duel ? 'duel' : 'royale'
   // Not the standard game: say so up top
   const dl = opts.diff && opts.diff !== 'normal' ? ` · ${diffName(opts.diff)}` : ''
@@ -83,7 +99,10 @@ export function showLoading(opts: { seconds: number; players: LoadingPlayer[]; s
     <div class="nld-glow"></div>
     <div class="nld-in">
       <section class="nld-l">
-        ${boss
+        ${boss && dd
+          ? `<div class="nld-head"><span class="n-label">${L('Raid dungeon', 'Raid-dungeon')} · ${boss.name}${dl}</span><h1>${esc(dd.name)}</h1><p class="nld-blurb">${esc(dd.blurb)}</p></div>
+        <div class="nld-boss"><img class="px" src="${animatedUrl(boss.species)}" onerror="this.onerror=null;this.src='${spriteUrl(boss.species)}'" alt=""></div>`
+          : boss
           ? `<div class="nld-head"><span class="n-label">Raid · ${esc(tx(boss.title))}${dl}</span><h1>${boss.name}</h1></div>
         <div class="nld-boss"><img class="px" src="${animatedUrl(boss.species)}" onerror="this.onerror=null;this.src='${spriteUrl(boss.species)}'" alt=""></div>`
           : opts.duel
