@@ -14,6 +14,7 @@ import type { Weather } from '../data/themes'
 import { drawEvents } from './events'
 import { drawHazards, drawHazardsSky } from './boss'
 import { drawBrazier, drawGate, gateShown } from './dungeon'
+import { drawAnimProp, drawEyes, drawLavaEmbers, drawLavaLayer, propLights } from './dungeonArt'
 import { L, tx } from '../i18n'
 import { BOSSES } from '../data/bosses'
 import { cinematic, drawPhaseScreen, phaseLook, shownPhase, updateCinematic } from './bossFx'
@@ -71,6 +72,8 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   const inView = (x: number, y: number, m = 3) =>
     x * TILE > ox - m * TILE && x * TILE < ox + vw + m * TILE && y * TILE > oy - m * TILE && y * TILE < oy + vh + m * TILE
 
+  // Raid dungeon: the lava flows
+  if (g.world.lavaMask) drawLavaLayer(ctx, g.world.lavaMask, ox, oy, vw, vh, time)
   // Ground marks (scorch, frost, craters) under everything else
   drawWater(g, ctx, ox, oy, vw, vh, time)
   g.vfx.drawDecals(ctx)
@@ -126,11 +129,14 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   for (const gt of g.world.gates)
     if (gateShown(gt, time) && inView(gt.x + gt.w / 2, gt.y + gt.h / 2, 6)) ents.push({ y: gt.y + gt.h, draw: () => drawGate(ctx, gt, time) })
   for (const b of g.world.braziers) if (inView(b.x, b.y)) ents.push({ y: b.y, draw: () => drawBrazier(ctx, b.x * TILE, b.y * TILE, time) })
+  for (const p of g.world.anim) if (inView(p.x + p.w / 2, p.y + p.h / 2, 4)) ents.push({ y: p.y + p.h - (p.kind === 'rune' ? 99 : 0), draw: () => drawAnimProp(ctx, p, time) })
   ents.sort((a, b) => a.y - b.y)
   for (const e of ents) e.draw()
 
   // Canopies and roofs
   ctx.drawImage(g.world.overlay, sx, sy, sw, sh, sx, sy, sw, sh)
+  if (g.world.props.length) drawEyes(ctx, g.world, time, inView)
+  if (g.world.lavaMask) drawLavaEmbers(ctx, g.world, time, inView)
 
   // Supply drops coming down; boss attacks on their way (meteors, icicles, the boss charging up)
   drawEvents(g, ctx, time)
@@ -1422,6 +1428,8 @@ function drawWater(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: numbe
         ctx.drawImage(fr, (tx % 2) * TILE, (ty % 2) * TILE, TILE, TILE, tx * TILE, ty * TILE, TILE, TILE)
         continue
       }
+      // Raid dungeon: its lava has its own flowing layer
+      if (lava && g.world.lavaMask) continue
       if (lava) {
         // Pulsing glow and the odd bubble
         ctx.fillStyle = `rgba(255,${180 + Math.round(60 * k)},60,${0.18 + 0.14 * k})`
@@ -1627,7 +1635,7 @@ function drawLights(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, 
   const lit = theme.dark ? 1 : theme.tint ? 0.8 : 0.5
   const pool: [number, number, number, string, number][] = []
   const add = (x: number, y: number, r: number, col: string, a: number) => {
-    if (pool.length < 50 && a > 0.04 && HEX.test(col) && inView(x / T, y / T, 4)) pool.push([x, y, r, col, a * lit])
+    if (pool.length < (g.world.props.length ? 90 : 50) && a > 0.04 && HEX.test(col) && inView(x / T, y / T, 4)) pool.push([x, y, r, col, a * lit])
   }
   for (const p of g.projs) add(p.x * T, p.y * T, 26 + p.move.tier * 9, pal(p.move.fx).glow, 0.55)
   for (const n of g.novas) {
@@ -1672,6 +1680,8 @@ function drawLights(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, 
     const k = h.total > 0 ? 1 - Math.max(0, h.t) / h.total : 1
     if (k > 0.6 && h.shape !== 'grid') add(h.x * T, h.y * T, Math.min(6, h.r) * T * 0.9, TYPE_COLOR[h.type], (k - 0.6) * 0.9)
   }
+  // Raid dungeon: lava, lavafalls, crystals, forges, runes
+  if (g.world.props.length) propLights(g.world, add, time)
   // Raid dungeon braziers: warm, flickering pools of light
   for (const b of g.world.braziers) {
     const fl = 0.85 + 0.15 * Math.sin(time * 9 + b.x * 3) * Math.sin(time * 13 + b.y)

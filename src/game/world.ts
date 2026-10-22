@@ -2,6 +2,7 @@ import { Rng } from './rng'
 import { THEMES, type ThemeId, type WorldTheme } from '../data/themes'
 import { STADIUMS, type StadiumDef, type StadiumId } from '../data/stadiums'
 import type { DungeonDef, Rect } from '../data/dungeons'
+import { ANIMATED, bakeEdges, bakeGrime, bakeProps, bakeStones, bakeTile, buildLavaMask, carveRoom, FM, furnishHall, furnishRoom, hallTest, type Prop } from './dungeonArt'
 import { hash, mix, paintGrass, shade, tallBed, tileArt, tone } from './tiles'
 
 export const TILE = 16
@@ -19,6 +20,8 @@ export enum T {
   ROD,
   /** 1 vs 1 stadium: the stands around the field (blocks movement). */
   STAND,
+  /** Raid dungeon: under a solid prop (statue, crate, tower…); the prop draws itself. */
+  PROP,
 }
 
 export interface House {
@@ -96,6 +99,12 @@ export class World {
   dvents: { x: number; y: number }[] = []
   /** Dungeon braziers along the walls (drawn and lit every frame). */
   braziers: { x: number; y: number }[] = []
+  /** Raid dungeon: floor material per tile (see dungeonArt FM), set pieces, the ones that move, lava glow spots, the lava's shape. */
+  floorMat = new Uint8Array(MAP * MAP)
+  props: Prop[] = []
+  anim: Prop[] = []
+  lavaLights: [number, number][] = []
+  lavaMask: HTMLCanvasElement | null = null
 
   constructor(public rng: Rng, opts: WorldOpts = {}) {
     const st = opts.stadium ? STADIUMS[opts.stadium] : null
@@ -120,7 +129,7 @@ export class World {
 
   blockedTile(tx: number, ty: number): boolean {
     const t = this.at(tx, ty)
-    return t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR || t === T.ROD || t === T.STAND || (this.gates.length > 0 && this.gateAt(tx, ty) >= 0)
+    return t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR || t === T.ROD || t === T.STAND || t === T.PROP || (this.gates.length > 0 && this.gateAt(tx, ty) >= 0)
   }
 
   /** The closed gate on a tile (-1 = none). */
@@ -192,7 +201,7 @@ export class World {
     this.tall = []
     for (let i = 0; i < MAP * MAP; i++) {
       const t = this.tiles[i]
-      const walk = !(t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR || t === T.ROD || t === T.STAND)
+      const walk = !(t === T.WATER || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PILLAR || t === T.ROD || t === T.STAND || t === T.PROP)
       if (walk && !seen[i]) this.tiles[i] = T.TREE
       else if (walk) {
         this.walkable.push(i)
@@ -285,92 +294,17 @@ export class World {
    */
   private generateDungeon(def: DungeonDef, kind: ArenaKind) {
     const rng = this.rng
-    const veins = new Noise(rng, 5)
     this.tiles.fill(T.TREE)
-    const near = (x: number, y: number, r: Rect, pad: number) => x >= r.x - pad && x < r.x + r.w + pad && y >= r.y - pad && y < r.y + r.h + pad
-    const nearHall = (x: number, y: number, pad: number) => def.halls.some((h) => near(x, y, h, pad))
-    const floor = (x: number, y: number) => (veins.fbm(x, y) > 0.62 ? T.SAND : T.GRASS)
-    // Halls: plain stone floor
+    const nearHall = hallTest(def)
+    // Halls: old mine shafts
     for (const h of def.halls) for (let y = h.y; y < h.y + h.h; y++) for (let x = h.x; x < h.x + h.w; x++) this.set(x, y, T.SAND)
-    for (const room of def.rooms) {
-      const { x: rx, y: ry, w, h } = room.rect
-      for (let y = ry; y < ry + h; y++)
-        for (let x = rx; x < rx + w; x++) {
-          // A ragged edge (never where a hall comes in)
-          const edge = Math.min(x - rx, rx + w - 1 - x, y - ry, ry + h - 1 - y)
-          if (edge === 0 && !nearHall(x, y, 3) && rng.next() < 0.45) continue
-          this.set(x, y, floor(x, y))
-        }
-      const cx = rx + Math.floor(w / 2), cy = ry + Math.floor(h / 2)
-      const rock = (x: number, y: number, s = 1) => {
-        for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) if (!nearHall(x + dx, y + dy, 3)) this.set(x + dx, y + dy, T.ROCK)
-      }
-      const lava = (x: number, y: number, pw: number, ph: number) => {
-        for (let dy = 0; dy < ph; dy++) for (let dx = 0; dx < pw; dx++) if (this.at(x + dx, y + dy) !== T.TREE && this.at(x + dx, y + dy) !== T.ROCK) this.set(x + dx, y + dy, T.LAVA)
-      }
-      switch (room.deco) {
-        case 'gate':
-          // Broken pillars either side of the way in, lava seeping in at the corners
-          for (const [dx, dy] of [[-6, -5], [6, -5], [-6, 3], [6, 3]]) rock(cx + dx, cy + dy)
-          lava(rx + 2, ry + h - 5, 3, 3)
-          lava(rx + w - 5, ry + h - 5, 3, 3)
-          break
-        case 'river': {
-          // A lava river across the hall with two stone bridges
-          for (let x = rx; x < rx + w; x++) {
-            const bridge = (x >= rx + 4 && x < rx + 7) || (x >= rx + w - 7 && x < rx + w - 4)
-            const wob = Math.round(Math.sin(x * 0.6) * 0.8)
-            for (let y = cy - 1 + wob; y <= cy + 1 + wob; y++) if (this.at(x, y) !== T.TREE) this.set(x, y, bridge ? T.SAND : T.LAVA)
-          }
-          rock(cx - 1, cy - 6)
-          rock(cx + 1, cy + 6)
-          break
-        }
-        case 'hall':
-          // Two rows of great pillars and lava channels along the walls
-          for (let i = 0; i < 4; i++) {
-            rock(rx + 6 + i * 6, ry + 7, 2)
-            rock(rx + 6 + i * 6, ry + h - 9, 2)
-          }
-          lava(rx + 2, ry + 4, 1, h - 8)
-          lava(rx + w - 3, ry + 4, 1, h - 8)
-          break
-        case 'forge':
-          // Lava pools, and vents that erupt now and then
-          lava(cx - 1, cy - 1, 3, 3)
-          for (const [dx, dy] of [[-8, -6], [7, -6], [-8, 6], [7, 6]]) {
-            const vx = cx + dx, vy = cy + dy
-            lava(vx - 1, vy - 1, 2, 2)
-            this.dvents.push({ x: vx, y: vy })
-          }
-          break
-        case 'den':
-          // A ring of boulders around the warden's lair, cracks of lava running through
-          for (let i = 0; i < 8; i++) {
-            const a = (i / 8) * Math.PI * 2 + 0.2
-            rock(Math.round(cx + Math.cos(a) * 8), Math.round(cy + Math.sin(a) * 9))
-          }
-          for (let i = 0; i < 3; i++) {
-            let a = rng.range(0, Math.PI * 2), d = 2.5
-            while (d < 11) {
-              const x = Math.floor(cx + Math.cos(a) * d), y = Math.floor(cy + Math.sin(a) * d)
-              if (this.at(x, y) === T.GRASS || this.at(x, y) === T.SAND) this.set(x, y, T.LAVA)
-              d += 0.6
-              a += rng.range(-0.12, 0.12)
-            }
-          }
-          break
-        case 'bastion':
-          // Four towers and a lava moat line in front of the arena gate
-          for (const [dx, dy] of [[-8, -7], [6, -7], [-8, 5], [6, 5]]) rock(cx + dx, cy + dy, 2)
-          lava(rx + 4, cy - 1, 1, 3)
-          break
-      }
-    }
+    for (const room of def.rooms) carveRoom(this, room, def, rng)
+    def.halls.forEach((h, i) => furnishHall(this, h, def, i))
+    for (const room of def.rooms) furnishRoom(this, room, def, rng)
     // Braziers along the room walls and both sides of every hall
     const floorAt = (x: number, y: number) => {
       const t = this.at(x, y)
-      return t === T.GRASS || t === T.SAND
+      return (t === T.GRASS || t === T.SAND) && !this.props.some((p) => x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h)
     }
     for (const room of def.rooms) {
       const { x: rx, y: ry, w, h } = room.rect
@@ -381,7 +315,7 @@ export class World {
     }
     for (const hl of def.halls) {
       const long = hl.w > hl.h
-      for (let k = 2; k < (long ? hl.w : hl.h) - 1; k += 5) {
+      for (let k = 4; k < (long ? hl.w : hl.h) - 1; k += 8) {
         if (long) this.braziers.push({ x: hl.x + k + 0.5, y: hl.y + 0.6 }, { x: hl.x + k + 0.5, y: hl.y + hl.h - 0.4 })
         else this.braziers.push({ x: hl.x + 0.6, y: hl.y + k + 0.5 }, { x: hl.x + hl.w - 0.4, y: hl.y + k + 0.5 })
       }
@@ -588,6 +522,7 @@ export class World {
   // ---------- Rendering (pre-baked into canvases) ----------
 
   private render() {
+    const dungeon = this.gates.length > 0
     const size = MAP * TILE
     const th = this.theme
     this.ground = canvas(size, size)
@@ -599,6 +534,8 @@ export class World {
       for (let tx = 0; tx < MAP; tx++) {
         const t = this.at(tx, ty)
         const x = tx * TILE, y = ty * TILE
+        // Raid dungeon: its own walls and floors
+        if (dungeon && t !== T.ROCK && bakeTile(g, this, tx, ty, t)) continue
         if (t === T.STAND) {
           paintStand(g, x, y, tx, ty, this.stadium!)
           continue
@@ -630,7 +567,7 @@ export class World {
         for (let tx = 0; tx < MAP; tx++) {
           if (this.at(tx, ty) !== T.TREE) continue
           if (this.arena) {
-            drawCanopy(o, tx * TILE, ty * TILE, (tx * 7 + ty * 13) % 3, th)
+            if (!dungeon) drawCanopy(o, tx * TILE, ty * TILE, (tx * 7 + ty * 13) % 3, th)
             continue
           }
           const v = Math.floor(hash(tx, ty, 77) * 3)
@@ -645,7 +582,17 @@ export class World {
     for (const h of this.houses) (this.arena ? drawHouse : paintHouse)(g, o, h)
     for (const p of this.pillars) if (p.hp > 0) drawPillar(g, o, p.x * TILE, p.y * TILE)
     for (const v of [...this.vents, ...this.dvents]) drawVent(g, v.x * TILE, v.y * TILE)
-    if (this.gates.length) paintDungeonFloor(g, this)
+    if (dungeon) {
+      bakeStones(g, this)
+      paintDungeonFloor(g, this)
+      bakeGrime(g, this)
+      bakeEdges(g, this)
+      this.lavaMask = buildLavaMask(this, g)
+      bakeProps(g, o, this)
+      this.anim = this.props.filter((p) => ANIMATED.has(p.kind))
+      this.lavaLights = []
+      for (let ty = 0; ty < MAP; ty++) for (let tx = 0; tx < MAP; tx++) if (this.at(tx, ty) === T.LAVA && (tx * 7 + ty * 13) % 5 === 0) this.lavaLights.push([tx + 0.5, ty + 0.5])
+    }
     for (const rd of this.rods) drawRod(g, o, rd.x * TILE, rd.y * TILE)
 
     // Minimap
@@ -655,7 +602,7 @@ export class World {
     const col: Record<number, string> = {
       [T.GRASS]: mc.grass, [T.TALL]: mc.tall, [T.PATH]: mc.path, [T.SAND]: mc.sand, [T.WATER]: mc.water,
       [T.TREE]: mc.tree, [T.ROCK]: '#909098', [T.HOUSE]: '#e05848', [T.FLOWER]: mc.grass, [T.BRIDGE]: '#c09060',
-      [T.LAVA]: '#ff7020', [T.ICE]: '#cce8f8', [T.PILLAR]: '#ffffff', [T.ROD]: '#ffe060', [T.STAND]: '#303040',
+      [T.LAVA]: '#ff7020', [T.ICE]: '#cce8f8', [T.PILLAR]: '#ffffff', [T.ROD]: '#ffe060', [T.STAND]: '#303040', [T.PROP]: '#6a5a52',
     }
     for (let ty = 0; ty < MAP; ty++)
       for (let tx = 0; tx < MAP; tx++) {
@@ -1030,17 +977,12 @@ function paintDungeonFloor(g: CanvasRenderingContext2D, w: World) {
     for (let tx = 1; tx < MAP - 1; tx++) {
       const t = w.at(tx, ty)
       if (t !== T.GRASS && t !== T.SAND) continue
+      const fm = w.floorMat[ty * MAP + tx]
+      if (fm && fm !== FM.cave && fm !== FM.dirt && fm !== FM.mine) continue
       // Leave the crater arena as it is
       if (Math.hypot(tx + 0.5 - ARENA_C, ty + 0.5 - ARENA_C) < ARENA_R + 1.5) continue
       const x = tx * TILE, y = ty * TILE
       const v = hash(tx, ty, 201)
-      const nearLava = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => w.at(tx + dx, ty + dy) === T.LAVA)
-      if (nearLava) {
-        g.fillStyle = 'rgba(20,6,4,0.35)'
-        g.fillRect(x, y, TILE, TILE)
-        g.fillStyle = 'rgba(255,120,40,0.18)'
-        g.fillRect(x + 2, y + 2, TILE - 4, TILE - 4)
-      }
       if (v < 0.05) {
         // A crack, sometimes with lava glowing in it
         const glow = v < 0.018
@@ -1051,10 +993,7 @@ function paintDungeonFloor(g: CanvasRenderingContext2D, w: World) {
           cx += 1 + Math.floor(hash(tx, ty, 210 + i) * 2)
           cy += Math.floor(hash(tx, ty, 220 + i) * 3) - 1
         }
-        if (glow) {
-          g.fillStyle = 'rgba(255,160,60,0.25)'
-          g.fillRect(x + 1, y + 1, TILE - 2, TILE - 2)
-        }
+
       } else if (v < 0.062) {
         // Old bones
         g.fillStyle = '#d8ccbc'

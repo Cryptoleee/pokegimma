@@ -2156,7 +2156,7 @@ export class Game {
       p.y += p.vy * dt
       p.life -= dt
       const t = this.world.at(Math.floor(p.x), Math.floor(p.y + 0.4))
-      let dead = p.life <= 0 || t === T.TREE || t === T.ROCK || t === T.HOUSE || this.world.gateAt(Math.floor(p.x), Math.floor(p.y + 0.4)) >= 0
+      let dead = p.life <= 0 || t === T.TREE || t === T.ROCK || t === T.HOUSE || t === T.PROP || this.world.gateAt(Math.floor(p.x), Math.floor(p.y + 0.4)) >= 0
       let hit = false
       if (!dead)
         for (const e of this.enemiesOf(p.src)) {
