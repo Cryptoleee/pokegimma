@@ -1148,4 +1148,8 @@ ticker.onmessage = () => {
 // Handy for debugging from the console.
 ;(window as unknown as { battlemon: unknown }).battlemon = { get game() { return game }, get room() { return room }, get music() { return currentMusic() }, remotes, snapshot, voiceLog, sound: { move: moveByName, namePitch, cast: playMoveCast, hit: playMoveHit, charge: playMoveCharge, item: playItem, boss: playBoss, reset: resetSfx, ready: loadSfx } }
 
+// Installable as an app (and quicker on the next visit): the service worker, once the page has loaded
+if ('serviceWorker' in navigator && import.meta.env.PROD)
+  addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
+
 toTitle()
