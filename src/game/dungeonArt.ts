@@ -1,3 +1,4 @@
+import propsUrl from '../assets/dungeon/props.png'
 import type { DungeonDef, Rect, Room } from '../data/dungeons'
 import type { Rng } from './rng'
 import { hash } from './tiles'
@@ -22,7 +23,7 @@ export type PropKind =
   | 'statue' | 'column' | 'skeleton' | 'bedroll' | 'campfire' | 'crate' | 'barrel' | 'rune' | 'treasure'
   | 'anvil' | 'crucible' | 'chimney' | 'rails' | 'cart' | 'coal' | 'trough' | 'bones' | 'nest' | 'skull' | 'cage'
   | 'tower' | 'barricade' | 'warbanner' | 'beam' | 'crystal' | 'lavafall' | 'steam' | 'rubble' | 'web'
-  | 'pillar' | 'tent' | 'ballista' | 'firebowl' | 'weapons' | 'wall' | 'arrows' | 'emblem'
+  | 'pillar' | 'throne' | 'torchstand' | 'spire' | 'carcass' | 'tent' | 'ballista' | 'firebowl' | 'weapons' | 'wall' | 'arrows' | 'emblem'
   | 'banner' | 'chains' | 'rack' | 'claws' | 'sconce' | 'railing'
 
 /** A placed thing: footprint in tiles (x, y top-left), variant. */
@@ -33,12 +34,14 @@ export interface Prop {
   w: number
   h: number
   v: number
+  /** Drawn from the painted sprite atlas (set when baked). */
+  art?: boolean
 }
 
 /** Things that block: their tiles become T.PROP (walls of the prop, drawn by the prop itself). */
-const BLOCKS = new Set<PropKind>(['statue', 'column', 'crate', 'barrel', 'anvil', 'crucible', 'chimney', 'trough', 'bones', 'skull', 'cage', 'tower', 'barricade', 'tent', 'ballista', 'firebowl', 'weapons', 'wall'])
+const BLOCKS = new Set<PropKind>(['statue', 'column', 'crate', 'barrel', 'anvil', 'crucible', 'chimney', 'trough', 'bones', 'skull', 'cage', 'tower', 'barricade', 'tent', 'ballista', 'firebowl', 'weapons', 'wall', 'throne', 'torchstand', 'spire'])
 /** Moving parts, drawn every frame. */
-export const ANIMATED = new Set<PropKind>(['campfire', 'rune', 'treasure', 'crucible', 'chimney', 'crystal', 'lavafall', 'steam', 'trough', 'firebowl', 'sconce'])
+export const ANIMATED = new Set<PropKind>(['campfire', 'rune', 'treasure', 'crucible', 'chimney', 'crystal', 'lavafall', 'steam', 'trough', 'firebowl', 'sconce', 'torchstand'])
 
 interface Ctx {
   w: World
@@ -147,6 +150,8 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
       put(c, 'rubble', cx + 9, cy - 1, 1, 1)
       put(c, 'rubble', cx - 10, cy + 5, 1, 1, 1)
       put(c, 'rune', cx, cy - 2, 1, 1, 2)
+      put(c, 'torchstand', cx - 4, ry + 2, 1, 1)
+      put(c, 'torchstand', cx + 4, ry + 2, 1, 1)
       wallDeco(['sconce', 'banner', 'chains', 'banner'], 3)
       break
     }
@@ -180,6 +185,9 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
       put(c, 'crystal', rx + 1, ry + rh - 3, 1, 1, 0)
       put(c, 'crystal', rx + rw - 2, ry + rh - 4, 1, 1, 1)
       put(c, 'rubble', cx - 8, cy + 6, 1, 1)
+      put(c, 'spire', rx + 3, ry + 3, 2, 1)
+      put(c, 'spire', rx + rw - 6, ry + rh - 3, 2, 1)
+      put(c, 'carcass', cx - 11, cy + 5, 4, 2)
       wallDeco(['sconce', 'chains', 'claws'], 4)
       break
     }
@@ -200,6 +208,9 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
       put(c, 'treasure', rx + 4, ry + rh - 3, 1, 1, 0)
       put(c, 'treasure', rx + rw - 5, ry + rh - 3, 1, 1, 1)
       put(c, 'skeleton', cx - 3, ry + 12, 1, 1, 3)
+      put(c, 'throne', cx - 1, ry + 1, 3, 2)
+      put(c, 'torchstand', cx - 7, ry + 4, 1, 1)
+      put(c, 'torchstand', cx + 7, ry + 4, 1, 1)
       wallDeco(['sconce', 'banner', 'banner', 'sconce', 'chains'], 3)
       break
     }
@@ -251,6 +262,9 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
       put(c, 'cage', rx + 2, ry + 2, 2, 2, 0)
       put(c, 'cage', rx + rw - 4, ry + 2, 2, 2, 1)
       put(c, 'cage', rx + rw - 4, ry + rh - 4, 2, 2, 2)
+      put(c, 'carcass', rx + 3, ry + rh - 6, 4, 2)
+      put(c, 'spire', rx + rw - 5, cy - 2, 2, 1)
+      put(c, 'spire', rx + 2, cy + 3, 2, 1)
       for (let i = 0; i < 6; i++) put(c, 'skeleton', rx + 3 + Math.floor(rng.next() * (rw - 6)), ry + 3 + Math.floor(rng.next() * (rh - 6)), 1, 1, i)
       wallDeco(['sconce', 'claws', 'claws', 'chains'], 3)
       break
@@ -604,15 +618,83 @@ export function bakeProps(g: CanvasRenderingContext2D, o: CanvasRenderingContext
   for (const p of [...w.props].sort((a, b) => order(a) - order(b))) bakeProp(g, o, w, p)
 }
 
+/**
+ * Painted sprites for the props (pixel art generated for the dungeon and cut to
+ * game size), all in one atlas: [x, y, w, h]. Until it's loaded the props are
+ * drawn by hand below, so nothing ever waits on it.
+ */
+const ATLAS = {
+  anvil: [21, 146, 18, 15], ballista: [153, 65, 51, 42], banner: [210, 110, 14, 22], barrel: [242, 110, 13, 17], bones: [57, 146, 20, 14],
+  cage: [113, 0, 32, 54], carcass: [55, 110, 64, 35], cart: [183, 110, 26, 24], chest: [160, 110, 22, 26], crate: [225, 110, 16, 17],
+  crucible: [114, 65, 38, 42], firebowl: [40, 146, 16, 14], fossil: [0, 110, 54, 35], furnace: [78, 0, 34, 58], gold: [0, 146, 20, 15],
+  spire: [205, 65, 34, 41], statue: [41, 0, 36, 58], tent: [146, 0, 56, 44], tent1: [0, 65, 56, 44], tent2: [57, 65, 56, 44],
+  throne: [0, 0, 40, 64], torchstand: [143, 110, 16, 26], weapons: [120, 110, 22, 26],
+} as const satisfies Record<string, readonly [number, number, number, number]>
+type Sprite = keyof typeof ATLAS
+const atlas = typeof Image === 'undefined' ? null : new Image()
+if (atlas) atlas.src = propsUrl
+const atlasReady = () => !!atlas && atlas.complete && atlas.naturalWidth > 0
+/** Flat on the ground: nothing of it stands over the actors. */
+const FLAT = new Set<Sprite>(['gold', 'carcass', 'banner', 'bones'])
+
+function spriteOf(p: Prop): Sprite | null {
+  switch (p.kind) {
+    case 'statue': return 'statue'
+    case 'skull': return 'fossil'
+    case 'cage': return 'cage'
+    case 'crucible': return 'crucible'
+    case 'tent': return (['tent', 'tent1', 'tent2'] as const)[p.v % 3]
+    case 'ballista': return 'ballista'
+    case 'treasure': return p.v % 2 ? 'chest' : 'gold'
+    case 'weapons': return 'weapons'
+    case 'cart': return 'cart'
+    case 'firebowl': return 'firebowl'
+    case 'anvil': return 'anvil'
+    case 'crate': return 'crate'
+    case 'barrel': return 'barrel'
+    case 'bones': return 'bones'
+    case 'chimney': return 'furnace'
+    case 'throne': return 'throne'
+    case 'torchstand': return 'torchstand'
+    case 'spire': return 'spire'
+    case 'carcass': return 'carcass'
+    case 'banner': return 'banner'
+  }
+  return null
+}
+
+/** A sprite standing on the bottom of the prop's footprint, centred; what rises above the footprint goes on the overlay. */
+function bakeSprite(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, p: Prop, name: Sprite) {
+  const [sx, sy, sw, sh] = ATLAS[name]
+  const x = p.x * TILE, y = p.y * TILE, W = p.w * TILE, H = p.h * TILE
+  const dx = Math.round(x + W / 2 - sw / 2), dy = y + H - sh
+  if (p.kind !== 'banner' && p.kind !== 'carcass') {
+    g.fillStyle = 'rgba(0,0,0,0.32)'
+    g.beginPath()
+    g.ellipse(x + W / 2, y + H - 2, Math.min(sw / 2, W / 2 + 2), Math.max(3, Math.min(6, H / 4)), 0, 0, Math.PI * 2)
+    g.fill()
+  }
+  const up = FLAT.has(name) ? 0 : Math.max(0, y - dy)
+  if (up) o.drawImage(atlas!, sx, sy, sw, up, dx, dy, sw, up)
+  g.drawImage(atlas!, sx, sy + up, sw, sh - up, dx, dy + up, sw, sh - up)
+}
+
 function bakeProp(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, w: World, p: Prop) {
   const x = p.x * TILE, y = p.y * TILE, W = p.w * TILE, H = p.h * TILE
+  const faceTile0 = w.at(p.x, p.y) === T.TREE && w.at(p.x, p.y + 1) !== T.TREE
+  const sprite = atlasReady() ? spriteOf(p) : null
+  if (sprite && (p.kind !== 'banner' || faceTile0)) {
+    p.art = true
+    bakeSprite(g, o, p, sprite)
+    return
+  }
   const shadow = (cx: number, cy: number, rx: number, ry: number) => {
     g.fillStyle = 'rgba(0,0,0,0.35)'
     g.beginPath()
     g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2)
     g.fill()
   }
-  const faceTile = w.at(p.x, p.y) === T.TREE && w.at(p.x, p.y + 1) !== T.TREE
+  const faceTile = faceTile0
   switch (p.kind) {
     case 'statue': {
       // A guardian statue on a plinth: a horned dragon, wings folded, glowing eyes (the glow is animated)
@@ -938,6 +1020,35 @@ function bakeProp(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, w: W
       }
       break
     }
+    case 'throne':
+      // An obsidian throne with a spiked back
+      shadow(x + W / 2, y + H - 3, W / 2, 5)
+      px(g, '#1e1618', x + 4, y + H - 12, W - 8, 11)
+      px(o, '#262022', x + 10, y - 26, W - 20, H + 14)
+      for (let i = 0; i < 3; i++) px(o, '#2e2628', x + 10 + i * ((W - 22) / 2), y - 34 + (i === 1 ? -6 : 0), 4, 10)
+      px(o, '#ff7a2a', x + W / 2 - 1, y - 20, 2, 14)
+      break
+    case 'torchstand':
+      // A stone torch stand with a bowl of coals on top (the fire is animated)
+      shadow(x + 8, y + 15, 6, 2)
+      px(g, '#2a2224', x + 4, y + 4, 8, 12)
+      px(o, '#3a3032', x + 4, y - 8, 8, 12)
+      px(o, '#4a4042', x + 2, y - 10, 12, 3)
+      px(o, '#ff8a2a', x + 3, y - 10, 10, 1)
+      break
+    case 'spire':
+      // Sharp basalt stalagmites with glowing cracks
+      shadow(x + W / 2, y + 14, W / 2, 3)
+      for (const [sx2, h2] of [[6, 18], [16, 30], [26, 16]]) {
+        o.fillStyle = '#2a2224'
+        o.beginPath(); o.moveTo(x + sx2 - 6, y + 14); o.lineTo(x + sx2, y + 14 - h2); o.lineTo(x + sx2 + 6, y + 14); o.closePath(); o.fill()
+        px(o, '#ff7a2a', x + sx2, y + 14 - h2 / 2, 1, h2 / 3)
+      }
+      break
+    case 'carcass':
+      for (let i = 0; i < 9; i++) px(g, '#d0c4b0', x + 10 + i * 5, y + 8 + Math.sin(i) * 2, 2, 12)
+      px(g, '#d0c4b0', x + 8, y + 14, W - 12, 2)
+      break
     case 'pillar': {
       // A great basalt column rising from its footing (the footing is the rock tile under it)
       const top = y - 34, bw = W - 6
@@ -1310,6 +1421,7 @@ export function propLights(w: World, add: (x: number, y: number, r: number, col:
       case 'campfire': add(cx, cy, 22, '#ff8a3a', 0.35 * fl); break
       case 'treasure': add(cx, cy, 24, '#ffd060', 0.25); break
       case 'firebowl': add(cx, cy - 6, 50, '#ff8a3a', 0.6 * fl); break
+      case 'torchstand': add(cx, cy - 16, 52, '#ff8a3a', 0.6 * fl); break
       case 'sconce': add(cx, cy + 2, 40, '#ff9a4a', 0.45 * fl); break
     }
   }
@@ -1344,7 +1456,20 @@ export function drawAnimProp(ctx: CanvasRenderingContext2D, p: Prop, time: numbe
       ctx.fillRect(x + W - 5 + s * 2, bot - 5, 3, 2)
       break
     }
+    case 'torchstand': {
+      // Fire on top of the stand
+      ctx.globalCompositeOperation = 'lighter'
+      const top = y - 8
+      for (let i = 0; i < 6; i++) {
+        const k = (time * 1.8 + i / 6 + p.x * 0.17) % 1
+        const s = (1 - k) * 4 + 1
+        ctx.fillStyle = k < 0.3 ? `rgba(255,240,170,${0.9 - k})` : k < 0.6 ? `rgba(255,160,50,${0.85 - k * 0.6})` : `rgba(230,70,20,${(1 - k) * 0.9})`
+        ctx.fillRect(x + 8 + Math.sin(time * 5 + i * 2.1) * (2 - k) + (i - 2.5) * 0.7 - s / 2, top - k * 13 - s / 2, s, s)
+      }
+      break
+    }
     case 'crucible': {
+      if (p.art) break
       // The pour: a stream of glowing metal from the crucible's lip into the basin
       ctx.globalCompositeOperation = 'lighter'
       const sx = x + W / 2 - 2, sy = y + H - 9
@@ -1541,7 +1666,7 @@ export function drawEyes(ctx: CanvasRenderingContext2D, w: World, time: number, 
   ctx.globalCompositeOperation = 'lighter'
   const a = 0.6 + 0.4 * Math.sin(time * 2.2)
   for (const p of w.props) {
-    if (p.kind !== 'statue' || !inView(p.x + 1, p.y + 1, 3)) continue
+    if (p.kind !== 'statue' || p.art || !inView(p.x + 1, p.y + 1, 3)) continue
     const cx = (p.x + p.w / 2) * TILE, top = (p.y + p.h) * TILE - 12
     ctx.fillStyle = `rgba(255,90,30,${a})`
     ctx.fillRect(cx - 3, top - 23, 2, 1)
