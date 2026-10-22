@@ -5530,3 +5530,46 @@ body.desk .hchat-hint kbd {
 #hud .sb-live-panel .nrb-row {
   min-height: 46px;
 }
+
+/* ---------------------------------------------------------------- controllers */
+
+/* With a pad: its buttons on the HUD instead of the keys (also on handhelds without a keyboard) */
+body.pad #hud kbd[data-pad] {
+  display: inline-block;
+  min-width: 18px;
+  font-size: 0;
+  text-align: center;
+}
+body.pad #hud kbd[data-pad]::after {
+  content: attr(data-pad);
+  font-size: 10px;
+}
+body.pad #hud .hchat-hint {
+  display: none;
+}
+/* Moving through menus with the D-pad: a clear ring on what A will press */
+body.pad :is(button, a, input, [role='button'], [tabindex], .title2):focus {
+  outline: 3px solid var(--n-acc) !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(255, 214, 10, 0.22);
+}
+.pad-toast {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--safe-t) + 14px);
+  z-index: 200;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: rgba(14, 14, 16, 0.94);
+  border: 1px solid var(--n-line2);
+  color: var(--n-text);
+  font: 700 14px var(--n-font);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  animation: n-modal-in 0.2s ease-out;
+  transition: opacity 0.4s;
+}
+.pad-toast.out {
+  opacity: 0;
+}

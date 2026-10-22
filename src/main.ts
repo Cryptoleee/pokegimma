@@ -8,6 +8,7 @@ import { finalForm } from './game/boss'
 import { pickStadium, STADIUMS, type StadiumId } from './data/stadiums'
 import { Game, INTRO_TIME, SEATS, type GameHooks, type GameResult, type MatchSetup } from './game/game'
 import { chatBubble, render, view } from './game/render'
+import { padTick, type PadHooks } from './pad'
 import { TILE } from './game/world'
 import { chatWidget, feedLine, Hud } from './ui/hud'
 import { clearScreen, showLeaveConfirm, showPartyFull } from './ui/screens'
@@ -1100,13 +1101,22 @@ function desktopInput(g: Game) {
 }
 let steering = false
 
+/** A controller plays the match you're in (not one you're watching) and drives the menus otherwise. */
+const padHooks: PadHooks = {
+  control: () => (game && hud && viewing && !spec ? { g: game, hud } : null),
+  pause: () => confirmLeave(),
+  board: () => hud?.board.toggle(),
+  chat: () => !!hud?.openChat(),
+}
+
 let last = performance.now()
 function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000)
   last = now
+  if (game && viewing) desktopInput(game)
+  padTick(padHooks)
   if (game) {
     const g = game
-    if (viewing) desktopInput(g)
     const steps = spec && spec.g === g && g.mode === 'solo' ? spec.speed : 1
     for (let i = 0; i < steps; i++) g.update(dt)
     if (spec) spectateTick(dt)
