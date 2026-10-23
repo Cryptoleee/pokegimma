@@ -18,7 +18,7 @@ import { dailyOf, isUnlocked, levelCost, levelOf, nextUnlock, RAID_UNLOCKS } fro
 import { showOptions } from './screens'
 import { hasUnseen, maybeShowNews, newsPreview, showNews } from './news'
 import { showSupport } from './support'
-import { appEsc as esc, appShell, bar, bindShell, BOLT, DISCORD, discordMe, IC, icon, masteryLine, monChips, monImg, strike, teamCard, teamStage, type AppTab } from './app'
+import { appEsc as esc, appShell, bar, bindShell, BOLT, DISCORD, discordMe, IC, icon, loginBanner, masteryLine, monChips, monImg, strike, teamCard, teamStage, type AppTab } from './app'
 import { openTeamSheet } from './team'
 import { storm, STORM_TINT } from './storm'
 import { dungeonOpen, raidPick, shinyPartner } from './menu'
@@ -160,6 +160,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
           <button class="n-icon home-news" aria-label="${L('What’s new', 'Wat is er nieuw')}">${icon(IC.news)}${hasUnseen() ? '<i class="n-pip"></i>' : ''}</button>
           <button class="n-icon home-opts" aria-label="${L('Options', 'Opties')}">${icon(IC.opts)}</button>
         </header>
+        <div data-login-banner>${loginBanner()}</div>
         ${st.rejoin ? `<button class="n-card n-rejoin" data-act="rejoin"><span><b>${L('Back to the lobby', 'Terug naar de lobby')} <em>${esc(st.rejoin)}</em></b><small>${L('you left it a moment ago', 'je ging er net uit')}</small></span>${icon(IC.next, 18)}</button>` : ''}
         <div class="n-teamcol">
           <section class="n-stage">

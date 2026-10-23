@@ -25,4 +25,6 @@ export const WISP_ICON = wisp
  * Thanks list (and the Wall of Legends): supporters who said their name may be
  * shown. Their pack itself is given by account on the server, in api/_supporters.ts.
  */
-export const SUPPORTER_NAMES: { name: string; tier: SupportTier }[] = []
+export const SUPPORTER_NAMES: { name: string; tier: SupportTier }[] = [
+  { name: 'cryptoleee', tier: 'legend' },
+]

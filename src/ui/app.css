@@ -1444,7 +1444,7 @@
   .n-home {
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    grid-template-areas: 'top top' 'rejoin rejoin' 'team play' 'extra extra';
+    grid-template-areas: 'top top' 'login login' 'rejoin rejoin' 'team play' 'extra extra';
     align-items: stretch;
     align-content: start;
     column-gap: 24px;
@@ -6209,8 +6209,8 @@ body.duo-view #hud {
     min-height: 0;
     display: grid;
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-    grid-template-rows: auto auto minmax(0, 1fr);
-    grid-template-areas: 'top top' 'rejoin rejoin' 'team play';
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas: 'top top' 'login login' 'rejoin rejoin' 'team play';
     gap: 10px 14px;
     padding: calc(var(--safe-t) + 10px) 14px calc(var(--safe-b) + 10px);
   }
@@ -6220,6 +6220,12 @@ body.duo-view #hud {
   .n-home .n-rejoin {
     grid-area: rejoin;
     padding: 8px 14px;
+  }
+  .n-login {
+    padding: 8px 12px;
+  }
+  .n-login-t small {
+    display: none;
   }
   .n-home .n-stage {
     grid-area: team;
@@ -6748,4 +6754,111 @@ body.duo-view #hud {
 .sup-gold {
   color: #ffd04a !important;
   text-shadow: 0 0 8px rgba(255, 200, 60, 0.45);
+}
+
+/* Log in with Discord (guests, on home) */
+[data-login-banner] {
+  grid-area: login;
+}
+[data-login-banner]:empty {
+  display: none;
+}
+.n-login {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 14px 44px 14px 16px;
+  border-radius: 20px;
+  background: linear-gradient(120deg, #5865f2, #4752c4);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(88, 101, 242, 0.3);
+}
+.n-home .n-login {
+  margin-bottom: 0;
+}
+.n-login-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.16);
+}
+.n-login-ic .n-dc {
+  width: 26px;
+  height: 26px;
+}
+.n-login-t {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.n-login-t b {
+  font-size: 16px;
+  font-weight: 800;
+}
+.n-login-t small {
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.85);
+}
+.n-login-go {
+  flex: none;
+  height: 42px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 21px;
+  background: #fff;
+  color: #3c45a5;
+  font-family: var(--n-font);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.n-login-go:active {
+  transform: scale(0.97);
+}
+.n-login-x {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  cursor: pointer;
+}
+@media (max-width: 520px) {
+  .n-login {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+  }
+  .n-login-t {
+    flex-basis: calc(100% - 60px);
+  }
+  .n-login-go {
+    width: 100%;
+  }
+}
+.n-nav .n-acct.n-acct-login {
+  background: #5865f2;
+  border-color: #5865f2;
+  color: #fff;
+  cursor: pointer;
+}
+.n-nav .n-acct.n-acct-login .n-dc {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+.n-nav .n-acct.n-acct-login small {
+  color: rgba(255, 255, 255, 0.8);
 }

@@ -9,4 +9,6 @@ import type { SupportTier } from './_progress.js'
  *
  * Example: { 'K7QX2M': 'legend', 'd123456789012345678': 'storm' }
  */
-export const SUPPORTERS: Record<string, SupportTier> = {}
+export const SUPPORTERS: Record<string, SupportTier> = {
+  SL9WU2: 'legend', // cryptoleee
+}

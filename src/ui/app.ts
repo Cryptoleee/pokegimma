@@ -9,7 +9,7 @@ import { sfx } from '../audio'
 import { L } from '../i18n'
 import { progress } from '../progress'
 import { masteryOf, MAX_MASTERY, SHINY_AT } from '../../api/_progress'
-import { accountState, accountStatus, onAccount } from '../account'
+import { accountState, accountStatus, login, onAccount } from '../account'
 
 /**
  * The menu app: a dark shell with four tabs (Play, Team, Friends, Profile) as a
@@ -79,6 +79,7 @@ export function discordAvatar(cls = '') {
 /** The account card at the bottom of the rail (desktop and sideways phones). */
 function accountCard() {
   const me = discordMe()
+  if (!me && accountStatus() === 'guest') return `<button class="n-acct n-acct-login" data-login>${DISCORD}<span class="n-acct-t"><small>Discord</small><b>${L('Log in', 'Inloggen')}</b></span></button>`
   if (!me) return ''
   return `<button class="n-acct" data-acct aria-label="${appEsc(L(`Signed in with Discord as ${me.dname || me.name}`, `Ingelogd met Discord als ${me.dname || me.name}`))}">${discordAvatar()}<span class="n-acct-t"><small>${DISCORD}${L('Discord', 'Discord')}</small><b>${appEsc(me.dname || me.name)}</b></span></button>`
 }
@@ -96,6 +97,39 @@ onAccount(() => {
     }
   })
   document.querySelectorAll<HTMLElement>('[data-acct-slot]').forEach((slot) => (slot.innerHTML = discordAvatar('n-av-chip')))
+  document.querySelectorAll<HTMLElement>('[data-login-banner]').forEach((slot) => (slot.innerHTML = loginBanner()))
+})
+
+const LOGIN_X = 'sb:loginBannerX'
+/**
+ * For guests, on home: a big Discord login card (progress everywhere, friends,
+ * rankings, supporter rewards). Closing it hides it for 3 days; the login button
+ * in the rail and on the profile stays.
+ */
+export function loginBanner() {
+  if (accountStatus() !== 'guest') return ''
+  try {
+    if (Date.now() - Number(localStorage.getItem(LOGIN_X) || 0) < 3 * 86400e3) return ''
+  } catch {}
+  return `<div class="n-login">
+    <span class="n-login-ic">${DISCORD}</span>
+    <span class="n-login-t"><b>${L('Log in with Discord', 'Log in met Discord')}</b><small>${L('Keep your progress on every device, add friends, join the world rankings and get supporter rewards.', 'Bewaar je voortgang op elk apparaat, voeg vrienden toe, kom in de wereldranglijst en krijg supporter-beloningen.')}</small></span>
+    <button class="n-login-go" data-login>${L('Log in', 'Inloggen')}</button>
+    <button class="n-login-x" data-login-x aria-label="${L('Not now', 'Nu niet')}">✕</button>
+  </div>`
+}
+document.addEventListener('click', (e) => {
+  const t = e.target as HTMLElement
+  if (t.closest('[data-login]')) {
+    sfx.select()
+    login()
+  } else if (t.closest('[data-login-x]')) {
+    sfx.select()
+    try {
+      localStorage.setItem(LOGIN_X, String(Date.now()))
+    } catch {}
+    t.closest('[data-login-banner]')?.replaceChildren()
+  }
 })
 function bindAcct(root: ParentNode) {
   root.querySelector<HTMLElement>('.n-acct')?.addEventListener('click', () => root.querySelector<HTMLElement>('.n-tab[data-tab="profile"]')?.click())
