@@ -1,5 +1,6 @@
 import { clock, pipeline } from './_redis.js'
 import { accountsOn, json, parse, sameOrigin, sessionUid, token } from './_account.js'
+import { SUPPORTERS } from './_supporters.js'
 import { applyMatch, levelOf, mergeGuest, normalize, sanitize, SHINY_AT, masteryOf, titleOf, titlesOf, weekOf, type Progress } from './_progress.js'
 
 /**
@@ -25,7 +26,14 @@ const WEEK_TTL = 70 * 86400
 
 async function load(uid: string): Promise<Progress> {
   const [v] = await pipeline([['GET', `prog:${uid}`]])
-  return normalize(parse<Progress>(v))
+  const p = normalize(parse<Progress>(v))
+  // Patreon supporters: always from the list, never from what's stored or sent
+  p.supporter = SUPPORTERS[uid]
+  if (!p.supporter) {
+    delete p.supporter
+    if (p.title === 'supporter') p.title = ''
+  }
+  return p
 }
 
 const card = (p: Progress) => JSON.stringify({ lv: levelOf(p.xp).lv, title: titleOf(p) })

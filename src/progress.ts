@@ -18,7 +18,10 @@ const listeners = new Set<() => void>()
 
 function load(): Progress {
   try {
-    return normalize(JSON.parse(localStorage.getItem(GUEST_KEY) ?? 'null'))
+    const p = normalize(JSON.parse(localStorage.getItem(GUEST_KEY) ?? 'null'))
+    // Supporting is an account thing, set by the server
+    delete p.supporter
+    return p
   } catch {
     return newProgress()
   }

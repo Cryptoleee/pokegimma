@@ -1,4 +1,5 @@
 import { spriteUrl } from '../data/pokemon'
+import { showSupport } from './support'
 import { channelPref, outputMode, setChannel, setOutputMode, sfx, type Channel, type OutMode } from '../audio'
 import { say } from '../voice'
 import { bindLangSwitch, L, langSwitch } from '../i18n'
@@ -98,6 +99,7 @@ export function showOptions() {
         <div class="lang-sw" role="radiogroup" aria-label="${L('Sound via media player', 'Geluid via mediaspeler')}">${(['auto', 'on', 'off'] as OutMode[])
           .map((m) => `<button type="button" data-out="${m}" role="radio" aria-checked="${m === outputMode()}" class="${m === outputMode() ? 'on' : ''}">${{ auto: 'Auto', on: L('On', 'Aan'), off: L('Off', 'Uit') }[m]}</button>`)
           .join('')}</div></div>
+      <button class="opt-row opt-support"><i>♥</i><span><b>${L('Support the game', 'Steun de game')}</b><small>${L('Made by one person: help on Patreon', 'Gemaakt door één persoon: help mee via Patreon')}</small></span><em class="opt-go">${L('Open', 'Open')}</em></button>
       <button class="btn" id="opt-done">${L('Done', 'Klaar')}</button>
     </div>`
   modal.querySelectorAll<HTMLElement>('.opt-row[data-c]').forEach((b) =>
@@ -112,6 +114,10 @@ export function showOptions() {
       if (on && c === 'voice') say('go')
     }),
   )
+  modal.querySelector('.opt-support')?.addEventListener('click', () => {
+    sfx.select()
+    showSupport(() => showOptions())
+  })
   modal.querySelector('.opt-keys')?.addEventListener('click', () => {
     sfx.select()
     showKeys(() => showOptions())

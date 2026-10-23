@@ -38,6 +38,7 @@ const TITLES: Record<string, T> = {
   unscathed: ['Unscathed', 'Ongeschonden'],
   stormrider: ['Storm Rider', 'Stormrijder'],
   frostbound: ['Frostbound', 'IJsgeboren'],
+  supporter: ['★ Supporter', '★ Supporter'],
 }
 
 export function titleName(id: string) {

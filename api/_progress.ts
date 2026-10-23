@@ -159,6 +159,10 @@ export interface Daily {
   firstWin: boolean
 }
 
+/** Patreon tiers (set by the server from api/_supporters.ts, never by the client). */
+export type SupportTier = 'spark' | 'storm' | 'legend'
+export const SUPPORT_TIERS: SupportTier[] = ['spark', 'storm', 'legend']
+
 export interface Progress {
   v: 1
   xp: number
@@ -172,6 +176,8 @@ export interface Progress {
   streak: number
   bestStreak: number
   daily: Daily
+  /** Supporting the game on Patreon (the Legend tier has a golden title). */
+  supporter?: SupportTier
   /** Chosen title (id from titlesOf), '' = the newest one. */
   title: string
   /** Partners shown shiny (only those with mastery ≥ SHINY_AT). */
@@ -205,6 +211,7 @@ export function normalize(p: Partial<Progress> | null | undefined): Progress {
       : Array.isArray(p.ach) && p.ach.includes('dg_flawless') ? ['depths'] : [] },
     daily: { ...n.daily, ...(p.daily ?? {}) },
     shiny: Array.isArray(p.shiny) ? p.shiny : [],
+    supporter: SUPPORT_TIERS.includes(p.supporter as SupportTier) ? p.supporter : undefined,
   }
 }
 
@@ -255,6 +262,7 @@ export function titlesOf(p: Progress): string[] {
   const out = LEVEL_TITLES.filter(([l]) => lv >= l).map(([, t]) => t)
   for (const a of ACHIEVEMENTS) if (a.title && p.ach.includes(a.id)) out.push(a.title)
   for (const id of PARTNERS) if (masteryOf(p.partners[id] ?? 0).lv >= MAX_MASTERY) out.push(`master:${id}`)
+  if (p.supporter === 'legend') out.push('supporter')
   return out
 }
 
