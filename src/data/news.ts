@@ -22,6 +22,28 @@ export interface NewsEntry {
 
 export const NEWS: NewsEntry[] = [
   {
+    id: '2026-10-23',
+    title: ['The Raid Revamp', 'De raid-revamp'],
+    intro: [
+      'Raids are now real dungeons: fight through six rooms of packs and wardens, alone or with friends, to reach the legendary at the end.',
+      'Raids zijn nu echte dungeons: vecht je door zes zalen vol groepen en wachters, alleen of met vrienden, naar de legendary aan het eind.',
+    ],
+    video: {
+      wide: '/news/raid-revamp-16x9.mp4',
+      tall: '/news/raid-revamp-9x16.mp4',
+      poster: { wide: '/news/raid-revamp-16x9.jpg', tall: '/news/raid-revamp-9x16.jpg' },
+    },
+    items: [
+      { icon: '🏰', text: ['Three raid dungeons, each with its own wardens, mechanics and boss: The Burning Depths (Reshiram), The Storm Tower (Zekrom) and The Frozen Citadel (Kyurem). Beat one to unlock the next', 'Drie raid-dungeons, elk met eigen wachters, mechanieken en baas: De Brandende Diepten (Reshiram), De Stormtoren (Zekrom) en De IJscitadel (Kyurem). Versla er een om de volgende te openen'] },
+      { icon: '◎', text: ['Pull packs one at a time and take out menders and guards first', 'Pull de groepen één voor één en haal healers en schildwachten eerst neer'] },
+      { icon: '⚡', text: ['Interrupt casts: hit a casting foe with a melee, dash or ultimate move and the spell fails', 'Onderbreek casts: raak een castende vijand met een melee-, dash- of ultimate-aanval en de spreuk mislukt'] },
+      { icon: '⚠️', text: ['Telegraphed attacks: read the warning on the ground and get out in time', 'Aangekondigde aanvallen: lees de waarschuwing op de grond en ga op tijd opzij'] },
+      { icon: '😈', text: ['Easy, Normal or Hard, and checkpoints: go down and you\'re back at the last gate', 'Makkelijk, Normaal of Moeilijk, en checkpoints: ga je neer, dan sta je weer bij de laatste poort'] },
+      { icon: '🎁', text: ['Rewards per dungeon: a new partner (Magby, Elekid or Spheal, who grow into the wardens), a title (Flame Tamer, Storm Rider, Frostbound), and a Mini Reshiram, Zekrom or Kyurem follower if you clear it without losing a life', 'Beloningen per dungeon: een nieuwe partner (Magby, Elekid of Spheal, die uitgroeien tot de wachters), een titel (Vlammentemmer, Stormrijder, IJsgeboren), en een Mini-Reshiram, -Zekrom of -Kyurem als volger als je hem haalt zonder een leven te verliezen'] },
+      { icon: '♥', text: ['One-time supporter packs (Spark, Storm, Legend) with a badge, a title and more. All cosmetic: the game stays free to play. Tap the heart on the home screen', 'Eenmalige supporter-pakketten (Vonk, Storm, Legende) met een badge, een titel en meer. Alles cosmetisch: de game blijft gratis. Tik op het hartje op het home-scherm'] },
+    ],
+  },
+  {
     id: '2026-10-20b',
     title: ['New mode: 1 vs 1', 'Nieuwe modus: 1 tegen 1'],
     intro: [
