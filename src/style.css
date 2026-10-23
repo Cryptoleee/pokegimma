@@ -9187,3 +9187,44 @@ body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
 .cin-title.tall {
   top: 36%;
 }
+
+/* The legend/event pill, once it has had its moment: a small tracker at the top edge */
+.legend.mini {
+  top: calc(8px + var(--safe-t));
+  gap: 6px;
+  padding: 3px 8px 3px 3px;
+  border-width: 2px;
+  box-shadow: 0 2px 0 #1a1420, 0 0 10px rgba(255, 216, 74, 0.4);
+  opacity: 0.92;
+  transition: top 0.3s ease, opacity 0.3s ease;
+}
+.legend.mini img {
+  width: 26px;
+  height: 26px;
+}
+.legend.mini .lg-txt b {
+  display: none;
+}
+.legend.mini .lg-txt span {
+  font-size: 12px;
+  font-weight: 800;
+}
+.legend.mini .lg-arrow {
+  width: 22px;
+  height: 22px;
+  font-size: 15px;
+}
+/* Wide screens (desktop, a handheld's top display): the big pill sits at the top edge too, off the play area */
+@media (min-width: 760px) {
+  #hud > .legend {
+    top: calc(8px + var(--safe-t));
+  }
+}
+/* Narrow screens: top centre is taken (your card, the buttons, the minimap), so the small tracker sits under your card */
+@media (max-width: 759px) {
+  #hud > .legend.mini {
+    left: calc(10px + var(--safe-l, 0px));
+    top: calc(70px + var(--safe-t));
+    transform: none;
+  }
+}

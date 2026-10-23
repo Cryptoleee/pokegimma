@@ -157,11 +157,25 @@ export function startDuoView() {
       </div>`
   }
 
+  /**
+   * Only a real tap counts. On a handheld the A button "clicks" whatever has
+   * focus, so a chat button you tapped once would fire again with every attack:
+   * buttons here never keep focus, and clicks without a pointer are ignored.
+   */
+  function tap(b: HTMLElement, fn: () => void) {
+    b.tabIndex = -1
+    b.addEventListener('click', (e) => {
+      b.blur()
+      if (e.detail === 0) return
+      fn()
+    })
+  }
+
   function bind() {
-    root.querySelectorAll<HTMLElement>('[data-c]').forEach((b) => b.addEventListener('click', () => cmd({ t: 'cmd', c: b.dataset.c as 'board' | 'pause' })))
-    root.querySelectorAll<HTMLElement>('[data-i]').forEach((b) => b.addEventListener('click', () => cmd({ t: 'cmd', c: 'switch', i: Number(b.dataset.i) })))
-    root.querySelectorAll<HTMLElement>('[data-item]').forEach((b) => b.addEventListener('click', () => cmd({ t: 'cmd', c: 'item', key: b.dataset.item as 'master' | 'potion' | 'revive' })))
-    root.querySelectorAll<HTMLElement>('[data-say]').forEach((b) => b.addEventListener('click', () => cmd({ t: 'cmd', c: 'say', text: b.dataset.say! })))
+    root.querySelectorAll<HTMLElement>('[data-c]').forEach((b) => tap(b, () => cmd({ t: 'cmd', c: b.dataset.c as 'board' | 'pause' })))
+    root.querySelectorAll<HTMLElement>('[data-i]').forEach((b) => tap(b, () => cmd({ t: 'cmd', c: 'switch', i: Number(b.dataset.i) })))
+    root.querySelectorAll<HTMLElement>('[data-item]').forEach((b) => tap(b, () => cmd({ t: 'cmd', c: 'item', key: b.dataset.item as 'master' | 'potion' | 'revive' })))
+    root.querySelectorAll<HTMLElement>('[data-say]').forEach((b) => tap(b, () => cmd({ t: 'cmd', c: 'say', text: b.dataset.say! })))
   }
 
   const setText = (sel: string, text: string) => {
@@ -213,6 +227,10 @@ export function startDuoView() {
     }
   }
 
+  // Keys (and the handheld's buttons acting as keys) never press anything here
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key.startsWith('Gamepad') || e.code.startsWith('Gamepad')) e.preventDefault()
+  }, true)
   paint()
   fullscreenGate(() => state?.lang ?? (navigator.language.startsWith('nl') ? 'nl' : 'en'))
 }

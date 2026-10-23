@@ -66,6 +66,9 @@ export class Hud {
   private cdShown = ''
   /** Legendary alert: where it is and how to get it. */
   private legend = h('div', 'legend hidden')
+  /** When the legend/event pill last popped up big; after a few seconds it shrinks to a small tracker at the top. */
+  private legendAt = 0
+  private legendState = ''
   private legendId = -1
   private chat: ChatWidget | null = null
   /** Raid: boss bar, team lives and the respawn countdown. */
@@ -737,8 +740,13 @@ export class Hud {
       this.legendId = -1
       return
     }
+    // Big again for a moment when it's new, or once it's weakened
+    const st = w.state === 'weak' ? 'weak' : ''
+    if (this.legendId === w.id && st !== this.legendState) this.legendAt = performance.now()
+    this.legendState = st
     if (this.legendId !== w.id) {
       this.legendId = w.id
+      this.legendAt = performance.now()
       this.legend.innerHTML = `<img class="px" src="${spriteUrl(w.species.id, { shiny: w.shiny })}" alt=""><div class="lg-txt"><b>★ ${w.name} <small>Lv ${w.level}</small></b><span></span></div><i class="lg-arrow">➤</i>`
       this.legend.classList.remove('pop')
       void this.legend.offsetWidth
@@ -750,7 +758,8 @@ export class Hud {
     const how = w.state === 'weak'
       ? (g.claimedByOther(w, p) ? L('Weakened, someone else gets first try', 'Verzwakt, iemand anders mag eerst') : L('Weakened! Catch it fast!', 'Verzwakt! Snel vangen!'))
       : p.masterBalls > 0 ? L('Throw your Master Ball!', 'Gooi je Master Ball!') : L('Beat it, or catch it with a Master Ball', 'Versla hem, of vang hem met een Master Ball')
-    ;(this.legend.querySelector('span') as HTMLElement).textContent = `${Math.round(d)} m · ${how}`
+    const mini = this.legendMini()
+    ;(this.legend.querySelector('span') as HTMLElement).textContent = mini ? `${Math.round(d)} m` : `${Math.round(d)} m · ${how}`
     this.legend.classList.toggle('near', d < 6)
   }
 
@@ -767,6 +776,7 @@ export class Hud {
     const key = -1000 - e.id
     if (this.legendId !== key) {
       this.legendId = key
+      this.legendAt = performance.now()
       const icon = e.kind === 'drop' ? `<img class="px" src="${itemUrl('master-ball')}" alt="">` : `<img class="px" src="${spriteUrl(e.species ?? 25)}" alt="">`
       this.legend.innerHTML = `${icon}<div class="lg-txt"><b>${e.kind === 'drop' ? L('📦 Supply drop', '📦 Bevoorrading') : L('🐾 Swarm', '🐾 Zwerm')}</b><span></span></div><i class="lg-arrow">➤</i>`
       this.legend.classList.remove('pop')
@@ -779,7 +789,15 @@ export class Hud {
     ;(this.legend.querySelector('span') as HTMLElement).textContent = e.kind === 'drop'
       ? `${Math.round(d)} m · ${e.t > 0.5 ? L(`lands in ${Math.ceil(e.t)}s`, `landt over ${Math.ceil(e.t)}s`) : L('landed!', 'geland!')}`
       : `${Math.round(d)} m · ${L('six wild Pokémon', 'zes wilde Pokémon')}`
+    if (this.legendMini()) (this.legend.querySelector('span') as HTMLElement).textContent = `${Math.round(d)} m`
     this.legend.classList.toggle('near', d < 6)
+  }
+
+  /** After 5 s the pill shrinks to a small tracker at the top edge, out of the way. */
+  private legendMini() {
+    const mini = performance.now() - this.legendAt > 5000
+    this.legend.classList.toggle('mini', mini)
+    return mini
   }
 
   /** The minimap as a picture (for a second screen). */
