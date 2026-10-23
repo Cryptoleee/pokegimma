@@ -41,6 +41,7 @@ export const dungeonOpen = (id: string) => {
 export const dungeonPlayable = (id: string) => dungeonOpen(id) || local
 /** What a guest sees as picked: just what the host sent (the host's progress decides, not the guest's). */
 export const raidShown = (raid: string | undefined) => (raid === 'classic' ? 'classic' : (DUNGEON_LIST.find((d) => d.id === raid) ?? DUNGEON_LIST[0])?.id ?? 'classic')
+/** (An old saved choice 'dungeon' meant the first dungeon when there was only one: now it's like no choice.) */
 /** The dungeon that's picked: the chosen one if you can play it, else the furthest one that's open. */
 export const raidPick = (raid: string | undefined) => {
   if (raid === 'classic') return 'classic'

@@ -379,7 +379,7 @@ function coldRoom(c: Ctx, room: Room, rw: number, rh: number, rx: number, ry: nu
     const t = L2 ? Math.max(0, Math.min(1, ((x - rx - ax) * dx + (y - ry - ay) * dy) / L2)) : 0
     return Math.hypot(x - rx - ax - dx * t, y - ry - ay - dy * t) >= 3.2
   })
-  const free = (x: number, y: number) => floorTile(w.at(x, y)) && !c.nearHall(x, y, 2) && off(x, y)
+  const free = (x: number, y: number) => floorTile(w.at(x, y)) && !c.nearHall(x, y, 3) && off(x, y)
   /** A round pool of charged water; pulses (when `pulse`) from its middle. */
   const pool = (px: number, py: number, r: number, pulse = true) => {
     let n = 0

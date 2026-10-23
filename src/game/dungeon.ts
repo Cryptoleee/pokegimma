@@ -788,7 +788,7 @@ function roomCleared(g: Game, d: DungeonRun) {
   } else prepareRoom(g, d)
   for (const v of g.viewers) {
     v.hooks.banner(last
-      ? { kind: 'legendary', kicker: both('DUNGEON', 'DUNGEON'), title: both('THE WAY IS OPEN', 'DE WEG IS VRIJ'), sub: both(`${g.raid!.def.name} waits in the crater…`, `${g.raid!.def.name} wacht in de krater…`), mon: g.raid!.def.species, color: g.raid!.def.color }
+      ? { kind: 'legendary', kicker: both('DUNGEON', 'DUNGEON'), title: both('THE WAY IS OPEN', 'DE WEG IS VRIJ'), sub: inBoth(() => `${d.def.theme.toBoss()} · ${L(`${g.raid!.def.name} is waiting…`, `${g.raid!.def.name} wacht…`)}`), mon: g.raid!.def.species, color: g.raid!.def.color }
       : { kind: 'win', kicker: both('DUNGEON', 'DUNGEON'), title: both('Room cleared!', 'Kamer veroverd!'), sub: both('The gate is open · on to the next room', 'De poort is open · door naar de volgende kamer'), color: '#ffd040' })
     v.sfx('loot')
   }

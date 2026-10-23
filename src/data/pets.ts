@@ -30,10 +30,13 @@ const read = () => {
   }
 }
 
-export const petUnlocked = (p: Progress, pet: Pet) =>
-  (p.stats.dgFlawless ?? []).includes(pet.dungeon) || (pet.dungeon === 'depths' && p.ach.includes('dg_flawless'))
+export const petUnlocked = (p: Progress, pet: Pet) => (p.stats.dgFlawless ?? []).includes(pet.dungeon)
 /** The follower you picked ('none' = none; unset = the first one you have). */
-const picked = () => read() ?? ''
+const picked = () => {
+  const v = read() ?? ''
+  // An older build stored a switched-off follower as 'off:<id>'
+  return v.startsWith('off:') ? 'none' : v
+}
 /** Whether this follower is the one walking with you. */
 export const petOn = (p: Progress, pet: Pet) => {
   const pick = picked()

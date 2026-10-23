@@ -27,7 +27,7 @@ export interface MatchChoice {
   stadium?: StadiumId | 'random'
   /** How hard the bots, the CPU or the boss play. */
   diff?: Difficulty
-  /** Raid: through a dungeon (its id; 'dungeon' = the first one) to its boss, or a classic raid against a random boss. */
+  /** Raid: through a dungeon (its id; unset = the furthest one the host has opened) to its boss, or a classic raid against a random boss. */
   raid?: string
 }
 

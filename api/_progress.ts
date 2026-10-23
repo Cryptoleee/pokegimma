@@ -200,7 +200,9 @@ export function normalize(p: Partial<Progress> | null | undefined): Progress {
     ...n, ...p, v: 1,
     partners: { ...(p.partners ?? {}) },
     ach: Array.isArray(p.ach) ? p.ach.filter((a) => ACH_IDS.has(a)) : [],
-    stats: { ...s, bosses: Array.isArray(s.bosses) ? s.bosses : [], used: Array.isArray(s.used) ? s.used : [], dg: Array.isArray(s.dg) ? s.dg : [], dgHard: Array.isArray(s.dgHard) ? s.dgHard : [], dgFlawless: Array.isArray(s.dgFlawless) ? s.dgFlawless : [] },
+    stats: { ...s, bosses: Array.isArray(s.bosses) ? s.bosses : [], used: Array.isArray(s.used) ? s.used : [], dg: Array.isArray(s.dg) ? s.dg : [], dgHard: Array.isArray(s.dgHard) ? s.dgHard : [], dgFlawless: Array.isArray(s.dgFlawless) && s.dgFlawless.length ? s.dgFlawless
+      // Clean clears from before they were kept per dungeon: there was only the Depths then
+      : Array.isArray(p.ach) && p.ach.includes('dg_flawless') ? ['depths'] : [] },
     daily: { ...n.daily, ...(p.daily ?? {}) },
     shiny: Array.isArray(p.shiny) ? p.shiny : [],
   }
@@ -654,6 +656,11 @@ export function mergeGuest(acc: Progress, guest: Partial<Progress>): Progress {
   s.dw += cap(gs.dw, 60)
   for (const b of gs.bosses) if (BOSS_IDS.includes(b) && !s.bosses.includes(b)) s.bosses.push(b)
   for (const id of gs.used) if (PARTNERS.includes(id) && !s.used.includes(id)) s.used.push(id)
+  // Dungeons cleared (they open the next dungeon, a partner and a follower)
+  for (const k of ['dg', 'dgHard', 'dgFlawless'] as const) {
+    const to = (s[k] ??= [])
+    for (const id of gs[k] ?? []) if (DUNGEON_IDS.includes(id) && !to.includes(id)) to.push(id)
+  }
   // Achievements follow from the merged stats (not taken over as-is)
   for (const a of ACHIEVEMENTS) if (!acc.ach.includes(a.id) && a.test(acc, null)) acc.ach.push(a.id)
   for (const id of g.shiny) if (masteryOf(acc.partners[id] ?? 0).lv >= SHINY_AT && !acc.shiny.includes(id)) acc.shiny.push(id)

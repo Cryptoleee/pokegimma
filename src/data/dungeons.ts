@@ -489,7 +489,7 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
             ic({ id: 'm_ava', name: 'Avalanche', shape: 'cone', warn: 1.1, cd: 4, dmg: 0.32, target: 'nearest', len: 7, width: 0.45, weight: 3, fx: 'blizzard' }),
             ic({ id: 'm_frost', get name() { return L('Frozen Ground', 'Bevroren Grond') }, shape: 'circle', warn: 3.6, cd: 11, dmg: 0.4, target: 'random', r: 2.6, weight: 3, follow: true, linger: { dur: 7, dps: 0.12 }, fx: 'blizzard' }),
             ic({ id: 'm_crash', name: 'Icicle Crash', shape: 'circle', warn: 1.3, cd: 6, dmg: 0.3, target: 'players', r: 2.1, extra: 2, stagger: 0.15, weight: 2, fx: 'stoneedge' }),
-            ic({ id: 'm_quake', name: 'Earthquake', shape: 'circle', warn: 1.4, cd: 9, dmg: 0.34, target: 'self', r: 3.8, weight: 2, fx: 'quake' }),
+            ic({ id: 'm_quake', get name() { return L('Earthquake', 'Aardbeving') }, shape: 'circle', warn: 1.4, cd: 9, dmg: 0.34, target: 'self', r: 3.8, weight: 2, fx: 'quake' }),
           ],
         },
       },
