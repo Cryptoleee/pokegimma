@@ -21,7 +21,7 @@ export function showSupport(onClose?: () => void) {
         <div class="sup-tier sup-${t.id}"><img class="px" src="${t.badge}" alt=""><span><b>${t.name()} <em>${t.price} ${L('one-time', 'eenmalig')}</em></b><small>${t.perks()}</small></span></div>`).join('')}
       </div>
       <a class="btn sup-go" href="${SHOP_URL}" target="_blank" rel="noopener">${L('Go to the shop', 'Naar de shop')} ↗</a>
-      <p class="sup-free">${L('After buying, send your Discord user ID on Patreon and log in with Discord. Following for free helps too.', 'Stuur na het kopen je Discord-gebruikers-ID op Patreon en log in met Discord. Gratis volgen helpt ook.')}</p>
+      <p class="sup-free">${L('After buying, log in with Discord and send me your friend code (Friends tab) on Patreon. Following for free helps too.', 'Log na het kopen in met Discord en stuur me je vriendcode (tabblad Vrienden) op Patreon. Gratis volgen helpt ook.')}</p>
       ${names.length ? `<div class="sup-thanks"><span class="n-label">${L('Thank you', 'Bedankt')}</span><p>${names.map((n) => `<span class="sup-name sup-${n.tier}">${esc(n.name)}</span>`).join('')}</p></div>` : ''}
     </div>`
   const close = () => {

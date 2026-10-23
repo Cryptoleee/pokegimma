@@ -25,10 +25,11 @@ const MATCHES_PER_HOUR = 100
 const WEEK_TTL = 70 * 86400
 
 async function load(uid: string): Promise<Progress> {
-  const [v] = await pipeline([['GET', `prog:${uid}`]])
+  const [v, u] = await pipeline([['GET', `prog:${uid}`], ['GET', `user:${uid}`]])
   const p = normalize(parse<Progress>(v))
-  // Patreon supporters: always from the list, never from what's stored or sent
-  p.supporter = SUPPORTERS[uid]
+  // Patreon supporters: always from the list (by account or by friend code), never from what's stored or sent
+  const code = parse<{ code?: string }>(u)?.code
+  p.supporter = SUPPORTERS[uid] ?? (code ? SUPPORTERS[code] : undefined)
   if (!p.supporter) delete p.supporter
   if (p.title && !titlesOf(p).includes(p.title)) p.title = ''
   return p
