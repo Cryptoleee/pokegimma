@@ -6862,3 +6862,9 @@ body.duo-view #hud {
 .n-nav .n-acct.n-acct-login small {
   color: rgba(255, 255, 255, 0.8);
 }
+/* With the rail (desktop) its Discord button is enough: no card on home */
+@media (min-width: 900px) {
+  [data-login-banner] {
+    display: none;
+  }
+}
