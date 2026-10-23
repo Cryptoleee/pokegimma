@@ -176,7 +176,7 @@ export interface Progress {
   streak: number
   bestStreak: number
   daily: Daily
-  /** Supporting the game on Patreon (the Legend tier has a golden title). */
+  /** A supporter pack bought on Patreon (one-time; set by the server). */
   supporter?: SupportTier
   /** Chosen title (id from titlesOf), '' = the newest one. */
   title: string
@@ -262,7 +262,9 @@ export function titlesOf(p: Progress): string[] {
   const out = LEVEL_TITLES.filter(([l]) => lv >= l).map(([, t]) => t)
   for (const a of ACHIEVEMENTS) if (a.title && p.ach.includes(a.id)) out.push(a.title)
   for (const id of PARTNERS) if (masteryOf(p.partners[id] ?? 0).lv >= MAX_MASTERY) out.push(`master:${id}`)
-  if (p.supporter === 'legend') out.push('supporter')
+  // Supporter packs (one-time, they stack): Spark, Stormchaser, ★ Legend
+  const tier = SUPPORT_TIERS.indexOf(p.supporter as SupportTier)
+  if (tier >= 0) out.push(...['sup_spark', 'sup_storm', 'sup_legend'].slice(0, tier + 1))
   return out
 }
 

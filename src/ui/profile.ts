@@ -46,9 +46,9 @@ function untilReset() {
 function petCard(p: Progress) {
   return `<div class="pf-card"><h4>${L('Followers', 'Volgers')}</h4><div class="pf-pets">${PETS.map((pet) => {
     const got = petUnlocked(p, pet), on = petOn(p, pet)
-    const name = L(`Mini ${SPECIES[pet.sp].name}`, `Mini-${SPECIES[pet.sp].name}`)
+    const name = pet.name?.() ?? L(`Mini ${SPECIES[pet.sp].name}`, `Mini-${SPECIES[pet.sp].name}`)
     return `<div class="pf-pet ${got ? '' : 'locked'}">
-      <img class="px" src="${spriteUrl(pet.sp)}" alt="">
+      <img class="px" src="${pet.img ?? spriteUrl(pet.sp)}" alt="">
       <span><b>${name}</b><small>${got ? L('Follows you in every match', 'Loopt in elk potje achter je aan') : `🔒 ${pet.how()}`}</small></span>
       ${got ? `<button class="pf-shiny pf-petbtn ${on ? 'on' : ''}" data-pet="${pet.id}">${on ? L('On', 'Aan') : L('Off', 'Uit')}</button>` : ''}
     </div>`

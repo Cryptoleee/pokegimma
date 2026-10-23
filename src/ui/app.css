@@ -6734,3 +6734,18 @@ body.duo-view #hud {
 .nr-support:hover {
   color: #ff7a9a;
 }
+
+/* Supporter packs: a small badge by the name, a golden name for Legend */
+.sup-badge {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  vertical-align: -2px;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+.sup-gold {
+  color: #ffd04a !important;
+  text-shadow: 0 0 8px rgba(255, 200, 60, 0.45);
+}

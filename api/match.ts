@@ -29,10 +29,8 @@ async function load(uid: string): Promise<Progress> {
   const p = normalize(parse<Progress>(v))
   // Patreon supporters: always from the list, never from what's stored or sent
   p.supporter = SUPPORTERS[uid]
-  if (!p.supporter) {
-    delete p.supporter
-    if (p.title === 'supporter') p.title = ''
-  }
+  if (!p.supporter) delete p.supporter
+  if (p.title && !titlesOf(p).includes(p.title)) p.title = ''
   return p
 }
 

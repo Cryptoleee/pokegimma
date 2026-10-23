@@ -13,6 +13,7 @@ import { L } from '../i18n'
 import { openInvite } from './friends'
 import { progress } from '../progress'
 import { local } from '../stats'
+import { badgeOf } from '../data/support'
 import { STADIUM_LIST, STADIUMS } from '../data/stadiums'
 import { titleName } from '../data/rewards'
 import { masteryOf, SHINY_AT } from '../../api/_progress'
@@ -348,7 +349,7 @@ export function showLobby(room: Room, on: LobbyActions) {
       return `
         <div class="nl-p ${isMe ? 'me' : ''} ${ready ? 'ready' : ''}" style="--d:${i * 60}ms" data-pid="${esc(p.pid)}">
           <span class="nl-p-pic"><img class="px" src="${trainerSpriteUrl(tr.sprite)}" alt="">${p.team[0] ? gif(p.team[0], '', !!p.shiny) : ''}</span>${bubble(p.pid, false)}
-          <span class="nl-p-info"><b>${esc(p.name)}${tags ? ` <em>(${tags})</em>` : ''}</b><small>${lv}${p.title ? `${esc(titleName(String(p.title)))} · ` : ''}${tr.name}${p.team[0] ? ` &amp; ${SPECIES[p.team[0]].name}` : ''}</small></span>
+          <span class="nl-p-info"><b class="${p.sup === 'legend' ? 'sup-gold' : ''}">${p.sup ? `<img class="sup-badge" src="${badgeOf(p.sup)}" alt="" title="Supporter">` : ''}${esc(p.name)}${tags ? ` <em>(${tags})</em>` : ''}</b><small>${lv}${p.title ? `${esc(titleName(String(p.title)))} · ` : ''}${tr.name}${p.team[0] ? ` &amp; ${SPECIES[p.team[0]].name}` : ''}</small></span>
           <span class="nl-state">${state}</span>
         </div>`
     }).join('')

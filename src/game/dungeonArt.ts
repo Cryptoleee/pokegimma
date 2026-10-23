@@ -3,6 +3,8 @@ import stormUrl from '../assets/dungeon/props-storm.png'
 import iceUrl from '../assets/dungeon/props-ice.png'
 import type { DungeonDef, Rect, Room } from '../data/dungeons'
 import type { Rng } from './rng'
+import { SUPPORTER_NAMES } from '../data/support'
+import { L } from '../i18n'
 import { hash } from './tiles'
 import { T, TILE, type World } from './world'
 
@@ -33,6 +35,8 @@ export type PropKind =
   // The Frozen Citadel
   | 'icecrystal' | 'icepillar' | 'frozenmon' | 'istatue' | 'fountain' | 'ithrone' | 'ibrazier' | 'sled' | 'snowpile' | 'icerubble'
   | 'scrate' | 'ibarrel' | 'ibanner' | 'iwindow' | 'tusk'
+  // Every dungeon's last stand: the Wall of Legends (supporters' names)
+  | 'legends'
 
 /** A placed thing: footprint in tiles (x, y top-left), variant. */
 export interface Prop {
@@ -49,7 +53,7 @@ export interface Prop {
 /** Things that block: their tiles become T.PROP (walls of the prop, drawn by the prop itself). */
 const BLOCKS = new Set<PropKind>(['statue', 'column', 'crate', 'barrel', 'anvil', 'crucible', 'chimney', 'trough', 'bones', 'skull', 'cage', 'tower', 'barricade', 'tent', 'ballista', 'firebowl', 'weapons', 'wall', 'throne', 'torchstand', 'spire',
   'coil', 'rod', 'bell', 'dstatue', 'dynamo', 'lthrone', 'spool', 'masonry', 'lcrate', 'hbarrel', 'pedestal',
-  'icecrystal', 'icepillar', 'frozenmon', 'istatue', 'fountain', 'ithrone', 'ibrazier', 'sled', 'snowpile', 'icerubble', 'scrate', 'ibarrel'])
+  'icecrystal', 'icepillar', 'frozenmon', 'istatue', 'fountain', 'ithrone', 'ibrazier', 'sled', 'snowpile', 'icerubble', 'scrate', 'ibarrel', 'legends'])
 /** Moving parts, drawn every frame. */
 export const ANIMATED = new Set<PropKind>(['campfire', 'rune', 'treasure', 'crucible', 'chimney', 'crystal', 'lavafall', 'steam', 'trough', 'firebowl', 'sconce', 'torchstand', 'coil', 'orb', 'pedestal', 'lthrone', 'dynamo', 'ibrazier', 'icecrystal', 'fountain', 'ithrone'])
 
@@ -361,6 +365,10 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
     default:
       coldRoom(c, room, rw, rh, rx, ry, cx, cy, rock, wallDeco)
   }
+  // The last stand of every dungeon has the Wall of Legends: the first free spot of a few
+  if (room.deco === 'bastion' || room.deco === 'ramparts' || room.deco === 'summit')
+    for (const [x, y] of [[cx - 2, ry + 2], [cx - 2, ry + rh - 4], [rx + 2, cy - 1], [rx + rw - 6, cy - 1], [cx + 3, cy + 3], [cx - 7, cy - 6]])
+      if (put(c, 'legends', x, y, 4, 2)) break
 }
 
 /**
@@ -935,7 +943,7 @@ export function bakeProps(g: CanvasRenderingContext2D, o: CanvasRenderingContext
     return
   }
   // The Storm Tower and the Citadel: everything drawn for the Depths is recoloured; their own sprites go on after, in their own colours
-  const own = (p: Prop) => p.kind in STORM || p.kind in ICE
+  const own = (p: Prop) => p.kind in STORM || p.kind in ICE || p.kind === 'legends'
   for (const p of props) if (!own(p)) bakeProp(g, o, w, p)
   coolDown(g)
   coolDown(o)
@@ -1085,6 +1093,7 @@ function bakeProp(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, w: W
     g.fill()
   }
   const faceTile = faceTile0
+  if (p.kind === 'legends') return wallOfLegends(g, o, x, y, W, H)
   if (p.kind in STORM || p.kind in ICE) {
     // Its sprite isn't there (yet): a plain block of stone so it still reads as in the way
     if (!BLOCKS.has(p.kind)) return
@@ -1811,6 +1820,62 @@ export function drawLavaLayer(ctx: CanvasRenderingContext2D, mask: HTMLCanvasEle
 }
 
 // ---------------------------------------------------------------- moving props
+
+/**
+ * The Wall of Legends: a stone slab in every dungeon's last stand, with the names
+ * of the game's Legend supporters carved in gold (baked once, the same for everyone).
+ */
+function wallOfLegends(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, x: number, y: number, W: number, H: number) {
+  const top = y - 22, bot = y + H - 3, l = x + 3, r = x + W - 3
+  g.fillStyle = 'rgba(0,0,0,0.35)'
+  g.beginPath()
+  g.ellipse(x + W / 2, bot + 1, W / 2, 4, 0, 0, Math.PI * 2)
+  g.fill()
+  // The slab: the part above its footprint goes over the actors
+  for (const [ctx, from, to] of [[o, top, y], [g, y, bot]] as const) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(l - 2, from, r - l + 4, to - from)
+    ctx.clip()
+    ctx.fillStyle = '#2c2a30'
+    ctx.fillRect(l - 2, bot - 4, r - l + 4, 4)
+    ctx.fillStyle = '#4a4650'
+    ctx.beginPath()
+    ctx.moveTo(l, bot - 3)
+    ctx.lineTo(l, top + 6)
+    ctx.quadraticCurveTo(x + W / 2, top - 4, r, top + 6)
+    ctx.lineTo(r, bot - 3)
+    ctx.closePath()
+    ctx.fill()
+    ctx.fillStyle = '#5c5862'
+    ctx.fillRect(l + 1, top + 6, 2, bot - top - 10)
+    ctx.fillStyle = '#36333b'
+    ctx.fillRect(r - 3, top + 6, 2, bot - top - 10)
+    // Carved: a header, then the Legends' names in gold
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = `700 5px "Pixelify Sans", monospace`
+    ctx.fillStyle = '#c8a050'
+    ctx.fillText(L('LEGENDS', 'LEGENDES'), x + W / 2, top + 6)
+    ctx.fillStyle = '#7a6a48'
+    ctx.fillRect(l + 6, top + 10, r - l - 12, 1)
+    const names = SUPPORTER_NAMES.filter((n) => n.tier === 'legend').map((n) => n.name).slice(0, 5)
+    ctx.font = `600 5px "Pixelify Sans", monospace`
+    if (names.length)
+      names.forEach((n, i) => {
+        ctx.fillStyle = '#1e1c22'
+        ctx.fillText(n, x + W / 2 + 0.5, top + 16.5 + i * 6)
+        ctx.fillStyle = '#ffd04a'
+        ctx.fillText(n, x + W / 2, top + 16 + i * 6)
+      })
+    else {
+      // Waiting for its first names: faint carved lines
+      ctx.fillStyle = '#3c3940'
+      for (let i = 0; i < 4; i++) ctx.fillRect(l + 8, top + 16 + i * 6, r - l - 16, 1)
+    }
+    ctx.restore()
+  }
+}
 
 /** Lights from the dungeon: lava pools, lavafalls, crystals, crucibles, chimney fires, runes, campfire embers. */
 export function propLights(w: World, add: (x: number, y: number, r: number, col: string, a: number) => void, time: number) {

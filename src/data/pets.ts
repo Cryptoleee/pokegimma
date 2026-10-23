@@ -1,4 +1,5 @@
-import type { Progress } from '../../api/_progress'
+import { SUPPORT_TIERS, type Progress } from '../../api/_progress'
+import { WISP, WISP_ICON } from './support'
 import { L } from '../i18n'
 
 /**
@@ -11,13 +12,19 @@ export interface Pet {
   /** Species shown. */
   sp: number
   /** Dungeon whose flawless clear unlocks it. */
-  dungeon: string
+  dungeon?: string
+  /** Or: the supporter pack that comes with it (that one and up). */
+  pack?: 'storm'
+  /** Its own name and picture (when it isn't a Pokémon). */
+  name?: () => string
+  img?: string
   how: () => string
 }
 
 export const PETS: Pet[] = [
   { id: 'reshiram', sp: 643, dungeon: 'depths', how: () => L('Clear The Burning Depths without losing a life', 'Haal De Brandende Diepten zonder een leven te verliezen') },
   { id: 'zekrom', sp: 644, dungeon: 'storm', how: () => L('Clear The Storm Tower without losing a life', 'Haal De Stormtoren zonder een leven te verliezen') },
+  { id: 'wisp', sp: WISP, pack: 'storm', name: () => 'Storm Wisp', img: WISP_ICON, how: () => L('Comes with the Storm or Legend supporter pack', 'Hoort bij het Storm- of Legende-supporterpakket') },
   { id: 'kyurem', sp: 646, dungeon: 'citadel', how: () => L('Clear The Frozen Citadel without losing a life', 'Haal De IJscitadel zonder een leven te verliezen') },
 ]
 
@@ -30,7 +37,8 @@ const read = () => {
   }
 }
 
-export const petUnlocked = (p: Progress, pet: Pet) => (p.stats.dgFlawless ?? []).includes(pet.dungeon)
+export const petUnlocked = (p: Progress, pet: Pet) =>
+  pet.pack ? SUPPORT_TIERS.indexOf(p.supporter!) >= SUPPORT_TIERS.indexOf(pet.pack) : !!pet.dungeon && (p.stats.dgFlawless ?? []).includes(pet.dungeon)
 /** The follower you picked ('none' = none; unset = the first one you have). */
 const picked = () => {
   const v = read() ?? ''

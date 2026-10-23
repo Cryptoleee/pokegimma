@@ -19,6 +19,8 @@ import { L, tx } from '../i18n'
 import { BOSSES } from '../data/bosses'
 import { cinematic, drawPhaseScreen, phaseLook, shownPhase, updateCinematic } from './bossFx'
 import { ENRAGE_TIME } from './boss'
+import { badgeOf, WISP } from '../data/support'
+import type { SupportTier } from '../../api/_progress'
 
 const FONT = '"Pixelify Sans", monospace'
 
@@ -113,9 +115,13 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   const ents: Ent[] = []
   for (const tr of g.trainers) {
     const tv = vis(g, tr, tr.isPlayer)
-    if (tr.alive && inView(tr.x, tr.y) && tv > 0) ents.push({ y: tr.y, draw: () => drawTrainer(g, ctx, tr, time, tv) })
+    if (tr.alive && inView(tr.x, tr.y) && tv > 0) {
+      ents.push({ y: tr.y, draw: () => drawTrainer(g, ctx, tr, time, tv) })
+      // Glow on top of the partner standing right by the trainer
+      if (supOf(g, tr) === 'legend') ents.push({ y: tr.y + 0.7, draw: () => drawSparks(ctx, tr, time) })
+    }
     const pet = petFollow(g, tr, time)
-    if (pet && inView(pet.x, pet.y) && tv > 0) ents.push({ y: pet.y, draw: () => drawPet(ctx, pet, time, tv) })
+    if (pet && inView(pet.x, pet.y) && tv > 0) ents.push({ y: pet.sp === WISP ? pet.y + 0.7 : pet.y, draw: () => drawPet(ctx, pet, time, tv) })
     const m = tr.mon
     if (tr.isPlayer && !g.partnerOut) continue
     const mvis = vis(g, m, tr.isPlayer)
@@ -206,7 +212,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
     }
     const m = tr.mon
     if (m.fainted || (tr.isPlayer && !g.partnerOut) || vis(g, m, tr.isPlayer) === 0) continue
-    plate(ctx, m, tr.isPlayer ? 'me' : 'foe', tr.isPlayer ? m.name : tr.name.split(' ').pop()!)
+    plate(ctx, m, tr.isPlayer ? 'me' : 'foe', tr.isPlayer ? m.name : tr.name.split(' ').pop()!, supOf(g, tr))
   }
   const p = g.player
   for (const w of g.wilds) {
@@ -452,7 +458,76 @@ function petFollow(g: Game, tr: Trainer, time: number): PetState | null {
   return st
 }
 
+/** A player's supporter pack (from the match setup). */
+const supOf = (g: Game, tr: Trainer): SupportTier | undefined => (tr.human ? g.setup.humans.find((h) => h.pid === tr.pid)?.sup : undefined)
+
+const badgeImgs = new Map<string, HTMLImageElement>()
+function badgeImg(t: SupportTier) {
+  const url = badgeOf(t)
+  if (!url || typeof Image === 'undefined') return null
+  let i = badgeImgs.get(url)
+  if (!i) {
+    i = new Image()
+    i.src = url
+    badgeImgs.set(url, i)
+  }
+  return i.complete && i.naturalWidth ? i : null
+}
+
+/** The Storm Wisp: a little orb of lightning bobbing along, crackling now and then. */
+function drawWisp(ctx: CanvasRenderingContext2D, st: PetState, time: number, fade: number) {
+  const px = st.x * TILE, py = st.y * TILE - 16 + Math.sin(time * 3.1 + st.seed) * 2.2
+  shadow(ctx, st.x * TILE, st.y * TILE + 1, 3)
+  ctx.save()
+  ctx.globalAlpha = fade
+  ctx.globalCompositeOperation = 'lighter'
+  const pulse = 0.8 + 0.2 * Math.sin(time * 7 + st.seed)
+  drawGlow(ctx, px, py, 12 * pulse, '#4ab8ff', 0.55)
+  ctx.fillStyle = 'rgba(120,210,255,0.9)'
+  ctx.beginPath()
+  ctx.arc(px, py, 3.2, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(240,252,255,1)'
+  ctx.beginPath()
+  ctx.arc(px - 0.5, py - 0.6, 1.6, 0, Math.PI * 2)
+  ctx.fill()
+  // A tiny bolt jumping off it, a new shape a few times a second
+  const f = Math.floor(time * 9 + st.seed * 10)
+  if (hash(f, 3, 77) > 0.45) {
+    let a = hash(f, 4, 78) * Math.PI * 2, x = px, y = py
+    ctx.strokeStyle = 'rgba(255,245,150,0.9)'
+    ctx.lineWidth = 0.8
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    for (let k = 0; k < 3; k++) {
+      a += (hash(f, 5 + k, 79) - 0.5) * 1.6
+      x += Math.cos(a) * 2.6
+      y += Math.sin(a) * 2.6
+      ctx.lineTo(x, y)
+    }
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+/** Legend supporters leave a few golden sparks behind them as they run. */
+function drawSparks(ctx: CanvasRenderingContext2D, tr: Trainer, time: number) {
+  if (tr.walkT <= 0) return
+  ctx.save()
+  for (let i = 0; i < 8; i++) {
+    const k = (time * 1.6 + i / 8 + tr.id * 0.37) % 1
+    const sx = tr.x * TILE + (hash(tr.id, Math.floor(time * 1.6 + i / 8), 90 + i) - 0.5) * 14 - (tr.faceRight ? 8 : -8) * k
+    const sy = tr.y * TILE - 4 - k * 14
+    if (k < 0.3) drawGlow(ctx, sx, sy, 5, '#ffd04a', 0.6 * (1 - k))
+    ctx.fillStyle = k < 0.4 ? '#fff6c0' : `rgba(255,196,40,${Math.min(1, (1 - k) * 1.4)})`
+    const z = k < 0.3 ? 3 : k < 0.7 ? 2 : 1
+    ctx.fillRect(Math.round(sx), Math.round(sy), z, z)
+  }
+  ctx.restore()
+}
+
 function drawPet(ctx: CanvasRenderingContext2D, st: PetState, time: number, fade: number) {
+  if (st.sp === WISP) return drawWisp(ctx, st, time, fade)
   const s = liveSprite(st.sp, false, false) ?? monSprite(st.sp, false, false)
   if (!s.ready) return
   const [fx, fy] = frameAt(s, time, st.seed * 1000)
@@ -937,7 +1012,7 @@ function castBar(ctx: CanvasRenderingContext2D, m: Mon, time: number) {
 }
 
 /** Nameplate: name, HP number on a chunky team-coloured bar with a trailing damage strip. */
-function plate(ctx: CanvasRenderingContext2D, m: Mon, team: Team, name: string) {
+function plate(ctx: CanvasRenderingContext2D, m: Mon, team: Team, name: string, sup?: SupportTier) {
   const c = TEAM_COL[team]
   const legend = m.legendary && !m.owner
   const w = legend ? 40 : 30, h = 6
@@ -971,8 +1046,14 @@ function plate(ctx: CanvasRenderingContext2D, m: Mon, team: Team, name: string) 
   ctx.strokeText(hpText, x + w / 2, y + h / 2 + 0.5)
   ctx.fillStyle = '#ffffff'
   ctx.fillText(hpText, x + w / 2, y + h / 2 + 0.5)
-  // name above
-  label(ctx, name, m.x * TILE, y - 2, legend ? '#ffd040' : c.name)
+  // name above (a supporter's badge in front of it, a Legend's name in gold)
+  label(ctx, name, m.x * TILE, y - 2, legend || sup === 'legend' ? '#ffd040' : c.name)
+  const b = sup && badgeImg(sup)
+  if (b) {
+    const tw = ctx.measureText(name).width
+    const s = 7 / Math.max(b.naturalWidth, b.naturalHeight)
+    ctx.drawImage(b, Math.round(m.x * TILE - tw / 2 - 9), Math.round(y - 9), b.naturalWidth * s, b.naturalHeight * s)
+  }
 }
 
 function drawRings(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, y: number) => boolean, time: number) {

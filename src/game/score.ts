@@ -1,3 +1,4 @@
+import type { SupportTier } from '../../api/_progress'
 import type { Game } from './game'
 
 /**
@@ -10,6 +11,8 @@ export interface ScoreRow {
   name: string
   sprite: string
   human: boolean
+  /** A supporter's pack (badge by the name, gold for Legend). */
+  sup?: SupportTier
   alive: boolean
   /** Final place (0 while still in the match). */
   place: number
@@ -37,6 +40,7 @@ export function scoreRows(g: Game): ScoreRow[] {
       time: Math.floor(tr.alive ? g.time : tr.diedAt), kos: tr.kos, caught: tr.caught, dmg: Math.round(tr.dmg),
       bossDmg: Math.round(tr.bossDmg), share: boss ? Math.round((tr.bossDmg / boss.maxHp) * 100) : 0, lives: tr.lives,
       mon: m?.species.id ?? 0, lv: m?.level ?? 0, shiny: !!m?.shiny,
+      sup: tr.human ? g.setup.humans.find((h) => h.pid === tr.pid)?.sup : undefined,
     }
   })
   return sortRows(rows, g.kind === 'raid')

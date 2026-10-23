@@ -3,6 +3,7 @@ import type { StadiumId } from '../data/stadiums'
 import type { AimDir, Dir } from '../game/entities'
 import type { MatchKind, MatchSetup } from '../game/game'
 import type { ThemeId } from '../data/themes'
+import type { SupportTier } from '../../api/_progress'
 
 /** A player in the lobby. `pid` is a local profile id for now (an account id later). */
 export interface LobbyPlayer {
@@ -15,6 +16,8 @@ export interface LobbyPlayer {
   /** Progress cosmetics: partner shown shiny, follower (species), trainer level, title id. */
   shiny?: boolean
   pet?: number
+  /** Supporter pack (badge next to the name, gold for Legend). */
+  sup?: SupportTier
   lv?: number
   title?: string
 }

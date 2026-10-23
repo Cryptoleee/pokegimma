@@ -1,3 +1,4 @@
+import { badgeOf } from '../data/support'
 import { spriteUrl } from '../data/pokemon'
 import { RAID_LIVES } from '../data/bosses'
 import { trainerSpriteUrl } from '../data/trainers'
@@ -33,7 +34,7 @@ export function boardList(rows: ScoreRow[], raid: boolean, me: number) {
       const out = raid ? r.lives <= 0 && !r.alive : !r.alive && r.place !== 1
       return `<div class="nrb-row ${r.id === me ? 'me' : ''} ${out ? 'out' : ''} ${!raid && r.place === 1 ? 'win' : ''}">
         <span class="nrb-rank">${rank}</span>
-        <span class="nrb-who"><img class="px" src="${trainerSpriteUrl(r.sprite)}" alt=""><b>${r.name}</b>${tag}</span>
+        <span class="nrb-who"><img class="px" src="${trainerSpriteUrl(r.sprite)}" alt="">${r.sup ? `<img class="sup-badge" src="${badgeOf(r.sup)}" alt="" title="${L('Supporter', 'Supporter')}">` : ''}<b class="${r.sup === 'legend' ? 'sup-gold' : ''}">${r.name}</b>${tag}</span>
         <span class="nrb-mon">${r.mon ? `<img class="px" src="${spriteUrl(r.mon, { shiny: r.shiny })}" alt=""><small>Lv ${r.lv}</small>` : ''}</span>
         ${raid
           ? `<span class="nrb-n"><b>${r.bossDmg}</b><small>${r.share}%</small></span><span class="nrb-lives">${'<i></i>'.repeat(Math.max(0, r.lives))}${'<i class="lost"></i>'.repeat(Math.max(0, RAID_LIVES - r.lives))}</span>`

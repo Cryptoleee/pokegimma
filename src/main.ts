@@ -230,7 +230,7 @@ let ready = false
 
 function me(): LobbyPlayer {
   const p = progress()
-  return { pid: profile().id, name: profile().name || trainer.name, trainer: trainer.key, team, ready, shiny: !!team[0] && shinyPartner(team[0]), pet: myPet(p), lv: levelOf(p.xp).lv, title: titleOf(p) }
+  return { pid: profile().id, name: profile().name || trainer.name, trainer: trainer.key, team, ready, shiny: !!team[0] && shinyPartner(team[0]), pet: myPet(p), sup: p.supporter, lv: levelOf(p.xp).lv, title: titleOf(p) }
 }
 
 // ---------- Menus ----------

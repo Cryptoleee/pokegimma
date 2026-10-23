@@ -38,7 +38,10 @@ const TITLES: Record<string, T> = {
   unscathed: ['Unscathed', 'Ongeschonden'],
   stormrider: ['Storm Rider', 'Stormrijder'],
   frostbound: ['Frostbound', 'IJsgeboren'],
-  supporter: ['★ Supporter', '★ Supporter'],
+  // Supporter packs (marked, so they never read like the level titles)
+  sup_spark: ['⚡ Spark', '⚡ Vonk'],
+  sup_storm: ['🌩️ Stormchaser', '🌩️ Stormjager'],
+  sup_legend: ['★ Legend', '★ Legende'],
 }
 
 export function titleName(id: string) {

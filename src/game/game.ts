@@ -1,3 +1,4 @@
+import type { SupportTier } from '../../api/_progress'
 import { ALL_PARTNERS, PARTY_MAX, rarityOf, SPECIES, TEAM_SIZE, WILD, type Rarity } from '../data/pokemon'
 import { eventTimes, startEvent, updateEvents, type WorldEvent } from './events'
 import { roleInfo } from '../data/roles'
@@ -232,6 +233,8 @@ export interface HumanSetup {
   shiny?: boolean
   /** A follower (species) trotting after the trainer, for show only. */
   pet?: number
+  /** Supporter pack: a badge by the name, a golden name and sparks for Legend. */
+  sup?: SupportTier
 }
 
 /** Battle royale (last trainer standing) or raid (everyone against a boss). */
