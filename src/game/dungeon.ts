@@ -211,11 +211,35 @@ function prepareRoom(g: Game, d: DungeonRun) {
   }
 }
 
+/** Healing well: stand this close to drink. */
+export const WELL_R = 2.4
+/** A room's well flows once the room is cleared. */
+export const wellOn = (g: Game, room: number) => room < (g.raidView?.dg?.room ?? 0) || (g.raidView?.dg?.stage ?? 0) > 0
+
+/** Wells (host): whoever stands at one that flows gets 12% of their health back every second. */
+function wellTick(g: Game, dt: number) {
+  for (const w of g.world.wells) {
+    if (!wellOn(g, w.room)) continue
+    for (const tr of g.trainers) {
+      const m = tr.mon
+      if (!tr.alive || m.fainted || m.hp >= m.maxHp) continue
+      if (Math.hypot(m.x - w.x, m.y - w.y) > WELL_R && Math.hypot(tr.x - w.x, tr.y - w.y) > WELL_R) continue
+      const was = m.hp
+      m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.12 * dt)
+      // Now and then a green plus, and a chime when you start drinking
+      if (Math.floor(g.time * 2.5) !== Math.floor((g.time - dt) * 2.5)) g.addFxPublic({ kind: 'heal', x: m.x, y: m.y - 0.5, t: 0, life: 0.6, color: '#80f0c0' })
+      if (was < m.maxHp * 0.999 && (m.wellT ?? 0) < g.time - 2) g.soundAt(m.x, m.y, 'item', ['potion'], { owners: [tr], range: 8 })
+      m.wellT = g.time
+    }
+  }
+}
+
 /** Host tick while the run is on. Returns true until the boss fight starts (then boss.ts takes over). */
 export function dungeonTick(g: Game, r: RaidState, dt: number): boolean {
   const d = r.dg!
   if (d.stage === 'boss') return false
   d.time += dt
+  wellTick(g, dt)
   const def = d.def
   const standing = g.trainers.filter((t) => t.alive && !t.mon.fainted)
   const near = (x: number, y: number, range: number) => standing.some((t) => Math.hypot(t.mon.x - x, t.mon.y - y) < range || Math.hypot(t.x - x, t.y - y) < range)
@@ -809,7 +833,7 @@ function roomCleared(g: Game, d: DungeonRun) {
   for (const v of g.viewers) {
     v.hooks.banner(last
       ? { kind: 'legendary', kicker: both('DUNGEON', 'DUNGEON'), title: both('THE WAY IS OPEN', 'DE WEG IS VRIJ'), sub: inBoth(() => `${d.def.theme.toBoss()} · ${L(`${g.raid!.def.name} is waiting…`, `${g.raid!.def.name} wacht…`)}`), mon: g.raid!.def.species, color: g.raid!.def.color }
-      : { kind: 'win', kicker: both('DUNGEON', 'DUNGEON'), title: both('Room cleared!', 'Kamer veroverd!'), sub: both('The gate is open · on to the next room', 'De poort is open · door naar de volgende kamer'), color: '#ffd040' })
+      : { kind: 'win', kicker: both('DUNGEON', 'DUNGEON'), title: both('Room cleared!', 'Kamer veroverd!'), sub: both('The gate is open · the well heals you · on to the next room', 'De poort is open · de put geneest je · door naar de volgende kamer'), color: '#ffd040' })
     v.sfx('loot')
   }
 }
@@ -943,6 +967,116 @@ export function drawGate(ctx: CanvasRenderingContext2D, gt: Gate, time: number) 
 }
 
 /** A brazier: an iron bowl on a stand with a fire that never goes out. */
+/**
+ * A healing well: a round stone rim with water in it. Dry and dark until its
+ * room is cleared; then the water glows, ripples and sends motes up, and a soft
+ * ring on the floor shows how close you need to stand.
+ */
+export function drawWell(ctx: CanvasRenderingContext2D, x: number, y: number, time: number, on: boolean) {
+  const px = Math.round(x), py = Math.round(y)
+  ctx.save()
+  // The ring on the floor (where it heals)
+  if (on) {
+    const pulse = 0.5 + 0.5 * Math.sin(time * 2.4)
+    ctx.strokeStyle = `rgba(110,255,190,${0.25 + pulse * 0.25})`
+    ctx.lineWidth = 1.2
+    ctx.setLineDash([3, 3])
+    ctx.lineDashOffset = -time * 6
+    ctx.beginPath()
+    ctx.ellipse(px, py + 2, WELL_R * TILE, WELL_R * TILE * 0.62, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.globalCompositeOperation = 'lighter'
+    const gl = ctx.createRadialGradient(px, py, 0, px, py, 26)
+    gl.addColorStop(0, `rgba(80,255,170,${0.28 + pulse * 0.12})`)
+    gl.addColorStop(1, 'rgba(80,255,170,0)')
+    ctx.fillStyle = gl
+    ctx.fillRect(px - 26, py - 26, 52, 52)
+    ctx.globalCompositeOperation = 'source-over'
+  }
+  // The well itself half again as big (it has to read at a glance)
+  ctx.translate(px, py)
+  ctx.scale(1.5, 1.5)
+  ctx.translate(-px, -py)
+  // Two posts and a little roof over it, with a bucket on a rope
+  ctx.fillStyle = '#3a2a22'
+  ctx.fillRect(px - 11, py - 20, 2, 22)
+  ctx.fillRect(px + 9, py - 20, 2, 22)
+  ctx.fillStyle = '#5a4030'
+  ctx.fillRect(px - 10, py - 18, 20, 1)
+  ctx.fillStyle = on ? '#2f6a5a' : '#3a3438'
+  ctx.beginPath()
+  ctx.moveTo(px - 14, py - 19)
+  ctx.lineTo(px, py - 27)
+  ctx.lineTo(px + 14, py - 19)
+  ctx.closePath()
+  ctx.fill()
+  ctx.fillStyle = on ? '#4a9a80' : '#4a4448'
+  ctx.fillRect(px - 14, py - 20, 28, 2)
+  ctx.fillStyle = '#c8b090'
+  ctx.fillRect(px, py - 18, 1, 9 + Math.sin(time * 1.4) * 0.8)
+  ctx.fillStyle = '#6a4a30'
+  ctx.fillRect(px - 2, py - 10 + Math.sin(time * 1.4) * 0.8, 5, 3)
+  // Shadow, then the rim: stones round an oval
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'
+  ctx.beginPath()
+  ctx.ellipse(px, py + 4, 12, 5, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#4a4248'
+  ctx.beginPath()
+  ctx.ellipse(px, py, 11, 7, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillRect(px - 11, py, 22, 4)
+  ctx.beginPath()
+  ctx.ellipse(px, py + 4, 11, 7, 0, 0, Math.PI)
+  ctx.fill()
+  ctx.fillStyle = '#6a6068'
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2
+    ctx.fillRect(Math.round(px + Math.cos(a) * 9.5) - 2, Math.round(py + Math.sin(a) * 5.6) - 1, 4, 2)
+  }
+  ctx.fillStyle = '#2e282c'
+  for (let i = 0; i < 5; i++) ctx.fillRect(px - 10 + i * 5, py + 4, 1, 4)
+  // The water
+  ctx.fillStyle = on ? '#1c8a74' : '#1a1a20'
+  ctx.beginPath()
+  ctx.ellipse(px, py, 7.5, 4.2, 0, 0, Math.PI * 2)
+  ctx.fill()
+  if (on) {
+    ctx.globalCompositeOperation = 'lighter'
+    // Ripples spreading out from the middle
+    for (let k = 0; k < 2; k++) {
+      const f = (time * 0.7 + k * 0.5) % 1
+      ctx.strokeStyle = `rgba(160,255,220,${0.7 * (1 - f)})`
+      ctx.lineWidth = 0.8
+      ctx.beginPath()
+      ctx.ellipse(px, py, 1 + f * 6.5, 0.6 + f * 3.6, 0, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+    ctx.fillStyle = 'rgba(200,255,235,0.8)'
+    ctx.fillRect(px - 3 + Math.sin(time * 1.7) * 2, py - 2, 3, 1)
+    // Motes rising out of it
+    for (let i = 0; i < 6; i++) {
+      const k = (time * 0.45 + i / 6) % 1
+      const mx = px + Math.sin(i * 2.3 + time * 1.3) * (3 + i % 3)
+      const my = py - 2 - k * 26
+      ctx.fillStyle = i % 2 ? `rgba(140,255,200,${1 - k})` : `rgba(230,255,240,${(1 - k) * 0.9})`
+      ctx.fillRect(Math.round(mx), Math.round(my), k < 0.4 ? 2 : 1, k < 0.4 ? 2 : 1)
+    }
+    // A plus sign hovering over it
+    const bob = Math.sin(time * 2) * 1.5
+    ctx.fillStyle = 'rgba(120,255,180,0.95)'
+    ctx.fillRect(px - 1, py - 36 + bob, 2, 6)
+    ctx.fillRect(px - 3, py - 34 + bob, 6, 2)
+  } else {
+    // Dry: a few dark cracks
+    ctx.fillStyle = '#2a2a32'
+    ctx.fillRect(px - 3, py - 1, 4, 1)
+    ctx.fillRect(px + 1, py, 3, 1)
+  }
+  ctx.restore()
+}
+
 export function drawBrazier(ctx: CanvasRenderingContext2D, x: number, y: number, time: number) {
   const px = Math.round(x), py = Math.round(y)
   // The Storm Tower's braziers burn with caught lightning

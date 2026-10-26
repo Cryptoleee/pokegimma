@@ -101,6 +101,8 @@ export class World {
   dsparks: { x: number; y: number; k: 'puddle' | 'coil' }[] = []
   /** Dungeon braziers along the walls (drawn and lit every frame). */
   braziers: { x: number; y: number }[] = []
+  /** Dungeon healing wells: one per room near its way out, dry until the room is cleared. */
+  wells: { x: number; y: number; room: number }[] = []
   /** Raid dungeon: floor material per tile (see dungeonArt FM), set pieces, the ones that move, lava glow spots, the lava's shape. */
   floorMat = new Uint8Array(MAP * MAP)
   props: Prop[] = []
@@ -323,6 +325,29 @@ export class World {
         else this.braziers.push({ x: hl.x + 0.6, y: hl.y + k + 0.5 }, { x: hl.x + hl.w - 0.4, y: hl.y + k + 0.5 })
       }
     }
+    // A healing well in every room, a few tiles inside its way out, on open floor
+    def.rooms.forEach((room, i) => {
+      const gt = def.gates[i], rm = room.rect
+      if (!gt) return
+      const gx = gt.x + gt.w / 2, gy = gt.y + gt.h / 2, cx = rm.x + rm.w / 2, cy = rm.y + rm.h / 2
+      const dd = Math.hypot(cx - gx, cy - gy) || 1
+      const bx = gx + ((cx - gx) / dd) * 5, by = gy + ((cy - gy) / dd) * 5
+      const clear = (x: number, y: number) => {
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if (!floorAt(x + ox, y + oy)) return false
+        return x > rm.x + 1 && x < rm.x + rm.w - 2 && y > rm.y + 1 && y < rm.y + rm.h - 2 && !this.braziers.some((b) => Math.hypot(b.x - x - 0.5, b.y - y - 0.5) < 2)
+      }
+      for (let d = 0; d <= 8; d++) {
+        let spot: [number, number] | null = null
+        for (let k = 0; k < (d ? 8 * d : 1) && !spot; k++) {
+          const x = Math.round(bx + Math.cos((k / (8 * d || 1)) * Math.PI * 2) * d), y = Math.round(by + Math.sin((k / (8 * d || 1)) * Math.PI * 2) * d)
+          if (clear(x, y)) spot = [x, y]
+        }
+        if (spot) {
+          this.wells.push({ x: spot[0] + 0.5, y: spot[1] + 0.5, room: i })
+          break
+        }
+      }
+    })
     this.carveArena(kind)
     this.collect(def.start[0], def.start[1])
     // Gates go in last: closed, they'd cut the flood above in two

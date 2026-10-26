@@ -97,6 +97,8 @@ export class Mon {
   revealT = 0
   /** Seconds since this Pokémon last dealt or took damage (drives out-of-combat regen). */
   combatT = 0
+  /** Last time it drank from a healing well (game time). */
+  wellT?: number
   lastHitBy: Trainer | null = null
 
   // Wild behaviour
