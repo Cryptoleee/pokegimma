@@ -10,6 +10,7 @@ import type { Reward } from '../progress'
 import { rewardsHtml, runRewards } from './rewards'
 import { appEsc as esc, IC, icon, teamStage } from './app'
 import { askAfterWin, showSupport } from './support'
+import { showFeedback } from './feedback'
 
 /** End-of-match screen: where you placed, your team, counted stats, rewards and the scoreboard. */
 export interface ResultAction {
@@ -98,6 +99,7 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
           <div class="nr-stats">${stats}</div>
           ${reward ? rewardsHtml() : ''}
           ${r.won && askAfterWin() ? `<button class="nr-support">♥ ${L('Enjoying it? Support the game', 'Plezier gehad? Steun de game')}</button>` : ''}
+          <button class="nr-feedback">💬 ${L('Send feedback', 'Feedback sturen')}</button>
         </section>
         <section class="nr-pane" data-pane="rw"></section>
         <section class="nr-pane" data-pane="board">
@@ -129,6 +131,10 @@ export function showResults(r: GameResult, trainerSprite: string, main: ResultAc
     requestAnimationFrame(tick)
   })
 
+  el.querySelector('.nr-feedback')?.addEventListener('click', () => {
+    sfx.select()
+    showFeedback({ mode: kind === 'royale' ? 'br' : kind, result: kind === 'raid' ? (r.won ? 'clear' : 'fail') : r.won ? 'win' : 'lose' })
+  })
   el.querySelector('.nr-support')?.addEventListener('click', () => {
     sfx.select()
     showSupport()

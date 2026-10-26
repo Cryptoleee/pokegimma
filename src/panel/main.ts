@@ -340,6 +340,7 @@ async function boot() {
   data = res.body as Full
   liveAt = Date.now()
   draw()
+  void loadInbox()
   liveTimer = window.setInterval(refreshLive, 15000)
   fullTimer = window.setInterval(refreshFull, 120000)
 }
@@ -366,6 +367,7 @@ async function refreshFull() {
       data = r.body as Full
       liveAt = Date.now()
       draw()
+      void loadInbox()
     }
   } catch {
     /* keep the old frame */
@@ -374,6 +376,106 @@ async function refreshFull() {
   }
 }
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && data && refreshLive())
+
+// ---------- Inbox (player feedback) ----------
+
+interface Feedback {
+  id: string
+  t: number
+  text: string
+  kind: string
+  mode: string
+  result?: string
+  lang?: string
+  dev?: string
+  name?: string
+  discord?: string
+}
+let inbox: { items: Feedback[]; seen: number; unread: number } | null = null
+let inboxFilter = 'all'
+let inboxCard: HTMLElement | null = null
+
+async function loadInbox() {
+  try {
+    const r = await fetch('/api/feedback', { headers: { 'x-stats-key': key }, cache: 'no-store' })
+    if (r.status === 200) inbox = await r.json()
+  } catch {
+    /* next time */
+  }
+  drawInbox()
+}
+
+const KIND_NAME: Record<string, string> = { bug: '🐞 Bug', idea: '💡 Idee', other: '💬 Anders' }
+const MODE_NAME: Record<string, string> = { menu: 'home', br: 'battle royale', raid: 'raid', duel: '1v1' }
+const RESULT_NAME: Record<string, string> = { win: 'gewonnen', lose: 'verloren', clear: 'verslagen', fail: 'mislukt' }
+
+function drawInbox() {
+  if (!inboxCard) return
+  const c = inboxCard
+  c.replaceChildren()
+  const head = h('div', 'ib-head')
+  const title = h('h2', '', 'Inbox')
+  if (inbox?.unread) title.append(h('span', 'ib-new', `${inbox.unread} nieuw`))
+  head.append(title)
+  const seg = h('div', 'seg')
+  for (const [k, name] of [['all', 'Alles'], ['bug', 'Bugs'], ['idea', 'Ideeën'], ['other', 'Anders']]) {
+    const n = inbox ? inbox.items.filter((x) => k === 'all' || x.kind === k).length : 0
+    const b = h('button', k === inboxFilter ? 'on' : '', `${name} ${n}`)
+    b.onclick = () => {
+      inboxFilter = k
+      drawInbox()
+    }
+    seg.append(b)
+  }
+  head.append(h('div', 'spacer'), seg)
+  if (inbox?.unread) {
+    const read = h('button', 'ghost', 'Alles gelezen')
+    read.onclick = async () => {
+      await fetch('/api/feedback?seen=1', { method: 'POST', headers: { 'x-stats-key': key } }).catch(() => null)
+      if (inbox) {
+        inbox.seen = Date.now()
+        inbox.unread = 0
+      }
+      drawInbox()
+    }
+    head.append(read)
+  }
+  c.append(head, h('p', 'sub', 'Berichten via "Feedback sturen" (home en na een potje), nieuwste eerst'))
+  const items = (inbox?.items ?? []).filter((x) => inboxFilter === 'all' || x.kind === inboxFilter)
+  if (!inbox) {
+    c.append(h('p', 'ib-empty', 'Laden…'))
+    return
+  }
+  if (!items.length) {
+    c.append(h('p', 'ib-empty', 'Nog geen berichten.'))
+    return
+  }
+  const list = h('div', 'ib-list')
+  for (const fb of items.slice(0, 100)) {
+    const row = h('article', `ib-item ${fb.t > inbox.seen ? 'unread' : ''}`)
+    const meta = h('div', 'ib-meta')
+    meta.append(h('span', `ib-kind k-${fb.kind}`, KIND_NAME[fb.kind] ?? fb.kind))
+    const where = MODE_NAME[fb.mode] ?? fb.mode
+    const parts = [where + (fb.result ? ` · ${RESULT_NAME[fb.result] ?? fb.result}` : ''), fb.dev === 'mobile' ? '📱' : fb.dev === 'desktop' ? '💻' : '', fb.lang?.toUpperCase() ?? '']
+    meta.append(h('span', 'ib-where', parts.filter(Boolean).join(' · ')))
+    const who = [fb.name, fb.discord ? `Discord: ${fb.discord}` : ''].filter(Boolean).join(' · ')
+    if (who) meta.append(h('span', 'ib-who', who))
+    meta.append(h('span', 'spacer'))
+    meta.append(h('time', 'ib-time', new Date(fb.t).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })))
+    const del = h('button', 'ib-del', '✕')
+    del.title = 'Verwijderen'
+    del.onclick = async () => {
+      if (!confirm('Dit bericht verwijderen?')) return
+      await fetch(`/api/feedback?id=${encodeURIComponent(fb.id)}`, { method: 'DELETE', headers: { 'x-stats-key': key } }).catch(() => null)
+      if (inbox) inbox.items = inbox.items.filter((x) => x.id !== fb.id)
+      drawInbox()
+    }
+    meta.append(del)
+    row.append(meta, h('p', 'ib-text', fb.text))
+    list.append(row)
+  }
+  c.append(list)
+}
 
 // ---------- Dashboard ----------
 
@@ -460,6 +562,11 @@ function draw() {
 
   const grid = h('div', 'grid')
   wrap.append(grid)
+
+  // Inbox: what players sent
+  inboxCard = h('section', 'card inbox')
+  grid.append(inboxCard)
+  drawInbox()
 
   // Live
   liveCard = h('section', 'card')

@@ -18,6 +18,7 @@ import { dailyOf, isUnlocked, levelCost, levelOf, nextUnlock, RAID_UNLOCKS } fro
 import { showOptions } from './screens'
 import { hasUnseen, maybeShowNews, newsPreview, showNews } from './news'
 import { showSupport } from './support'
+import { showFeedback } from './feedback'
 import { appEsc as esc, appShell, bar, bindShell, BOLT, DISCORD, discordMe, IC, icon, loginBanner, masteryLine, monChips, monImg, strike, teamCard, teamStage, type AppTab } from './app'
 import { openTeamSheet } from './team'
 import { storm, STORM_TINT } from './storm'
@@ -156,6 +157,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
         <header class="n-top">
           <div class="n-hello"><small>${greeting()}</small><b>${esc(name || L('Trainer', 'Trainer'))}${discordMe() ? `<span class="n-hello-dc" title="${L('Signed in with Discord', 'Ingelogd met Discord')}">${DISCORD}</span>` : ''}</b></div>
           <button class="n-pill" data-act="quests" aria-label="${L(`Daily quests: ${done} of ${q.length} done`, `Dagopdrachten: ${done} van ${q.length} klaar`)}">${icon(IC.star, 14)}${done}/${q.length}</button>
+          <button class="n-icon home-feedback" aria-label="${L('Send feedback', 'Feedback sturen')}" title="${L('Send feedback', 'Feedback sturen')}">${icon(IC.chat)}</button>
           <button class="n-icon home-support" aria-label="${L('Support the game', 'Steun de game')}" title="${L('Support the game', 'Steun de game')}">${icon(IC.heart)}</button>
           <button class="n-icon home-news" aria-label="${L('What’s new', 'Wat is er nieuw')}">${icon(IC.news)}${hasUnseen() ? '<i class="n-pip"></i>' : ''}</button>
           <button class="n-icon home-opts" aria-label="${L('Options', 'Opties')}">${icon(IC.opts)}</button>
@@ -426,6 +428,7 @@ export function showMenu(st: MenuState, on: MenuActions) {
       act('.home-opts', () => showOptions())
       act('.home-news', () => showNews(() => paint()))
       act('.home-support', () => showSupport())
+      act('.home-feedback', () => showFeedback({ mode: 'menu' }))
       act('[data-act="quests"]', () => on.tab('profile'))
       act('[data-act="team"]', () => on.tab('team'))
       act('[data-act="rejoin"]', () => askName(() => on.rejoin(st.rejoin!)))

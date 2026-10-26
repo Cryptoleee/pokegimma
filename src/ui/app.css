@@ -6868,3 +6868,128 @@ body.duo-view #hud {
     display: none;
   }
 }
+
+/* Send feedback: a speech bubble on home, a quiet line after a match, a small panel */
+.home-feedback svg {
+  color: #8ab8ff;
+}
+.nr-feedback {
+  align-self: center;
+  margin-top: 2px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--n-mute, #aaa);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.nr-feedback:hover {
+  color: #8ab8ff;
+}
+.n-ui #modal .panel.fb {
+  position: relative;
+  width: min(460px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+  border-color: var(--n-line2);
+  background: var(--n-s1);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+.n-ui .fb-ic {
+  font-size: 16px;
+}
+.n-ui #modal p.fb-intro {
+  margin: 0;
+  color: var(--n-mute);
+  line-height: 1.45;
+}
+.n-ui .fb-kinds {
+  display: flex;
+  gap: 6px;
+}
+.n-ui .fb-kind {
+  flex: 1;
+  padding: 9px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--n-line);
+  background: var(--n-s2);
+  color: var(--n-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.n-ui .fb-kind.on {
+  border-color: var(--n-acc);
+  background: color-mix(in srgb, var(--n-acc) 16%, var(--n-s2));
+}
+.n-ui .fb-text {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--n-line);
+  background: var(--n-s2);
+  color: var(--n-text);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.n-ui .fb-text:focus {
+  outline: none;
+  border-color: var(--n-acc);
+}
+.n-ui .fb-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: -6px;
+  font-size: 12px;
+}
+.n-ui .fb-count {
+  color: var(--n-mute);
+}
+.n-ui .fb-err {
+  color: #ff8a80;
+  text-align: right;
+}
+.n-ui #modal .fb-send:disabled {
+  opacity: 0.5;
+}
+.n-ui .fb-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 0 6px;
+  text-align: center;
+}
+.n-ui .fb-done span {
+  font-size: 40px;
+}
+.n-ui .fb-done b {
+  font-size: 20px;
+}
+.n-ui .fb-done p {
+  margin: 0;
+  color: var(--n-mute);
+}
+/* Narrow phones: five round buttons in the home header, and still room for your name */
+@media (max-width: 430px) {
+  .n-home > .n-top {
+    gap: 6px;
+  }
+  .n-home > .n-top .n-icon {
+    width: 38px;
+    height: 38px;
+  }
+  .n-home > .n-top .n-pill {
+    height: 38px;
+    padding: 0 10px;
+  }
+}
