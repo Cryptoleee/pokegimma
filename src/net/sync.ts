@@ -8,6 +8,8 @@ import type { Vfx } from '../game/vfx'
 import type { Command, NetEvent, RosterEntry } from './protocol'
 import { bossAttack, cloneMon, type Hazard } from '../game/boss'
 import type { DungeonView } from '../game/dungeon'
+import { ability, choose } from '../game/perks'
+import { RAID_ROLES } from '../data/perks'
 
 /** Dungeon foe roles, by index on the wire ('' = -1). */
 const FOE_ROLES: string[] = ['brute', 'caster', 'mender', 'guard']
@@ -118,6 +120,7 @@ function monState(m: Mon, own: boolean) {
   if (m.claimT > 0 && m.claim) o.cl = [m.claim.id, r1(m.claimT)]
   if (m.catching) o.ca = 1
   if (m.boss) o.bs = m.bossMul
+  if (m.hpMul !== 1) o.hm = m.hpMul
   if (m.foe) o.fo = [m.foe, r2(m.bossMul), FOE_ROLES.indexOf(m.role), m.idle ? 1 : 0]
   if (m.cast) o.cs = [m.cast.kind === 'heal' ? 1 : 0, r2(m.cast.t), m.cast.total]
   if (m.frozenT > 0) o.fz = r2(m.frozenT)
@@ -151,6 +154,10 @@ export function snapshot(g: Game, v: RemoteViewer) {
       o.lv = tr.lives
       o.rs = r1(tr.respawnT)
       o.bd = Math.round(tr.bossDmg)
+      // Their raid role (everyone draws it) and whether its ability is going
+      if (tr.rr) o.rr = RAID_ROLES.indexOf(tr.rr)
+      if (tr.abT > 0) o.ab = r1(tr.abT)
+      if (tr.perks.length) o.pp = tr.perks
     }
     // 1 vs 1 power-ups (auras, and your own speed)
     if (tr.atkT > 0 || tr.spdT > 0 || tr.defT > 0) o.bf = [r1(tr.atkT), r1(tr.spdT), r1(tr.defT)]
@@ -177,6 +184,8 @@ export function snapshot(g: Game, v: RemoteViewer) {
     me: {
       p: me.party.map((m) => m.id), ac: me.active, mb: me.masterBalls, po: me.potions, re: me.revives, et: me.ethers,
       k: me.kos, c: me.caught, sw: r2(me.swapCd), sp: me.spectate?.id ?? 0, dd: r1(me.diedAt), tp: me.tpN,
+      // Raid: your perks, your ability's cooldown and a pick waiting for you
+      ...(g.raid ? { pp: me.perks, ac2: r1(me.abCd), pk: me.pick ? [me.pick.kind === 'role' ? 0 : 1, me.pick.opts, r1(me.pick.t)] : 0 } : {}),
     },
   }
   // Ground items rarely change: only send them when the count does (and now and then)
@@ -235,6 +244,12 @@ export function runCommand(g: Game, v: RemoteViewer, c: Command) {
       if (c.k === 'potion') g.usePotion(tr)
       else if (c.k === 'ether') g.useEther(tr)
       else g.useRevive(tr)
+      return
+    case 'perk':
+      if (tr.pick) choose(g, tr, Number(c.i) || 0)
+      return
+    case 'ability':
+      ability(g, tr)
       return
     case 'pick': {
       const p = v.pending
@@ -311,6 +326,7 @@ function getMon(cs: ClientState, o: Record<string, number & string & unknown[]>,
   m.claim = cl ? cs.trainers.get(cl[0]) ?? null : null
   m.claimT = cl ? cl[1] : 0
   m.catching = !!o.ca
+  m.hpMul = o.hm ?? 1
   if (o.bs) {
     m.boss = true
     m.bossMul = o.bs
@@ -382,6 +398,9 @@ export function applySnapshot(g: Game, raw: unknown) {
       tr.lives = t.lv
       tr.respawnT = t.rs
       tr.bossDmg = t.bd
+      if (t.rr !== undefined) tr.rr = RAID_ROLES[t.rr] ?? tr.rr
+      tr.abT = t.ab ?? 0
+      tr.perks = (t.pp as unknown as string[] | undefined) ?? tr.perks
     }
     const bf = t.bf as unknown as number[] | undefined
     ;[tr.atkT, tr.spdT, tr.defT] = bf ?? [0, 0, 0]
@@ -421,6 +440,13 @@ export function applySnapshot(g: Game, raw: unknown) {
   me.potions = s.me.po
   me.revives = s.me.re
   me.ethers = s.me.et ?? 0
+  if (s.me.pp) {
+    me.perks = s.me.pp as unknown as string[]
+    me.abCd = s.me.ac2 ?? 0
+    const pk = s.me.pk as unknown as [number, string[], number] | 0
+    // A pick you just made stays closed until the host has it
+    me.pick = pk && !(me.pickSent && me.pickSent > performance.now() - 1500) ? { kind: pk[0] ? 'up' : 'role', opts: pk[1], t: pk[2] } : null
+  }
   me.kos = s.me.k
   me.caught = s.me.c
   me.swapCd = Math.max(me.swapCd, s.me.sw)

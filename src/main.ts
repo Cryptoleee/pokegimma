@@ -1022,7 +1022,9 @@ window.addEventListener('keydown', (e) => {
   if (a === 'switch') {
     for (let i = 1; i <= p.party.length; i++) if (g.switchTo(p, (p.active + i) % p.party.length)) break
   }
-  if (a === 'catch') {
+  // In a raid there's nothing to catch: the same key fires your role's ability
+  if (a === 'catch' && g.kind === 'raid') hud.fireAbility()
+  else if (a === 'catch') {
     const w = g.catchable(p)
     if (w) g.throwBall(p, w, false)
   }

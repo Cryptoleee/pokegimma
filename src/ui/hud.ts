@@ -18,6 +18,8 @@ import { BOSSES, RAID_LIVES } from '../data/bosses'
 import { DUEL_WINS, ROUND_TIME } from '../game/duel'
 import { L, tx, type Txt } from '../i18n'
 import { keyName, keyOf } from '../keys'
+import { ROLE_DEF, upgradeOf, type RaidRole } from '../data/perks'
+import { abilityCd, PICK_TIME, pickTitle } from '../game/perks'
 
 const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = '') => {
   const el = document.createElement(tag)
@@ -79,6 +81,11 @@ export class Hud {
   private duelBar = h('div', 'duelbar hidden')
   private duelKey = ''
   private countSec = 0
+  /** Raid: your role's ability button and the role / upgrade cards when there's a pick. */
+  private abil = h('div', 'abil hidden')
+  private pickEl = h('div', 'perkpick hidden')
+  private pickKey = ''
+  private abilKey = ''
   /** Resets for every touch control, so a lost touch can never leave one stuck. */
   private releasers: (() => void)[] = []
 
@@ -179,6 +186,14 @@ export class Hud {
     }
     root.append(moves)
 
+    if (g.kind === 'raid') {
+      this.abil.onpointerdown = (e) => {
+        e.preventDefault()
+        this.fireAbility()
+      }
+      root.append(this.abil, this.pickEl)
+    }
+
     this.catchBtn.onpointerdown = (e) => {
       e.preventDefault()
       const w = this.g.catchable(this.g.player)
@@ -189,6 +204,8 @@ export class Hud {
 
   useItem(key: 'master' | 'potion' | 'revive') {
     const g = this.g, p = g.player
+    // A pick on screen: the item keys (1 2 3, or ◀ ▲ ▶) choose a card
+    if (p.pick) return g.choosePerk(p, ['master', 'potion', 'revive'].indexOf(key))
     if (!p.alive) return
     if (key === 'master' && g.kind === 'raid') {
       if (p.ethers <= 0) return this.deny(L('No Max Ethers', 'Geen Max Ethers'))
@@ -205,6 +222,69 @@ export class Hud {
       if (p.revives <= 0) return this.deny(L('No Revives', 'Geen Revives'))
       if (!g.useRevive(p)) this.deny(g.kind === 'raid' ? L('No teammate needs it right now', 'Geen teamgenoot die hem nu nodig heeft') : L('Nobody has fainted', 'Niemand is verslagen'))
     }
+  }
+
+  /** Raid: your role's ability (space / B, or the button). */
+  fireAbility() {
+    const g = this.g, p = g.player
+    if (!p.alive || p.mon.fainted) return
+    if (!p.rr) return this.deny(L('Choose your role first', 'Kies eerst je rol'))
+    if (p.abCd > 0) return this.deny(L(`${ROLE_DEF[p.rr].ability()} is ready in ${Math.ceil(p.abCd)} s`, `${ROLE_DEF[p.rr].ability()} is klaar over ${Math.ceil(p.abCd)} s`))
+    if (g.useAbility(p)) sfx.select()
+  }
+
+  /** Raid: the ability button and the pick cards. */
+  private updatePerks() {
+    const g = this.g, p = g.player
+    // Ability: icon, the cooldown sweeping round, lit while it's going
+    this.abil.classList.toggle('hidden', !p.rr || !p.alive)
+    if (p.rr) {
+      const d = ROLE_DEF[p.rr]
+      const key = p.rr
+      if (key !== this.abilKey) {
+        this.abilKey = key
+        this.abil.style.setProperty('--rc', d.color)
+        this.abil.innerHTML = `<i>${d.icon}</i><b>${esc(d.ability())}</b><div class="cd"></div><span class="secs"></span><kbd data-pad="B">${keyName(keyOf('catch'))}</kbd>`
+      }
+      const full = abilityCd(p) || 1
+      this.abil.style.setProperty('--cd', `${Math.min(1, p.abCd / full) * 360}deg`)
+      this.abil.classList.toggle('ready', p.abCd <= 0)
+      this.abil.classList.toggle('on', p.abT > 0)
+      ;(this.abil.querySelector('.secs') as HTMLElement).textContent = p.abCd > 0 ? `${Math.ceil(p.abCd)}` : ''
+    }
+    // The cards
+    const pk = p.pick
+    const key = pk ? `${pk.kind}:${pk.opts.join(',')}` : ''
+    if (key !== this.pickKey) {
+      this.pickKey = key
+      this.pickEl.classList.toggle('hidden', !pk)
+      if (pk) {
+        const keys = (['master', 'potion', 'revive'] as const).map((a) => keyName(keyOf(a)))
+        const card = (i: number, color: string, icon: string, name: string, body: string) =>
+          `<button class="pp-card" data-i="${i}" style="--rc:${color}"><i>${icon}</i><b>${esc(name)}</b>${body}<kbd data-pad="${['◀', '▲', '▶'][i]}">${keys[i]}</kbd></button>`
+        const cards = pk.opts.map((id, i) => {
+          if (pk.kind === 'role') {
+            const d = ROLE_DEF[id as RaidRole]
+            return card(i, d.color, d.icon, d.name(), `<small>${esc(d.passive())}</small><small class="pp-ab"><em>${esc(d.ability())}</em> · ${esc(d.abilityText())}</small>`)
+          }
+          const u = upgradeOf(id)
+          if (!u) return ''
+          const d = u.role === 'any' ? null : ROLE_DEF[u.role]
+          return card(i, d?.color ?? '#ffd040', d?.icon ?? '★', u.name(), `<small>${esc(u.text())}</small>`)
+        })
+        this.pickEl.innerHTML = `<div class="pp-head"><b>${esc(pickTitle(pk.kind))}</b><span class="pp-time"><i></i></span></div><div class="pp-cards">${cards.join('')}</div>`
+        this.pickEl.querySelectorAll<HTMLElement>('.pp-card').forEach((b) =>
+          b.addEventListener('pointerdown', (e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            sfx.select()
+            g.choosePerk(p, Number(b.dataset.i))
+          }),
+        )
+        sfx.banner()
+      }
+    }
+    if (pk) (this.pickEl.querySelector('.pp-time i') as HTMLElement).style.width = `${Math.max(0, pk.t / PICK_TIME) * 100}%`
   }
 
   private deny(text: string) {
@@ -414,6 +494,7 @@ export class Hud {
   update() {
     const g = this.g, p = g.player
     const m = p.mon
+    if (g.kind === 'raid') this.updatePerks()
 
     // Countdown
     if (g.introT > 0) {

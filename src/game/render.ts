@@ -20,6 +20,8 @@ import { BOSSES } from '../data/bosses'
 import { cinematic, drawPhaseScreen, phaseLook, shownPhase, updateCinematic } from './bossFx'
 import { ENRAGE_TIME } from './boss'
 import { badgeOf, WISP } from '../data/support'
+import { ROLE_DEF, type RaidRole } from '../data/perks'
+import { auraR } from './perks'
 import type { SupportTier } from '../../api/_progress'
 
 const FONT = '"Pixelify Sans", monospace'
@@ -89,6 +91,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
 
   // Team rings on the ground + target reticle base + aim preview (under actors)
   drawRings(g, ctx, inView, time)
+  if (g.raid || g.raidView) drawRoles(g, ctx, inView, time, false)
   // Raid dungeon guards: the shield they hold over their pack
   for (const w of g.wilds) {
     if (w.role !== 'guard' || w.fainted || !inView(w.x, w.y, 6)) continue
@@ -141,6 +144,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   for (const p of g.world.anim) if (inView(p.x + p.w / 2, p.y + p.h / 2, 4)) ents.push({ y: p.y + p.h - (p.kind === 'rune' ? 99 : 0), draw: () => drawAnimProp(ctx, p, time) })
   ents.sort((a, b) => a.y - b.y)
   for (const e of ents) e.draw()
+  if (g.raid || g.raidView) drawRoles(g, ctx, inView, time, true)
 
   // Canopies and roofs
   ctx.drawImage(g.world.overlay, sx, sy, sw, sh, sx, sy, sw, sh)
@@ -213,7 +217,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
     }
     const m = tr.mon
     if (m.fainted || (tr.isPlayer && !g.partnerOut) || vis(g, m, tr.isPlayer) === 0) continue
-    plate(ctx, m, tr.isPlayer ? 'me' : g.kind === 'raid' ? 'ally' : 'foe', tr.isPlayer ? m.name : tr.name.split(' ').pop()!, supOf(g, tr))
+    plate(ctx, m, tr.isPlayer ? 'me' : g.kind === 'raid' ? 'ally' : 'foe', tr.isPlayer ? m.name : tr.name.split(' ').pop()!, supOf(g, tr), tr.rr || undefined)
   }
   const p = g.player
   for (const w of g.wilds) {
@@ -1015,7 +1019,7 @@ function castBar(ctx: CanvasRenderingContext2D, m: Mon, time: number) {
 }
 
 /** Nameplate: name, HP number on a chunky team-coloured bar with a trailing damage strip. */
-function plate(ctx: CanvasRenderingContext2D, m: Mon, team: Team, name: string, sup?: SupportTier) {
+function plate(ctx: CanvasRenderingContext2D, m: Mon, team: Team, name: string, sup?: SupportTier, role?: RaidRole) {
   const c = TEAM_COL[team]
   const legend = m.legendary && !m.owner
   const w = legend ? 40 : 30, h = 6
@@ -1051,11 +1055,148 @@ function plate(ctx: CanvasRenderingContext2D, m: Mon, team: Team, name: string, 
   ctx.fillText(hpText, x + w / 2, y + h / 2 + 0.5)
   // name above (a supporter's badge in front of it, a Legend's name in gold)
   label(ctx, name, m.x * TILE, y - 2, legend || sup === 'legend' ? '#ffd040' : c.name)
+  // Raid role: a small mark after the name (shield, plus or blade)
+  if (role) roleMark(ctx, Math.round(m.x * TILE + ctx.measureText(name).width / 2 + 5), Math.round(y - 5.5), role)
   const b = sup && badgeImg(sup)
   if (b) {
     const tw = ctx.measureText(name).width
     const s = 7 / Math.max(b.naturalWidth, b.naturalHeight)
     ctx.drawImage(b, Math.round(m.x * TILE - tw / 2 - 9), Math.round(y - 9), b.naturalWidth * s, b.naturalHeight * s)
+  }
+}
+
+/** A role's mark: a coloured disc with a shield, a plus or a blade on it. */
+function roleMark(ctx: CanvasRenderingContext2D, x: number, y: number, role: RaidRole) {
+  ctx.fillStyle = '#16121e'
+  ctx.beginPath()
+  ctx.arc(x, y, 4.2, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = ROLE_DEF[role].color
+  ctx.beginPath()
+  ctx.arc(x, y, 3.3, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#ffffff'
+  if (role === 'healer') {
+    ctx.fillRect(x - 0.6, y - 2, 1.2, 4)
+    ctx.fillRect(x - 2, y - 0.6, 4, 1.2)
+  } else if (role === 'tank') {
+    ctx.beginPath()
+    ctx.moveTo(x - 1.8, y - 1.8)
+    ctx.lineTo(x + 1.8, y - 1.8)
+    ctx.lineTo(x + 1.8, y)
+    ctx.lineTo(x, y + 2.2)
+    ctx.lineTo(x - 1.8, y)
+    ctx.closePath()
+    ctx.fill()
+  } else {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(Math.PI / 4)
+    ctx.fillRect(-0.6, -2.4, 1.2, 4.2)
+    ctx.fillRect(-1.6, 0.8, 3.2, 0.9)
+    ctx.restore()
+  }
+}
+
+/**
+ * Raid roles on the field, so everyone sees who does what. Under the partner
+ * (ground pass): the tank's blue shield ring, the healer's aura (as far as it
+ * reaches), the striker's red ring. Over it (top pass), while an ability is
+ * going: the tank's shield dome, the healer's wave rolling out, the striker's
+ * flames.
+ */
+function drawRoles(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, y: number) => boolean, time: number, top: boolean) {
+  for (const tr of g.trainers) {
+    const m = tr.mon
+    if (!tr.rr || !tr.alive || !m || m.fainted || !inView(m.x, m.y)) continue
+    const d = ROLE_DEF[tr.rr]
+    const x = m.x * TILE, y = m.y * TILE
+    ctx.save()
+    if (!top) {
+      if (tr.rr === 'healer') {
+        // The aura: a soft green pool with a slowly turning dashed edge
+        const r = auraR(tr) * TILE
+        const pulse = 0.5 + 0.5 * Math.sin(time * 2 + tr.id)
+        ctx.fillStyle = `rgba(88,224,128,${0.07 + pulse * 0.04})`
+        ctx.beginPath()
+        ctx.ellipse(x, y, r, r * 0.62, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = `rgba(120,255,160,${0.35 + pulse * 0.2})`
+        ctx.lineWidth = 1.2
+        ctx.setLineDash([4, 4])
+        ctx.lineDashOffset = -time * 8
+        ctx.stroke()
+        ctx.setLineDash([])
+        // Little pluses drifting up inside it
+        for (let i = 0; i < 4; i++) {
+          const k = (time * 0.5 + i / 4 + tr.id * 0.3) % 1
+          const a = i * 1.7 + tr.id
+          const px = x + Math.cos(a) * r * 0.6, py = y + Math.sin(a) * r * 0.35 - k * 14
+          ctx.fillStyle = `rgba(150,255,180,${(1 - k) * 0.8})`
+          ctx.fillRect(px - 0.5, py - 1.5, 1, 3)
+          ctx.fillRect(px - 1.5, py - 0.5, 3, 1)
+        }
+      } else {
+        // Tank and striker: a ring of their colour under the partner
+        ctx.strokeStyle = d.color
+        ctx.globalAlpha = 0.75
+        ctx.lineWidth = tr.rr === 'tank' ? 2.4 : 1.6
+        ctx.beginPath()
+        ctx.ellipse(x, y + 1, 13, 6.5, 0, 0, Math.PI * 2)
+        ctx.stroke()
+        if (tr.rr === 'tank') {
+          // Four small shield studs round it
+          ctx.fillStyle = d.color
+          for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI * 2 + time * 0.6
+            ctx.fillRect(Math.round(x + Math.cos(a) * 13) - 1.5, Math.round(y + 1 + Math.sin(a) * 6.5) - 1.5, 3, 3)
+          }
+        }
+      }
+    } else if (tr.abT > 0) {
+      ctx.globalCompositeOperation = 'lighter'
+      if (tr.rr === 'tank') {
+        // Taunt: a shimmering shield dome over the partner
+        const r = 20 + Math.sin(time * 9) * 1
+        const gr = ctx.createRadialGradient(x, y - 10, r * 0.4, x, y - 10, r)
+        gr.addColorStop(0, 'rgba(88,168,255,0.02)')
+        gr.addColorStop(0.8, 'rgba(88,168,255,0.18)')
+        gr.addColorStop(1, 'rgba(160,210,255,0.55)')
+        ctx.fillStyle = gr
+        ctx.beginPath()
+        ctx.ellipse(x, y - 10, r, r * 0.95, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = `rgba(200,230,255,${0.5 + 0.3 * Math.sin(time * 12)})`
+        ctx.lineWidth = 1
+        ctx.stroke()
+      } else if (tr.rr === 'healer') {
+        // Healing wave: a green ring rolling out
+        const k = 1 - tr.abT / 0.9
+        const r = (1 + k * 6) * TILE
+        ctx.strokeStyle = `rgba(120,255,160,${0.8 * (1 - k)})`
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.ellipse(x, y, r, r * 0.62, 0, 0, Math.PI * 2)
+        ctx.stroke()
+      } else {
+        // Fury: flames licking up round the partner
+        for (let i = 0; i < 7; i++) {
+          const a = (i / 7) * Math.PI * 2 + time * 2
+          const fx = x + Math.cos(a) * 11, fy = y + Math.sin(a) * 5
+          const h = 6 + Math.sin(time * 13 + i * 2) * 3
+          ctx.fillStyle = 'rgba(255,100,50,0.55)'
+          ctx.fillRect(fx - 1.5, fy - h, 3, h)
+          ctx.fillStyle = 'rgba(255,220,120,0.6)'
+          ctx.fillRect(fx - 0.5, fy - h * 0.6, 1, h * 0.6)
+        }
+        const gl = ctx.createRadialGradient(x, y - 8, 0, x, y - 8, 22)
+        gl.addColorStop(0, 'rgba(255,90,40,0.28)')
+        gl.addColorStop(1, 'rgba(255,90,40,0)')
+        ctx.fillStyle = gl
+        ctx.fillRect(x - 22, y - 30, 44, 44)
+      }
+    }
+    ctx.restore()
   }
 }
 

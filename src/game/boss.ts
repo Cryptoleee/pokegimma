@@ -1,3 +1,4 @@
+import { offerRole, perkTick } from './perks'
 import { BOSSES, RAID_LEVEL, RAID_LIVES, RAID_TIME, RESPAWN_TIME, type BossAttack, type BossDef, type HazardShape } from '../data/bosses'
 import type { Move, MoveFx } from '../data/moves'
 import { SPECIES } from '../data/pokemon'
@@ -167,6 +168,8 @@ export function setupRaid(g: Game, id: keyof typeof BOSSES) {
   }
   g.clones = []
   if (dungeon) setupDungeon(g, g.raid, dungeon, g.setup.room ?? 0)
+  // Everyone picks a role first: Tank, Healer or Striker
+  for (const tr of humans) offerRole(tr)
   // The arena has no storm: park the zone far outside it
   g.zone.x = g.zone.nx = ARENA_C
   g.zone.y = g.zone.ny = ARENA_C
@@ -189,6 +192,7 @@ export function updateRaid(g: Game, dt: number) {
   const r = g.raid!
   if (r.result) return
   // A dungeon run first: rooms and waves; the boss fight starts in its arena
+  perkTick(g, dt)
   const inDungeon = !!r.dg && dungeonTick(g, r, dt)
   if (!inDungeon) r.timeLeft -= dt
   const boss = r.boss
@@ -532,7 +536,10 @@ function standSpot(g: Game, x: number, y: number) {
 /** Lay out an attack's hazards on the ground. */
 function castAttack(g: Game, r: RaidState, a: BossAttack, foes: Mon[]) {
   const boss = r.boss
-  const pick = a.target === 'random' ? foes[Math.floor(Math.random() * foes.length)] : closest(boss, foes)
+  // A tank draws it: a taunting tank takes every aimed attack, and any tank gets the random ones more often
+  const tanks = foes.filter((f) => f.owner?.rr === 'tank' && Math.hypot(f.x - boss.x, f.y - boss.y) < 16)
+  const taunting = tanks.find((f) => f.owner!.abT > 0)
+  const pick = taunting ?? (a.target === 'random' ? (tanks.length && Math.random() < 0.4 ? tanks[0] : foes[Math.floor(Math.random() * foes.length)]) : closest(boss, foes))
   const aimAt = pick ?? { x: boss.x, y: boss.y + 3 }
   // Teleport: blink next to the target first (a step toward the middle, so it's never in a wall)
   if (a.move === 'teleport' && pick) {

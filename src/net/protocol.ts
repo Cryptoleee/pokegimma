@@ -49,6 +49,9 @@ export type Command =
   | { t: 'switch'; i: number }
   | { t: 'ball'; w: number; m: boolean }
   | { t: 'item'; k: 'potion' | 'revive' | 'ether' }
+  /** Raid: pick a role / upgrade card, or fire your role's ability. */
+  | { t: 'perk'; i: number }
+  | { t: 'ability' }
   /** Answer to "your team is full": which slot to replace (-1 = let it go). */
   | { t: 'pick'; i: number }
 

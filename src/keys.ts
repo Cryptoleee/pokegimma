@@ -27,7 +27,7 @@ export const actionName = (a: Action) =>
     move2: L('Move 2', 'Aanval 2'),
     move3: L('Move 3', 'Aanval 3'),
     move4: L('Ultimate', 'Ultimate'),
-    catch: L('Catch', 'Vangen'),
+    catch: L('Catch (raid: role ability)', 'Vangen (raid: rol-ability)'),
     switch: L('Switch Pokémon', 'Wissel Pokémon'),
     master: 'Master Ball',
     potion: 'Potion',

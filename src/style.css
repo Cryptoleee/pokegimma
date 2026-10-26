@@ -9228,3 +9228,208 @@ body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
     transform: none;
   }
 }
+
+/* =====================================================================
+   Raid roles: the ability button and the role / upgrade cards
+   ===================================================================== */
+.abil {
+  --rc: #ffd040;
+  --cd: 0deg;
+  position: absolute;
+  right: calc(178px + var(--safe-r));
+  bottom: calc(226px + var(--safe-b));
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid #1a1420;
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--rc) 70%, #fff), var(--rc) 60%, color-mix(in srgb, var(--rc) 60%, #000));
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  cursor: pointer;
+  z-index: 7;
+}
+.abil i {
+  font-style: normal;
+  font-size: 26px;
+  line-height: 1;
+  margin-top: -8px;
+  filter: drop-shadow(0 1px 0 #1a1420);
+}
+.abil b {
+  position: absolute;
+  bottom: 7px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 9px;
+  color: #fff;
+  text-shadow: 0 1px 0 #1a1420, 0 0 3px #1a1420;
+  white-space: nowrap;
+}
+.abil .cd {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(rgba(16, 12, 22, 0.72) var(--cd), transparent 0);
+  pointer-events: none;
+}
+.abil .secs {
+  position: absolute;
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #1a1420;
+  pointer-events: none;
+}
+.abil kbd {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+}
+.abil.ready {
+  animation: abilReady 1.1s ease-in-out infinite;
+}
+@keyframes abilReady {
+  50% { box-shadow: 0 4px 0 rgba(0, 0, 0, 0.45), 0 0 18px var(--rc); }
+}
+.abil.on {
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.45), 0 0 26px var(--rc), 0 0 0 4px color-mix(in srgb, var(--rc) 50%, transparent);
+}
+@media (max-height: 480px) {
+  .abil {
+    right: calc(372px + var(--safe-r));
+    bottom: calc(10px + var(--safe-b));
+    width: 56px;
+    height: 56px;
+  }
+}
+
+.perkpick {
+  position: absolute;
+  left: 50%;
+  bottom: calc(18px + var(--safe-b));
+  transform: translateX(-50%);
+  width: min(94vw, 640px);
+  padding: 10px 12px 12px;
+  border-radius: 18px;
+  border: 2px solid #1a1420;
+  background: rgba(20, 16, 28, 0.92);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  z-index: 20;
+  animation: ppIn 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes ppIn {
+  from { transform: translateX(-50%) translateY(30px); opacity: 0; }
+}
+.pp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.pp-head b {
+  font-size: 15px;
+  color: var(--hi);
+  white-space: nowrap;
+}
+.pp-time {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.pp-time i {
+  display: block;
+  height: 100%;
+  background: var(--hi);
+}
+.pp-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.pp-card {
+  --rc: #ffd040;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px 12px;
+  border-radius: 14px;
+  border: 2px solid var(--rc);
+  background: linear-gradient(color-mix(in srgb, var(--rc) 22%, #1c1826), #16121e);
+  color: #fff;
+  font-family: var(--font);
+  text-align: center;
+  cursor: pointer;
+  touch-action: none;
+}
+.pp-card:active,
+.pp-card:hover {
+  background: linear-gradient(color-mix(in srgb, var(--rc) 40%, #1c1826), #16121e);
+}
+.pp-card i {
+  font-style: normal;
+  font-size: 26px;
+  line-height: 1.1;
+}
+.pp-card b {
+  font-size: 15px;
+  color: var(--rc);
+}
+.pp-card small {
+  font-size: 11px;
+  line-height: 1.3;
+  color: #d8d4e4;
+}
+.pp-card .pp-ab {
+  color: #b8b4c8;
+}
+.pp-card .pp-ab em {
+  font-style: normal;
+  color: #fff;
+  font-weight: 700;
+}
+.pp-card kbd {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+@media (max-width: 520px) {
+  .pp-card {
+    padding: 8px 4px 10px;
+  }
+  .pp-card small {
+    font-size: 10px;
+  }
+}
+@media (max-height: 480px) {
+  .perkpick {
+    bottom: auto;
+    top: calc(60px + var(--safe-t));
+  }
+  .pp-card .pp-ab {
+    display: none;
+  }
+}
+/* Phones held upright: the cards go up top, clear of the move buttons */
+@media (max-width: 600px) and (min-height: 481px) {
+  .perkpick {
+    bottom: auto;
+    top: calc(118px + var(--safe-t));
+  }
+}
+/* Wide but short screens (a handheld's top display, phones on their side): the cards stay left of the move buttons */
+@media (max-height: 600px) and (orientation: landscape) {
+  .perkpick {
+    left: calc(50% - 120px);
+    width: min(calc(100vw - 290px), 580px);
+  }
+  .pp-card small {
+    font-size: 10px;
+  }
+}

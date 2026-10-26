@@ -10,6 +10,7 @@ import type { Game } from './game'
 import { preloadMon } from './sprites'
 import { ARENA_C, ARENA_R, T, TILE, type Gate } from './world'
 import { coldLook } from './dungeonArt'
+import { offerUpgrade, threatMul } from './perks'
 
 /**
  * Raid dungeons (host and solo): the run through the rooms before the boss.
@@ -465,7 +466,7 @@ export function foeHit(g: Game, m: Mon, by: Trainer | null, dmg: number) {
 function addThreat(m: Mon, by: Trainer, amount: number) {
   m.threat ??= new Map()
   const role = roleOf(by.mon.species.id)
-  m.threat.set(by, (m.threat.get(by) ?? 0) + amount * (role === 'defender' ? 3 : role === 'allrounder' ? 1.3 : 1))
+  m.threat.set(by, (m.threat.get(by) ?? 0) + amount * (role === 'defender' ? 3 : role === 'allrounder' ? 1.3 : 1) * threatMul(by))
 }
 
 /** Who a dungeon foe goes for: the angriest-at player still standing nearby, else the nearest. */
@@ -831,6 +832,8 @@ function roomCleared(g: Game, d: DungeonRun) {
     if (tr.alive || !tr.human) continue
     revive(g, tr, d)
   }
+  // Everyone grows: one upgrade out of three
+  for (const tr of g.trainers) offerUpgrade(tr)
   if (last) {
     d.stage = 'arena'
     d.packs = []

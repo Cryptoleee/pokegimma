@@ -28,6 +28,7 @@ import type { ClientState } from '../net/sync'
 import type { VoiceLine } from '../voice'
 import { both, type Txt } from '../i18n'
 import { BOT_SKILL, CPU_SKILL, TAKEN, type Difficulty } from '../data/difficulty'
+import { ability, cdMul, choose, dealtMul, potionHeal, speedMul, takenMul } from './perks'
 
 /** 'evolve' = the Evolution Crystal: walk over it and your Pokémon is fully evolved with every move. */
 /** 1 vs 1 power-ups: xatk, xspd, xdef (a few seconds' edge) and heal (Hyper Potion). */
@@ -845,7 +846,7 @@ export class Game {
   walk(tr: Trainer, dt: number) {
     let len = Math.hypot(tr.vx, tr.vy)
     // Speedsters make their trainer quicker on their feet
-    const speed = 4.4 * (tr.mon && !tr.mon.fainted ? roleInfo(tr.mon.species.id).speed : 1) * (tr.spdT > 0 ? BUFF.spd : 1)
+    const speed = 4.4 * (tr.mon && !tr.mon.fainted ? roleInfo(tr.mon.species.id).speed : 1) * (tr.spdT > 0 ? BUFF.spd : 1) * speedMul(tr)
     // Frozen solid by an ice attack: can't move for a moment
     if (tr.mon && tr.mon.frozenT > 0 && !tr.mon.fainted) len = 0
     // Ice floor: you keep sliding and turn slowly
@@ -1005,7 +1006,7 @@ export class Game {
       this.lastTarget = tgt
       this.lastTargetT = 1.6
     }
-    m.cds[slot] = mv.cooldown * (mv.kind === 'dash' ? roleInfo(m.species.id).dashCd : 1) * (m.owner && m.owner.spdT > 0 ? BUFF.cd : 1)
+    m.cds[slot] = mv.cooldown * (mv.kind === 'dash' ? roleInfo(m.species.id).dashCd : 1) * (m.owner && m.owner.spdT > 0 ? BUFF.cd : 1) * cdMul(m.owner)
     if (this.send) {
       // Client: the host runs the move; we only predict the cooldown and facing.
       this.aim(m, tgt, dir)
@@ -1321,8 +1322,8 @@ export class Game {
     const raw = (((2 * L) / 5 + 2) * mv.power * (src.atk / tgt.def)) / 50 + 2
     // The boss's ordinary moves are chip damage (a share of your HP); its telegraphed attacks are the real threat
     const dmg = src.boss
-      ? Math.max(1, Math.round(tgt.maxHp * (0.02 + mv.tier * 0.012) * mult * (eff > 1 ? 1.3 : eff < 1 ? 0.75 : 1)))
-      : Math.max(1, Math.round(raw * eff * mult * src.dmgMul * (this.raid?.dg ? dungeonMul(this, src, tgt) : 1) * roleInfo(src.species.id).dmg * DMG_SCALE * (this.duel ? DUEL_DMG * buffDamage(src, tgt) : 1) * this.rng.range(0.9, 1.05)))
+      ? Math.max(1, Math.round(tgt.maxHp * (0.02 + mv.tier * 0.012) * mult * (eff > 1 ? 1.3 : eff < 1 ? 0.75 : 1) * takenMul(tgt.owner)))
+      : Math.max(1, Math.round(raw * eff * mult * src.dmgMul * (this.raid?.dg ? dungeonMul(this, src, tgt) : 1) * roleInfo(src.species.id).dmg * DMG_SCALE * (this.duel ? DUEL_DMG * buffDamage(src, tgt) : 1) * (this.raid ? dealtMul(src.owner) * takenMul(tgt.owner) : 1) * this.rng.range(0.9, 1.05)))
     tgt.hp -= dmg
     if (tgt.boss && src.owner) src.owner.bossDmg += Math.min(dmg, tgt.hp + dmg)
     // Raid dungeon: wakes a waiting pack, builds threat, can break a cast
@@ -1447,6 +1448,7 @@ export class Game {
     // Difficulty: people take more or less damage from bots, wild Pokémon and the raid boss (never from each other)
     if (this.diff !== 'normal' && m.owner?.human && (by ? !by.owner?.human : this.kind === 'raid')) dmg *= TAKEN[this.diff]
     if (m.owner && this.raid?.dg && !by?.owner) dmg *= relicMul(this, 'def')
+    if (m.owner && this.raid) dmg *= takenMul(m.owner)
     m.hp -= dmg
     m.combatT = 0
     m.revealT = Math.max(m.revealT, HIT_REVEAL)
@@ -1717,7 +1719,7 @@ export class Game {
       return true
     }
     tr.potions--
-    m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.5)
+    m.hp = Math.min(m.maxHp, m.hp + m.maxHp * potionHeal(tr))
     this.addFx({ kind: 'heal', x: m.x, y: m.y - 0.5, t: 0, life: 0.7, color: '#80f080' })
     this.soundAt(tr.x, tr.y, 'item', ['potion'], { owners: [tr], range: 8 })
     return true
@@ -1748,6 +1750,28 @@ export class Game {
     v?.sfx('item', 'revive')
     v?.hooks.toast(both(`${m.name} is back on its feet!`, `${m.name} is weer fit!`), '#80f080')
     return true
+  }
+
+  /** Raid: pick card i of the role / upgrade on offer. */
+  choosePerk(tr: Trainer, i: number) {
+    if (!tr.pick) return
+    if (this.send) {
+      this.send({ t: 'perk', i })
+      tr.pick = null
+      tr.pickSent = performance.now()
+      return
+    }
+    choose(this, tr, i)
+  }
+
+  /** Raid: your role's ability (Taunt, Healing wave, Fury). False while it recharges. */
+  useAbility(tr: Trainer): boolean {
+    if (!tr.rr || tr.abCd > 0 || !tr.alive || tr.mon.fainted) return false
+    if (this.send) {
+      this.send({ t: 'ability' })
+      return true
+    }
+    return ability(this, tr)
   }
 
   /** Max Ether (raids): every move of your Pokémon ready again, the ultimate too. */

@@ -1,3 +1,4 @@
+import type { RaidRole } from '../data/perks'
 import { SPECIES, rarityOf, type Rarity, type Species } from '../data/pokemon'
 import { movesetFor, SLOT_UNLOCK, type Move } from '../data/moves'
 import type { TrainerDef } from '../data/trainers'
@@ -99,6 +100,8 @@ export class Mon {
   combatT = 0
   /** Last time it drank from a healing well (game time). */
   wellT?: number
+  /** Raid perks: max HP bonus (a tank's). */
+  hpMul = 1
   lastHitBy: Trainer | null = null
 
   // Wild behaviour
@@ -165,7 +168,7 @@ export class Mon {
     if (this.boss || this.foe) return Math.round(statHp(this.species, this.level) * this.bossMul)
     if (this.legendary && !this.owner) return statHp(this.species, this.level) * 2.2
     // Defenders and all-rounders get a little extra HP
-    return Math.round(statHp(this.species, this.level) * roleInfo(this.species.id).hp * this.power)
+    return Math.round(statHp(this.species, this.level) * roleInfo(this.species.id).hp * this.power * this.hpMul)
   }
   get atk() {
     return stat(this.species.atk, this.level) * this.power
@@ -221,6 +224,15 @@ export class Trainer {
   revives = 0
   /** Max Ethers (raids only). */
   ethers = 0
+  /** Raid role (none until picked), upgrades taken, ability cooldown and how long it's still active. */
+  rr: RaidRole | '' = ''
+  perks: string[] = []
+  abCd = 0
+  abT = 0
+  /** Raid: a choice waiting on screen (role or upgrade) and seconds left to make it. */
+  pick: { kind: 'role' | 'up'; opts: string[]; t: number } | null = null
+  /** Client: when you last sent a pick (the card stays closed until the host has it). */
+  pickSent?: number
   kos = 0
   caught = 0
   /** Progress counters: legendaries caught, evolutions, grabbed the Evolution Crystal. */

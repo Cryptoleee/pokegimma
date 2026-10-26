@@ -114,7 +114,9 @@ function playTick(g: Game, hud: Hud, hooks: PadHooks, lx: number, ly: number, rx
     held[s] = now[s]
   }
   if (g.paused) return
-  if (pressed(B.B)) {
+  // B catches; in a raid (nothing to catch) it fires your role's ability
+  if (pressed(B.B) && g.kind === 'raid') hud.fireAbility()
+  else if (pressed(B.B)) {
     const w = g.catchable(p)
     if (w) g.throwBall(p, w, false)
   }
