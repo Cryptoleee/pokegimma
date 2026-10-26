@@ -95,7 +95,7 @@ export function choose(g: Game, tr: Trainer, i: number) {
   const id = pk.opts[i] ?? pk.opts[0]
   tr.perks.push(id)
   if (id === 'any_potion') tr.potions++
-  if (id === 'any_life') tr.lives++
+  if (id === 'any_life') tr.lives = Math.min(tr.lives + 1, (g.raid?.dg?.def.lives ?? 3) + 1)
   applyHp(tr)
   v?.sfx('loot')
 }
@@ -112,9 +112,9 @@ export function ability(g: Game, tr: Trainer): boolean {
   if (tr.rr === 'tank') {
     // Every foe close by turns on you
     for (const w of g.wilds) {
-      if (!w.foe || w.fainted || Math.hypot(w.x - m.x, w.y - m.y) > TAUNT_R) continue
+      // Packs still waiting stay put (a taunt isn't a pull)
+      if (!w.foe || w.fainted || w.idle || Math.hypot(w.x - m.x, w.y - m.y) > TAUNT_R) continue
       tauntOne(w, tr)
-      w.idle = false
     }
     g.vfx.ring(m.x, m.y - 0.2, TAUNT_R, d.color, 0.6, 10)
     g.vfx.ring(m.x, m.y - 0.2, TAUNT_R * 0.5, '#ffffff', 0.4, 6)

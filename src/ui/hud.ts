@@ -169,7 +169,7 @@ export class Hud {
       const b = h('div', `ib ${key}`, `<img class="px" src="${itemUrl(sprite)}" alt="${label}"><b>0</b><kbd data-pad="${{ master: '◀', potion: '▲', revive: '▶' }[key]}">${kb}</kbd>`) as HTMLDivElement
       b.onpointerdown = (e) => {
         e.preventDefault()
-        this.useItem(key)
+        this.useItem(key, false)
       }
       this.itemBtns[key] = b
       items.append(b)
@@ -202,10 +202,10 @@ export class Hud {
     root.append(this.catchBtn, this.countdown)
   }
 
-  useItem(key: 'master' | 'potion' | 'revive') {
+  useItem(key: 'master' | 'potion' | 'revive', fromKey = true) {
     const g = this.g, p = g.player
-    // A pick on screen: the item keys (1 2 3, or ◀ ▲ ▶) choose a card
-    if (p.pick) return g.choosePerk(p, ['master', 'potion', 'revive'].indexOf(key))
+    // A pick on screen: the item keys (1 2 3, or ◀ ▲ ▶) choose a card; tapping the item itself still uses it
+    if (p.pick && fromKey) return g.choosePerk(p, ['master', 'potion', 'revive'].indexOf(key))
     if (!p.alive) return
     if (key === 'master' && g.kind === 'raid') {
       if (p.ethers <= 0) return this.deny(L('No Max Ethers', 'Geen Max Ethers'))
