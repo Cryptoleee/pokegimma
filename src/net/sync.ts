@@ -24,7 +24,7 @@ import { duelFrozen, type DuelView } from '../game/duel'
 const DIRS: Dir[] = ['down', 'up', 'left', 'right']
 const STATES: WildState[] = ['roam', 'aggro', 'weak']
 // New kinds go at the end: the index is what goes over the wire
-const ITEMS: ItemKind[] = ['master', 'potion', 'candy', 'revive', 'evolve', 'xatk', 'xspd', 'xdef', 'heal']
+const ITEMS: ItemKind[] = ['master', 'potion', 'candy', 'revive', 'evolve', 'xatk', 'xspd', 'xdef', 'heal', 'ether']
 const SHAPES: Hazard['shape'][] = ['circle', 'cone', 'line', 'ring', 'grid']
 const r2 = (v: number) => Math.round(v * 100) / 100
 const r1 = (v: number) => Math.round(v * 10) / 10
@@ -175,7 +175,7 @@ export function snapshot(g: Game, v: RemoteViewer) {
     rv: g.raidView ? raidViewState(g) : undefined,
     dv: g.duelView ? { ...g.duelView, t: r1(g.duelView.t), roundT: r1(g.duelView.roundT), pads: g.duelView.pads.map(r1), k: g.trainers.map((t) => [t.id, t.kos]) } : undefined,
     me: {
-      p: me.party.map((m) => m.id), ac: me.active, mb: me.masterBalls, po: me.potions, re: me.revives,
+      p: me.party.map((m) => m.id), ac: me.active, mb: me.masterBalls, po: me.potions, re: me.revives, et: me.ethers,
       k: me.kos, c: me.caught, sw: r2(me.swapCd), sp: me.spectate?.id ?? 0, dd: r1(me.diedAt), tp: me.tpN,
     },
   }
@@ -233,6 +233,7 @@ export function runCommand(g: Game, v: RemoteViewer, c: Command) {
     }
     case 'item':
       if (c.k === 'potion') g.usePotion(tr)
+      else if (c.k === 'ether') g.useEther(tr)
       else g.useRevive(tr)
       return
     case 'pick': {
@@ -419,6 +420,7 @@ export function applySnapshot(g: Game, raw: unknown) {
   me.masterBalls = s.me.mb
   me.potions = s.me.po
   me.revives = s.me.re
+  me.ethers = s.me.et ?? 0
   me.kos = s.me.k
   me.caught = s.me.c
   me.swapCd = Math.max(me.swapCd, s.me.sw)

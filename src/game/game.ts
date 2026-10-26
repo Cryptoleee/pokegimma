@@ -20,7 +20,7 @@ import { MAP, T, World } from './world'
 import type { ThemeId } from '../data/themes'
 import { BOSSES, type BossId } from '../data/bosses'
 import { dungeonOf } from '../data/dungeons'
-import { castHit, foeDown, foeHit, foeTarget, guardShield, relicMul, roleTick } from './dungeon'
+import { castHit, foeDown, foeHit, foeTarget, guardShield, raidRevive, relicMul, roleTick } from './dungeon'
 import { botThink } from './ai'
 import type { Dir } from './entities'
 import type { Command } from '../net/protocol'
@@ -31,18 +31,19 @@ import { BOT_SKILL, CPU_SKILL, TAKEN, type Difficulty } from '../data/difficulty
 
 /** 'evolve' = the Evolution Crystal: walk over it and your Pokémon is fully evolved with every move. */
 /** 1 vs 1 power-ups: xatk, xspd, xdef (a few seconds' edge) and heal (Hyper Potion). */
-export type ItemKind = 'master' | 'potion' | 'candy' | 'revive' | 'evolve' | 'xatk' | 'xspd' | 'xdef' | 'heal'
+/** 'ether' = Max Ether (raids): every move ready again at once. */
+export type ItemKind = 'master' | 'potion' | 'candy' | 'revive' | 'evolve' | 'xatk' | 'xspd' | 'xdef' | 'heal' | 'ether'
 const PICKUP_SOUND: Record<ItemKind, ItemSound> = {
   master: 'pickupMaster', potion: 'pickupPotion', candy: 'pickupCandy', revive: 'pickupRevive', evolve: 'pickupSurge',
-  xatk: 'pickupSurge', xspd: 'pickupSurge', xdef: 'pickupSurge', heal: 'pickupPotion',
+  xatk: 'pickupSurge', xspd: 'pickupSurge', xdef: 'pickupSurge', heal: 'pickupPotion', ether: 'pickupCandy',
 }
 export const ITEM_SPRITE: Record<ItemKind, string> = {
   master: 'master-ball', potion: 'potion', candy: 'rare-candy', revive: 'revive', evolve: 'shiny-stone',
-  xatk: 'x-attack', xspd: 'x-speed', xdef: 'x-defense', heal: 'hyper-potion',
+  xatk: 'x-attack', xspd: 'x-speed', xdef: 'x-defense', heal: 'hyper-potion', ether: 'max-ether',
 }
 export const ITEM_NL: Record<ItemKind, string> = {
   master: 'Master Ball', potion: 'Potion', candy: 'Rare Candy', revive: 'Revive', evolve: 'Evolution Crystal',
-  xatk: 'X Attack', xspd: 'X Speed', xdef: 'X Defense', heal: 'Hyper Potion',
+  xatk: 'X Attack', xspd: 'X Speed', xdef: 'X Defense', heal: 'Hyper Potion', ether: 'Max Ether',
 }
 
 export interface GroundItem {
@@ -1723,6 +1724,17 @@ export class Game {
   }
 
   useRevive(tr: Trainer): boolean {
+    // A raid: a Revive brings a teammate back (whoever is out of lives first)
+    if (this.raid) {
+      if (tr.revives <= 0) return false
+      if (this.send) {
+        this.send({ t: 'item', k: 'revive' })
+        return true
+      }
+      if (!raidRevive(this, tr)) return false
+      tr.revives--
+      return true
+    }
     const idx = tr.party.findIndex((m) => m.fainted)
     if (tr.revives <= 0 || idx < 0) return false
     if (this.send) {
@@ -1735,6 +1747,22 @@ export class Game {
     const v = this.vOf(tr)
     v?.sfx('item', 'revive')
     v?.hooks.toast(both(`${m.name} is back on its feet!`, `${m.name} is weer fit!`), '#80f080')
+    return true
+  }
+
+  /** Max Ether (raids): every move of your Pokémon ready again, the ultimate too. */
+  useEther(tr: Trainer): boolean {
+    const m = tr.mon
+    if (tr.ethers <= 0 || m.fainted || !m.cds.some((c) => c > 0.3)) return false
+    if (this.send) {
+      this.send({ t: 'item', k: 'ether' })
+      return true
+    }
+    tr.ethers--
+    m.cds = m.cds.map(() => 0)
+    this.vfx.ring(m.x, m.y - 0.3, 1.8, '#a080ff', 0.5, 6)
+    this.addFx({ kind: 'heal', x: m.x, y: m.y - 0.5, t: 0, life: 0.7, color: '#b090ff' })
+    this.soundAt(tr.x, tr.y, 'item', ['potion'], { owners: [tr], range: 8 })
     return true
   }
 
@@ -1860,7 +1888,11 @@ export class Game {
         break
       case 'revive':
         tr.revives++
-        v?.hooks.toast(both('Found a Revive', 'Revive gevonden'))
+        v?.hooks.toast(this.raid ? both('Found a Revive · brings back a teammate who is out', 'Revive gevonden · haalt een teamgenoot terug die eruit ligt') : both('Found a Revive', 'Revive gevonden'), this.raid ? '#80f080' : undefined)
+        break
+      case 'ether':
+        tr.ethers++
+        v?.hooks.toast(both('Found a Max Ether · all your moves ready at once', 'Max Ether gevonden · al je aanvallen direct weer klaar'), '#b090ff')
         break
       case 'evolve':
         this.evolutionSurge(tr)

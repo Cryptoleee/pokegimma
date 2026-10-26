@@ -217,6 +217,8 @@ export class Trainer {
   masterBalls = 0
   potions = 1
   revives = 0
+  /** Max Ethers (raids only). */
+  ethers = 0
   kos = 0
   caught = 0
   /** Progress counters: legendaries caught, evolutions, grabbed the Evolution Crystal. */

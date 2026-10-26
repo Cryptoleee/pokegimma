@@ -41,6 +41,8 @@ interface Pack {
   /** Patrol: back and forth between two spots. */
   patrol: { a: [number, number]; b: [number, number]; toB: boolean } | null
   done: boolean
+  /** Where its last member stood (its loot drops there). */
+  last?: [number, number]
 }
 
 export interface DungeonRun {
@@ -199,7 +201,7 @@ function prepareRoom(g: Game, d: DungeonRun) {
   if (room.warden) {
     const wd = room.warden
     const m = makeFoe(g, { sp: wd.sp, n: 1, lv: wd.lv }, 3)
-    m.bossMul = wd.hp * (1 + 0.75 * (humansOf(g) - 1)) * (g.diff === 'easy' ? 0.8 : g.diff === 'hard' ? 1.25 : 1)
+    m.bossMul = wd.hp * (1 + 0.6 * (humansOf(g) - 1)) * (g.diff === 'easy' ? 0.8 : g.diff === 'hard' ? 1.25 : 1)
     m.hp = m.maxHp
     m.idle = true
     const [x, y] = freeSpot(g, ox + wd.at[0], oy + wd.at[1])
@@ -226,7 +228,11 @@ export function dungeonTick(g: Game, r: RaidState, dt: number): boolean {
       if (!p.done && !p.members.length) {
         p.done = true
         d.fights++
+        // A pack beaten: a Potion for every other player, near where it fell
+        const at = p.last ?? [0, 0]
+        for (let k = 0; k < Math.ceil(humansOf(g) / 2); k++) dropItem(g, at[0] + k * 0.7, at[1] + 0.4, 'potion')
       }
+      if (p.members.length) p.last = [p.members[0].x, p.members[0].y]
       if (!p.idle || p.done) continue
       if (p.members.some((m) => near(m.x, m.y, PULL_RANGE))) {
         pullPack(g, d, p, null)
@@ -390,7 +396,8 @@ function roomBanner(g: Game, d: DungeonRun) {
 
 /** How many of a foe come (more players, more foes; the difficulty adds or takes a few). */
 function countOf(g: Game, n: number) {
-  const k = (1 + 0.5 * (humansOf(g) - 1)) * (g.diff === 'easy' ? 0.75 : g.diff === 'hard' ? 1.3 : 1)
+  // More players, bigger packs: but not one foe more per player (each extra caster is one more circle to dodge)
+  const k = (1 + 0.35 * (humansOf(g) - 1)) * (g.diff === 'easy' ? 0.75 : g.diff === 'hard' ? 1.3 : 1)
   return Math.max(1, Math.round(n * k))
 }
 
@@ -558,7 +565,7 @@ function makeFoe(g: Game, s: FoeSpec, kind: 1 | 2 | 3 = s.elite ? 2 : 1) {
   m.role = s.role ?? ''
   const roleHp = s.role === 'brute' ? 1.5 : s.role === 'guard' ? 1.4 : s.role === 'caster' || s.role === 'mender' ? 0.85 : 1
   const roleDmg = s.role === 'brute' ? 1.35 : s.role === 'caster' ? 0.9 : s.role === 'mender' ? 0.6 : s.role === 'guard' ? 0.8 : 1
-  m.bossMul = (kind === 2 ? 3.2 : 1.25) * roleHp * (1 + 0.3 * (humansOf(g) - 1))
+  m.bossMul = (kind === 2 ? 3.2 : 1.25) * roleHp * (1 + 0.25 * (humansOf(g) - 1))
   m.dmgMul = (kind === 3 ? 0.42 : kind === 2 ? 0.52 : 0.4) * roleDmg * TAKEN[g.diff]
   m.hp = m.maxHp
   m.aggressive = true
@@ -599,6 +606,15 @@ function spawnFoe(g: Game, f: FoeSpec, rect: Rect) {
   return m
 }
 
+/** Loot on the floor (not too much of one kind lying around: room for everyone, no more). */
+function dropItem(g: Game, x: number, y: number, kind: 'potion' | 'revive' | 'ether') {
+  const cap = (kind === 'potion' ? 3 : 1) * humansOf(g) + 1
+  if (g.items.filter((it) => it.kind === kind).length >= cap) return
+  const [fx, fy] = freeSpot(g, x, y)
+  g.items.push({ x: fx, y: fy, kind, bob: 0 })
+  g.soundAt(fx, fy, 'spawnChime', [], { range: 20 })
+}
+
 /** A foe went down: off the field (never catchable); elites and wardens leave a potion, a common foe now and then. */
 export function foeDown(g: Game, m: Mon) {
   const i = g.wilds.indexOf(m)
@@ -606,11 +622,12 @@ export function foeDown(g: Game, m: Mon) {
   m.cast = null
   g.addFxPublic({ kind: 'poof', x: m.x, y: m.y - 0.4, t: 0, life: 0.4, color: '#ffb060' })
   g.vfx.burst(m.x, m.y - 0.4, { n: m.foe >= 2 ? 26 : 12, speed: 5, cols: ['#ffffff', '#ffd080', '#ff8030'], shape: 'flame', add: true, s0: 3, s1: 0.5, life: 0.5 })
-  const drop = m.foe === 2 || Math.random() < 0.05
-  if (drop && g.items.filter((it) => it.kind === 'potion').length < 4) {
-    g.items.push({ x: m.x, y: m.y, kind: 'potion', bob: 0 })
-    g.soundAt(m.x, m.y, 'spawnChime', [], { range: 20 })
-  }
+  const drop = m.foe === 2 || Math.random() < 0.1
+  if (drop) dropItem(g, m.x, m.y, 'potion')
+  // An elite now and then leaves a Revive (a warden always does: see wardenDown)
+  if (m.foe === 2 && Math.random() < 0.25) dropItem(g, m.x + 0.6, m.y, 'revive')
+  // ...or a Max Ether (every move ready again)
+  else if (m.foe === 2 && Math.random() < 0.35) dropItem(g, m.x + 0.6, m.y, 'ether')
   if (m.foe === 3) wardenDown(g, m)
 }
 
@@ -651,6 +668,9 @@ function wardenDown(g: Game, m: Mon) {
   const relic = d.wardenDef.relic
   d.relics.push(relic)
   for (let k = 0; k < humansOf(g); k++) g.items.push({ x: m.x + (k - (humansOf(g) - 1) / 2) * 1.2, y: m.y + 1, kind: 'potion', bob: 0 })
+  // And a Revive for the team (brings back whoever is out)
+  dropItem(g, m.x, m.y + 2.2, 'revive')
+  dropItem(g, m.x + 1.2, m.y + 2.2, 'ether')
   for (const tr of g.trainers)
     if (tr.alive && tr.lives < d.def.lives) tr.lives++
   const named = d.def.theme.relics[relic]
@@ -806,6 +826,31 @@ export function openGate(g: Game, i: number) {
   g.vfx.burst(x, y - 0.5, { n: 30, speed: 6, cols: ['#3a3038', '#58484c', '#ff9040', '#ffd080'], shape: 'rock', s0: 3, s1: 1, life: 0.9, grav: 9 })
   g.vfx.glow(x, y - 0.5, 70, '#ff8030', 0.6)
   g.soundAt(x, y, 'boss', ['quake', 'earthpower', 0.9], { global: true })
+}
+
+/**
+ * A Revive used in a raid: the first teammate who is out of lives comes back
+ * next to you with one; if nobody is out, one who's waiting to come back is
+ * back right away, next to you. False when nobody needs it.
+ */
+export function raidRevive(g: Game, by: Trainer): boolean {
+  const out = g.trainers.find((t) => t.human && t !== by && !t.alive)
+  const waiting = g.trainers.find((t) => t.human && t !== by && t.alive && t.mon.fainted && t.respawnT > 0)
+  const tr = out ?? waiting
+  if (!tr || !by.alive) return false
+  if (out) {
+    tr.alive = true
+    tr.lives = 1
+    tr.spectate = null
+    if (tr.isPlayer) g.spectate = null
+  }
+  tr.respawnT = 0
+  respawnAt(g, tr, [by.x, by.y])
+  g.vfx.ring(tr.mon.x, tr.mon.y - 0.2, 2.4, '#80f080', 0.7, 8)
+  g.vfx.burst(tr.mon.x, tr.mon.y - 0.5, { n: 18, speed: 4, dir: -Math.PI / 2, spread: 1.2, cols: ['#ffffff', '#b0ffb0', '#60e060'], shape: 'star', add: true, s0: 3, s1: 0.6, life: 0.7 })
+  g.soundAt(tr.x, tr.y, 'item', ['revive'], { range: 18 })
+  for (const v of g.viewers) v.hooks.feed(both(`💚 ${by.name} brought ${tr.name} back`, `💚 ${by.name} heeft ${tr.name} teruggehaald`), { kind: 'info' })
+  return true
 }
 
 /** Out of lives, but the team cleared a room: back in with one life. */

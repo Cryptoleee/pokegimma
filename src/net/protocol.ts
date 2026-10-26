@@ -48,7 +48,7 @@ export type Command =
   | { t: 'move'; s: number; tg?: number; d?: AimDir }
   | { t: 'switch'; i: number }
   | { t: 'ball'; w: number; m: boolean }
-  | { t: 'item'; k: 'potion' | 'revive' }
+  | { t: 'item'; k: 'potion' | 'revive' | 'ether' }
   /** Answer to "your team is full": which slot to replace (-1 = let it go). */
   | { t: 'pick'; i: number }
 

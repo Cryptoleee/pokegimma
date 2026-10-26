@@ -212,7 +212,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
     }
     const m = tr.mon
     if (m.fainted || (tr.isPlayer && !g.partnerOut) || vis(g, m, tr.isPlayer) === 0) continue
-    plate(ctx, m, tr.isPlayer ? 'me' : 'foe', tr.isPlayer ? m.name : tr.name.split(' ').pop()!, supOf(g, tr))
+    plate(ctx, m, tr.isPlayer ? 'me' : g.kind === 'raid' ? 'ally' : 'foe', tr.isPlayer ? m.name : tr.name.split(' ').pop()!, supOf(g, tr))
   }
   const p = g.player
   for (const w of g.wilds) {
@@ -974,9 +974,11 @@ function vis(g: Game, e: { x: number; y: number; revealT: number }, mine: boolea
   return d < BUSH_SIGHT ? 0.5 : 0
 }
 
-type Team = 'me' | 'foe' | 'wild'
+type Team = 'me' | 'ally' | 'foe' | 'wild'
 const TEAM_COL: Record<Team, { bar: string; dark: string; name: string; ring: string }> = {
   me: { bar: '#48e070', dark: '#1c7a38', name: '#7cf09c', ring: '#48e070' },
+  // Teammates (raid): green like you, the name a touch lighter so you still find yourself
+  ally: { bar: '#48e070', dark: '#1c7a38', name: '#d8ffe0', ring: '#48e070' },
   foe: { bar: '#ff4a48', dark: '#8a1c1c', name: '#ff8a80', ring: '#ff4a48' },
   wild: { bar: '#ffc830', dark: '#8a6410', name: '#ffffff', ring: '#ffc830' },
 }
@@ -1073,7 +1075,7 @@ function drawRings(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, y
   for (const tr of g.trainers) {
     const m = tr.mon
     if (!tr.alive || m.fainted || !inView(m.x, m.y) || (tr.isPlayer && !g.partnerOut) || vis(g, m, tr.isPlayer) === 0) continue
-    ring(m, tr.isPlayer ? TEAM_COL.me.ring : TEAM_COL.foe.ring, 0.85)
+    ring(m, tr.isPlayer ? TEAM_COL.me.ring : g.kind === 'raid' ? TEAM_COL.ally.ring : TEAM_COL.foe.ring, 0.85)
   }
   const t = g.playerTarget
   if (t && g.player.alive && inView(t.x, t.y) && g.introT <= 0) {

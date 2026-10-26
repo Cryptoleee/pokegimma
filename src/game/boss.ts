@@ -151,7 +151,7 @@ export function setupRaid(g: Game, id: keyof typeof BOSSES) {
   })
   const boss = new Mon(def.species, def.level)
   boss.boss = true
-  boss.bossMul = def.hp * (1 + 0.75 * (humans.length - 1))
+  boss.bossMul = def.hp * (1 + 0.65 * (humans.length - 1))
   boss.hp = boss.maxHp
   boss.x = boss.homeX = ARENA_C
   boss.y = boss.homeY = ARENA_C - 2

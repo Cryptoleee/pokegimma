@@ -142,7 +142,7 @@ export function startDuoView() {
               <button class="dv-mon" data-i="${i}"><img class="px" src="${spriteUrl(m.id, { shiny: m.shiny })}" alt=""><span><b>${esc(m.name)}</b><small></small><span class="dv-bar"><i></i></span></span></button>`).join('')}
             </section>
           </div>
-          ${s.kind === 'duel' ? '' : `<section class="dv-items">${ITEMS.map(([k, sprite, name]) => `<button class="dv-item" data-item="${k}"><img class="px" src="${itemUrl(sprite)}" alt=""><span>${name}</span><b>0</b></button>`).join('')}</section>`}
+          ${s.kind === 'duel' ? '' : `<section class="dv-items">${(s.kind === 'raid' ? [['master', 'max-ether', 'Max Ether'] as const, ...ITEMS.slice(1)] : ITEMS).map(([k, sprite, name]) => `<button class="dv-item" data-item="${k}"><img class="px" src="${itemUrl(sprite)}" alt=""><span>${name}</span><b>0</b></button>`).join('')}</section>`}
           ${chat}
         </div>`
     }

@@ -155,7 +155,9 @@ export class Hud {
 
     // Items
     const items = h('div', 'items2')
-    for (const [key, sprite, label] of [['master', 'master-ball', 'Master'], ['potion', 'potion', 'Potion'], ['revive', 'revive', 'Revive']] as const) {
+    // A raid has no wild Pokémon to catch: its first slot holds Max Ethers instead of Master Balls
+    const first = g.kind === 'raid' ? (['master', 'max-ether', 'Max Ether'] as const) : (['master', 'master-ball', 'Master'] as const)
+    for (const [key, sprite, label] of [first, ['potion', 'potion', 'Potion'], ['revive', 'revive', 'Revive']] as const) {
       const kb = keyName(keyOf(key))
       const b = h('div', `ib ${key}`, `<img class="px" src="${itemUrl(sprite)}" alt="${label}"><b>0</b><kbd data-pad="${{ master: '◀', potion: '▲', revive: '▶' }[key]}">${kb}</kbd>`) as HTMLDivElement
       b.onpointerdown = (e) => {
@@ -188,7 +190,10 @@ export class Hud {
   useItem(key: 'master' | 'potion' | 'revive') {
     const g = this.g, p = g.player
     if (!p.alive) return
-    if (key === 'master') {
+    if (key === 'master' && g.kind === 'raid') {
+      if (p.ethers <= 0) return this.deny(L('No Max Ethers', 'Geen Max Ethers'))
+      if (!g.useEther(p)) this.deny(L('Your moves are already ready', 'Je aanvallen zijn al klaar'))
+    } else if (key === 'master') {
       if (p.masterBalls <= 0) return this.deny(L("You don't have a Master Ball", 'Je hebt geen Master Ball'))
       const t = g.masterTarget(p)
       if (!t) return this.deny(L('No wild Pokémon nearby', 'Geen wilde Pokémon dichtbij'))
@@ -198,7 +203,7 @@ export class Hud {
       if (!g.usePotion(p)) this.deny(L('Your Pokémon is already healthy', 'Je Pokémon is al fit'))
     } else {
       if (p.revives <= 0) return this.deny(L('No Revives', 'Geen Revives'))
-      if (!g.useRevive(p)) this.deny(L('Nobody has fainted', 'Niemand is verslagen'))
+      if (!g.useRevive(p)) this.deny(g.kind === 'raid' ? L('No teammate needs it right now', 'Geen teamgenoot die hem nu nodig heeft') : L('Nobody has fainted', 'Niemand is verslagen'))
     }
   }
 
@@ -511,7 +516,7 @@ export class Hud {
     })
 
     // Items
-    const counts = { master: p.masterBalls, potion: p.potions, revive: p.revives }
+    const counts = { master: g.kind === 'raid' ? p.ethers : p.masterBalls, potion: p.potions, revive: p.revives }
     for (const [key2, n] of Object.entries(counts)) {
       const b = this.itemBtns[key2]
       b.classList.toggle('empty', n <= 0)

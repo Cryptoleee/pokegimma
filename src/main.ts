@@ -1179,7 +1179,7 @@ function duoState(withMini: boolean): DuoState {
       return { ...base, scene: 'watch', kind, label, title: L('Spectating', 'Toeschouwer'), sub: kind === 'royale' ? L(`${left} trainers left`, `${left} trainers over`) : clock(g.time) }
     }
     const party = p.party.map((m, i) => ({ id: m.species.id, name: m.name, lv: m.level, hp: Math.max(0, m.hp), max: m.maxHp, active: i === p.active, fainted: m.fainted, shiny: !!m.shiny }))
-    const st: DuoState = { ...base, scene: 'match', kind, label, title: '', sub: clock(g.time), party, items: { master: p.masterBalls, potion: p.potions, revive: p.revives } }
+    const st: DuoState = { ...base, scene: 'match', kind, label, title: '', sub: clock(g.time), party, items: { master: g.kind === 'raid' ? p.ethers : p.masterBalls, potion: p.potions, revive: p.revives } }
     if (kind === 'royale') {
       const left = g.trainers.filter((t) => t.alive).length
       st.title = L(`${left} trainers left`, `${left} trainers over`)
