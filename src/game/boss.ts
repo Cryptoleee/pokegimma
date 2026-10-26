@@ -930,6 +930,15 @@ function impactFx(g: Game, h: Hazard) {
         return
       }
       const r = h.r
+      // A pack caster's bolt: a small, clear hit, so a room full of them stays readable
+      if (h.atk === 'f_bolt') {
+        v.glow(h.x, h.y, 22 * r, p.glow, 0.6)
+        v.ring(h.x, h.y, r * 1.1, p.cols[2], 0.4, 5)
+        v.burst(h.x, h.y - 0.2, { n: 8, dir: -Math.PI / 2, spread: 0.5, speed: 6, cols: p.cols, shape: h.type === 'fire' ? 'flame' : shape, add: true, s0: 4, s1: 2, life: 0.45, drag: 2 })
+        if (decal || h.type === 'fire') v.decal(h.x, h.y, r * 0.7, h.type === 'fire' ? 'scorch' : decal!, 5)
+        v.shakeBy(2)
+        return
+      }
       if (h.dur > 0 && !isPool(h)) {
         // A tornado touches down: a gust and a ring of dust
         v.burst(h.x, h.y - 0.3, { n: 20, speed: 6, cols: p.cols, shape: 'smoke', s0: 5, s1: 10, life: 0.7, flat: 0.5, drag: 2 })

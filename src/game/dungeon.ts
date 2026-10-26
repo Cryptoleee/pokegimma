@@ -252,9 +252,10 @@ export function dungeonTick(g: Game, r: RaidState, dt: number): boolean {
       if (!p.done && !p.members.length) {
         p.done = true
         d.fights++
-        // A pack beaten: a Potion for every other player, near where it fell
+        // A pack beaten: a Potion for every other player, near where it fell (alone: now and then)
         const at = p.last ?? [0, 0]
-        for (let k = 0; k < Math.ceil(humansOf(g) / 2); k++) dropItem(g, at[0] + k * 0.7, at[1] + 0.4, 'potion')
+        const n = humansOf(g) > 1 ? Math.ceil(humansOf(g) / 2) : Math.random() < 0.4 ? 1 : 0
+        for (let k = 0; k < n; k++) dropItem(g, at[0] + k * 0.7, at[1] + 0.4, 'potion')
       }
       if (p.members.length) p.last = [p.members[0].x, p.members[0].y]
       if (!p.idle || p.done) continue
@@ -304,7 +305,7 @@ export function dungeonTick(g: Game, r: RaidState, dt: number): boolean {
     if (room.deco === 'forge' && d.started && g.world.dvents.length) {
       d.ventT -= dt
       if (d.ventT <= 0) {
-        d.ventT = 3.6 + Math.random() * 2.4
+        d.ventT = 5.5 + Math.random() * 3
         const v = g.world.dvents[Math.floor(Math.random() * g.world.dvents.length)]
         addHazard(g, { shape: 'circle', x: v.x, y: v.y, ang: 0, r: 2.6, inner: 0, width: 1, t: 1.4, dmg: 0.24, fx: 'earthpower', type: 'fire', freeze: 0, cover: false, both: false, atk: 'vent' })
       }
@@ -507,6 +508,12 @@ export function roleTick(g: Game, w: Mon, target: Mon | null, dt: number): boole
   if (w.roleT > 0) return false
   if (w.role === 'caster') {
     if (Math.hypot(target.x - w.x, target.y - w.y) > 10) return false
+    // Not everyone at once: a few bolts in the air at a time (one more than there are players), never two on one spot
+    const bolts = g.wilds.filter((o) => o.cast?.kind === 'bolt')
+    if (bolts.length >= humansOf(g) + 1 || bolts.some((o) => o.cast!.tgt === target && o.cast!.t > 0.5)) {
+      w.roleT = 0.6 + Math.random() * 0.6
+      return false
+    }
     w.roleT = 4.5 + Math.random() * 2
     const warn = 1.6
     const dmg = 0.2 * (g.diff === 'hard' ? 1.25 : g.diff === 'easy' ? 0.8 : 1)
@@ -645,7 +652,7 @@ export function foeDown(g: Game, m: Mon) {
   if (i >= 0) g.wilds.splice(i, 1)
   m.cast = null
   g.addFxPublic({ kind: 'poof', x: m.x, y: m.y - 0.4, t: 0, life: 0.4, color: '#ffb060' })
-  g.vfx.burst(m.x, m.y - 0.4, { n: m.foe >= 2 ? 26 : 12, speed: 5, cols: ['#ffffff', '#ffd080', '#ff8030'], shape: 'flame', add: true, s0: 3, s1: 0.5, life: 0.5 })
+  g.vfx.burst(m.x, m.y - 0.4, { n: m.foe >= 2 ? 16 : 7, speed: 4, cols: ['#ffffff', '#ffd080', '#ff8030'], shape: 'flame', add: true, s0: 3, s1: 0.5, life: 0.4 })
   const drop = m.foe === 2 || Math.random() < 0.1
   if (drop) dropItem(g, m.x, m.y, 'potion')
   // An elite now and then leaves a Revive (a warden always does: see wardenDown)
