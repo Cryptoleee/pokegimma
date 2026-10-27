@@ -237,6 +237,8 @@ export interface HumanSetup {
   pet?: number
   /** Supporter pack: a badge by the name, a golden name and sparks for Legend. */
   sup?: SupportTier
+  /** Friend code, when logged in (add each other as friends after the match). */
+  fc?: string
 }
 
 /** Battle royale (last trainer standing) or raid (everyone against a boss). */

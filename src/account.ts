@@ -21,6 +21,7 @@ export interface Friend {
   id: string
   name: string
   avatar: string
+  fc?: string
   online: boolean
   pres?: Presence
 }
@@ -108,7 +109,8 @@ export async function pollNow() {
   }
   if (status === 'in') {
     const p = getPres()
-    timer = window.setTimeout(pollNow, fast ? 10_000 : p.s === 'game' ? 60_000 : 30_000)
+    // In the menus and a lobby often enough that a friend's invite shows up within seconds, wherever you are
+    timer = window.setTimeout(pollNow, fast ? 8_000 : p.s === 'game' ? 45_000 : 12_000)
   }
 }
 

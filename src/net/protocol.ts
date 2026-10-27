@@ -18,6 +18,8 @@ export interface LobbyPlayer {
   pet?: number
   /** Supporter pack (badge next to the name, gold for Legend). */
   sup?: SupportTier
+  /** Friend code (logged in with Discord): others can add you as a friend from the lobby or the results. */
+  fc?: string
   lv?: number
   title?: string
 }

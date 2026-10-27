@@ -124,6 +124,8 @@ export interface FriendView {
   id: string
   name: string
   avatar: string
+  /** Their friend code (to see in a lobby who's already a friend). */
+  fc?: string
   online: boolean
   pres?: Presence
 }
@@ -173,7 +175,7 @@ export async function stateFor(uid: string, pres: Presence | null, now = Date.no
     friends: friends.flatMap((id, i) => {
       if (!users.has(id)) return []
       const p = parse<Presence>(presList[i])
-      return [{ ...view(id), online: !!p, pres: p ?? undefined }]
+      return [{ ...view(id), fc: users.get(id)?.code, online: !!p, pres: p ?? undefined }]
     }),
     requests: reqs.filter((id) => users.has(id)).map(view),
     invites: invites.filter((x) => users.has(x.from)).map((x) => ({ ...view(x.from), code: x.code, q: x.q, at: x.at })),

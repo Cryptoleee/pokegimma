@@ -274,7 +274,7 @@ export function showInviteToast(inv: Invite, join: () => void) {
   toastEl?.remove()
   const t = document.createElement('div')
   t.className = 'fr-toast'
-  t.innerHTML = `${avatar(inv.avatar)}<span><b>${esc(inv.name)}</b><small>${L('invites you to their lobby', 'nodigt je uit voor de lobby')}</small></span><button class="fr-join">${L('Join ▶', 'Meedoen ▶')}</button><button class="fr-no" aria-label="${L('Ignore', 'Negeren')}">✕</button>`
+  t.innerHTML = `${avatar(inv.avatar)}<span><small class="fr-kick">${L('Invite', 'Uitnodiging')}</small><b>${esc(inv.name)}</b><small>${L('invites you to their lobby', 'nodigt je uit voor de lobby')}</small></span><button class="fr-join">${L('Join ▶', 'Meedoen ▶')}</button><button class="fr-no" aria-label="${L('Ignore', 'Negeren')}">✕</button><i class="fr-timer"></i>`
   document.body.append(t)
   toastEl = t
   sfx.banner()
@@ -292,7 +292,7 @@ export function showInviteToast(inv: Invite, join: () => void) {
     sfx.select()
     close()
   })
-  setTimeout(close, 20_000)
+  setTimeout(close, 30_000)
 }
 
 /** Hide any open invite pop-up (e.g. a match starts). */
@@ -300,3 +300,47 @@ export function hideInviteToast() {
   toastEl?.remove()
   toastEl = null
 }
+
+// ---------------------------------------------------------------- add a player you met
+
+/** Friend codes you asked this session (the button shows it was sent). */
+const asked = new Set<string>()
+
+/**
+ * A small "+ Friend" button for a player you played with (the lobby list, the
+ * results, the live scoreboard). Nothing when you're not logged in, for
+ * yourself, or for someone who's already your friend.
+ */
+export function addFriendButton(fc: string | undefined) {
+  const s = accountState()
+  if (!fc || accountStatus() !== 'in' || !s || fc === s.me.code) return ''
+  if (s.friends.some((f) => f.fc === fc)) return `<span class="add-fr done" title="${L('Friends', 'Vrienden')}">✓</span>`
+  if (asked.has(fc)) return `<span class="add-fr sent">${L('Sent ✓', 'Verstuurd ✓')}</span>`
+  return `<button class="add-fr" data-addfr="${esc(fc)}" title="${L('Add as friend', 'Toevoegen als vriend')}">+ ${L('Friend', 'Vriend')}</button>`
+}
+
+// One handler for every such button, wherever it is
+document.addEventListener('click', async (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-addfr]')
+  if (!b) return
+  e.stopPropagation()
+  const fc = b.dataset.addfr!
+  sfx.select()
+  b.disabled = true
+  b.textContent = '…'
+  const res = await friendAction({ a: 'add', code: fc })
+  const text: Partial<Record<FriendResult, string>> = {
+    sent: L('Sent ✓', 'Verstuurd ✓'),
+    friends: L('Friends ✓', 'Vrienden ✓'),
+    already: L('Friends ✓', 'Vrienden ✓'),
+    full: L('Their list is full', 'Hun lijst is vol'),
+  }
+  if (res === 'sent' || res === 'friends' || res === 'already') {
+    asked.add(fc)
+    b.outerHTML = `<span class="add-fr sent">${text[res]}</span>`
+  } else {
+    sfx.denied()
+    b.disabled = false
+    b.textContent = text[res] ?? L('Try again', 'Opnieuw')
+  }
+})

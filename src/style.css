@@ -9433,3 +9433,69 @@ body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
     font-size: 10px;
   }
 }
+/* The invite pop-up stands out on every screen: over menus and dialogs, bigger, with a timer */
+.fr-toast {
+  z-index: 400;
+  width: min(480px, calc(100% - 24px));
+  padding: 12px 14px 16px;
+  gap: 12px;
+  border-width: 3px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(143, 152, 255, 0.25);
+  overflow: hidden;
+}
+.fr-toast > img,
+.fr-toast > .fr-av {
+  width: 46px;
+  height: 46px;
+}
+.fr-toast b {
+  font-size: 17px;
+}
+.fr-toast .fr-kick {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #ffd84a;
+}
+.fr-toast .fr-join {
+  padding: 10px 16px;
+  font-size: 15px;
+}
+.fr-toast .fr-timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  width: 100%;
+  background: #ffd84a;
+  transform-origin: left;
+  animation: frTimer 30s linear forwards;
+}
+@keyframes frTimer {
+  to { transform: scaleX(0); }
+}
+.add-fr {
+  margin-left: 8px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  border: 1px solid #5865f2;
+  background: rgba(88, 101, 242, 0.18);
+  color: #c8ceff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  vertical-align: 1px;
+}
+.add-fr:hover {
+  background: rgba(88, 101, 242, 0.35);
+}
+.add-fr.sent,
+.add-fr.done {
+  border-color: transparent;
+  background: transparent;
+  color: #7ce07c;
+  cursor: default;
+}
