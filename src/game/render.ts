@@ -13,7 +13,7 @@ import { FLOWER_FRAMES, hash, TALL_FRAMES, TALL_TOP, tileArt, WATER_FRAMES } fro
 import type { Weather } from '../data/themes'
 import { drawEvents } from './events'
 import { drawHazards, drawHazardsSky } from './boss'
-import { drawBrazier, drawGate, drawWell, gateShown, wellOn } from './dungeon'
+import { drawBrazier, drawGate, drawWell, gateShown, wellOn, wellsHere } from './dungeon'
 import { drawAnimProp, drawEyes, drawLavaEmbers, drawLavaLayer, propLights, coldLook, dungeonLook } from './dungeonArt'
 import { L, tx } from '../i18n'
 import { BOSSES } from '../data/bosses'
@@ -140,7 +140,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   for (const gt of g.world.gates)
     if (gateShown(gt, time) && inView(gt.x + gt.w / 2, gt.y + gt.h / 2, 6)) ents.push({ y: gt.y + gt.h, draw: () => drawGate(ctx, gt, time) })
   for (const b of g.world.braziers) if (inView(b.x, b.y)) ents.push({ y: b.y, draw: () => drawBrazier(ctx, b.x * TILE, b.y * TILE, time) })
-  for (const w of g.world.wells) if (inView(w.x, w.y)) ents.push({ y: w.y - 0.4, draw: () => drawWell(ctx, w.x * TILE, w.y * TILE, time, wellOn(g, w.room)) })
+  if (wellsHere(g)) for (const w of g.world.wells) if (inView(w.x, w.y)) ents.push({ y: w.y - 0.4, draw: () => drawWell(ctx, w.x * TILE, w.y * TILE, time, wellOn(g, w.room)) })
   for (const p of g.world.anim) if (inView(p.x + p.w / 2, p.y + p.h / 2, 4)) ents.push({ y: p.y + p.h - (p.kind === 'rune' ? 99 : 0), draw: () => drawAnimProp(ctx, p, time) })
   ents.sort((a, b) => a.y - b.y)
   for (const e of ents) e.draw()

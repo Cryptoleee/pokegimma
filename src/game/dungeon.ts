@@ -214,8 +214,10 @@ function prepareRoom(g: Game, d: DungeonRun) {
 
 /** Healing well: stand this close to drink. */
 export const WELL_R = 2.4
+/** Healing wells are for going it alone: with friends a healer does that job. */
+export const wellsHere = (g: Game) => g.setup.humans.length <= 1
 /** A room's well flows once the room is cleared. */
-export const wellOn = (g: Game, room: number) => room < (g.raidView?.dg?.room ?? 0) || (g.raidView?.dg?.stage ?? 0) > 0
+export const wellOn = (g: Game, room: number) => wellsHere(g) && (room < (g.raidView?.dg?.room ?? 0) || (g.raidView?.dg?.stage ?? 0) > 0)
 
 /** Wells (host): whoever stands at one that flows gets 12% of their health back every second. */
 function wellTick(g: Game, dt: number) {
@@ -253,9 +255,9 @@ export function dungeonTick(g: Game, r: RaidState, dt: number): boolean {
       if (!p.done && !p.members.length) {
         p.done = true
         d.fights++
-        // A pack beaten: a Potion for every other player, near where it fell (alone: now and then)
+        // A pack beaten (with friends): now and then a Potion, near where it fell
         const at = p.last ?? [0, 0]
-        const n = humansOf(g) > 1 ? Math.ceil(humansOf(g) / 2) : Math.random() < 0.4 ? 1 : 0
+        const n = humansOf(g) > 1 && Math.random() < 0.35 ? 1 : 0
         for (let k = 0; k < n; k++) dropItem(g, at[0] + k * 0.7, at[1] + 0.4, 'potion')
       }
       if (p.members.length) p.last = [p.members[0].x, p.members[0].y]
@@ -640,7 +642,7 @@ function spawnFoe(g: Game, f: FoeSpec, rect: Rect) {
 
 /** Loot on the floor (not too much of one kind lying around: room for everyone, no more). */
 function dropItem(g: Game, x: number, y: number, kind: 'potion' | 'revive' | 'ether') {
-  const cap = (kind === 'potion' ? 3 : 1) * humansOf(g) + 1
+  const cap = (kind === 'potion' ? 2 : 1) * humansOf(g)
   if (g.items.filter((it) => it.kind === kind).length >= cap) return
   const [fx, fy] = freeSpot(g, x, y)
   g.items.push({ x: fx, y: fy, kind, bob: 0 })
@@ -654,7 +656,7 @@ export function foeDown(g: Game, m: Mon) {
   m.cast = null
   g.addFxPublic({ kind: 'poof', x: m.x, y: m.y - 0.4, t: 0, life: 0.4, color: '#ffb060' })
   g.vfx.burst(m.x, m.y - 0.4, { n: m.foe >= 2 ? 16 : 7, speed: 4, cols: ['#ffffff', '#ffd080', '#ff8030'], shape: 'flame', add: true, s0: 3, s1: 0.5, life: 0.4 })
-  const drop = m.foe === 2 || Math.random() < 0.1
+  const drop = (m.foe === 2 && Math.random() < 0.6) || Math.random() < 0.05
   if (drop) dropItem(g, m.x, m.y, 'potion')
   // An elite now and then leaves a Revive (a warden always does: see wardenDown)
   if (m.foe === 2 && Math.random() < 0.25) dropItem(g, m.x + 0.6, m.y, 'revive')
@@ -843,7 +845,7 @@ function roomCleared(g: Game, d: DungeonRun) {
   for (const v of g.viewers) {
     v.hooks.banner(last
       ? { kind: 'legendary', kicker: both('DUNGEON', 'DUNGEON'), title: both('THE WAY IS OPEN', 'DE WEG IS VRIJ'), sub: inBoth(() => `${d.def.theme.toBoss()} · ${L(`${g.raid!.def.name} is waiting…`, `${g.raid!.def.name} wacht…`)}`), mon: g.raid!.def.species, color: g.raid!.def.color }
-      : { kind: 'win', kicker: both('DUNGEON', 'DUNGEON'), title: both('Room cleared!', 'Kamer veroverd!'), sub: both('The gate is open · the well heals you · on to the next room', 'De poort is open · de put geneest je · door naar de volgende kamer'), color: '#ffd040' })
+      : { kind: 'win', kicker: both('DUNGEON', 'DUNGEON'), title: both('Room cleared!', 'Kamer veroverd!'), sub: wellsHere(g) ? both('The gate is open · the well heals you · on to the next room', 'De poort is open · de put geneest je · door naar de volgende kamer') : both('The gate is open · on to the next room', 'De poort is open · door naar de volgende kamer'), color: '#ffd040' })
     v.sfx('loot')
   }
 }

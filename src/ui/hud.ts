@@ -270,7 +270,9 @@ export class Hud {
           const u = upgradeOf(id)
           if (!u) return ''
           const d = u.role === 'any' ? null : ROLE_DEF[u.role]
-          return card(i, d?.color ?? '#ffd040', d?.icon ?? '★', u.name(), `<small>${esc(u.text())}</small>`)
+          // A path step shows the path and how far along it this takes you
+          const step = u.path ? `<span class="pp-path">${esc(u.path())} <i>${'●'.repeat(u.tier!)}${'○'.repeat(3 - u.tier!)}</i></span>` : `<span class="pp-path">${L('For anyone', 'Voor iedereen')}</span>`
+          return card(i, d?.color ?? '#ffd040', d?.icon ?? '★', u.name(), `${step}<small>${esc(u.text())}</small>`)
         })
         this.pickEl.innerHTML = `<div class="pp-head"><b>${esc(pickTitle(pk.kind))}</b><span class="pp-time"><i></i></span></div><div class="pp-cards">${cards.join('')}</div>`
         this.pickEl.querySelectorAll<HTMLElement>('.pp-card').forEach((b) =>

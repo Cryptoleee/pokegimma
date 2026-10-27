@@ -233,6 +233,9 @@ export class Trainer {
   pick: { kind: 'role' | 'up'; opts: string[]; t: number } | null = null
   /** Client: when you last sent a pick (the card stays closed until the host has it). */
   pickSent?: number
+  /** Raid: the last upgrade cards you were shown (not shown again straight away), and a healer's battle hymn still on you. */
+  lastOffer: string[] = []
+  blessT = 0
   kos = 0
   caught = 0
   /** Progress counters: legendaries caught, evolutions, grabbed the Evolution Crystal. */

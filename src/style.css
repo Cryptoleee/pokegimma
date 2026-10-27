@@ -9499,3 +9499,19 @@ body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
   color: #7ce07c;
   cursor: default;
 }
+.pp-card .pp-path {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #b8b4c8;
+}
+.pp-card .pp-path i {
+  font-style: normal;
+  color: var(--rc);
+  letter-spacing: 1px;
+}
+.pp-card .pp-path i {
+  font-size: 7px;
+  vertical-align: 1px;
+}
