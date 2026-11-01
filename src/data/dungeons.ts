@@ -709,6 +709,29 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
     get blurb() { return L('Break into a secret lab deep under the mountain: an archive swept by lasers, a hall of cloning tanks, a pulsing reactor, a chamber where the floor reads your mind, and Mewtwo waiting in the test chamber.', 'Breek in in een geheim lab diep onder de berg: een archief vol lasers, een zaal vol kloontanks, een pulserende reactor, een kamer waar de vloer je gedachten leest, en Mewtwo wacht in de testkamer.') },
     start: [117, 21],
     lives: 3,
+    intro: {
+      id: 'lab-intro',
+      look: 'lab',
+      shots: [
+        {
+          src: 'lab-intro', len: 20.3, lines: [
+            { at: 0.6, until: 3.2, title: true, text: () => L('THE FORSAKEN LAB', 'HET VERLATEN LAB'), kicker: () => L('Raid dungeon', 'Raid-dungeon') },
+            { at: 16.2, until: 20.3, title: true, text: () => 'MEWTWO', kicker: () => L('The clone that broke free', 'De kloon die losbrak') },
+          ],
+        },
+      ],
+    },
+    outro: {
+      id: 'lab-outro',
+      look: 'lab',
+      shots: [
+        {
+          src: 'lab-outro', len: 12.2, lines: [
+            { at: 8.2, until: 12.2, title: true, heroes: true, text: () => L('MEWTWO DEFEATED', 'MEWTWO VERSLAGEN'), kicker: () => L('The lab falls silent', 'Het lab valt stil') },
+          ],
+        },
+      ],
+    },
     arenaEntry: [64, 76],
     rooms: [
       {
