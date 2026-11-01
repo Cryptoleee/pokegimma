@@ -463,7 +463,7 @@ function roomHazards(g: Game, d: DungeonRun, deco: string, dt: number) {
     const near = Math.random() < 0.5
     addHazard(g, near
       ? { ...psy, shape: 'circle', x: mx, y: my, ang: 0, r: 5.5, t: 2, dmg: 0.2, fx: 'psychic', atk: 'vent' }
-      : { ...psy, shape: 'ring', x: mx, y: my, ang: 0, inner: 3.6, r: Math.max(rect.w, rect.h), t: 2.1, dmg: 0.2, fx: 'psychic', atk: 'vent' })
+      : { ...psy, shape: 'ring', x: mx, y: my, ang: 0, inner: 3.6, r: Math.hypot(rect.w, rect.h) / 2 + 0.5, t: 2.1, dmg: 0.2, fx: 'psychic', atk: 'vent' })
     for (const v of g.viewers) if (here().includes(v.tr)) {
       v.hooks.toast(near ? both('The core is pulsing: get away from it!', 'De kern pulseert: ga er vandaan!') : both('A wave is coming: get close to the core!', 'Er komt een golf: ga vlak bij de kern staan!'), '#e0a0ff')
       v.sfx('warn')
