@@ -1,6 +1,6 @@
 import { WILD } from '../data/pokemon'
 import type { Game } from './game'
-import { TILE } from './world'
+import { MAP, TILE } from './world'
 import { both } from '../i18n'
 
 /**
@@ -52,7 +52,7 @@ export function startEvent(g: Game, kind: WorldEvent['kind']) {
     ? (() => {
         for (let k = 0; k < 40; k++) {
           const i = g.rng.pick(g.world.tall)
-          const x = (i % 128) + 0.5, y = Math.floor(i / 128) + 0.5
+          const x = (i % MAP) + 0.5, y = Math.floor(i / MAP) + 0.5
           if (inside(x, y)) return [x, y] as const
         }
         return null

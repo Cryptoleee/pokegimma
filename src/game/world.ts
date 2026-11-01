@@ -6,7 +6,16 @@ import { ANIMATED, setDungeonLook, bakeEdges, bakeGrime, bakeProps, bakeStones, 
 import { hash, mix, paintGrass, shade, tallBed, tileArt, tone } from './tiles'
 
 export const TILE = 16
-export const MAP = 128
+/**
+ * Map size in tiles. Raids, dungeons and duels are 128 across; the battle royale
+ * is bigger (BR_MAP) so the trainers start further apart. Set it (setMapSize)
+ * before a World is made: everything reads it live.
+ */
+export let MAP = 128
+export const BR_MAP = 160
+export const setMapSize = (n: number) => {
+  MAP = n
+}
 
 export enum T {
   GRASS, TALL, PATH, SAND, WATER, TREE, ROCK, HOUSE, FLOWER, BRIDGE,
@@ -61,7 +70,7 @@ export interface Gate extends Rect {
 }
 
 /** Arena centre and radius (tiles). */
-export const ARENA_C = MAP / 2
+export const ARENA_C = 64
 export const ARENA_R = 15
 /** 1 vs 1 stadium field: half its width and height (tiles), around ARENA_C. */
 export const FIELD_W = 10
@@ -178,7 +187,9 @@ export class World {
 
     // Towns
     const spots: Town[] = []
-    for (let tries = 0; spots.length < 6 && tries < 500; tries++) {
+    // (one town more on a bigger map)
+    const towns = MAP > 128 ? 8 : 6
+    for (let tries = 0; spots.length < towns && tries < 900; tries++) {
       const x = rng.int(16, MAP - 18)
       const y = rng.int(16, MAP - 16)
       if (spots.every((s) => Math.hypot(s.x - x, s.y - y) > 32)) spots.push({ x, y, name: TOWN_NAMES[spots.length] })

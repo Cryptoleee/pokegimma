@@ -8,7 +8,7 @@ import { liveSprite } from './monAnim'
 import { trainerSpriteUrl } from '../data/trainers'
 import { drawCharge, drawChargeCore, drawDashAura, drawIncoming, drawMelee, drawProjectile, pal } from './moveFx'
 import { drawGlow } from './vfx'
-import { ARENA_C, SKIN, standCell, standPerson, T, TILE } from './world'
+import { ARENA_C, MAP, SKIN, standCell, standPerson, T, TILE } from './world'
 import { FLOWER_FRAMES, hash, TALL_FRAMES, TALL_TOP, tileArt, WATER_FRAMES } from './tiles'
 import type { Weather } from '../data/themes'
 import { drawEvents } from './events'
@@ -277,7 +277,7 @@ function grassOver(g: Game, ctx: CanvasRenderingContext2D, x: number, y: number)
 function tallFrame(g: Game, tx: number, ty: number, time: number) {
   const art = tileArt(g.world.theme)
   const v = Math.floor(hash(tx, ty, 5) * art.tall.length)
-  const rt = g.world.rustle.get(ty * 128 + tx)
+  const rt = g.world.rustle.get(ty * MAP + tx)
   let f: number
   if (rt !== undefined && time - rt < 0.5 && time >= rt) f = Math.floor(time * 18 + tx) % TALL_FRAMES
   else {
@@ -293,9 +293,9 @@ function drawFoliage(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: num
   if (w.arena) return
   const art = tileArt(w.theme)
   const tx0 = Math.max(0, Math.floor(ox / TILE)), ty0 = Math.max(0, Math.floor(oy / TILE))
-  const tx1 = Math.min(127, Math.ceil((ox + vw) / TILE)), ty1 = Math.min(128, Math.ceil((oy + vh) / TILE) + 1)
+  const tx1 = Math.min(MAP - 1, Math.ceil((ox + vw) / TILE)), ty1 = Math.min(MAP, Math.ceil((oy + vh) / TILE) + 1)
   if ((tx1 - tx0) * (ty1 - ty0) > 9000) return
-  for (let ty = ty0; ty < ty1 && ty < 128; ty++)
+  for (let ty = ty0; ty < ty1 && ty < MAP; ty++)
     for (let tx = tx0; tx <= tx1; tx++) {
       const t = w.at(tx, ty)
       if (t === T.TALL) ctx.drawImage(tallFrame(g, tx, ty, time), tx * TILE, ty * TILE - TALL_TOP)
@@ -1668,13 +1668,13 @@ function cloudSprite() {
 }
 
 function drawClouds(ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number) {
-  const span = 128 * TILE
+  const span = MAP * TILE
   const c = cloudSprite()
   ctx.globalAlpha = 0.22
   for (let i = 0; i < 14; i++) {
     const size = (10 + (i % 4) * 4) * TILE
-    const x = (((i * 977) % 128) * TILE + time * (10 + (i % 3) * 4)) % span
-    const y = (((i * 613) % 128) * TILE + time * 4) % span
+    const x = (((i * 977) % MAP) * TILE + time * (10 + (i % 3) * 4)) % span
+    const y = (((i * 613) % MAP) * TILE + time * 4) % span
     if (x + size < ox || x - size > ox + vw || y + size < oy || y - size > oy + vh) continue
     ctx.drawImage(c, x - size, y - size * 0.7, size * 2, size * 1.4)
   }

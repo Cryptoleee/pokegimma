@@ -103,7 +103,7 @@ Net als in Pokémon Unite heeft elke partner een rol en een aanvalsstijl. Je zie
 
 ## Werelden en gebeurtenissen
 
-Elke battle royale speelt in een van negen werelden. In solo kies je die zelf, in multiplayer de host; standaard is het **Willekeurig**.
+Elke battle royale speelt op een kaart van 160×160 tegels (raids, dungeons en duels zijn 128×128): genoeg ruimte om eerst te zoeken en te groeien voor je de anderen tegenkomt. De stormcirkels, het aantal wilde Pokémon, de items en de dorpen (8 in plaats van 6) groeien mee met de kaart. Elke battle royale speelt in een van negen werelden. In solo kies je die zelf, in multiplayer de host; standaard is het **Willekeurig**.
 
 | Wereld | Wat is anders |
 | --- | --- |

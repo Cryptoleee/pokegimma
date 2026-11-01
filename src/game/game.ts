@@ -16,7 +16,7 @@ import type { ItemSound } from '../moveSfx'
 import { LEVEL_CAP, Mon, Trainer, xpNeeded, type AimDir, AWAKENS, AWAKEN_LEGEND } from './entities'
 import { Rng } from './rng'
 import { preloadMon } from './sprites'
-import { MAP, T, World } from './world'
+import { BR_MAP, MAP, setMapSize, T, World } from './world'
 import type { ThemeId } from '../data/themes'
 import { BOSSES, type BossId } from '../data/bosses'
 import { dungeonOf } from '../data/dungeons'
@@ -119,9 +119,10 @@ export interface ZonePhase {
 }
 
 // Storm damage: share of max HP per second (rising the longer you stay out, see STORM_RAMP)
+// (The circles are for a 128-tile map: they grow with a bigger one, see Zone.k)
 const PHASES: ZonePhase[] = [
-  { wait: 55, shrink: 35, r: 46, dps: 0.045 },
-  { wait: 40, shrink: 30, r: 30, dps: 0.06 },
+  { wait: 65, shrink: 38, r: 46, dps: 0.045 },
+  { wait: 45, shrink: 32, r: 30, dps: 0.06 },
   { wait: 35, shrink: 28, r: 18, dps: 0.085 },
   { wait: 30, shrink: 24, r: 9, dps: 0.12 },
   { wait: 25, shrink: 20, r: 3.5, dps: 0.17 },
@@ -132,15 +133,17 @@ const STORM_RAMP = 0.1
 const STORM_RAMP_MAX = 1.5
 
 export class Zone {
+  /** How much bigger than the 128-tile map this one is (the circles grow with it). */
+  k = MAP / 128
   x = MAP / 2
   y = MAP / 2
-  r = 95
+  r = 95 * this.k
   fromX = MAP / 2
   fromY = MAP / 2
-  fromR = 95
+  fromR = 95 * this.k
   nx = MAP / 2
   ny = MAP / 2
-  nr = 46
+  nr = 46 * this.k
   phase = 0
   t = 0
   shrinking = false
@@ -385,6 +388,9 @@ export class Game {
     this.kind = setup.kind ?? 'royale'
     this.diff = setup.diff ?? 'normal'
     this.rng = new Rng(setup.seed)
+    // The battle royale plays on a bigger map (host and clients both size it from the kind)
+    setMapSize(this.kind === 'royale' ? BR_MAP : 128)
+    this.zone = new Zone()
     this.world = new World(this.rng, this.kind === 'raid' ? { arena: BOSSES[setup.boss ?? 'reshiram'].arena, dungeon: setup.classic ? undefined : dungeonOf(setup.boss) ?? undefined } : this.kind === 'duel' ? { stadium: setup.stadium ?? 'classic' } : { theme: setup.theme })
     // The client only needs the world: everything else comes from the host.
     if (mode === 'client') return
@@ -445,10 +451,14 @@ export class Game {
     // Spread everyone out over the map.
     const placed: [number, number][] = []
     for (const tr of this.trainers) {
-      let p = this.world.randomWalkable()
-      for (let k = 0; k < 60; k++) {
-        const c = this.world.randomWalkable((x, y) => Math.hypot(x - 64, y - 64) < 52)
-        if (placed.every(([a, b]) => Math.hypot(a - c[0], b - c[1]) > 22)) { p = c; break }
+      // The first spot far enough from everyone; failing that, the one furthest from the others
+      const k = MAP / 128
+      let p = this.world.randomWalkable(), best = -1
+      for (let n = 0; n < 120; n++) {
+        const c = this.world.randomWalkable((x, y) => Math.hypot(x - MAP / 2, y - MAP / 2) < 60 * k)
+        const gap = placed.length ? Math.min(...placed.map(([a, b]) => Math.hypot(a - c[0], b - c[1]))) : Infinity
+        if (gap > best) { best = gap; p = c }
+        if (gap > 22 * k) break
       }
       placed.push(p)
       tr.x = p[0]
@@ -464,7 +474,7 @@ export class Game {
     // The Evolution Crystal: one per match, early on (everyone races for it)
     this.crystalAt = this.rng.range(28, 45)
     this.eventPlan = eventTimes(this)
-    for (let i = 0; i < 22; i++) this.spawnWild(true)
+    for (let i = 0; i < Math.round(22 * (MAP / 128) ** 2); i++) this.spawnWild(true)
     for (const tr of this.trainers) if (tr.human) tr.party.forEach((m) => preloadMon(m.species.id))
   }
 
@@ -925,7 +935,7 @@ export class Game {
   /** Rustling grass and footstep dust. */
   private stepFx(x: number, y: number, dt: number) {
     const t = this.world.at(Math.floor(x), Math.floor(y))
-    if (t === T.TALL) this.world.rustle.set(Math.floor(y) * 128 + Math.floor(x), this.time)
+    if (t === T.TALL) this.world.rustle.set(Math.floor(y) * MAP + Math.floor(x), this.time)
     if (t === T.TALL && Math.random() < dt * 9)
       this.vfx.burst(x, y - 0.1, { n: 2, speed: 2, dir: -Math.PI / 2, spread: 1, cols: ['#88d858', '#48a838', '#2c7a30'], shape: 'leaf', s0: 1.8, s1: 1, life: 0.5, grav: 6 })
     else if ((t === T.PATH || t === T.SAND) && Math.random() < dt * 6)
@@ -1805,10 +1815,12 @@ export class Game {
         this.items.push({ x, y, kind, bob: Math.random() * 6 })
       }
     }
-    add('master', 10)
-    add('potion', 45)
-    add('candy', 24)
-    add('revive', 12)
+    // (more on a bigger map, so it's just as full)
+    const a = (MAP / 128) ** 2
+    add('master', Math.round(10 * a))
+    add('potion', Math.round(45 * a))
+    add('candy', Math.round(24 * a))
+    add('revive', Math.round(12 * a))
     // Towns are worth visiting
     for (const t of this.world.towns) {
       this.items.push({ x: t.x + 0.5, y: t.y + 0.5, kind: this.rng.chance(0.4) ? 'master' : 'revive', bob: 0 })
@@ -1946,7 +1958,7 @@ export class Game {
     if (this.spawnT <= 0) {
       this.spawnT = 1.5
       const frac = Math.min(1, (Math.PI * this.zone.r * this.zone.r) / (MAP * MAP))
-      const want = Math.round(6 + 18 * frac)
+      const want = Math.round((6 + 18 * frac) * (MAP / 128) ** 2)
       if (this.wilds.length < want) this.spawnWild(false)
     }
     if (this.legendIdx < this.legendTimes.length && this.time >= this.legendTimes[this.legendIdx]) {
@@ -2302,7 +2314,7 @@ export class Game {
     }
     z.nx = nx
     z.ny = ny
-    z.nr = ph.r
+    z.nr = ph.r * z.k
     this.flow = this.world.flowTo(Math.floor(nx), Math.floor(ny))
   }
 
