@@ -80,11 +80,13 @@ export type RoomDeco =
   | 'sgate' | 'flooded' | 'chapel' | 'dynamo' | 'cistern' | 'ramparts'
   // The Frozen Citadel
   | 'igate' | 'frozen' | 'pillars' | 'icefall' | 'icelake' | 'summit'
+  // The Sky Pillar
+  | 'skygate' | 'cloister' | 'aerie' | 'gallery' | 'belfry' | 'peak'
 
 /** A dungeon's element: what its casters throw, how its foes arrive, what its relics are called. */
 export interface DungeonTheme {
   /** Hazard type of its casters' bolts, pools and room hazards. */
-  type: 'fire' | 'electric' | 'ice'
+  type: 'fire' | 'electric' | 'ice' | 'dragon'
   /** Effect (and sound) of its casters' bolts and its foes' arrival. */
   fx: MoveFx
   /** Colours of a foe's arrival burst, hot to cool. */
@@ -150,6 +152,11 @@ const my = (r: Rect): Rect => ({ x: r.x, y: MAPW - r.y - r.h, w: r.w, h: r.h })
 /** A spot inside a room of height h, mirrored top to bottom. */
 const mya = (h: number, at: [number, number]): [number, number] => [at[0], h - 1 - at[1]]
 const ic = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'ice', phase: 0, weight: 1, ...a })
+/** The Sky Pillar winds round the arena the fourth way: mirrored both ways (you start top right). */
+const mxy = (r: Rect): Rect => mx(my(r))
+const mxya = (w: number, h: number, at: [number, number]): [number, number] => [w - 1 - at[0], h - 1 - at[1]]
+const dr = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'dragon', phase: 0, weight: 1, ...a })
+const fl = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'flying', phase: 0, weight: 1, ...a })
 const el = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'electric', phase: 0, weight: 1, ...a })
 
 export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
@@ -543,6 +550,114 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
       my({ x: 81, y: 18, w: 2, h: 5 }),
       my({ x: 106, y: 36, w: 5, h: 2 }),
       my({ x: 89, y: 62, w: 2, h: 5 }),
+    ],
+  },
+  rayquaza: {
+    id: 'pillar',
+    boss: 'rayquaza',
+    theme: {
+      type: 'dragon', fx: 'hurricane', burst: ['#ffffff', '#c8f8e0', '#58d090'], accent: '#58d090',
+      bolts: () => L('gusts of wind', 'windstoten'),
+      relics: { ember: () => L('Feather of the Gale', 'Veer van de Storm'), shell: () => L('Scale of the Sky', 'Schub van de Hemel') },
+      icon: '🌪️', dark: '#1c4a3a',
+      toBoss: () => L('To the top', 'Naar de top'),
+      tips: {
+        wardens: () => L('Two wardens guard the way up, each with their own tricks: a Twister that follows you, Dragon Breath in a cone, a Hyper Beam in a straight line, Draco Meteors raining down. They call help and enrage after two minutes. Beat one for a relic for the team and a life back.', 'Twee wachters bewaken de weg omhoog, elk met eigen trucs: een Wervelwind die je volgt, Drakenadem in een kegel, een Hyper Beam in een rechte lijn, regens van Draco Meteors. Ze roepen hulp en worden na twee minuten woedend. Versla er een voor een reliek voor het team en een leven terug.'),
+        liquid: () => L('Where the floor has broken away there is only sky: don\'t step into the gaps. Cracked stone gives way under your feet, and in the wind gallery the gusts push you toward the edge.', 'Waar de vloer is weggebroken is alleen lucht: stap niet in de gaten. Gebarsten steen bezwijkt onder je voeten, en in de windgalerij duwen de windstoten je naar de rand.'),
+        partner: () => L('Everything up here is dragons and birds. Types still count, but no more than 1.5× either way: no partner carries you through.', 'Alles hier boven is draak en vogel. Types tellen mee, maar nooit meer dan 1,5× (beide kanten op): geen partner sleept je erdoorheen.'),
+        boss: (n) => L(`After the peak the way to the top opens. Step out and ${n} comes down from the storm: you have 4 minutes. `, `Na de top gaat de weg naar het dak open. Stap naar buiten en ${n} daalt neer uit de storm: je hebt 4 minuten. `),
+      },
+    },
+    get name() { return L('The Sky Pillar', 'De Hemelpilaar') },
+    get blurb() { return L('Climb an ancient tower above the clouds: crumbling cloisters, a dragons\' aerie, a gallery where the wind tries to blow you off, the old bell tower, and Rayquaza circling above the top.', 'Klim een eeuwenoude toren boven de wolken op: afbrokkelende kloostergangen, een drakennest, een galerij waar de wind je eraf probeert te blazen, de oude klokkentoren, en Rayquaza cirkelt boven de top.') },
+    start: [106, 10],
+    lives: 3,
+    arenaEntry: [51, 63],
+    rooms: [
+      {
+        get name() { return L('The Sky Gate', 'De Hemelpoort') }, deco: 'skygate', rect: mxy({ x: 8, y: 98, w: 26, h: 24 }),
+        packs: [
+          { at: mxya(26, 24, [13, 10]), foes: [f(17, 2, 41), f(329, 1, 41, 'caster')] },
+          { at: mxya(26, 24, [5, 4]), foes: [f(621, 1, 42, 'brute'), f(357, 1, 41, 'mender'), f(397, 1, 41)] },
+          { at: mxya(26, 24, [20, 4]), foes: [f(17, 1, 41), f(329, 2, 41, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('The Cloud Cloister', 'Het Wolkenklooster') }, deco: 'cloister', rect: mxy({ x: 8, y: 60, w: 26, h: 24 }),
+        packs: [
+          { at: mxya(26, 24, [7, 18]), foes: [f(397, 2, 42), f(357, 1, 42, 'mender')] },
+          { at: mxya(26, 24, [20, 18]), foes: [f(148, 1, 44, 'caster', true), f(17, 2, 42)] },
+          { at: mxya(26, 24, [5, 6]), patrol: mxya(26, 24, [21, 6]), foes: [f(397, 1, 43), f(17, 1, 42)] },
+          { at: mxya(26, 24, [13, 3]), link: 2, foes: [f(621, 1, 43, 'brute'), f(227, 1, 42, 'guard'), f(329, 1, 42, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('The Dragons\' Aerie', 'Het Drakennest') }, deco: 'aerie', rect: mxy({ x: 5, y: 16, w: 32, h: 30 }),
+        packs: [
+          { at: mxya(32, 30, [8, 22]), foes: [f(333, 2, 43), f(357, 1, 43, 'mender')] },
+          { at: mxya(32, 30, [24, 22]), foes: [f(611, 1, 44, 'brute'), f(164, 1, 43, 'caster')] },
+        ],
+        warden: {
+          sp: 334, lv: 48, hp: 5.5, at: mxya(32, 30, [16, 7]), enrage: 120, relic: 'ember', get title() { return L('Warden of the Wind', 'Wachter van de Wind') },
+          calls: [{ at: 0.6, foes: [f(333, 1, 43, 'caster'), f(397, 1, 42)] }, { at: 0.3, foes: [f(621, 1, 44, 'brute'), f(357, 1, 43, 'mender')] }],
+          attacks: [
+            dr({ id: 'a_breath', get name() { return L('Dragon Breath', 'Drakenadem') }, shape: 'cone', warn: 1.1, cd: 4, dmg: 0.32, target: 'nearest', len: 8, width: 0.45, weight: 3, fx: 'dragonpulse' }),
+            fl({ id: 'a_twister', get name() { return L('Twister', 'Wervelwind') }, shape: 'circle', warn: 3.6, cd: 16, dmg: 0.3, target: 'random', r: 2.4, weight: 2, follow: true, linger: { dur: 5, dps: 0.1 }, fx: 'hurricane' }),
+            fl({ id: 'a_sky', name: 'Sky Attack', shape: 'circle', warn: 1.3, cd: 6, dmg: 0.3, target: 'players', r: 2.1, extra: 2, stagger: 0.15, weight: 2, fx: 'hurricane' }),
+            dr({ id: 'a_pulse', name: 'Dragon Pulse', shape: 'circle', warn: 1.4, cd: 9, dmg: 0.34, target: 'self', r: 3.8, weight: 2, fx: 'dracometeor' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Wind Gallery', 'De Windgalerij') }, deco: 'gallery', rect: mxy({ x: 53, y: 8, w: 28, h: 28 }),
+        packs: [
+          { at: mxya(28, 28, [7, 13]), foes: [f(329, 2, 44, 'caster'), f(333, 1, 44)] },
+          { at: mxya(28, 28, [14, 22]), foes: [f(227, 1, 46, 'guard', true), f(611, 1, 44, 'brute'), f(329, 1, 44, 'caster')] },
+          { at: mxya(28, 28, [14, 5]), foes: [f(397, 2, 44), f(357, 1, 44, 'mender')] },
+          { at: mxya(28, 28, [22, 14]), link: 2, foes: [f(611, 1, 45, 'brute'), f(17, 1, 44), f(357, 1, 44, 'mender')] },
+        ],
+      },
+      {
+        get name() { return L('The Old Bell Tower', 'De Oude Klokkentoren') }, deco: 'belfry', rect: mxy({ x: 96, y: 6, w: 26, h: 30 }),
+        packs: [
+          { at: mxya(26, 30, [5, 6]), foes: [f(398, 2, 44), f(397, 1, 44)] },
+          { at: mxya(26, 30, [5, 24]), foes: [f(372, 1, 46, 'guard', true), f(621, 1, 44, 'brute'), f(357, 1, 44, 'mender')] },
+        ],
+        warden: {
+          sp: 149, lv: 49, hp: 6.5, at: mxya(26, 30, [14, 16]), enrage: 130, relic: 'shell', get title() { return L('Lord of the Skies', 'Heer van de Hemel') },
+          calls: [{ at: 0.65, foes: [f(398, 2, 44)] }, { at: 0.35, foes: [f(372, 1, 46, 'brute', true), f(334, 1, 44, 'mender')] }],
+          attacks: [
+            fl({ id: 'd_hurricane', name: 'Hurricane', shape: 'ring', warn: 1.4, cd: 7, dmg: 0.34, target: 'self', inner: 3.2, r: 8, weight: 2, fx: 'hurricane' }),
+            dr({ id: 'd_beam', name: 'Hyper Beam', shape: 'line', warn: 1.35, cd: 7, dmg: 0.34, target: 'nearest', len: 13, width: 1.5, weight: 3, fx: 'hyperbeam' }),
+            dr({ id: 'd_twister', get name() { return L('Whirlwind', 'Draaikolk') }, shape: 'circle', warn: 1.5, cd: 9, dmg: 0.22, target: 'players', r: 2.4, extra: 2, stagger: 0.2, weight: 3, linger: { dur: 9, dps: 0.1 }, fx: 'hurricane' }),
+            dr({ id: 'd_meteor', name: 'Draco Meteor', shape: 'circle', warn: 1.25, cd: 6, dmg: 0.25, target: 'players', r: 2, extra: 3, stagger: 0.12, weight: 2, fx: 'dracometeor' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Peak', 'De Top') }, deco: 'peak', rect: mxy({ x: 92, y: 54, w: 30, h: 28 }),
+        waves: [
+          { foes: [f(398, 2, 45), f(227, 1, 44, 'guard'), f(330, 1, 44, 'caster')] },
+          { foes: [f(628, 1, 46, 'brute', true), f(330, 2, 45, 'caster'), f(357, 1, 45, 'mender')] },
+          { final: true, foes: [f(373, 1, 47, 'brute', true), f(635, 1, 47, 'caster', true), f(334, 1, 45, 'mender'), f(398, 2, 45), f(227, 1, 45, 'guard')] },
+        ],
+      },
+    ],
+    halls: [
+      mxy({ x: 18, y: 84, w: 5, h: 14 }),
+      mxy({ x: 18, y: 46, w: 5, h: 14 }),
+      mxy({ x: 37, y: 26, w: 16, h: 5 }),
+      mxy({ x: 81, y: 18, w: 15, h: 5 }),
+      mxy({ x: 106, y: 36, w: 5, h: 18 }),
+      mxy({ x: 76, y: 62, w: 16, h: 5 }),
+    ],
+    gates: [
+      mxy({ x: 18, y: 96, w: 5, h: 2 }),
+      mxy({ x: 18, y: 58, w: 5, h: 2 }),
+      mxy({ x: 37, y: 26, w: 2, h: 5 }),
+      mxy({ x: 81, y: 18, w: 2, h: 5 }),
+      mxy({ x: 106, y: 36, w: 5, h: 2 }),
+      mxy({ x: 89, y: 62, w: 2, h: 5 }),
     ],
   },
 }

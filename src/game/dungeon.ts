@@ -9,7 +9,7 @@ import { Mon, type Trainer } from './entities'
 import type { Game } from './game'
 import { preloadMon } from './sprites'
 import { ARENA_C, ARENA_R, T, TILE, type Gate } from './world'
-import { coldLook } from './dungeonArt'
+import { coldLook, dungeonLook } from './dungeonArt'
 import { offerUpgrade, threatMul } from './perks'
 
 /**
@@ -76,6 +76,8 @@ export interface DungeonRun {
   checkpoint: [number, number]
   /** Forge vents: next eruption. */
   ventT: number
+  /** The Sky Pillar's wind gallery: a gust on its way (delay) or blowing (t), pushing everyone along (dx, dy). */
+  gust?: { dx: number; dy: number; delay: number; t: number } | null
   /** Fights won so far / in the whole dungeon (packs, wardens, waves). */
   fights: number
   total: number
@@ -323,7 +325,17 @@ export function dungeonTick(g: Game, r: RaidState, dt: number): boolean {
     if (standing.some((t) => Math.hypot(t.x - ARENA_C, t.y - ARENA_C) < ARENA_R - 2.5)) startBoss(g, r, d)
   }
 
-  g.raidView = { timeLeft: r.timeLeft, phase: 0, dg: viewOf(g, d) }
+  // A gust in the wind gallery: everyone is pushed along while it blows (each player moves their own)
+  let wind: [number, number] | undefined
+  if (d.gust) {
+    if (d.gust.delay > 0) d.gust.delay -= dt
+    else {
+      d.gust.t -= dt
+      wind = [d.gust.dx, d.gust.dy]
+      if (d.gust.t <= 0) d.gust = null
+    }
+  }
+  g.raidView = { timeLeft: r.timeLeft, phase: 0, dg: viewOf(g, d), ...(wind ? { wind } : {}) }
   return (d.stage as string) !== 'boss'
 }
 
@@ -340,6 +352,7 @@ function roomHazards(g: Game, d: DungeonRun, deco: string, dt: number) {
   const inRoom = (p: { x: number; y: number }) => p.x >= rect.x && p.x < rect.x + rect.w && p.y >= rect.y && p.y < rect.y + rect.h
   const base = { inner: 0, width: 1, freeze: 0, cover: false, both: false, type: 'electric' as const }
   const cold = { ...base, type: 'ice' as const }
+  const sky = { ...base, type: 'dragon' as const }
   const here = () => g.trainers.filter((t) => t.alive && !t.mon.fainted && inRoom(t))
   d.ventT -= dt
   if (d.ventT > 0) return
@@ -392,6 +405,43 @@ function roomHazards(g: Game, d: DungeonRun, deco: string, dt: number) {
     for (let i = 0; i < 2; i++) {
       const a = Math.random() * Math.PI * 2, r = i ? 2 + Math.random() * 3 : Math.random() * 1.5
       addHazard(g, { ...base, shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 1.8, t: 1.25 + i * 0.3, dmg: 0.15, fx: 'thunder', atk: 'vent' })
+    }
+  } else if (deco === 'cloister') {
+    // Cracked flagstones give way: a hole opens under you for a moment
+    d.ventT = 4.5 + Math.random() * 2
+    const t = here()[Math.floor(Math.random() * here().length)]
+    if (!t) return
+    const a = Math.random() * Math.PI * 2, r = Math.random() * 1.5
+    addHazard(g, { ...sky, shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 1.6, t: 1.6, dmg: 0.1, fx: 'rocktomb', atk: 'collapse', dur: 2.5, dps: 0.06 })
+  } else if (deco === 'gallery') {
+    // A gust through the gallery, from one side: it pushes you toward the open sky on the other
+    d.ventT = 6 + Math.random() * 2.5
+    if (!here().length || d.gust) return
+    const west = Math.random() < 0.5
+    d.gust = { dx: west ? 1.7 : -1.7, dy: 0, delay: 1.4, t: 2.6 }
+    for (const v of g.viewers) if (here().includes(v.tr)) {
+      v.hooks.toast(west ? both('Gust from the west: hold on!', 'Windstoot uit het westen: zet je schrap!') : both('Gust from the east: hold on!', 'Windstoot uit het oosten: zet je schrap!'), '#a8f0d0')
+      v.sfx('warn')
+    }
+    g.soundAt(rect.x + rect.w / 2, rect.y + rect.h / 2, 'boss', ['wind', 'hurricane', 0.8, 4], { range: 30 })
+  } else if (deco === 'belfry') {
+    // Loose masonry falls from the bell tower: a shadow grows where it lands
+    d.ventT = 3.2 + Math.random() * 1.4
+    const t = here()[Math.floor(Math.random() * here().length)]
+    if (!t) return
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * Math.PI * 2, r = i ? 2 + Math.random() * 3.5 : Math.random()
+      addHazard(g, { ...sky, shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 1.5, t: 1.3 + i * 0.3, dmg: 0.14, fx: 'stoneedge', atk: 'icicle' })
+    }
+  } else if (deco === 'peak' && d.gauntlet) {
+    // Meteors out of the storm over the peak while the waves come
+    d.ventT = 3 + Math.random() * 1.4
+    const all = here()
+    const t = all[Math.floor(Math.random() * all.length)]
+    if (!t) return
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * Math.PI * 2, r = i ? 2 + Math.random() * 3 : Math.random() * 1.5
+      addHazard(g, { ...sky, shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 1.8, t: 1.25 + i * 0.3, dmg: 0.15, fx: 'dracometeor', atk: 'vent' })
     }
   } else d.ventT = 1
 }
@@ -1093,7 +1143,8 @@ export function drawBrazier(ctx: CanvasRenderingContext2D, x: number, y: number,
   const px = Math.round(x), py = Math.round(y)
   // The Storm Tower's braziers burn with caught lightning
   const st = coldLook()
-  const [c0, c1, c2, c3] = st ? ['#5ac8ff', 'rgba(60,120,255,0.85)', 'rgba(120,215,255,0.9)', 'rgba(235,250,255,0.9)'] : ['#ff6020', 'rgba(255,90,20,0.85)', 'rgba(255,190,60,0.9)', 'rgba(255,250,200,0.9)']
+  // (the Sky Pillar's burn gold and white in the wind)
+  const [c0, c1, c2, c3] = dungeonLook() === 'sky' ? ['#ffd860', 'rgba(255,190,80,0.85)', 'rgba(255,235,150,0.9)', 'rgba(255,255,235,0.9)'] : st ? ['#5ac8ff', 'rgba(60,120,255,0.85)', 'rgba(120,215,255,0.9)', 'rgba(235,250,255,0.9)'] : ['#ff6020', 'rgba(255,90,20,0.85)', 'rgba(255,190,60,0.9)', 'rgba(255,250,200,0.9)']
   ctx.fillStyle = 'rgba(0,0,0,0.35)'
   ctx.fillRect(px - 5, py - 1, 10, 3)
   // Stand and bowl

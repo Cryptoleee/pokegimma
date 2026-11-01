@@ -65,13 +65,15 @@ export const ANIMATED = new Set<PropKind>(['campfire', 'rune', 'treasure', 'cruc
  * frosted stone, glowing orange to electric cyan or to icy white-blue) and
  * everything that burns sparks or glitters instead.
  */
-export type DungeonLook = 'fire' | 'electric' | 'ice'
+export type DungeonLook = 'fire' | 'electric' | 'ice' | 'sky'
 let look: DungeonLook = 'fire'
-let elec = false, icy = false
-export const setDungeonLook = (type: DungeonLook) => {
-  look = type
-  elec = type === 'electric'
-  icy = type === 'ice'
+let elec = false, icy = false, sky = false
+/** The Sky Pillar (its element is 'dragon'): weathered green-grey stone, gold and jade light, open sky where the floor broke away. */
+export const setDungeonLook = (type: DungeonLook | 'dragon') => {
+  look = type === 'dragon' ? 'sky' : type
+  elec = look === 'electric'
+  icy = look === 'ice'
+  sky = look === 'sky'
 }
 /** Not the Depths: braziers, gates and the dark burn cold blue. */
 export const coldLook = () => look !== 'fire'
@@ -79,11 +81,13 @@ export const dungeonLook = () => look
 /** Fire colours (r,g,b) by heat, or the storm's or the ice's: white-hot, mid, dying, and the sparks. */
 const heat = () => elec
   ? { hot: '225,245,255', mid: '90,200,255', low: '60,90,255', spark: '255,240,120' }
+  : sky
+    ? { hot: '255,252,220', mid: '150,240,190', low: '60,170,130', spark: '255,230,140' }
   : icy
     ? { hot: '240,252,255', mid: '150,220,255', low: '80,140,230', spark: '255,255,255' }
     : { hot: '255,240,170', mid: '255,160,50', low: '230,70,20', spark: '255,170,60' }
 /** A light's colour in this dungeon (every warm light turns electric in the storm, icy in the citadel). */
-const lit = (c: string) => (elec ? (c === '#ffd060' ? '#ffe46a' : '#5ac8ff') : icy ? (c === '#ffd060' ? '#e8f8ff' : '#9ad8ff') : c)
+const lit = (c: string) => (elec ? (c === '#ffd060' ? '#ffe46a' : '#5ac8ff') : icy ? (c === '#ffd060' ? '#e8f8ff' : '#9ad8ff') : sky ? (c === '#ffd060' ? '#fff0b0' : '#8ef0c0') : c)
 
 interface Ctx {
   w: World
@@ -163,7 +167,7 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
   const rock = (x: number, y: number, s = 1) => {
     for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) if (!c.nearHall(x + dx, y + dy, 3) && floorTile(w.at(x + dx, y + dy))) w.set(x + dx, y + dy, T.ROCK)
   }
-  const BASE: Partial<Record<Room['deco'], number>> = { gate: FM.flag, river: FM.cave, hall: FM.obsidian, forge: FM.flag, den: FM.dirt, sgate: FM.flag, flooded: FM.cave, chapel: FM.obsidian, dynamo: FM.grate, cistern: FM.cave, igate: FM.flag, frozen: FM.cave, pillars: FM.obsidian, icelake: FM.cave }
+  const BASE: Partial<Record<Room['deco'], number>> = { skygate: FM.flag, cloister: FM.paving, aerie: FM.dirt, gallery: FM.flag, belfry: FM.obsidian, peak: FM.paving, gate: FM.flag, river: FM.cave, hall: FM.obsidian, forge: FM.flag, den: FM.dirt, sgate: FM.flag, flooded: FM.cave, chapel: FM.obsidian, dynamo: FM.grate, cistern: FM.cave, igate: FM.flag, frozen: FM.cave, pillars: FM.obsidian, icelake: FM.cave }
   const base = BASE[room.deco] ?? FM.paving
   mat(c, rx - 4, ry - 4, rw + 8, rh + 8, base)
   // Wall decorations on the north wall (drawn on its face, if there is one)
@@ -366,7 +370,7 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
       coldRoom(c, room, rw, rh, rx, ry, cx, cy, rock, wallDeco)
   }
   // The last stand of every dungeon has the Wall of Legends: the first free spot of a few
-  if (room.deco === 'bastion' || room.deco === 'ramparts' || room.deco === 'summit')
+  if (room.deco === 'bastion' || room.deco === 'ramparts' || room.deco === 'summit' || room.deco === 'peak')
     for (const [x, y] of [[cx - 2, ry + 2], [cx - 2, ry + rh - 4], [rx + 2, cy - 1], [rx + rw - 6, cy - 1], [cx + 3, cy + 3], [cx - 7, cy - 6]])
       if (put(c, 'legends', x, y, 4, 2)) break
 }
@@ -639,6 +643,103 @@ function coldRoom(c: Ctx, room: Room, rw: number, rh: number, rx: number, ry: nu
       for (let i = 0; i < 8; i++) put(c, 'arrows', rx + 3 + Math.floor(c.rng.next() * (rw - 6)), ry + 3 + Math.floor(c.rng.next() * (rh - 6)), 1, 1, i)
       put(c, 'skeleton', cx + 2, cy - 7, 1, 1, 4)
       wallDeco(['ibanner', 'sconce', 'ibanner', 'chains'], 3)
+      break
+    }
+    // ---- The Sky Pillar: open sky wherever the floor broke away (its "lava")
+    case 'skygate': {
+      // The sky gate: a runner between dragon statues to the way up, the floor broken away at the corners
+      mat(c, cx - 2, ry, 5, rh, FM.carpet)
+      put(c, 'dstatue', cx - 8, ry + 2, 2, 2, 0)
+      put(c, 'dstatue', cx + 6, ry + 2, 2, 2, 1)
+      for (const [x, y] of [[rx + 3, ry + 3], [rx + rw - 4, ry + 3], [rx + 3, ry + rh - 4], [rx + rw - 4, ry + rh - 4]]) put(c, 'column', x, y, 1, 1)
+      pool(rx + 2, cy, 1.8, false)
+      pool(rx + rw - 3, cy + 3, 1.6, false)
+      put(c, 'nest', rx + rw - 6, cy - 4, 2, 2)
+      put(c, 'torchstand', cx - 4, ry + rh - 3, 1, 1)
+      put(c, 'torchstand', cx + 4, ry + rh - 3, 1, 1)
+      put(c, 'rubble', rx + 4, cy + 4, 2, 1)
+      put(c, 'rune', cx, cy, 1, 1, 1)
+      wallDeco(['window', 'banner', 'window', 'sconce'], 3)
+      break
+    }
+    case 'cloister': {
+      // The cloud cloister: an arcade of columns round an open court, cracked flagstones that give way, gaps to the sky
+      for (let x = rx + 3; x < rx + rw - 3; x += 5) {
+        put(c, 'column', x, ry + 3, 1, 1)
+        put(c, 'column', x, ry + rh - 4, 1, 1)
+      }
+      pool(cx - 5, cy, 2.1)
+      pool(cx + 5, cy - 1, 2.1)
+      pool(cx, cy + 6, 1.7)
+      pool(rx + 3, cy - 5, 1.6)
+      put(c, 'rubble', cx + 2, cy - 5, 2, 1)
+      put(c, 'rubble', rx + rw - 6, cy + 4, 2, 1)
+      put(c, 'pedestal', cx - 1, cy - 1, 2, 2)
+      put(c, 'web', rx + 1, ry + 1, 1, 1, 0)
+      put(c, 'skeleton', cx - 6, cy + 5, 1, 1, 1)
+      wallDeco(['window', 'sconce', 'window', 'banner'], 3)
+      break
+    }
+    case 'aerie': {
+      // The dragons' aerie: great nests of sticks and bones, claw marks, the warden's perch on a dais at the far end
+      mat(c, cx - 5, ry + 2, 11, 7, FM.dais)
+      put(c, 'throne', cx - 1, ry + 2, 3, 2)
+      for (const [x, y] of [[rx + 3, ry + 4], [rx + rw - 6, ry + 4], [rx + 4, ry + rh - 6], [rx + rw - 7, ry + rh - 7], [cx - 1, cy + 3]]) put(c, 'nest', x, y, 2, 2)
+      for (const [x, y] of [[cx - 7, cy], [cx + 6, cy - 2], [rx + 6, cy + 2]]) put(c, 'bones', x, y, 1, 1, 2)
+      put(c, 'claws', cx + 3, cy + 6, 1, 1)
+      put(c, 'claws', cx - 5, cy - 5, 1, 1)
+      put(c, 'dstatue', rx + 2, cy - 2, 2, 2, 0)
+      put(c, 'dstatue', rx + rw - 4, cy - 2, 2, 2, 1)
+      put(c, 'treasure', rx + rw - 5, ry + 2, 1, 1)
+      wallDeco(['banner', 'window', 'claws', 'window'], 3)
+      break
+    }
+    case 'gallery': {
+      // The wind gallery: the outer wall gone, sky down both sides, columns to shelter behind when the gusts come through
+      strip(rx + 1, ry + 3, 2, rh - 6)
+      strip(rx + rw - 3, ry + 3, 2, rh - 6)
+      for (const y of [ry + 6, cy, ry + rh - 7]) {
+        put(c, 'column', rx + 6, y, 1, 1)
+        put(c, 'column', rx + rw - 7, y, 1, 1)
+      }
+      put(c, 'warbanner', cx - 4, ry + 2, 1, 1)
+      put(c, 'warbanner', cx + 4, ry + 2, 1, 1)
+      put(c, 'rubble', cx - 2, cy + 3, 2, 1)
+      put(c, 'wall', cx - 1, cy - 5, 3, 1, 1)
+      put(c, 'rune', cx, cy, 1, 1, 3)
+      wallDeco(['window', 'sconce', 'window', 'sconce'], 3)
+      break
+    }
+    case 'belfry': {
+      // The old bell tower: great bells hanging from beams, fallen masonry, gaps where the floor gave in
+      for (const [x, y] of [[cx - 7, ry + 4], [cx + 5, ry + 4], [cx - 7, ry + rh - 7], [cx + 5, ry + rh - 7]]) put(c, 'bell', x, y, 2, 2)
+      put(c, 'masonry', rx + 3, cy - 2, 2, 1)
+      put(c, 'masonry', rx + rw - 5, cy + 3, 2, 1)
+      pool(cx, ry + 3, 1.7)
+      pool(cx - 1, ry + rh - 4, 1.7)
+      for (const [x, y] of [[rx + 2, ry + 2], [rx + rw - 3, ry + rh - 3]]) put(c, 'pillar', x, y, 1, 1)
+      put(c, 'chains', rx + rw - 4, ry + 2, 1, 1)
+      put(c, 'rubble', cx + 3, cy + 1, 2, 1)
+      put(c, 'skeleton', cx - 4, cy + 3, 1, 1, 2)
+      wallDeco(['window', 'chains', 'window', 'banner'], 3)
+      break
+    }
+    case 'peak': {
+      // The peak: open to the storm, broken walls for cover, columns along the edge, the Wall of Legends
+      for (let x = rx + 3; x < rx + rw - 3; x += 6) {
+        put(c, 'column', x, ry + 1, 1, 1)
+        put(c, 'column', x + 3, ry + rh - 2, 1, 1)
+      }
+      put(c, 'wall', cx + 4, cy + 4, 4, 1, 0)
+      put(c, 'wall', cx - 7, cy - 4, 3, 1, 1)
+      put(c, 'crystal', rx + 3, ry + 3, 1, 1, 0)
+      put(c, 'crystal', rx + rw - 4, ry + rh - 4, 1, 1, 1)
+      pool(cx - 2, cy + 1, 1.5, false)
+      pool(rx + rw - 7, ry + 5, 1.4, false)
+      put(c, 'rubble', rx + 2, cy + 2, 2, 1)
+      put(c, 'warbanner', rx + 2, cy - 3, 1, 1)
+      put(c, 'skeleton', cx + 2, cy - 7, 1, 1, 4)
+      wallDeco(['banner', 'sconce', 'banner', 'chains'], 3)
       break
     }
   }
@@ -969,7 +1070,11 @@ function coolDown(ctx: CanvasRenderingContext2D) {
     if (h > 80 && h < 320) continue
     let s = c / mx
     let v = mx / 255
-    if (icy) {
+    if (sky) {
+      // Warm stone turns weathered green-grey and lighter; gold stays a soft gold, every other glow turns jade
+      if (s > 0.5 && v > 0.6) { if (h > 36 && h <= 80) { h = 48; s *= 0.7 } else { h = 150; s *= 0.6 } }
+      else { h = 140; s = Math.max(s * 0.22, 0.06); v = Math.min(1, v * 1.4 + 0.1) }
+    } else if (icy) {
       if (s > 0.5 && v > 0.6) { h = 194; s *= 0.45 }
       else { h = 208; s = Math.max(s * 0.32, 0.1); v = Math.min(1, v * 1.3 + 0.05) }
     } else if (s > 0.5 && v > 0.6) {
@@ -1686,8 +1791,11 @@ function lavaTexture() {
   const TAU = Math.PI * 2
   // The storm's charged water: deep and dark, lit by bright crackling veins
   // The citadel's freezing water: deep blue, with floes of white ice drifting in it
+  // The Sky Pillar's gaps: open sky far below, clouds drifting through
   const stops: [number, number, number, number][] = elec
     ? [[0, 6, 16, 30], [0.35, 10, 34, 58], [0.55, 16, 62, 96], [0.72, 30, 120, 170], [0.88, 120, 220, 255], [1, 240, 255, 230]]
+    : sky
+      ? [[0, 40, 104, 186], [0.42, 64, 140, 220], [0.62, 104, 176, 240], [0.76, 176, 214, 252], [0.88, 240, 248, 255], [1, 255, 255, 255]]
     : icy
       ? [[0, 8, 26, 56], [0.4, 16, 52, 98], [0.6, 34, 96, 150], [0.76, 110, 180, 224], [0.86, 215, 240, 255], [1, 250, 254, 255]]
       : [[0, 70, 14, 6], [0.3, 160, 40, 12], [0.5, 230, 95, 24], [0.7, 255, 160, 50], [0.88, 255, 225, 130], [1, 255, 250, 205]]
@@ -1802,7 +1910,7 @@ export function drawLavaLayer(ctx: CanvasRenderingContext2D, mask: HTMLCanvasEle
   const pat = b.createPattern(tex, 'repeat')!
   // Slow base flow
   // (Freezing water barely moves)
-  const drift = icy ? time * 0.3 : time
+  const drift = icy ? time * 0.3 : sky ? time * 0.7 : time
   pat.setTransform(new DOMMatrix([1.5, 0, 0, 1.5, -sx + drift * 6, -sy + drift * 3.5]))
   b.fillStyle = pat
   b.fillRect(0, 0, W, H)
@@ -1810,7 +1918,7 @@ export function drawLavaLayer(ctx: CanvasRenderingContext2D, mask: HTMLCanvasEle
   const pat2 = b.createPattern(tex, 'repeat')!
   pat2.setTransform(new DOMMatrix([1.1, 0, 0, 1.1, -sx - drift * 9, -sy + drift * 5]))
   b.globalCompositeOperation = 'lighter'
-  b.globalAlpha = elec ? 0.3 + 0.35 * flick(time, 1) : icy ? 0.2 : 0.35 + 0.08 * Math.sin(time * 1.7)
+  b.globalAlpha = elec ? 0.3 + 0.35 * flick(time, 1) : icy ? 0.2 : sky ? 0.28 : 0.35 + 0.08 * Math.sin(time * 1.7)
   b.fillStyle = pat2
   b.fillRect(0, 0, W, H)
   b.globalAlpha = 1
@@ -1950,7 +2058,8 @@ function zaps(ctx: CanvasRenderingContext2D, x: number, y: number, n: number, le
 const CRYSTAL_FIRE: [string, string, string][] = [['#ff9a4a', '#ff7a2a', '#ffe0b0'], ['#ff4a6a', '#ff3050', '#ffd0dc'], ['#b07aff', '#9a5aff', '#e8d8ff']]
 const CRYSTAL_STORM: [string, string, string][] = [['#8ae0ff', '#4ab8ff', '#e0f8ff'], ['#ffe46a', '#e0b820', '#fff8d0'], ['#b07aff', '#9a5aff', '#e8d8ff']]
 const CRYSTAL_ICE: [string, string, string][] = [['#d8f6ff', '#8ad8ff', '#ffffff'], ['#bfe8ff', '#6ab8f0', '#ffffff'], ['#d0c8ff', '#a090f0', '#f0e8ff']]
-const crystal = (v: number) => (elec ? CRYSTAL_STORM : icy ? CRYSTAL_ICE : CRYSTAL_FIRE)[v % 3]
+const CRYSTAL_SKY: [string, string, string][] = [['#a8f0c8', '#58d090', '#f0fff6'], ['#ffe8a0', '#e0c050', '#fffbe8'], ['#c8e0ff', '#80b0f0', '#f4f8ff']]
+const crystal = (v: number) => (elec ? CRYSTAL_STORM : icy ? CRYSTAL_ICE : sky ? CRYSTAL_SKY : CRYSTAL_FIRE)[v % 3]
 
 /** The props that move, every frame (y-sorted by the caller through `drawAnimProp`). */
 export function drawAnimProp(ctx: CanvasRenderingContext2D, p: Prop, time: number) {
