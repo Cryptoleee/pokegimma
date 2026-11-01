@@ -1741,7 +1741,37 @@ function drawWater(g: Game, ctx: CanvasRenderingContext2D, ox: number, oy: numbe
 const motes: { x: number; y: number; s: number; ph: number; v: number }[] = []
 /** Ambient particles per world: pollen, rain, snow, sand, ash, embers or fireflies. */
 function drawWeather(w: Weather, ctx: CanvasRenderingContext2D, ox: number, oy: number, vw: number, vh: number, time: number, more = 1) {
-  const n = Math.round((w === 'rain' ? 90 : w === 'snow' || w === 'sand' ? 70 : w === 'ash' || w === 'wind' ? 50 : w === 'psy' ? 45 : 30) * more)
+  // Swamp fog: big soft banks drifting by (drawn first, under the motes)
+  if (w === 'fog') {
+    for (let i = 0; i < 7; i++) {
+      const fx = ox + ((i * 173.3 + time * (6 + i)) % (vw + 260)) - 130
+      const fy = oy + ((i * 97.7 + Math.sin(time * 0.1 + i) * 30) % (vh + 120)) - 60
+      const r = 70 + (i % 3) * 30
+      const gr = ctx.createRadialGradient(fx, fy, 0, fx, fy, r)
+      gr.addColorStop(0, 'rgba(200,220,190,0.16)')
+      gr.addColorStop(1, 'rgba(200,220,190,0)')
+      ctx.fillStyle = gr
+      ctx.fillRect(fx - r, fy - r, r * 2, r * 2)
+    }
+  }
+  // Island sun: slow light shafts across the view
+  if (w === 'sun') {
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+    for (let i = 0; i < 3; i++) {
+      const sx = ox + ((i * 211 + time * 4) % (vw + 200)) - 100
+      ctx.fillStyle = `rgba(255,240,180,${0.035 + 0.02 * Math.sin(time * 0.7 + i)})`
+      ctx.beginPath()
+      ctx.moveTo(sx, oy)
+      ctx.lineTo(sx + 40, oy)
+      ctx.lineTo(sx - 60, oy + vh)
+      ctx.lineTo(sx - 120, oy + vh)
+      ctx.closePath()
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+  const n = Math.round((w === 'rain' ? 90 : w === 'snow' || w === 'sand' ? 70 : w === 'ash' || w === 'wind' ? 50 : w === 'psy' || w === 'leaves' || w === 'petals' ? 45 : w === 'fog' ? 24 : 30) * more)
   while (motes.length < n) motes.push({ x: ox + Math.random() * vw, y: oy + Math.random() * vh, s: 0.6 + Math.random(), ph: Math.random() * 6, v: 0.6 + Math.random() * 0.8 })
   motes.length = n
   for (const m of motes) {
@@ -1753,11 +1783,14 @@ function drawWeather(w: Weather, ctx: CanvasRenderingContext2D, ox: number, oy: 
       case 'embers': m.x += Math.sin(time * 1.3 + m.ph) * 0.3; m.y -= 0.5 * m.v; break
       case 'wind': m.x += 6 * m.v; m.y += Math.sin(time * 2 + m.ph) * 0.4; break
       case 'psy': m.x += Math.sin(time * 0.8 + m.ph) * 0.25; m.y -= 0.18 * m.v; break
+      case 'leaves': m.x += Math.sin(time * 1.4 + m.ph) * 0.6 + 0.25; m.y += 0.5 * m.v; break
+      case 'petals': m.x += 0.7 * m.v + Math.sin(time * 1.8 + m.ph) * 0.4; m.y += 0.32 * m.v; break
+      case 'fog': m.x += Math.sin(time * 0.4 + m.ph) * 0.15; m.y -= 0.08 * m.v; break
       default: m.x += Math.sin(time * 0.7 + m.ph) * 0.15 + 0.12; m.y += Math.cos(time * 0.5 + m.ph) * 0.1 - 0.05
     }
     if (m.x < ox - 10 || m.x > ox + vw + 10 || m.y < oy - 10 || m.y > oy + vh + 10) {
       m.x = ox + Math.random() * vw
-      m.y = w === 'rain' || w === 'snow' || w === 'ash' ? oy - 5 : w === 'embers' ? oy + vh + 5 : oy + Math.random() * vh
+      m.y = w === 'rain' || w === 'snow' || w === 'ash' || w === 'leaves' || w === 'petals' ? oy - 5 : w === 'embers' ? oy + vh + 5 : oy + Math.random() * vh
       if (w === 'sand' || w === 'wind') m.x = ox - 5
       if (w === 'psy') m.y = oy + vh + 5
     }
@@ -1793,6 +1826,24 @@ function drawWeather(w: Weather, ctx: CanvasRenderingContext2D, ox: number, oy: 
         break
       case 'fireflies':
         ctx.fillStyle = `rgba(220,255,120,${0.2 + 0.8 * tw * tw})`
+        ctx.fillRect(m.x, m.y, 1.5, 1.5)
+        break
+      case 'leaves': {
+        // A small leaf, tumbling: wide, then edge-on
+        const flip = Math.abs(Math.sin(time * 3 + m.ph))
+        ctx.fillStyle = ['#e0702a', '#f0b030', '#c8402a', '#d89038'][Math.floor(m.ph * 10) % 4]
+        ctx.fillRect(m.x, m.y, Math.max(1, 3 * flip * m.s), 2)
+        break
+      }
+      case 'petals': {
+        const flip = Math.abs(Math.sin(time * 2.4 + m.ph))
+        ctx.fillStyle = m.ph > 3 ? 'rgba(255,200,225,0.95)' : 'rgba(255,240,248,0.95)'
+        ctx.fillRect(m.x, m.y, Math.max(1, 2.5 * flip * m.s), 1.5)
+        break
+      }
+      case 'fog':
+        // Marsh lights: faint green motes
+        ctx.fillStyle = `rgba(190,255,170,${0.15 + 0.5 * tw * tw})`
         ctx.fillRect(m.x, m.y, 1.5, 1.5)
         break
       default:

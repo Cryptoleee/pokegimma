@@ -1976,7 +1976,10 @@ export class Game {
       pos = [x, y]
     }
     if (!pos) return
-    const id = this.rng.pick(WILD[rarity])
+    // Some worlds have their own: on the island half the wild Pokémon are water, flying or grass, and so on
+    const local = this.world.theme.wildTypes
+    const fits = local ? WILD[rarity].filter((s) => SPECIES[s]?.types.some((t) => local.includes(t))) : []
+    const id = fits.length && this.rng.chance(0.5) ? this.rng.pick(fits) : this.rng.pick(WILD[rarity])
     const m = new Mon(id, this.wildLevel(rarity), this.rng.chance(1 / 64))
     m.x = m.homeX = m.goalX = pos[0]
     m.y = m.homeY = m.goalY = pos[1]

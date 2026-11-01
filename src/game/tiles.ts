@@ -356,6 +356,93 @@ function makeCactus(th: WorldTheme, v: number) {
   return cv
 }
 
+/** Palm: a ringed trunk curving up, a crown of drooping fronds, coconuts under it. */
+function makePalm(th: WorldTheme, v: number) {
+  const [sh, a, b, c, hi] = th.canopy
+  const [, bark, barkDark] = th.trunk
+  const fill = [a, b, c][v % 3]
+  const W = 30, H = 34
+  const cv = mk(W, H)
+  const g = cv.getContext('2d')!
+  const px = pxOf(g)
+  const lean = v === 1 ? -1 : 1
+  // Trunk: from the bottom middle, bending over a little to one side
+  const trunk: [number, number][] = []
+  for (let y = H - 1; y >= 11; y--) {
+    const k = (H - 1 - y) / (H - 12)
+    trunk.push([Math.round(15 + lean * 4 * k * k), y])
+  }
+  const out = shade(barkDark, -0.45)
+  for (const [x, y] of trunk) {
+    px(x - 2, y, out)
+    px(x + 2, y, out)
+    px(x - 1, y, mix(bark, '#ffffff', 0.2))
+    px(x, y, bark)
+    px(x + 1, y, barkDark)
+    // Rings
+    if (y % 3 === 0) { px(x - 1, y, barkDark); px(x, y, barkDark) }
+  }
+  const [tx, ty] = trunk[trunk.length - 1]
+  // Fronds: arcs out from the top, drooping, each a leaf strip with a lit spine
+  const fronds = [[-1, -0.35], [-0.85, 0.15], [-0.4, -0.85], [0.4, -0.85], [0.85, 0.15], [1, -0.35], [0, -1]]
+  const leaf = new Map<string, string>()
+  fronds.forEach(([dx, dy], i) => {
+    const len = 11 + (i % 2) * 2
+    for (let s = 0; s <= len; s++) {
+      const k = s / len
+      const x = tx + dx * s, y = ty + dy * s * 0.7 + k * k * 7
+      const w = k < 0.15 ? 1 : k > 0.85 ? 1 : 2
+      for (let o = -w; o <= w; o++) {
+        const px2 = Math.round(x + (dy !== 0 ? o * 0.6 : 0)), py2 = Math.round(y + (dx !== 0 ? o : 0))
+        leaf.set(`${px2},${py2}`, o === 0 ? mix(fill, hi, 0.45) : (o < 0 ? mix(fill, hi, 0.15) : fill))
+      }
+    }
+  })
+  const at = (x: number, y: number) => leaf.has(`${x},${y}`)
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (at(x, y)) px(x, y, hash(x, y, v + 9) < 0.08 ? mix(fill, sh, 0.4) : leaf.get(`${x},${y}`)!)
+      else if (at(x + 1, y) || at(x - 1, y) || at(x, y + 1) || at(x, y - 1)) px(x, y, sh)
+    }
+  // Coconuts under the crown
+  for (const [cx, cy] of [[tx - 1, ty + 2], [tx + 1, ty + 3], [tx - 2, ty + 3]].slice(0, v === 2 ? 1 : 3)) {
+    px(cx, cy, '#5a3a1e')
+    px(cx, cy - 1, '#8a6038')
+  }
+  return cv
+}
+
+/** Weeping willow: a dark rounded crown with long strands hanging down to the ground. */
+function makeWillow(th: WorldTheme, v: number) {
+  const [sh, a, b, c, hi] = th.canopy
+  const fill = [a, b, c][v % 3]
+  const W = 30, H = 30
+  const cv = mk(W, H)
+  const g = cv.getContext('2d')!
+  const px = pxOf(g)
+  const crown = (x: number, y: number) => ((x + 0.5 - 15) / 12) ** 2 + ((y + 0.5 - 9) / 8) ** 2 <= 1
+  // Strands: from the crown's rim down, each its own length, swaying apart at the tip
+  const strand = new Set<string>()
+  for (let i = 0; i < 12; i++) {
+    const x0 = 4 + i * 2 + Math.floor(hash(v, i, 3) * 2)
+    const len = 10 + Math.floor(hash(v, i, 4) * 9)
+    for (let y = 10; y < Math.min(H - 2, 10 + len); y++) strand.add(`${x0 + Math.round(Math.sin((y - 10) * 0.35 + i) * 0.6)},${y}`)
+  }
+  const has = (x: number, y: number) => crown(x, y) || strand.has(`${x},${y}`)
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (crown(x, y)) {
+        const l = -(((x - 15) / 12) * 0.5 + ((y - 9) / 8) * 0.85)
+        let col = l > 0.45 ? mix(fill, hi, 0.5) : l > 0 ? mix(fill, hi, 0.2) : l > -0.5 ? fill : mix(fill, sh, 0.45)
+        if (hash(x, y, v * 7 + 2) < 0.1) col = mix(col, sh, 0.35)
+        px(x, y, col)
+      } else if (strand.has(`${x},${y}`)) {
+        px(x, y, (y + x) % 3 === 0 ? mix(fill, hi, 0.35) : fill)
+      } else if (has(x + 1, y) || has(x - 1, y) || has(x, y - 1)) px(x, y, sh)
+    }
+  return cv
+}
+
 // ---------------------------------------------------------------- water
 
 export const WATER_FRAMES = 8
@@ -400,7 +487,7 @@ const cache = new Map<string, TileArt>()
 export function tileArt(th: WorldTheme): TileArt {
   let a = cache.get(th.id)
   if (!a) {
-    const tree = th.decor === 'pine' ? makePine : th.decor === 'dead' ? makeDead : th.decor === 'cactus' ? makeCactus : makeOak
+    const tree = th.decor === 'pine' ? makePine : th.decor === 'dead' ? makeDead : th.decor === 'cactus' ? makeCactus : th.decor === 'palm' ? makePalm : th.decor === 'willow' ? makeWillow : makeOak
     a = { tall: makeTall(th), flowers: makeFlowers(th), trees: [0, 1, 2].map((v) => tree(th, v)), water: makeWater(th) }
     cache.set(th.id, a)
   }

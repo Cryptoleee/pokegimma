@@ -5,11 +5,11 @@ import { L } from '../i18n'
  * pick one per match; raid arenas have their own.
  */
 
-export type ThemeId = 'forest' | 'desert' | 'snow' | 'volcano' | 'night' | 'crater' | 'icecave' | 'plateau' | 'sky' | 'lab'
+export type ThemeId = 'forest' | 'desert' | 'snow' | 'volcano' | 'night' | 'island' | 'swamp' | 'autumn' | 'blossom' | 'crater' | 'icecave' | 'plateau' | 'sky' | 'lab'
 
 /** What stands where trees would: also decides how the blocked border looks. */
-export type DecorStyle = 'oak' | 'pine' | 'cactus' | 'dead' | 'cliff' | 'icewall' | 'sky' | 'labwall'
-export type Weather = 'none' | 'rain' | 'snow' | 'sand' | 'ash' | 'embers' | 'fireflies' | 'wind' | 'psy'
+export type DecorStyle = 'oak' | 'pine' | 'cactus' | 'dead' | 'palm' | 'willow' | 'cliff' | 'icewall' | 'sky' | 'labwall'
+export type Weather = 'none' | 'rain' | 'snow' | 'sand' | 'ash' | 'embers' | 'fireflies' | 'wind' | 'psy' | 'fog' | 'leaves' | 'petals' | 'sun'
 
 export interface WorldTheme {
   id: ThemeId
@@ -46,6 +46,8 @@ export interface WorldTheme {
   dark?: boolean
   /** Thresholds for the noise-based tile mix (battle royale layout). */
   mix: { water: number; sand: number; tree: number; tall: number; flower: number; rock: number }
+  /** Battle royale: wild Pokémon of these types show up more here (half of the spawns, when there are any). */
+  wildTypes?: string[]
   /** Minimap colours for the main tiles. */
   mini: { grass: string; tall: string; path: string; sand: string; water: string; tree: string }
 }
@@ -133,6 +135,85 @@ export const THEMES: Record<ThemeId, WorldTheme> = {
     dark: true,
     border: '#0c2016',
   },
+  island: {
+    ...FOREST, id: 'island', get name() { return L('Tropical Island', 'Tropisch Eiland') }, icon: '🏝️',
+    grass: ['#68c858', '#50b048', '#90dc70'],
+    tall: ['#3c9c48', '#24703a', '#78d060'],
+    path: ['#f0dca0', '#dcc488', '#a8d070'],
+    sand: ['#f8e8b0', '#ecd498'],
+    water: ['#28b8d8', '#60d8f0', '#e8fcff', '#1890b8'],
+    decor: 'palm',
+    canopy: ['#1a5a2c', '#2e8c3c', '#34963e', '#3aa044', '#8ade70'],
+    trunk: ['#2e7a34', '#a8804a', '#7a5a30'],
+    rock: ['#5a5650', '#b0a898', '#e4dccc'],
+    flowers: ['#ff5a7a', '#ffb030', '#ff80c8', '#ffffff'],
+    border: '#1888b0',
+    weather: 'sun',
+    tint: 'rgba(255,230,150,0.05)',
+    wildTypes: ['water', 'flying', 'grass'],
+    // Lots of sea: islands with wide beaches, joined by the roads
+    mix: { water: 0.38, sand: 0.47, tree: 0.66, tall: 0.55, flower: 0.03, rock: 0.008 },
+    mini: { grass: '#68c858', tall: '#3c9c48', path: '#f0dca0', sand: '#f8e8b0', water: '#28b8d8', tree: '#2e8c3c' },
+  },
+  swamp: {
+    ...FOREST, id: 'swamp', get name() { return L('Swamp', 'Moeras') }, icon: '🐸',
+    grass: ['#5a7244', '#4a6038', '#6e8652'],
+    tall: ['#4a6a3a', '#2c4422', '#6a8c4a'],
+    path: ['#6e6448', '#5a5038', '#5a7244'],
+    sand: ['#4e5236', '#40442c'],
+    water: ['#3e5a3a', '#587a4c', '#a8c08a', '#2c4228'],
+    decor: 'willow',
+    canopy: ['#16261a', '#2c4a30', '#30502e', '#365634', '#7ea25a'],
+    trunk: ['#2a3a24', '#4a3a28', '#2e2418'],
+    rock: ['#2e3028', '#5e6250', '#8a8e74'],
+    flowers: ['#c0a0e0', '#e0e080'],
+    border: '#101a12',
+    weather: 'fog',
+    tint: 'rgba(40,70,40,0.22)',
+    dark: true,
+    wildTypes: ['poison', 'water', 'bug', 'ground'],
+    // Murky pools everywhere and reeds to hide in
+    mix: { water: 0.33, sand: 0.36, tree: 0.6, tall: 0.5, flower: 0.01, rock: 0.006 },
+    mini: { grass: '#5a7244', tall: '#4a6a3a', path: '#6e6448', sand: '#4e5236', water: '#3e5a3a', tree: '#2c4a30' },
+  },
+  autumn: {
+    ...FOREST, id: 'autumn', get name() { return L('Autumn Woods', 'Herfstwoud') }, icon: '🍂',
+    grass: ['#9cac58', '#88984a', '#b8c470'],
+    tall: ['#b08a3c', '#7a5a24', '#d8b058'],
+    path: ['#d4b080', '#bc9868', '#a8a058'],
+    sand: ['#e0c890', '#ccb078'],
+    water: ['#4a7ab8', '#70a0d0', '#d8e8f8', '#345c98'],
+    decor: 'oak',
+    canopy: ['#5a2414', '#d0602a', '#e08a2c', '#c8402a', '#ffd060'],
+    trunk: ['#6a5030', '#5a3a22', '#3a2414'],
+    rock: ['#5a5048', '#a89a88', '#d8ccb8'],
+    flowers: ['#e05a2a', '#f0b030', '#a03a3a'],
+    border: '#4a2010',
+    weather: 'leaves',
+    tint: 'rgba(255,140,40,0.06)',
+    wildTypes: ['grass', 'normal', 'dark', 'bug'],
+    mix: { water: 0.28, sand: 0.32, tree: 0.6, tall: 0.48, flower: 0.03, rock: 0.01 },
+    mini: { grass: '#9cac58', tall: '#b08a3c', path: '#d4b080', sand: '#e0c890', water: '#4a7ab8', tree: '#c8582a' },
+  },
+  blossom: {
+    ...FOREST, id: 'blossom', get name() { return L('Blossom Valley', 'Kersenvallei') }, icon: '🌸',
+    grass: ['#88cc78', '#70b864', '#a8e098'],
+    tall: ['#5aa45a', '#3a7a44', '#88cc70'],
+    path: ['#c8c0b8', '#aaa29c', '#98c088'],
+    sand: ['#ecdcc8', '#dcc8b0'],
+    water: ['#5aa0d8', '#88c4f0', '#f0f8ff', '#3a7cb8'],
+    decor: 'oak',
+    canopy: ['#8a3a5a', '#f0a0c0', '#f8b8d0', '#e890b4', '#fff0f6'],
+    trunk: ['#5a8a4a', '#5a3a3a', '#3a2228'],
+    rock: ['#5a5864', '#b0aeba', '#e4e2ec'],
+    flowers: ['#ff90c0', '#ffffff', '#ffd0e0', '#f8d038'],
+    border: '#5a2a40',
+    weather: 'petals',
+    tint: 'rgba(255,180,220,0.05)',
+    wildTypes: ['psychic', 'grass', 'flying', 'normal'],
+    mix: { water: 0.3, sand: 0.33, tree: 0.62, tall: 0.52, flower: 0.06, rock: 0.006 },
+    mini: { grass: '#88cc78', tall: '#5aa45a', path: '#c8c0b8', sand: '#ecdcc8', water: '#5aa0d8', tree: '#f0a0c0' },
+  },
   crater: {
     ...FOREST, id: 'crater', get name() { return L('Volcano Crater', 'Vulkaankrater') }, icon: '🌋', royale: false,
     grass: ['#4a3a38', '#3a2e2c', '#5e4a46'],
@@ -217,7 +298,7 @@ export const THEMES: Record<ThemeId, WorldTheme> = {
 }
 
 /** Worlds you can pick for a battle royale. */
-export const ROYALE_THEMES: ThemeId[] = ['forest', 'desert', 'snow', 'volcano', 'night']
+export const ROYALE_THEMES: ThemeId[] = ['forest', 'desert', 'snow', 'volcano', 'night', 'island', 'swamp', 'autumn', 'blossom']
 
 /** Resolve "random" to a concrete theme from the seed (same on every device). */
 export function pickTheme(choice: ThemeId | 'random', seed: number): ThemeId {

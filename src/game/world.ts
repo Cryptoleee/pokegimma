@@ -603,7 +603,7 @@ export class World {
           // A pixel of jitter so a forest doesn't look stamped
           const jx = Math.round((hash(tx, ty, 78) - 0.5) * 2), jy = Math.round((hash(tx, ty, 79) - 0.5) * 2)
           const ax = th.decor === 'pine' ? 3 : th.decor === 'dead' ? 4 : th.decor === 'cactus' ? 0 : 7
-          o.drawImage(c, tx * TILE - ax + jx, ty * TILE + TILE - c.height + (th.decor === 'oak' ? -4 : th.decor === 'pine' ? -5 : th.decor === 'dead' ? -1 : 0) + jy)
+          o.drawImage(c, tx * TILE - ax + jx, ty * TILE + TILE - c.height + (th.decor === 'oak' ? -4 : th.decor === 'pine' ? -5 : th.decor === 'dead' ? -1 : th.decor === 'willow' ? -2 : 0) + jy)
         }
     }
     if (this.stadium) paintField(g, this)
@@ -1433,7 +1433,7 @@ class Noise {
 
 // ---------- Detailed BW tiles for the open-world maps (see tiles.ts) ----------
 
-const isTree = (th: WorldTheme) => th.decor === 'oak' || th.decor === 'pine' || th.decor === 'dead' || th.decor === 'cactus'
+const isTree = (th: WorldTheme) => th.decor === 'oak' || th.decor === 'pine' || th.decor === 'dead' || th.decor === 'cactus' || th.decor === 'palm' || th.decor === 'willow'
 
 function px(g: CanvasRenderingContext2D, x: number, y: number, c: string, w = 1, h = 1) {
   g.fillStyle = c
@@ -1448,7 +1448,7 @@ function treeBase(g: CanvasRenderingContext2D, x: number, y: number, th: WorldTh
     const half = Math.round(7 * Math.sqrt(1 - ((yy - 2) / 2.6) ** 2))
     px(g, x + 8 - half, y + 11 + yy, sh, half * 2, 1)
   }
-  if (th.decor === 'dead' || th.decor === 'cactus') return
+  if (th.decor === 'dead' || th.decor === 'cactus' || th.decor === 'palm') return
   const out = shade(trunkDark, -0.4)
   px(g, x + 5, y + 6, out, 6, 9)
   px(g, x + 6, y + 6, trunk, 4, 8)
