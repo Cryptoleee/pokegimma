@@ -83,7 +83,7 @@ export const REWARD_ROAD: { lv: number; kind: 'partner' | 'trainer'; id: string 
 ]
 
 /** Raid dungeons (ids, as in src/data/dungeons.ts). */
-export const DUNGEON_IDS = ['depths', 'storm', 'citadel', 'pillar']
+export const DUNGEON_IDS = ['depths', 'storm', 'citadel', 'pillar', 'lab']
 /** Raid dungeon lives (a clean run keeps all of them). */
 export const DUNGEON_LIVES = 3
 
@@ -93,9 +93,10 @@ export const RAID_UNLOCKS: { kind: 'partner'; id: string; dungeon: string }[] = 
   { kind: 'partner', id: '239', dungeon: 'storm' }, // Elekid, who grows into Electivire, the Warden of Thunder
   { kind: 'partner', id: '363', dungeon: 'citadel' }, // Spheal, who grows into Walrein, the Terror of the Frozen Lake
   { kind: 'partner', id: '333', dungeon: 'pillar' }, // Swablu, who grows into Altaria, the Warden of the Wind
+  { kind: 'partner', id: '577', dungeon: 'lab' }, // Solosis, who grows into Reuniclus, the Keeper of the Cells
 ]
 /** Followers (species) for a flawless clear (no life lost) of a dungeon. */
-export const DUNGEON_PETS: Record<string, number> = { depths: 643, storm: 644, citadel: 646, pillar: 384 }
+export const DUNGEON_PETS: Record<string, number> = { depths: 643, storm: 644, citadel: 646, pillar: 384, lab: 150 }
 export const raidUnlockOf = (kind: 'partner' | 'trainer', id: string | number) => RAID_UNLOCKS.find((r) => r.kind === kind && r.id === String(id))
 
 /** Every partner you can pick: the free ones, those on the reward road and the raid unlocks. */
@@ -311,6 +312,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'dg_storm', xp: 500, title: 'stormrider', test: (p) => (p.stats.dg ?? []).includes('storm') },
   { id: 'dg_citadel', xp: 500, title: 'frostbound', test: (p) => (p.stats.dg ?? []).includes('citadel') },
   { id: 'dg_pillar', xp: 500, title: 'skyborne', test: (p) => (p.stats.dg ?? []).includes('pillar') },
+  { id: 'dg_lab', xp: 500, title: 'mindbreaker', test: (p) => (p.stats.dg ?? []).includes('lab') },
   { id: 'dg_hard', xp: 600, title: 'infernal', test: (p) => (p.stats.dgHard ?? []).length > 0 },
   { id: 'dg_flawless', xp: 500, title: 'unscathed', test: (_, r) => !!r && r.kind === 'raid' && r.won && !!r.dungeon && (r.lives ?? 0) >= DUNGEON_LIVES },
   { id: 'raid_mvp', xp: 250, test: (_, r) => !!r && r.kind === 'raid' && r.won && r.humans >= 2 && (r.share ?? 0) >= 50 },

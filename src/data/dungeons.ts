@@ -82,11 +82,13 @@ export type RoomDeco =
   | 'igate' | 'frozen' | 'pillars' | 'icefall' | 'icelake' | 'summit'
   // The Sky Pillar
   | 'skygate' | 'cloister' | 'aerie' | 'gallery' | 'belfry' | 'peak'
+  // The Forsaken Lab
+  | 'airlock' | 'archive' | 'cloning' | 'reactor' | 'mind' | 'core'
 
 /** A dungeon's element: what its casters throw, how its foes arrive, what its relics are called. */
 export interface DungeonTheme {
   /** Hazard type of its casters' bolts, pools and room hazards. */
-  type: 'fire' | 'electric' | 'ice' | 'dragon'
+  type: 'fire' | 'electric' | 'ice' | 'dragon' | 'psychic'
   /** Effect (and sound) of its casters' bolts and its foes' arrival. */
   fx: MoveFx
   /** Colours of a foe's arrival burst, hot to cool. */
@@ -157,6 +159,10 @@ const mxy = (r: Rect): Rect => mx(my(r))
 const mxya = (w: number, h: number, at: [number, number]): [number, number] => [w - 1 - at[0], h - 1 - at[1]]
 const dr = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'dragon', phase: 0, weight: 1, ...a })
 const fl = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'flying', phase: 0, weight: 1, ...a })
+/** The Forsaken Lab winds round the arena a fifth way: the Depths turned over its diagonal (you start top right, head west along the top, then down). */
+const mt = (r: Rect): Rect => ({ x: r.y, y: r.x, w: r.h, h: r.w })
+const mta = (at: [number, number]): [number, number] => [at[1], at[0]]
+const ps = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'psychic', phase: 0, weight: 1, ...a })
 const el = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'electric', phase: 0, weight: 1, ...a })
 
 export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
@@ -681,6 +687,114 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
       mxy({ x: 81, y: 18, w: 2, h: 5 }),
       mxy({ x: 106, y: 36, w: 5, h: 2 }),
       mxy({ x: 89, y: 62, w: 2, h: 5 }),
+    ],
+  },
+  mewtwo: {
+    id: 'lab',
+    boss: 'mewtwo',
+    theme: {
+      type: 'psychic', fx: 'psychic', burst: ['#ffffff', '#ffc8f4', '#c060ff'], accent: '#c070ff',
+      bolts: () => L('psychic orbs', 'psychische bollen'),
+      relics: { ember: () => L('Spark of the Mind', 'Vonk van de Geest'), shell: () => L('Plate of Steel', 'Plaat van Staal') },
+      icon: '🧪', dark: '#2c1c4a',
+      toBoss: () => L('To the test chamber', 'Naar de testkamer'),
+      tips: {
+        wardens: () => L('Two wardens guard the lab, each with their own tricks: a Cell Bomb that follows you, Psychic in a cone, a Flash Cannon in a straight line, fields of psychic energy that linger. They call help and enrage after two minutes. Beat one for a relic for the team and a life back.', 'Twee wachters bewaken het lab, elk met eigen trucs: een Celbom die je volgt, Psychic in een kegel, een Flash Cannon in een rechte lijn, velden van psychische energie die blijven hangen. Ze roepen hulp en worden na twee minuten woedend. Versla er een voor een reliek voor het team en een leven terug.'),
+        liquid: () => L('Where the floor broke open, psychic coolant glows: don\'t stand in it. Lasers sweep the archive, the reactor core pulses (stay close to it or keep well away), and in the mind chamber the floor grid lights up: find a dark tile.', 'Waar de vloer is opengebroken gloeit psychische koelvloeistof: niet in gaan staan. Lasers vegen door het archief, de reactorkern pulseert (blijf er vlak bij of juist ver vandaan), en in de gedachtenkamer licht het vloerraster op: zoek een donker vak.'),
+        partner: () => L('Everything down here is psychic, steel or ghost. Types still count, but no more than 1.5× either way: no partner carries you through.', 'Alles hier beneden is psychisch, staal of geest. Types tellen mee, maar nooit meer dan 1,5× (beide kanten op): geen partner sleept je erdoorheen.'),
+        boss: (n) => L(`After the heart of the lab the door to the test chamber opens. Step in and ${n} breaks free: you have 4 minutes. `, `Na het hart van het lab gaat de deur naar de testkamer open. Stap erin en ${n} breekt los: je hebt 4 minuten. `),
+      },
+    },
+    get name() { return L('The Forsaken Lab', 'Het Verlaten Lab') },
+    get blurb() { return L('Break into a secret lab deep under the mountain: an archive swept by lasers, a hall of cloning tanks, a pulsing reactor, a chamber where the floor reads your mind, and Mewtwo waiting in the test chamber.', 'Breek in in een geheim lab diep onder de berg: een archief vol lasers, een zaal vol kloontanks, een pulserende reactor, een kamer waar de vloer je gedachten leest, en Mewtwo wacht in de testkamer.') },
+    start: [117, 21],
+    lives: 3,
+    arenaEntry: [64, 76],
+    rooms: [
+      {
+        get name() { return L('The Airlock', 'De Sluis') }, deco: 'airlock', rect: mt({ x: 8, y: 98, w: 26, h: 24 }),
+        packs: [
+          { at: mta([13, 10]), foes: [f(599, 2, 41), f(605, 1, 41, 'caster')] },
+          { at: mta([5, 4]), foes: [f(622, 1, 42, 'brute'), f(96, 1, 41, 'mender'), f(137, 1, 41)] },
+          { at: mta([20, 4]), foes: [f(599, 1, 41), f(605, 2, 41, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('The Archive', 'Het Archief') }, deco: 'archive', rect: mt({ x: 8, y: 60, w: 26, h: 24 }),
+        packs: [
+          { at: mta([7, 18]), foes: [f(137, 2, 42), f(96, 1, 42, 'mender')] },
+          { at: mta([20, 18]), foes: [f(64, 1, 44, 'caster', true), f(599, 2, 42)] },
+          { at: mta([5, 6]), patrol: mta([21, 6]), foes: [f(137, 1, 43), f(177, 1, 42)] },
+          { at: mta([13, 3]), link: 2, foes: [f(600, 1, 43, 'brute'), f(436, 1, 42, 'guard'), f(605, 1, 42, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('The Cloning Hall', 'De Kloonzaal') }, deco: 'cloning', rect: mt({ x: 5, y: 16, w: 32, h: 30 }),
+        packs: [
+          { at: mta([8, 22]), foes: [f(577, 2, 43), f(96, 1, 43, 'mender')] },
+          { at: mta([24, 22]), foes: [f(622, 1, 44, 'brute'), f(178, 1, 43, 'caster')] },
+        ],
+        warden: {
+          sp: 579, lv: 48, hp: 5.5, at: mta([16, 7]), enrage: 120, relic: 'ember', get title() { return L('Keeper of the Cells', 'Hoeder van de Cellen') },
+          calls: [{ at: 0.6, foes: [f(577, 1, 43, 'caster'), f(578, 1, 43, 'mender')] }, { at: 0.3, foes: [f(622, 1, 44, 'brute'), f(578, 1, 43, 'mender')] }],
+          attacks: [
+            ps({ id: 'r_psychic', name: 'Psychic', shape: 'cone', warn: 1.1, cd: 4, dmg: 0.32, target: 'nearest', len: 8, width: 0.45, weight: 3, fx: 'psychic' }),
+            ps({ id: 'r_cell', get name() { return L('Cell Bomb', 'Celbom') }, shape: 'circle', warn: 3.6, cd: 16, dmg: 0.3, target: 'random', r: 2.4, weight: 2, follow: true, linger: { dur: 5, dps: 0.1 }, fx: 'psyshock' }),
+            ps({ id: 'r_future', name: 'Future Sight', shape: 'circle', warn: 1.3, cd: 6, dmg: 0.3, target: 'players', r: 2.1, extra: 2, stagger: 0.15, weight: 2, fx: 'psychic' }),
+            ps({ id: 'r_shock', name: 'Psyshock', shape: 'circle', warn: 1.4, cd: 9, dmg: 0.34, target: 'self', r: 3.8, weight: 2, fx: 'psyshock' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Reactor', 'De Reactor') }, deco: 'reactor', rect: mt({ x: 53, y: 8, w: 28, h: 28 }),
+        packs: [
+          { at: mta([7, 13]), foes: [f(605, 2, 44, 'caster'), f(577, 1, 44)] },
+          { at: mta([14, 22]), foes: [f(437, 1, 46, 'guard', true), f(600, 1, 44, 'brute'), f(605, 1, 44, 'caster')] },
+          { at: mta([14, 5]), foes: [f(137, 2, 44), f(97, 1, 44, 'mender')] },
+          { at: mta([22, 14]), link: 2, foes: [f(600, 1, 45, 'brute'), f(599, 1, 44), f(97, 1, 44, 'mender')] },
+        ],
+      },
+      {
+        get name() { return L('The Mind Chamber', 'De Gedachtenkamer') }, deco: 'mind', rect: mt({ x: 96, y: 6, w: 26, h: 30 }),
+        packs: [
+          { at: mta([5, 6]), foes: [f(233, 2, 44), f(137, 1, 44)] },
+          { at: mta([5, 24]), foes: [f(437, 1, 46, 'guard', true), f(600, 1, 44, 'brute'), f(97, 1, 44, 'mender')] },
+        ],
+        warden: {
+          sp: 376, lv: 49, hp: 6.5, at: mta([14, 16]), enrage: 130, relic: 'shell', get title() { return L('Mind of the Lab', 'Brein van het Lab') },
+          calls: [{ at: 0.65, foes: [f(233, 2, 44)] }, { at: 0.35, foes: [f(601, 1, 46, 'brute', true), f(578, 1, 44, 'mender')] }],
+          attacks: [
+            ps({ id: 'm_wave', get name() { return L('Psychic Wave', 'Psychische Golf') }, shape: 'ring', warn: 1.4, cd: 7, dmg: 0.34, target: 'self', inner: 3.2, r: 8, weight: 2, fx: 'psychic' }),
+            ps({ id: 'm_cannon', name: 'Flash Cannon', shape: 'line', warn: 1.35, cd: 7, dmg: 0.34, target: 'nearest', len: 13, width: 1.5, weight: 3, fx: 'flashcannon' }),
+            ps({ id: 'm_field', get name() { return L('Psychic Field', 'Psychisch Veld') }, shape: 'circle', warn: 1.5, cd: 9, dmg: 0.22, target: 'players', r: 2.4, extra: 2, stagger: 0.2, weight: 3, linger: { dur: 9, dps: 0.1 }, fx: 'psychic' }),
+            ps({ id: 'm_meteor', name: 'Meteor Mash', shape: 'circle', warn: 1.25, cd: 6, dmg: 0.25, target: 'players', r: 2, extra: 3, stagger: 0.12, weight: 2, fx: 'meteormash' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Heart of the Lab', 'Het Hart van het Lab') }, deco: 'core', rect: mt({ x: 92, y: 54, w: 30, h: 28 }),
+        waves: [
+          { foes: [f(600, 2, 45), f(436, 1, 44, 'guard'), f(606, 1, 44, 'caster')] },
+          { foes: [f(623, 1, 46, 'brute', true), f(606, 2, 45, 'caster'), f(97, 1, 45, 'mender')] },
+          { final: true, foes: [f(601, 1, 47, 'brute', true), f(65, 1, 47, 'caster', true), f(579, 1, 45, 'mender'), f(233, 2, 45), f(437, 1, 45, 'guard')] },
+        ],
+      },
+    ],
+    halls: [
+      mt({ x: 18, y: 84, w: 5, h: 14 }),
+      mt({ x: 18, y: 46, w: 5, h: 14 }),
+      mt({ x: 37, y: 26, w: 16, h: 5 }),
+      mt({ x: 81, y: 18, w: 15, h: 5 }),
+      mt({ x: 106, y: 36, w: 5, h: 18 }),
+      mt({ x: 76, y: 62, w: 16, h: 5 }),
+    ],
+    gates: [
+      mt({ x: 18, y: 96, w: 5, h: 2 }),
+      mt({ x: 18, y: 58, w: 5, h: 2 }),
+      mt({ x: 37, y: 26, w: 2, h: 5 }),
+      mt({ x: 81, y: 18, w: 2, h: 5 }),
+      mt({ x: 106, y: 36, w: 5, h: 2 }),
+      mt({ x: 89, y: 62, w: 2, h: 5 }),
     ],
   },
 }

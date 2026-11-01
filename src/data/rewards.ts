@@ -39,6 +39,7 @@ const TITLES: Record<string, T> = {
   stormrider: ['Storm Rider', 'Stormrijder'],
   frostbound: ['Frostbound', 'IJsgeboren'],
   skyborne: ['Skyborne', 'Hemelgeboren'],
+  mindbreaker: ['Mindbreaker', 'Geestbreker'],
   // Supporter packs (marked, so they never read like the level titles)
   sup_spark: ['⚡ Spark', '⚡ Vonk'],
   sup_storm: ['🌩️ Stormchaser', '🌩️ Stormjager'],
@@ -73,6 +74,7 @@ export const ACH_INFO: Record<string, { icon: string; name: T; desc: T }> = {
   dg_storm: { icon: '⚡', name: ['Eye of the Storm', 'Oog van de Storm'], desc: ['Clear The Storm Tower (Elekid joins you)', 'Versla De Stormtoren (Elekid wordt je partner)'] },
   dg_citadel: { icon: '❄️', name: ['Through the Ice', 'Door het IJs'], desc: ['Clear The Frozen Citadel (Spheal joins you)', 'Versla De IJscitadel (Spheal wordt je partner)'] },
   dg_pillar: { icon: '🌪️', name: ['Above the Clouds', 'Boven de Wolken'], desc: ['Clear The Sky Pillar (Swablu joins you)', 'Versla De Hemelpilaar (Swablu wordt je partner)'] },
+  dg_lab: { icon: '🧪', name: ['Out of the Lab', 'Het lab uit'], desc: ['Clear The Forsaken Lab (Solosis joins you)', 'Versla Het Verlaten Lab (Solosis wordt je partner)'] },
   dg_hard: { icon: '😈', name: ['Into the inferno', 'Het inferno in'], desc: ['Clear a raid dungeon on hard', 'Versla een raid-dungeon op moeilijk'] },
   dg_flawless: { icon: '🛡️', name: ['Not a scratch', 'Geen schrammetje'], desc: ['Clear a raid dungeon without losing a life', 'Versla een raid-dungeon zonder een leven te verliezen'] },
   raid_flawless: { icon: '🛡️', name: ['Untouchable', 'Onaantastbaar'], desc: ['Clear a raid without losing a life', 'Haal een raid zonder een leven te verliezen'] },

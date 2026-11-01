@@ -353,6 +353,7 @@ function roomHazards(g: Game, d: DungeonRun, deco: string, dt: number) {
   const base = { inner: 0, width: 1, freeze: 0, cover: false, both: false, type: 'electric' as const }
   const cold = { ...base, type: 'ice' as const }
   const sky = { ...base, type: 'dragon' as const }
+  const psy = { ...base, type: 'psychic' as const }
   const here = () => g.trainers.filter((t) => t.alive && !t.mon.fainted && inRoom(t))
   d.ventT -= dt
   if (d.ventT > 0) return
@@ -442,6 +443,46 @@ function roomHazards(g: Game, d: DungeonRun, deco: string, dt: number) {
     for (let i = 0; i < 2; i++) {
       const a = Math.random() * Math.PI * 2, r = i ? 2 + Math.random() * 3 : Math.random() * 1.5
       addHazard(g, { ...sky, shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 1.8, t: 1.25 + i * 0.3, dmg: 0.15, fx: 'dracometeor', atk: 'vent' })
+    }
+  } else if (deco === 'archive') {
+    // Security lasers sweep the archive: a beam across the room through where you stand, sometimes a second one crossing it
+    d.ventT = 4.6 + Math.random() * 2
+    const t = here()[Math.floor(Math.random() * here().length)]
+    if (!t) return
+    const across = Math.random() < 0.5
+    for (let i = 0; i < (Math.random() < 0.45 ? 2 : 1); i++) {
+      const flat = i ? !across : across
+      const off = (Math.random() - 0.5) * 1.2
+      addHazard(g, { ...psy, shape: 'line', x: flat ? rect.x : t.x + off, y: flat ? t.y + off : rect.y, ang: flat ? 0 : Math.PI / 2, r: flat ? rect.w : rect.h, width: 1.1, t: 1.5 + i * 0.35, dmg: 0.14, fx: 'psybeam', atk: 'vent' })
+    }
+  } else if (deco === 'reactor') {
+    // The core pulses: a burst right round it (get away) or a wave through the rest of the hall (get close to it)
+    d.ventT = 6.5 + Math.random() * 2.5
+    if (!here().length) return
+    const mx = rect.x + rect.w / 2, my = rect.y + rect.h / 2
+    const near = Math.random() < 0.5
+    addHazard(g, near
+      ? { ...psy, shape: 'circle', x: mx, y: my, ang: 0, r: 5.5, t: 2, dmg: 0.2, fx: 'psychic', atk: 'vent' }
+      : { ...psy, shape: 'ring', x: mx, y: my, ang: 0, inner: 3.6, r: Math.max(rect.w, rect.h), t: 2.1, dmg: 0.2, fx: 'psychic', atk: 'vent' })
+    for (const v of g.viewers) if (here().includes(v.tr)) {
+      v.hooks.toast(near ? both('The core is pulsing: get away from it!', 'De kern pulseert: ga er vandaan!') : both('A wave is coming: get close to the core!', 'Er komt een golf: ga vlak bij de kern staan!'), '#e0a0ff')
+      v.sfx('warn')
+    }
+  } else if (deco === 'mind') {
+    // The floor grid of the mind chamber charges: half its tiles light up, then strike
+    d.ventT = 7.5 + Math.random() * 2.5
+    if (!here().length) return
+    addHazard(g, { ...psy, shape: 'grid', x: rect.x + rect.w / 2, y: rect.y + rect.h / 2, ang: 0, r: Math.min(rect.w, rect.h) / 2 - 1, inner: Math.random() < 0.5 ? 0 : 1, width: 3, t: 1.9, dmg: 0.2, fx: 'psychic', atk: 'grid' })
+    for (const v of g.viewers) if (here().includes(v.tr)) v.hooks.toast(both('The floor grid is charging: find a dark tile!', 'Het vloerraster laadt op: zoek een donker vak!'), '#ff90e0')
+  } else if (deco === 'core' && d.gauntlet) {
+    // Psychic orbs rain down in the heart of the lab while the waves come
+    d.ventT = 3 + Math.random() * 1.4
+    const all = here()
+    const t = all[Math.floor(Math.random() * all.length)]
+    if (!t) return
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * Math.PI * 2, r = i ? 2 + Math.random() * 3 : Math.random() * 1.5
+      addHazard(g, { ...psy, shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 1.8, t: 1.25 + i * 0.3, dmg: 0.15, fx: 'psyshock', atk: 'vent' })
     }
   } else d.ventT = 1
 }
@@ -1144,7 +1185,7 @@ export function drawBrazier(ctx: CanvasRenderingContext2D, x: number, y: number,
   // The Storm Tower's braziers burn with caught lightning
   const st = coldLook()
   // (the Sky Pillar's burn gold and white in the wind)
-  const [c0, c1, c2, c3] = dungeonLook() === 'sky' ? ['#ffd860', 'rgba(255,190,80,0.85)', 'rgba(255,235,150,0.9)', 'rgba(255,255,235,0.9)'] : st ? ['#5ac8ff', 'rgba(60,120,255,0.85)', 'rgba(120,215,255,0.9)', 'rgba(235,250,255,0.9)'] : ['#ff6020', 'rgba(255,90,20,0.85)', 'rgba(255,190,60,0.9)', 'rgba(255,250,200,0.9)']
+  const [c0, c1, c2, c3] = dungeonLook() === 'lab' ? ['#e080ff', 'rgba(190,80,255,0.85)', 'rgba(240,160,255,0.9)', 'rgba(255,235,255,0.9)'] : dungeonLook() === 'sky' ? ['#ffd860', 'rgba(255,190,80,0.85)', 'rgba(255,235,150,0.9)', 'rgba(255,255,235,0.9)'] : st ? ['#5ac8ff', 'rgba(60,120,255,0.85)', 'rgba(120,215,255,0.9)', 'rgba(235,250,255,0.9)'] : ['#ff6020', 'rgba(255,90,20,0.85)', 'rgba(255,190,60,0.9)', 'rgba(255,250,200,0.9)']
   ctx.fillStyle = 'rgba(0,0,0,0.35)'
   ctx.fillRect(px - 5, py - 1, 10, 3)
   // Stand and bowl

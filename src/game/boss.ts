@@ -215,6 +215,8 @@ export function updateRaid(g: Game, dt: number) {
         ? { n: 2, speed: 3, dir: -Math.PI / 2, spread: 1.4, cols: ['#ffffff', '#8ae0ff'], shape: 'streak', s0: 2.5, s1: 0.5, life: 0.3 }
         : kind === 'ice'
           ? { n: 2, speed: 1.5, dir: -Math.PI / 2, spread: 1.2, cols: ['#ffffff', '#bfeaff'], shape: 'shard', s0: 2.5, s1: 0.5, life: 0.5 }
+        : kind === 'psychic'
+          ? { n: 2, speed: 1.8, dir: -Math.PI / 2, spread: 1.2, cols: ['#ffffff', '#ff98e8', '#c070ff'], shape: 'star', s0: 2.5, s1: 0.5, life: 0.45 }
           : { n: 2, speed: 2, dir: -Math.PI / 2, spread: 0.6, cols: ['#ffb030', '#ff6020'], shape: 'flame', s0: 2.5, s1: 0.5, life: 0.4 })
     }
     if (m.fainted && tr.respawnT > 0) {
@@ -685,8 +687,8 @@ export function inHazard(h: Hazard, x: number, y: number) {
 
 /** The floor grid: is the cell under (x, y) one of the lit ones? */
 function gridLit(h: Hazard, x: number, y: number) {
-  const o = ARENA_C - ARENA_R
-  const cx = Math.floor((x - o) / h.width), cy = Math.floor((y - o) / h.width)
+  // (centred on the hazard: the arena's middle, or a dungeon room's)
+  const cx = Math.floor((x - (h.x - h.r)) / h.width), cy = Math.floor((y - (h.y - h.r)) / h.width)
   return (((cx + cy) % 2) + 2) % 2 === h.inner
 }
 
@@ -1049,11 +1051,11 @@ function impactFx(g: Game, h: Hazard) {
     }
     case 'grid': {
       // Every lit cell bursts with psychic energy at once
-      const c = h.width, o = ARENA_C - ARENA_R
-      for (let gy = o; gy < ARENA_C + ARENA_R; gy += c)
-        for (let gx = o; gx < ARENA_C + ARENA_R; gx += c) {
+      const c = h.width
+      for (let gy = h.y - h.r; gy < h.y + h.r; gy += c)
+        for (let gx = h.x - h.r; gx < h.x + h.r; gx += c) {
           const x = gx + c / 2, y = gy + c / 2
-          if (Math.hypot(x - ARENA_C, y - ARENA_C) > ARENA_R || !gridLit(h, x, y)) continue
+          if (Math.hypot(x - h.x, y - h.y) > h.r || !gridLit(h, x, y)) continue
           v.burst(x, y - 0.3, { n: 4, dir: -Math.PI / 2, spread: 0.8, speed: 6, cols: p.cols, shape: 'star', add: true, s0: 5, s1: 1, life: 0.6 })
           v.glow(x, y, 46, p.glow, 0.5)
         }
@@ -1098,10 +1100,10 @@ function hazardPath(ctx: CanvasRenderingContext2D, h: Hazard) {
     }
     case 'grid': {
       // The lit cells of the checkerboard inside the arena
-      const c = h.width, o = ARENA_C - ARENA_R
-      for (let gy = o; gy < ARENA_C + ARENA_R; gy += c)
-        for (let gx = o; gx < ARENA_C + ARENA_R; gx += c) {
-          if (Math.hypot(gx + c / 2 - ARENA_C, gy + c / 2 - ARENA_C) > ARENA_R || !gridLit(h, gx + c / 2, gy + c / 2)) continue
+      const c = h.width
+      for (let gy = h.y - h.r; gy < h.y + h.r; gy += c)
+        for (let gx = h.x - h.r; gx < h.x + h.r; gx += c) {
+          if (Math.hypot(gx + c / 2 - h.x, gy + c / 2 - h.y) > h.r || !gridLit(h, gx + c / 2, gy + c / 2)) continue
           ctx.rect(gx * TILE + 1, gy * TILE + 1, c * TILE - 2, c * TILE - 2)
         }
       break

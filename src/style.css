@@ -9188,6 +9188,10 @@ body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
 .cin.sky .cin-title { color: #fff8dc; }
 .cin.sky .cin-title b { text-shadow: 0 0 24px rgba(110, 230, 160, 0.95), 0 0 60px rgba(60, 200, 130, 0.5), 0 4px 0 #0c3a28, 0 0 2px #000; }
 .cin.sky .cin-title small { color: #b8f4cf; text-shadow: 0 2px 0 #000, 0 0 10px rgba(90, 220, 150, 0.7); }
+/* The Forsaken Lab's cutscenes: titles in pale lilac with a psychic violet glow */
+.cin.lab .cin-title { color: #fbf0ff; }
+.cin.lab .cin-title b { text-shadow: 0 0 24px rgba(200, 110, 255, 0.95), 0 0 60px rgba(160, 60, 240, 0.55), 0 4px 0 #2a0c40, 0 0 2px #000; }
+.cin.lab .cin-title small { color: #e6c4ff; text-shadow: 0 2px 0 #000, 0 0 10px rgba(190, 110, 255, 0.7); }
 .cin-title.tall {
   top: 36%;
 }

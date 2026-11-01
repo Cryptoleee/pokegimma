@@ -27,6 +27,7 @@ export const PETS: Pet[] = [
   { id: 'wisp', sp: WISP, pack: 'storm', name: () => 'Storm Wisp', img: WISP_ICON, how: () => L('Comes with the Storm or Legend supporter pack', 'Hoort bij het Storm- of Legende-supporterpakket') },
   { id: 'kyurem', sp: 646, dungeon: 'citadel', how: () => L('Clear The Frozen Citadel without losing a life', 'Haal De IJscitadel zonder een leven te verliezen') },
   { id: 'rayquaza', sp: 384, dungeon: 'pillar', how: () => L('Clear The Sky Pillar without losing a life', 'Haal De Hemelpilaar zonder een leven te verliezen') },
+  { id: 'mewtwo', sp: 150, dungeon: 'lab', how: () => L('Clear The Forsaken Lab without losing a life', 'Haal Het Verlaten Lab zonder een leven te verliezen') },
 ]
 
 const KEY = 'sb:pet'

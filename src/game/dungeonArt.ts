@@ -2,6 +2,7 @@ import propsUrl from '../assets/dungeon/props.png'
 import stormUrl from '../assets/dungeon/props-storm.png'
 import iceUrl from '../assets/dungeon/props-ice.png'
 import skyUrl from '../assets/dungeon/props-sky.png'
+import labUrl from '../assets/dungeon/props-lab.png'
 import type { DungeonDef, Rect, Room } from '../data/dungeons'
 import type { Rng } from './rng'
 import { SUPPORTER_NAMES } from '../data/support'
@@ -38,6 +39,8 @@ export type PropKind =
   | 'scrate' | 'ibarrel' | 'ibanner' | 'iwindow' | 'tusk'
   // The Sky Pillar
   | 'sstatue' | 'scolumn' | 'sbell' | 'snest' | 'saltar' | 'sbrazier' | 'swindow' | 'skybanner' | 'surn' | 'srubble' | 'sflag' | 'slantern'
+  // The Forsaken Lab
+  | 'xtank' | 'xconsole' | 'xserver' | 'xcore' | 'xshelf' | 'xdesk' | 'xgas' | 'xcrate' | 'xscreen' | 'xsign' | 'xpapers' | 'xholo'
   // Every dungeon's last stand: the Wall of Legends (supporters' names)
   | 'legends'
 
@@ -57,7 +60,8 @@ export interface Prop {
 const BLOCKS = new Set<PropKind>(['statue', 'column', 'crate', 'barrel', 'anvil', 'crucible', 'chimney', 'trough', 'bones', 'skull', 'cage', 'tower', 'barricade', 'tent', 'ballista', 'firebowl', 'weapons', 'wall', 'throne', 'torchstand', 'spire',
   'coil', 'rod', 'bell', 'dstatue', 'dynamo', 'lthrone', 'spool', 'masonry', 'lcrate', 'hbarrel', 'pedestal',
   'icecrystal', 'icepillar', 'frozenmon', 'istatue', 'fountain', 'ithrone', 'ibrazier', 'sled', 'snowpile', 'icerubble', 'scrate', 'ibarrel', 'legends',
-  'sstatue', 'scolumn', 'sbell', 'saltar', 'sbrazier', 'surn', 'slantern'])
+  'sstatue', 'scolumn', 'sbell', 'saltar', 'sbrazier', 'surn', 'slantern',
+  'xtank', 'xconsole', 'xserver', 'xcore', 'xshelf', 'xdesk', 'xgas', 'xcrate', 'xholo'])
 /** Moving parts, drawn every frame. */
 export const ANIMATED = new Set<PropKind>(['campfire', 'rune', 'treasure', 'crucible', 'chimney', 'crystal', 'lavafall', 'steam', 'trough', 'firebowl', 'sconce', 'torchstand', 'coil', 'orb', 'pedestal', 'lthrone', 'dynamo', 'ibrazier', 'icecrystal', 'fountain', 'ithrone'])
 
@@ -69,15 +73,17 @@ export const ANIMATED = new Set<PropKind>(['campfire', 'rune', 'treasure', 'cruc
  * frosted stone, glowing orange to electric cyan or to icy white-blue) and
  * everything that burns sparks or glitters instead.
  */
-export type DungeonLook = 'fire' | 'electric' | 'ice' | 'sky'
+export type DungeonLook = 'fire' | 'electric' | 'ice' | 'sky' | 'lab'
 let look: DungeonLook = 'fire'
-let elec = false, icy = false, sky = false
+let elec = false, icy = false, sky = false, lab = false
 /** The Sky Pillar (its element is 'dragon'): weathered green-grey stone, gold and jade light, open sky where the floor broke away. */
-export const setDungeonLook = (type: DungeonLook | 'dragon') => {
-  look = type === 'dragon' ? 'sky' : type
+/** The Forsaken Lab (its element is 'psychic'): blue-grey steel, violet and cyan light, glowing psychic coolant where the floor broke open. */
+export const setDungeonLook = (type: DungeonLook | 'dragon' | 'psychic') => {
+  look = type === 'dragon' ? 'sky' : type === 'psychic' ? 'lab' : type
   elec = look === 'electric'
   icy = look === 'ice'
   sky = look === 'sky'
+  lab = look === 'lab'
 }
 /** Not the Depths: braziers, gates and the dark burn cold blue. */
 export const coldLook = () => look !== 'fire'
@@ -87,11 +93,13 @@ const heat = () => elec
   ? { hot: '225,245,255', mid: '90,200,255', low: '60,90,255', spark: '255,240,120' }
   : sky
     ? { hot: '255,252,220', mid: '150,240,190', low: '60,170,130', spark: '255,230,140' }
+  : lab
+    ? { hot: '255,235,255', mid: '225,130,255', low: '140,60,230', spark: '255,170,240' }
   : icy
     ? { hot: '240,252,255', mid: '150,220,255', low: '80,140,230', spark: '255,255,255' }
     : { hot: '255,240,170', mid: '255,160,50', low: '230,70,20', spark: '255,170,60' }
 /** A light's colour in this dungeon (every warm light turns electric in the storm, icy in the citadel). */
-const lit = (c: string) => (elec ? (c === '#ffd060' ? '#ffe46a' : '#5ac8ff') : icy ? (c === '#ffd060' ? '#e8f8ff' : '#9ad8ff') : sky ? (c === '#ffd060' ? '#fff0b0' : '#8ef0c0') : c)
+const lit = (c: string) => (elec ? (c === '#ffd060' ? '#ffe46a' : '#5ac8ff') : icy ? (c === '#ffd060' ? '#e8f8ff' : '#9ad8ff') : sky ? (c === '#ffd060' ? '#fff0b0' : '#8ef0c0') : lab ? (c === '#ffd060' ? '#a8f0ff' : '#d890ff') : c)
 
 interface Ctx {
   w: World
@@ -171,7 +179,7 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
   const rock = (x: number, y: number, s = 1) => {
     for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) if (!c.nearHall(x + dx, y + dy, 3) && floorTile(w.at(x + dx, y + dy))) w.set(x + dx, y + dy, T.ROCK)
   }
-  const BASE: Partial<Record<Room['deco'], number>> = { skygate: FM.flag, cloister: FM.paving, aerie: FM.dirt, gallery: FM.flag, belfry: FM.flag, peak: FM.paving, gate: FM.flag, river: FM.cave, hall: FM.obsidian, forge: FM.flag, den: FM.dirt, sgate: FM.flag, flooded: FM.cave, chapel: FM.obsidian, dynamo: FM.grate, cistern: FM.cave, igate: FM.flag, frozen: FM.cave, pillars: FM.obsidian, icelake: FM.cave }
+  const BASE: Partial<Record<Room['deco'], number>> = { airlock: FM.grate, archive: FM.paving, cloning: FM.flag, reactor: FM.grate, mind: FM.obsidian, core: FM.flag, skygate: FM.flag, cloister: FM.paving, aerie: FM.dirt, gallery: FM.flag, belfry: FM.flag, peak: FM.paving, gate: FM.flag, river: FM.cave, hall: FM.obsidian, forge: FM.flag, den: FM.dirt, sgate: FM.flag, flooded: FM.cave, chapel: FM.obsidian, dynamo: FM.grate, cistern: FM.cave, igate: FM.flag, frozen: FM.cave, pillars: FM.obsidian, icelake: FM.cave }
   const base = BASE[room.deco] ?? FM.paving
   mat(c, rx - 4, ry - 4, rw + 8, rh + 8, base)
   // Wall decorations on the north wall (drawn on its face, if there is one)
@@ -374,7 +382,7 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
       coldRoom(c, room, rw, rh, rx, ry, cx, cy, rock, wallDeco)
   }
   // The last stand of every dungeon has the Wall of Legends: the first free spot of a few
-  if (room.deco === 'bastion' || room.deco === 'ramparts' || room.deco === 'summit' || room.deco === 'peak')
+  if (room.deco === 'bastion' || room.deco === 'ramparts' || room.deco === 'summit' || room.deco === 'peak' || room.deco === 'core')
     for (const [x, y] of [[cx - 2, ry + 2], [cx - 2, ry + rh - 4], [rx + 2, cy - 1], [rx + rw - 6, cy - 1], [cx + 3, cy + 3], [cx - 7, cy - 6]])
       if (put(c, 'legends', x, y, 4, 2)) break
 }
@@ -751,6 +759,89 @@ function coldRoom(c: Ctx, room: Room, rw: number, rh: number, rx: number, ry: nu
       wallDeco(['skybanner', 'sconce', 'skybanner', 'chains'], 3)
       break
     }
+    // ---- The Forsaken Lab: glowing psychic coolant wherever the floor broke open (its "lava")
+    case 'airlock': {
+      // The airlock: a walkway in from the sealed door, supply crates and gas bottles stacked along the walls, a leak
+      mat(c, cx - 2, ry, 5, rh, FM.paving)
+      for (const [x, y] of [[rx + 2, ry + 2], [rx + 3, ry + 2], [rx + rw - 3, ry + 3], [rx + 2, ry + rh - 3], [rx + rw - 4, ry + rh - 3]]) put(c, 'xcrate', x, y, 1, 1)
+      put(c, 'xgas', rx + rw - 4, cy - 1, 2, 1)
+      put(c, 'xgas', rx + 2, cy + 3, 2, 1)
+      put(c, 'xconsole', cx + 4, ry + 2, 3, 1)
+      pool(rx + 4, cy - 4, 1.6)
+      pool(rx + rw - 5, cy + 5, 1.4, false)
+      put(c, 'xpapers', cx - 5, cy + 2, 2, 1)
+      put(c, 'xpapers', cx + 3, cy - 4, 2, 1)
+      wallDeco(['xsign', 'xscreen', 'sconce', 'xsign'], 3)
+      break
+    }
+    case 'archive': {
+      // The archive: rows of shelves full of files, desks with the last notes, a server cabinet humming, papers everywhere
+      for (const y of [ry + 4, ry + rh - 6]) for (let x = rx + 3; x < rx + rw - 4; x += 5) put(c, 'xshelf', x, y, 2, 1)
+      put(c, 'xdesk', cx - 6, cy - 1, 2, 1)
+      put(c, 'xdesk', cx + 4, cy + 1, 2, 1)
+      put(c, 'xserver', rx + 2, cy, 1, 1)
+      put(c, 'xserver', rx + rw - 3, cy - 2, 1, 1)
+      for (const [x, y] of [[cx - 2, cy + 3], [cx + 1, cy - 4], [rx + 5, cy + 5], [rx + rw - 7, cy - 6]]) put(c, 'xpapers', x, y, 2, 1)
+      pool(cx + 1, cy + 7, 1.4, false)
+      wallDeco(['xscreen', 'sconce', 'xsign', 'xscreen'], 3)
+      break
+    }
+    case 'cloning': {
+      // The cloning hall: rows of glass tanks down both sides, the warden's dais under a hologram, coolant spilled from a broken tank
+      mat(c, cx - 5, ry + 2, 11, 7, FM.dais)
+      put(c, 'xholo', cx - 1, ry + 2, 2, 1)
+      for (let y = ry + 5; y < ry + rh - 4; y += 5) {
+        put(c, 'xtank', rx + 2, y, 2, 1)
+        put(c, 'xtank', rx + rw - 4, y, 2, 1)
+      }
+      put(c, 'xconsole', cx - 9, ry + 2, 3, 1)
+      put(c, 'xconsole', cx + 7, ry + 2, 3, 1)
+      pool(cx - 6, cy + 5, 1.8)
+      pool(cx + 6, cy + 2, 1.6)
+      put(c, 'xpapers', cx + 2, cy + 6, 2, 1)
+      wallDeco(['xscreen', 'xscreen', 'sconce', 'xsign'], 3)
+      break
+    }
+    case 'reactor': {
+      // The reactor hall: the psychic core in the middle, coolant channels round it, gas bottles and servers feeding it
+      put(c, 'xcore', cx - 1, cy - 1, 2, 2)
+      strip(cx - 6, cy - 6, 2, 13)
+      strip(cx + 5, cy - 6, 2, 13)
+      for (const [x, y] of [[rx + 2, ry + 3], [rx + rw - 4, ry + 3], [rx + 2, ry + rh - 4], [rx + rw - 4, ry + rh - 4]]) put(c, 'xgas', x, y, 2, 1)
+      put(c, 'xserver', cx - 3, ry + 2, 1, 1)
+      put(c, 'xserver', cx + 3, ry + 2, 1, 1)
+      put(c, 'xconsole', cx - 1, ry + rh - 3, 3, 1)
+      wallDeco(['xsign', 'sconce', 'xsign', 'xscreen'], 3)
+      break
+    }
+    case 'mind': {
+      // The mind chamber: the lab's thinking machine, banks of servers round the walls and a floor grid that lights up
+      for (let x = rx + 3; x < rx + rw - 3; x += 4) {
+        put(c, 'xserver', x, ry + 2, 1, 1)
+        put(c, 'xserver', x + 2, ry + rh - 3, 1, 1)
+      }
+      put(c, 'xconsole', rx + 2, cy - 1, 3, 1)
+      put(c, 'xconsole', rx + rw - 5, cy + 1, 3, 1)
+      put(c, 'xholo', cx - 1, cy - 1, 2, 1)
+      put(c, 'xpapers', cx + 4, cy + 4, 2, 1)
+      wallDeco(['xscreen', 'xscreen', 'xsign', 'xscreen'], 3)
+      break
+    }
+    case 'core': {
+      // The heart of the lab: broken tanks, two cores, cover behind the machines, the Wall of Legends
+      put(c, 'xcore', rx + 4, ry + 4, 2, 2)
+      put(c, 'xcore', rx + rw - 6, ry + rh - 6, 2, 2)
+      put(c, 'xtank', cx - 7, cy - 4, 2, 1)
+      put(c, 'xtank', cx + 5, cy + 3, 2, 1)
+      put(c, 'xconsole', cx + 3, cy - 5, 3, 1)
+      put(c, 'xshelf', cx - 6, cy + 4, 2, 1)
+      pool(cx - 1, cy + 1, 1.5, false)
+      pool(rx + rw - 6, ry + 5, 1.4, false)
+      put(c, 'xcrate', rx + 2, cy + 2, 1, 1)
+      put(c, 'xpapers', cx + 1, cy - 2, 2, 1)
+      wallDeco(['xscreen', 'sconce', 'xsign', 'xscreen'], 3)
+      break
+    }
   }
 }
 
@@ -1053,7 +1144,7 @@ export function bakeProps(g: CanvasRenderingContext2D, o: CanvasRenderingContext
     return
   }
   // The Storm Tower and the Citadel: everything drawn for the Depths is recoloured; their own sprites go on after, in their own colours
-  const own = (p: Prop) => p.kind in STORM || p.kind in ICE || p.kind in SKY || p.kind === 'legends'
+  const own = (p: Prop) => p.kind in STORM || p.kind in ICE || p.kind in SKY || p.kind in LAB || p.kind === 'legends'
   for (const p of props) if (!own(p)) bakeProp(g, o, w, p)
   coolDown(g)
   coolDown(o)
@@ -1079,7 +1170,11 @@ function coolDown(ctx: CanvasRenderingContext2D) {
     if (h > 80 && h < 320) continue
     let s = c / mx
     let v = mx / 255
-    if (sky) {
+    if (lab) {
+      // Warm stone turns blue-grey steel; gold turns screen cyan, every other glow turns psychic violet
+      if (s > 0.5 && v > 0.6) { if (h > 36 && h <= 80) { h = 190; s *= 0.75 } else { h = 288; s *= 0.8 } }
+      else { h = 228; s = Math.max(s * 0.3, 0.08); v = Math.min(1, v * 1.12) }
+    } else if (sky) {
       // Warm stone turns weathered green-grey and lighter; gold stays a soft gold, every other glow turns jade
       if (s > 0.5 && v > 0.6) { if (h > 36 && h <= 80) { h = 48; s *= 0.7 } else { h = 150; s *= 0.6 } }
       else { h = 140; s = Math.max(s * 0.22, 0.06); v = Math.min(1, v * 1.4 + 0.1) }
@@ -1133,7 +1228,11 @@ const ICE = {
 const SKY = {
   sstatue: [0, 0, 37, 50], scolumn: [38, 0, 15, 44], sbell: [54, 0, 53, 40], snest: [108, 0, 32, 26], saltar: [141, 0, 25, 34], sbrazier: [0, 51, 18, 28], swindow: [19, 51, 20, 30], skybanner: [40, 51, 18, 22], surn: [59, 51, 15, 22], srubble: [75, 51, 21, 18], sflag: [97, 51, 30, 32], slantern: [128, 51, 20, 34],
 } as const satisfies Record<string, readonly [number, number, number, number]>
-type Sprite = keyof typeof ATLAS | keyof typeof STORM | keyof typeof ICE | keyof typeof SKY
+/** The Forsaken Lab's own sprites. */
+const LAB = {
+  xtank: [0, 0, 26, 44], xconsole: [27, 0, 43, 30], xserver: [71, 0, 22, 40], xcore: [94, 0, 33, 44], xshelf: [128, 0, 26, 38], xdesk: [0, 45, 32, 26], xgas: [33, 45, 27, 36], xcrate: [61, 45, 23, 22], xscreen: [85, 45, 23, 18], xsign: [109, 45, 17, 16], xpapers: [127, 45, 27, 18], xholo: [0, 82, 25, 30],
+} as const satisfies Record<string, readonly [number, number, number, number]>
+type Sprite = keyof typeof ATLAS | keyof typeof STORM | keyof typeof ICE | keyof typeof SKY | keyof typeof LAB
 const image = (url: string) => {
   if (typeof Image === 'undefined') return null
   const i = new Image()
@@ -1144,17 +1243,19 @@ const atlas = image(propsUrl)
 const stormAtlas = image(stormUrl)
 const iceAtlas = image(iceUrl)
 const skyAtlas = image(skyUrl)
+const labAtlas = image(labUrl)
 const ready = (i: HTMLImageElement | null) => !!i && i.complete && i.naturalWidth > 0
 const atlasReady = () => ready(atlas)
 /** Flat on the ground: nothing of it stands over the actors. */
-const FLAT = new Set<Sprite>(['gold', 'carcass', 'banner', 'bones', 'sbanner', 'window', 'cocoon', 'masonry', 'ibanner', 'iwindow', 'icerubble', 'swindow', 'srubble', 'snest', 'skybanner'])
+const FLAT = new Set<Sprite>(['gold', 'carcass', 'banner', 'bones', 'sbanner', 'window', 'cocoon', 'masonry', 'ibanner', 'iwindow', 'icerubble', 'swindow', 'srubble', 'snest', 'skybanner', 'xscreen', 'xsign', 'xpapers'])
 /** Hung on a wall face. */
-const ON_WALL = new Set<PropKind>(['banner', 'sbanner', 'window', 'cocoon', 'ibanner', 'iwindow', 'swindow', 'skybanner'])
+const ON_WALL = new Set<PropKind>(['banner', 'sbanner', 'window', 'cocoon', 'ibanner', 'iwindow', 'swindow', 'skybanner', 'xscreen', 'xsign'])
 
 function spriteOf(p: Prop): Sprite | null {
   if (p.kind in STORM) return ready(stormAtlas) ? (p.kind as keyof typeof STORM) : null
   if (p.kind in ICE) return ready(iceAtlas) ? (p.kind as keyof typeof ICE) : null
   if (p.kind in SKY) return ready(skyAtlas) ? (p.kind as keyof typeof SKY) : null
+  if (p.kind in LAB) return ready(labAtlas) ? (p.kind as keyof typeof LAB) : null
   if (!atlasReady()) return null
   switch (p.kind) {
     case 'statue': return 'statue'
@@ -1183,7 +1284,7 @@ function spriteOf(p: Prop): Sprite | null {
 
 /** A sprite standing on the bottom of the prop's footprint, centred; what rises above the footprint goes on the overlay. */
 function bakeSprite(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, p: Prop, name: Sprite) {
-  const [img, [sx, sy, sw, sh]] = name in STORM ? [stormAtlas!, STORM[name as keyof typeof STORM]] : name in ICE ? [iceAtlas!, ICE[name as keyof typeof ICE]] : name in SKY ? [skyAtlas!, SKY[name as keyof typeof SKY]] : [atlas!, ATLAS[name as keyof typeof ATLAS]]
+  const [img, [sx, sy, sw, sh]] = name in STORM ? [stormAtlas!, STORM[name as keyof typeof STORM]] : name in ICE ? [iceAtlas!, ICE[name as keyof typeof ICE]] : name in SKY ? [skyAtlas!, SKY[name as keyof typeof SKY]] : name in LAB ? [labAtlas!, LAB[name as keyof typeof LAB]] : [atlas!, ATLAS[name as keyof typeof ATLAS]]
   const x = p.x * TILE, y = p.y * TILE, W = p.w * TILE, H = p.h * TILE
   const dx = Math.round(x + W / 2 - sw / 2), dy = y + H - sh
   if (!ON_WALL.has(p.kind) && p.kind !== 'carcass') {
@@ -1214,7 +1315,7 @@ function bakeProp(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, w: W
   }
   const faceTile = faceTile0
   if (p.kind === 'legends') return wallOfLegends(g, o, x, y, W, H)
-  if (p.kind in STORM || p.kind in ICE || p.kind in SKY) {
+  if (p.kind in STORM || p.kind in ICE || p.kind in SKY || p.kind in LAB) {
     // Its sprite isn't there (yet): a plain block of stone so it still reads as in the way
     if (!BLOCKS.has(p.kind)) return
     shadow(x + W / 2, y + H - 2, W / 2, 4)
@@ -1807,7 +1908,10 @@ function lavaTexture() {
   // The storm's charged water: deep and dark, lit by bright crackling veins
   // The citadel's freezing water: deep blue, with floes of white ice drifting in it
   // The Sky Pillar's gaps: open sky far below, clouds drifting through
-  const stops: [number, number, number, number][] = elec
+  // The lab's psychic coolant: deep violet, glowing pink-white where it churns
+  const stops: [number, number, number, number][] = lab
+    ? [[0, 26, 8, 48], [0.35, 64, 18, 112], [0.55, 120, 40, 184], [0.72, 196, 90, 236], [0.88, 248, 170, 255], [1, 255, 238, 255]]
+    : elec
     ? [[0, 6, 16, 30], [0.35, 10, 34, 58], [0.55, 16, 62, 96], [0.72, 30, 120, 170], [0.88, 120, 220, 255], [1, 240, 255, 230]]
     : sky
       ? [[0, 40, 104, 186], [0.42, 64, 140, 220], [0.62, 104, 176, 240], [0.76, 176, 214, 252], [0.88, 240, 248, 255], [1, 255, 255, 255]]
@@ -1925,7 +2029,7 @@ export function drawLavaLayer(ctx: CanvasRenderingContext2D, mask: HTMLCanvasEle
   const pat = b.createPattern(tex, 'repeat')!
   // Slow base flow
   // (Freezing water barely moves)
-  const drift = icy ? time * 0.3 : sky ? time * 0.7 : time
+  const drift = icy ? time * 0.3 : sky ? time * 0.7 : lab ? time * 0.5 : time
   pat.setTransform(new DOMMatrix([1.5, 0, 0, 1.5, -sx + drift * 6, -sy + drift * 3.5]))
   b.fillStyle = pat
   b.fillRect(0, 0, W, H)
@@ -1933,7 +2037,7 @@ export function drawLavaLayer(ctx: CanvasRenderingContext2D, mask: HTMLCanvasEle
   const pat2 = b.createPattern(tex, 'repeat')!
   pat2.setTransform(new DOMMatrix([1.1, 0, 0, 1.1, -sx - drift * 9, -sy + drift * 5]))
   b.globalCompositeOperation = 'lighter'
-  b.globalAlpha = elec ? 0.3 + 0.35 * flick(time, 1) : icy ? 0.2 : sky ? 0.28 : 0.35 + 0.08 * Math.sin(time * 1.7)
+  b.globalAlpha = elec ? 0.3 + 0.35 * flick(time, 1) : icy ? 0.2 : sky ? 0.28 : lab ? 0.3 + 0.12 * Math.sin(time * 2.3) : 0.35 + 0.08 * Math.sin(time * 1.7)
   b.fillStyle = pat2
   b.fillRect(0, 0, W, H)
   b.globalAlpha = 1
@@ -2074,7 +2178,8 @@ const CRYSTAL_FIRE: [string, string, string][] = [['#ff9a4a', '#ff7a2a', '#ffe0b
 const CRYSTAL_STORM: [string, string, string][] = [['#8ae0ff', '#4ab8ff', '#e0f8ff'], ['#ffe46a', '#e0b820', '#fff8d0'], ['#b07aff', '#9a5aff', '#e8d8ff']]
 const CRYSTAL_ICE: [string, string, string][] = [['#d8f6ff', '#8ad8ff', '#ffffff'], ['#bfe8ff', '#6ab8f0', '#ffffff'], ['#d0c8ff', '#a090f0', '#f0e8ff']]
 const CRYSTAL_SKY: [string, string, string][] = [['#a8f0c8', '#58d090', '#f0fff6'], ['#ffe8a0', '#e0c050', '#fffbe8'], ['#c8e0ff', '#80b0f0', '#f4f8ff']]
-const crystal = (v: number) => (elec ? CRYSTAL_STORM : icy ? CRYSTAL_ICE : sky ? CRYSTAL_SKY : CRYSTAL_FIRE)[v % 3]
+const CRYSTAL_LAB: [string, string, string][] = [['#e0a0ff', '#b060ff', '#f8e8ff'], ['#ff90e0', '#e050c0', '#ffe0f6'], ['#90e8ff', '#40b8f0', '#e8fbff']]
+const crystal = (v: number) => (elec ? CRYSTAL_STORM : icy ? CRYSTAL_ICE : sky ? CRYSTAL_SKY : lab ? CRYSTAL_LAB : CRYSTAL_FIRE)[v % 3]
 
 /** The props that move, every frame (y-sorted by the caller through `drawAnimProp`). */
 export function drawAnimProp(ctx: CanvasRenderingContext2D, p: Prop, time: number) {
