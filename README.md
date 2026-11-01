@@ -103,7 +103,7 @@ Net als in Pokémon Unite heeft elke partner een rol en een aanvalsstijl. Je zie
 
 ## Werelden en gebeurtenissen
 
-Elke battle royale speelt in een van vijf werelden. In solo kies je die zelf, in multiplayer de host; standaard is het **Willekeurig**.
+Elke battle royale speelt in een van negen werelden. In solo kies je die zelf, in multiplayer de host; standaard is het **Willekeurig**.
 
 | Wereld | Wat is anders |
 | --- | --- |
@@ -112,6 +112,10 @@ Elke battle royale speelt in een van vijf werelden. In solo kies je die zelf, in
 | **Sneeuw** | Besneeuwde dennen, bevroren meertjes en sneeuwval |
 | **Vulkaan** | Asgrond, dode bomen, gloeiende lava in plaats van water en asregen |
 | **Nacht** | Het bos in het donker, met vuurvliegjes en een donkere rand om het beeld |
+| **Eiland** | Wit strand en palmbomen rond lagunes, felle zon met lichtbanen, meer water-, vlieg- en gras-Pokémon |
+| **Moeras** | Modderige grond, treurwilgen en veel hoog gras, mist die over het veld trekt, donker, meer gif-, water-, insect- en grond-Pokémon |
+| **Herfstwoud** | Oranje en rode bomen, dwarrelende bladeren, meer gras-, normale, duister- en insect-Pokémon |
+| **Kersenvallei** | Roze bloesembomen en vijvers, dwarrelende blaadjes, meer psychische, gras-, vlieg- en normale Pokémon |
 
 Elk potje heeft twee gebeurtenissen, tussen de legendarische Pokémon door. Beide krijgen een banner, een pijl bovenin en een marker op de minimap.
 - **Bevoorrading:** na 10 seconden aftellen valt er een kist met een Master Ball, Potions, Rare Candy en een Revive.
@@ -159,13 +163,14 @@ Een raid is PvE: jij (en tot 11 vrienden) tegen één legendarische baas, in een
 
 ### Raid-dungeons
 
-Standaard is een raid een **dungeon**, in de geest van WoW-dungeons: eerst vecht je je door een reeks zalen, en pas aan het eind gaat de poort naar de arena van de legende open. In het raidmenu kies je de dungeon of **Klassiek** (meteen de arena in, willekeurige baas). Er zijn drie dungeons (`src/data/dungeons.ts`, logica in `src/game/dungeon.ts`, art in `src/game/dungeonArt.ts`), en ze gaan **op volgorde open**: versla er een om de volgende te ontgrendelen (op een preview of localhost kun je een dichte dungeon toch kiezen):
+Standaard is een raid een **dungeon**, in de geest van WoW-dungeons: eerst vecht je je door een reeks zalen, en pas aan het eind gaat de poort naar de arena van de legende open. In het raidmenu kies je de dungeon of **Klassiek** (meteen de arena in, willekeurige baas). Er zijn vier dungeons (`src/data/dungeons.ts`, logica in `src/game/dungeon.ts`, art in `src/game/dungeonArt.ts`), en ze gaan **op volgorde open**: versla er een om de volgende te ontgrendelen (op een preview of localhost kun je een dichte dungeon toch kiezen):
 
 1. **De Brandende Diepten** (Reshiram): vuur en lava. Wachters Magmortar en Camerupt. Beloning: Magby → Magmortar, mini-Reshiram, titel Vlammentemmer.
 2. **De Stormtoren** (Zekrom): links-rechts gespiegeld, geladen water. Plassen ontladen, spoelen in de Dynamozaal vonken naar elkaar, bliksem op de kantelen. Wachters Electivire en Eelektross. Beloning: Elekid → Electivire, mini-Zekrom, titel Stormrijder.
 3. **De IJscitadel** (Kyurem): boven-onder gespiegeld (je begint bovenaan), ijswater. Wakken bevriezen en barsten, ijspegels vallen in de galerij, ijzige windstoten over de wallen. Wachters Mamoswine en Walrein. Beloning: Spheal → Walrein, mini-Kyurem, titel IJsgeboren.
+4. **De Hemelpilaar** (Rayquaza): links-rechts en boven-onder gespiegeld (je begint rechtsboven), open lucht waar de vloer is weggebroken. In de kloostergang bezwijkt gebarsten steen, in de windgalerij duwen windstoten je naar de rand, in de klokkentoren valt metselwerk en op de top regent het meteoren. Wachters Altaria en Dragonite. Beloning: Swablu → Altaria, mini-Rayquaza, titel Hemelgeboren.
 
-Elke dungeon heeft een thema (`theme` in de data: type, kleuren, relieknamen, teksten voor HUD en laadtips) en een eigen intro en outro (H3-video's in `public/cutscenes`). De Stormtoren en de IJscitadel hergebruiken de art van de Diepten, omgekleurd na het bakken, plus eigen sprites (`src/assets/dungeon/props-*.png`).
+Elke dungeon heeft een thema (`theme` in de data: type, kleuren, relieknamen, teksten voor HUD en laadtips) en een eigen intro en outro (H3-video's in `public/cutscenes`). De Stormtoren, de IJscitadel en de Hemelpilaar hergebruiken de art van de Diepten, omgekleurd na het bakken, plus eigen sprites (`src/assets/dungeon/props-*.png`).
 
 - **Groepen en pulls:** in elke zaal staan groepen vijanden klaar (sommige patrouilleren). Kom je binnen 5,5 tegel of raak je er een, dan komt de hele groep op je af, en een gekoppelde groep doet mee (overpull). De poort uit een zaal (basalt plaat met gloeiende runen) gaat pas open als alles erin verslagen is.
 - **Rollen in een groep** (symbool op het naamplaatje): ⚔ brute (meer HP, slaat hard, trager), ✦ caster (houdt afstand, cast een vuurbal: rode cirkel onder je met castbalk), ✚ healer (geneest de zwakste uit de groep, 30%), ◆ schildwacht (vijanden binnen 4,5 tegel nemen 40% minder schade; gele stippelcirkel). Elites (★) zijn groter en taaier.

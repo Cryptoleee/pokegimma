@@ -22,6 +22,23 @@ export interface NewsEntry {
 
 export const NEWS: NewsEntry[] = [
   {
+    id: '2026-11-01',
+    title: ['The Sky Pillar', 'De Hemelpilaar'],
+    intro: [
+      'A fourth raid dungeon high above the clouds, raid roles with upgrade paths, and four new worlds for the battle royale.',
+      'Een vierde raid-dungeon hoog boven de wolken, raid-rollen met upgradepaden, en vier nieuwe werelden voor de battle royale.',
+    ],
+    items: [
+      { icon: '🌪️', text: ['New dungeon: The Sky Pillar. Climb a tower above the clouds past crumbling floors, gusts that push you to the edge and falling stone, beat the wardens Altaria and Dragonite, and face Rayquaza at the top. Unlocks after The Frozen Citadel', 'Nieuwe dungeon: De Hemelpilaar. Klim een toren boven de wolken op langs afbrokkelende vloeren, windstoten die je naar de rand duwen en vallende stenen, versla de wachters Altaria en Dragonite, en neem het op de top op tegen Rayquaza. Gaat open na De IJscitadel'] },
+      { icon: '🎁', text: ['Its rewards: Swablu as a partner (grows into Altaria), the title Skyborne, and a Mini Rayquaza follower if you clear it without losing a life', 'De beloningen: Swablu als partner (groeit uit tot Altaria), de titel Hemelgeboren, en een Mini-Rayquaza als volger als je hem haalt zonder een leven te verliezen'] },
+      { icon: '🛡️', text: ['Raid roles: pick Tank, Healer or Striker, each with a passive and an ability of its own (space or B). After every room pick 1 of 3 upgrades: three paths per role, three steps each, plus upgrades for anyone', 'Raid-rollen: kies Tank, Healer of Striker, elk met een eigen passief en een eigen ability (spatie of B). Na elke zaal kies je 1 van 3 upgrades: drie paden per rol, elk drie stappen, plus upgrades voor iedereen'] },
+      { icon: '🏝️', text: ['Four new battle royale worlds: Island, Swamp, Autumn Forest and Blossom Valley, each with its own trees, weather and more of its own kinds of Pokémon', 'Vier nieuwe battle royale-werelden: Eiland, Moeras, Herfstwoud en Kersenvallei, elk met eigen bomen, eigen weer en meer Pokémon die erbij passen'] },
+      { icon: '👥', text: ['Friend invites now pop up wherever you are, and you can add players as a friend from the lobby, the scoreboard and the results', 'Uitnodigingen van vrienden verschijnen nu waar je ook bent, en je kunt spelers als vriend toevoegen vanuit de lobby, het scorebord en de uitslag'] },
+      { icon: '💬', text: ['Send feedback from the home screen or after a match: every message is read', 'Stuur feedback vanaf het home-scherm of na een potje: elk bericht wordt gelezen'] },
+      { icon: '⚖️', text: ['Raid balance: fewer potions, and the healing well after a room is now only there when you play alone', 'Raid-balans: minder potions, en de healing well na een zaal staat er nu alleen als je alleen speelt'] },
+    ],
+  },
+  {
     id: '2026-10-23',
     title: ['The Raid Revamp', 'De raid-revamp'],
     intro: [

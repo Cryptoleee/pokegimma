@@ -572,6 +572,29 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
     get blurb() { return L('Climb an ancient tower above the clouds: crumbling cloisters, a dragons\' aerie, a gallery where the wind tries to blow you off, the old bell tower, and Rayquaza circling above the top.', 'Klim een eeuwenoude toren boven de wolken op: afbrokkelende kloostergangen, een drakennest, een galerij waar de wind je eraf probeert te blazen, de oude klokkentoren, en Rayquaza cirkelt boven de top.') },
     start: [106, 10],
     lives: 3,
+    intro: {
+      id: 'pillar-intro',
+      look: 'sky',
+      shots: [
+        {
+          src: 'pillar-intro', len: 22.5, lines: [
+            { at: 0.6, until: 3.2, title: true, text: () => L('THE SKY PILLAR', 'DE HEMELPILAAR'), kicker: () => L('Raid dungeon', 'Raid-dungeon') },
+            { at: 18.4, until: 22.5, title: true, text: () => 'RAYQUAZA', kicker: () => L('The sky dragon', 'De hemeldraak') },
+          ],
+        },
+      ],
+    },
+    outro: {
+      id: 'pillar-outro',
+      look: 'sky',
+      shots: [
+        {
+          src: 'pillar-outro', len: 12.2, lines: [
+            { at: 8.2, until: 12.2, title: true, heroes: true, text: () => L('RAYQUAZA DEFEATED', 'RAYQUAZA VERSLAGEN'), kicker: () => L('The storm clears', 'De storm gaat liggen') },
+          ],
+        },
+      ],
+    },
     arenaEntry: [51, 63],
     rooms: [
       {
