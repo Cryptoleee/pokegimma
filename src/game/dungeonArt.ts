@@ -1,6 +1,7 @@
 import propsUrl from '../assets/dungeon/props.png'
 import stormUrl from '../assets/dungeon/props-storm.png'
 import iceUrl from '../assets/dungeon/props-ice.png'
+import skyUrl from '../assets/dungeon/props-sky.png'
 import type { DungeonDef, Rect, Room } from '../data/dungeons'
 import type { Rng } from './rng'
 import { SUPPORTER_NAMES } from '../data/support'
@@ -35,6 +36,8 @@ export type PropKind =
   // The Frozen Citadel
   | 'icecrystal' | 'icepillar' | 'frozenmon' | 'istatue' | 'fountain' | 'ithrone' | 'ibrazier' | 'sled' | 'snowpile' | 'icerubble'
   | 'scrate' | 'ibarrel' | 'ibanner' | 'iwindow' | 'tusk'
+  // The Sky Pillar
+  | 'sstatue' | 'scolumn' | 'sbell' | 'snest' | 'saltar' | 'sbrazier' | 'swindow' | 'skybanner' | 'surn' | 'srubble' | 'sflag' | 'slantern'
   // Every dungeon's last stand: the Wall of Legends (supporters' names)
   | 'legends'
 
@@ -53,7 +56,8 @@ export interface Prop {
 /** Things that block: their tiles become T.PROP (walls of the prop, drawn by the prop itself). */
 const BLOCKS = new Set<PropKind>(['statue', 'column', 'crate', 'barrel', 'anvil', 'crucible', 'chimney', 'trough', 'bones', 'skull', 'cage', 'tower', 'barricade', 'tent', 'ballista', 'firebowl', 'weapons', 'wall', 'throne', 'torchstand', 'spire',
   'coil', 'rod', 'bell', 'dstatue', 'dynamo', 'lthrone', 'spool', 'masonry', 'lcrate', 'hbarrel', 'pedestal',
-  'icecrystal', 'icepillar', 'frozenmon', 'istatue', 'fountain', 'ithrone', 'ibrazier', 'sled', 'snowpile', 'icerubble', 'scrate', 'ibarrel', 'legends'])
+  'icecrystal', 'icepillar', 'frozenmon', 'istatue', 'fountain', 'ithrone', 'ibrazier', 'sled', 'snowpile', 'icerubble', 'scrate', 'ibarrel', 'legends',
+  'sstatue', 'scolumn', 'sbell', 'saltar', 'sbrazier', 'surn', 'slantern'])
 /** Moving parts, drawn every frame. */
 export const ANIMATED = new Set<PropKind>(['campfire', 'rune', 'treasure', 'crucible', 'chimney', 'crystal', 'lavafall', 'steam', 'trough', 'firebowl', 'sconce', 'torchstand', 'coil', 'orb', 'pedestal', 'lthrone', 'dynamo', 'ibrazier', 'icecrystal', 'fountain', 'ithrone'])
 
@@ -167,7 +171,7 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
   const rock = (x: number, y: number, s = 1) => {
     for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) if (!c.nearHall(x + dx, y + dy, 3) && floorTile(w.at(x + dx, y + dy))) w.set(x + dx, y + dy, T.ROCK)
   }
-  const BASE: Partial<Record<Room['deco'], number>> = { skygate: FM.flag, cloister: FM.paving, aerie: FM.dirt, gallery: FM.flag, belfry: FM.obsidian, peak: FM.paving, gate: FM.flag, river: FM.cave, hall: FM.obsidian, forge: FM.flag, den: FM.dirt, sgate: FM.flag, flooded: FM.cave, chapel: FM.obsidian, dynamo: FM.grate, cistern: FM.cave, igate: FM.flag, frozen: FM.cave, pillars: FM.obsidian, icelake: FM.cave }
+  const BASE: Partial<Record<Room['deco'], number>> = { skygate: FM.flag, cloister: FM.paving, aerie: FM.dirt, gallery: FM.flag, belfry: FM.flag, peak: FM.paving, gate: FM.flag, river: FM.cave, hall: FM.obsidian, forge: FM.flag, den: FM.dirt, sgate: FM.flag, flooded: FM.cave, chapel: FM.obsidian, dynamo: FM.grate, cistern: FM.cave, igate: FM.flag, frozen: FM.cave, pillars: FM.obsidian, icelake: FM.cave }
   const base = BASE[room.deco] ?? FM.paving
   mat(c, rx - 4, ry - 4, rw + 8, rh + 8, base)
   // Wall decorations on the north wall (drawn on its face, if there is one)
@@ -649,49 +653,53 @@ function coldRoom(c: Ctx, room: Room, rw: number, rh: number, rx: number, ry: nu
     case 'skygate': {
       // The sky gate: a runner between dragon statues to the way up, the floor broken away at the corners
       mat(c, cx - 2, ry, 5, rh, FM.carpet)
-      put(c, 'dstatue', cx - 8, ry + 2, 2, 2, 0)
-      put(c, 'dstatue', cx + 6, ry + 2, 2, 2, 1)
-      for (const [x, y] of [[rx + 3, ry + 3], [rx + rw - 4, ry + 3], [rx + 3, ry + rh - 4], [rx + rw - 4, ry + rh - 4]]) put(c, 'column', x, y, 1, 1)
+      put(c, 'sstatue', cx - 8, ry + 2, 2, 2, 0)
+      put(c, 'sstatue', cx + 6, ry + 2, 2, 2, 1)
+      for (const [x, y] of [[rx + 3, ry + 3], [rx + rw - 4, ry + 3], [rx + 3, ry + rh - 4], [rx + rw - 4, ry + rh - 4]]) put(c, 'scolumn', x, y, 1, 1)
       pool(rx + 2, cy, 1.8, false)
       pool(rx + rw - 3, cy + 3, 1.6, false)
-      put(c, 'nest', rx + rw - 6, cy - 4, 2, 2)
-      put(c, 'torchstand', cx - 4, ry + rh - 3, 1, 1)
-      put(c, 'torchstand', cx + 4, ry + rh - 3, 1, 1)
-      put(c, 'rubble', rx + 4, cy + 4, 2, 1)
+      put(c, 'snest', rx + rw - 6, cy - 4, 2, 2)
+      put(c, 'sbrazier', cx - 4, ry + rh - 3, 1, 1)
+      put(c, 'sbrazier', cx + 4, ry + rh - 3, 1, 1)
+      put(c, 'srubble', rx + 4, cy + 4, 2, 1)
       put(c, 'rune', cx, cy, 1, 1, 1)
-      wallDeco(['window', 'banner', 'window', 'sconce'], 3)
+      put(c, 'surn', rx + 3, ry + rh - 6, 1, 1)
+      put(c, 'slantern', rx + rw - 4, cy + 2, 1, 1)
+      wallDeco(['swindow', 'skybanner', 'swindow', 'sconce'], 3)
       break
     }
     case 'cloister': {
       // The cloud cloister: an arcade of columns round an open court, cracked flagstones that give way, gaps to the sky
       for (let x = rx + 3; x < rx + rw - 3; x += 5) {
-        put(c, 'column', x, ry + 3, 1, 1)
-        put(c, 'column', x, ry + rh - 4, 1, 1)
+        put(c, 'scolumn', x, ry + 3, 1, 1)
+        put(c, 'scolumn', x, ry + rh - 4, 1, 1)
       }
       pool(cx - 5, cy, 2.1)
       pool(cx + 5, cy - 1, 2.1)
       pool(cx, cy + 6, 1.7)
       pool(rx + 3, cy - 5, 1.6)
-      put(c, 'rubble', cx + 2, cy - 5, 2, 1)
-      put(c, 'rubble', rx + rw - 6, cy + 4, 2, 1)
-      put(c, 'pedestal', cx - 1, cy - 1, 2, 2)
+      put(c, 'srubble', cx + 2, cy - 5, 2, 1)
+      put(c, 'srubble', rx + rw - 6, cy + 4, 2, 1)
+      put(c, 'saltar', cx - 1, cy - 1, 2, 2)
       put(c, 'web', rx + 1, ry + 1, 1, 1, 0)
+      put(c, 'slantern', rx + 2, cy + 5, 1, 1)
+      put(c, 'surn', rx + rw - 4, cy - 5, 1, 1)
       put(c, 'skeleton', cx - 6, cy + 5, 1, 1, 1)
-      wallDeco(['window', 'sconce', 'window', 'banner'], 3)
+      wallDeco(['swindow', 'sconce', 'swindow', 'skybanner'], 3)
       break
     }
     case 'aerie': {
       // The dragons' aerie: great nests of sticks and bones, claw marks, the warden's perch on a dais at the far end
       mat(c, cx - 5, ry + 2, 11, 7, FM.dais)
       put(c, 'throne', cx - 1, ry + 2, 3, 2)
-      for (const [x, y] of [[rx + 3, ry + 4], [rx + rw - 6, ry + 4], [rx + 4, ry + rh - 6], [rx + rw - 7, ry + rh - 7], [cx - 1, cy + 3]]) put(c, 'nest', x, y, 2, 2)
+      for (const [x, y] of [[rx + 3, ry + 4], [rx + rw - 6, ry + 4], [rx + 4, ry + rh - 6], [rx + rw - 7, ry + rh - 7], [cx - 1, cy + 3]]) put(c, 'snest', x, y, 2, 2)
       for (const [x, y] of [[cx - 7, cy], [cx + 6, cy - 2], [rx + 6, cy + 2]]) put(c, 'bones', x, y, 1, 1, 2)
       put(c, 'claws', cx + 3, cy + 6, 1, 1)
       put(c, 'claws', cx - 5, cy - 5, 1, 1)
-      put(c, 'dstatue', rx + 2, cy - 2, 2, 2, 0)
-      put(c, 'dstatue', rx + rw - 4, cy - 2, 2, 2, 1)
+      put(c, 'sstatue', rx + 2, cy - 2, 2, 2, 0)
+      put(c, 'sstatue', rx + rw - 4, cy - 2, 2, 2, 1)
       put(c, 'treasure', rx + rw - 5, ry + 2, 1, 1)
-      wallDeco(['banner', 'window', 'claws', 'window'], 3)
+      wallDeco(['skybanner', 'swindow', 'claws', 'swindow'], 3)
       break
     }
     case 'gallery': {
@@ -699,36 +707,37 @@ function coldRoom(c: Ctx, room: Room, rw: number, rh: number, rx: number, ry: nu
       strip(rx + 1, ry + 3, 2, rh - 6)
       strip(rx + rw - 3, ry + 3, 2, rh - 6)
       for (const y of [ry + 6, cy, ry + rh - 7]) {
-        put(c, 'column', rx + 6, y, 1, 1)
-        put(c, 'column', rx + rw - 7, y, 1, 1)
+        put(c, 'scolumn', rx + 6, y, 1, 1)
+        put(c, 'scolumn', rx + rw - 7, y, 1, 1)
       }
-      put(c, 'warbanner', cx - 4, ry + 2, 1, 1)
-      put(c, 'warbanner', cx + 4, ry + 2, 1, 1)
-      put(c, 'rubble', cx - 2, cy + 3, 2, 1)
+      put(c, 'sflag', cx - 4, ry + 2, 1, 1)
+      put(c, 'sflag', cx + 4, ry + 2, 1, 1)
+      put(c, 'srubble', cx - 2, cy + 3, 2, 1)
       put(c, 'wall', cx - 1, cy - 5, 3, 1, 1)
       put(c, 'rune', cx, cy, 1, 1, 3)
-      wallDeco(['window', 'sconce', 'window', 'sconce'], 3)
+      put(c, 'slantern', cx + 4, cy + 6, 1, 1)
+      wallDeco(['swindow', 'sconce', 'swindow', 'sconce'], 3)
       break
     }
     case 'belfry': {
       // The old bell tower: great bells hanging from beams, fallen masonry, gaps where the floor gave in
-      for (const [x, y] of [[cx - 7, ry + 4], [cx + 5, ry + 4], [cx - 7, ry + rh - 7], [cx + 5, ry + rh - 7]]) put(c, 'bell', x, y, 2, 2)
-      put(c, 'masonry', rx + 3, cy - 2, 2, 1)
-      put(c, 'masonry', rx + rw - 5, cy + 3, 2, 1)
+      for (const [x, y] of [[cx - 7, ry + 4], [cx + 5, ry + 4], [cx - 7, ry + rh - 7], [cx + 5, ry + rh - 7]]) put(c, 'sbell', x, y, 2, 2)
+      put(c, 'srubble', rx + 3, cy - 2, 2, 1)
+      put(c, 'srubble', rx + rw - 5, cy + 3, 2, 1)
       pool(cx, ry + 3, 1.7)
       pool(cx - 1, ry + rh - 4, 1.7)
       for (const [x, y] of [[rx + 2, ry + 2], [rx + rw - 3, ry + rh - 3]]) put(c, 'pillar', x, y, 1, 1)
       put(c, 'chains', rx + rw - 4, ry + 2, 1, 1)
-      put(c, 'rubble', cx + 3, cy + 1, 2, 1)
+      put(c, 'srubble', cx + 3, cy + 1, 2, 1)
       put(c, 'skeleton', cx - 4, cy + 3, 1, 1, 2)
-      wallDeco(['window', 'chains', 'window', 'banner'], 3)
+      wallDeco(['swindow', 'chains', 'swindow', 'skybanner'], 3)
       break
     }
     case 'peak': {
       // The peak: open to the storm, broken walls for cover, columns along the edge, the Wall of Legends
       for (let x = rx + 3; x < rx + rw - 3; x += 6) {
-        put(c, 'column', x, ry + 1, 1, 1)
-        put(c, 'column', x + 3, ry + rh - 2, 1, 1)
+        put(c, 'scolumn', x, ry + 1, 1, 1)
+        put(c, 'scolumn', x + 3, ry + rh - 2, 1, 1)
       }
       put(c, 'wall', cx + 4, cy + 4, 4, 1, 0)
       put(c, 'wall', cx - 7, cy - 4, 3, 1, 1)
@@ -736,10 +745,10 @@ function coldRoom(c: Ctx, room: Room, rw: number, rh: number, rx: number, ry: nu
       put(c, 'crystal', rx + rw - 4, ry + rh - 4, 1, 1, 1)
       pool(cx - 2, cy + 1, 1.5, false)
       pool(rx + rw - 7, ry + 5, 1.4, false)
-      put(c, 'rubble', rx + 2, cy + 2, 2, 1)
-      put(c, 'warbanner', rx + 2, cy - 3, 1, 1)
+      put(c, 'srubble', rx + 2, cy + 2, 2, 1)
+      put(c, 'sflag', rx + 2, cy - 3, 1, 1)
       put(c, 'skeleton', cx + 2, cy - 7, 1, 1, 4)
-      wallDeco(['banner', 'sconce', 'banner', 'chains'], 3)
+      wallDeco(['skybanner', 'sconce', 'skybanner', 'chains'], 3)
       break
     }
   }
@@ -1044,7 +1053,7 @@ export function bakeProps(g: CanvasRenderingContext2D, o: CanvasRenderingContext
     return
   }
   // The Storm Tower and the Citadel: everything drawn for the Depths is recoloured; their own sprites go on after, in their own colours
-  const own = (p: Prop) => p.kind in STORM || p.kind in ICE || p.kind === 'legends'
+  const own = (p: Prop) => p.kind in STORM || p.kind in ICE || p.kind in SKY || p.kind === 'legends'
   for (const p of props) if (!own(p)) bakeProp(g, o, w, p)
   coolDown(g)
   coolDown(o)
@@ -1120,7 +1129,11 @@ const ICE = {
   ibrazier: [62, 53, 16, 31], sled: [131, 53, 34, 25], snowpile: [0, 94, 30, 25], icerubble: [50, 94, 30, 19], scrate: [96, 94, 24, 17], ibarrel: [31, 94, 18, 21],
   ibanner: [81, 94, 14, 18], iwindow: [79, 53, 16, 30], tusk: [96, 53, 34, 27],
 } as const satisfies Record<string, readonly [number, number, number, number]>
-type Sprite = keyof typeof ATLAS | keyof typeof STORM | keyof typeof ICE
+/** The Sky Pillar's own sprites. */
+const SKY = {
+  sstatue: [0, 0, 37, 50], scolumn: [38, 0, 15, 44], sbell: [54, 0, 53, 40], snest: [108, 0, 32, 26], saltar: [141, 0, 25, 34], sbrazier: [0, 51, 18, 28], swindow: [19, 51, 20, 30], skybanner: [40, 51, 18, 22], surn: [59, 51, 15, 22], srubble: [75, 51, 21, 18], sflag: [97, 51, 30, 32], slantern: [128, 51, 20, 34],
+} as const satisfies Record<string, readonly [number, number, number, number]>
+type Sprite = keyof typeof ATLAS | keyof typeof STORM | keyof typeof ICE | keyof typeof SKY
 const image = (url: string) => {
   if (typeof Image === 'undefined') return null
   const i = new Image()
@@ -1130,16 +1143,18 @@ const image = (url: string) => {
 const atlas = image(propsUrl)
 const stormAtlas = image(stormUrl)
 const iceAtlas = image(iceUrl)
+const skyAtlas = image(skyUrl)
 const ready = (i: HTMLImageElement | null) => !!i && i.complete && i.naturalWidth > 0
 const atlasReady = () => ready(atlas)
 /** Flat on the ground: nothing of it stands over the actors. */
-const FLAT = new Set<Sprite>(['gold', 'carcass', 'banner', 'bones', 'sbanner', 'window', 'cocoon', 'masonry', 'ibanner', 'iwindow', 'icerubble'])
+const FLAT = new Set<Sprite>(['gold', 'carcass', 'banner', 'bones', 'sbanner', 'window', 'cocoon', 'masonry', 'ibanner', 'iwindow', 'icerubble', 'swindow', 'srubble', 'snest', 'skybanner'])
 /** Hung on a wall face. */
-const ON_WALL = new Set<PropKind>(['banner', 'sbanner', 'window', 'cocoon', 'ibanner', 'iwindow'])
+const ON_WALL = new Set<PropKind>(['banner', 'sbanner', 'window', 'cocoon', 'ibanner', 'iwindow', 'swindow', 'skybanner'])
 
 function spriteOf(p: Prop): Sprite | null {
   if (p.kind in STORM) return ready(stormAtlas) ? (p.kind as keyof typeof STORM) : null
   if (p.kind in ICE) return ready(iceAtlas) ? (p.kind as keyof typeof ICE) : null
+  if (p.kind in SKY) return ready(skyAtlas) ? (p.kind as keyof typeof SKY) : null
   if (!atlasReady()) return null
   switch (p.kind) {
     case 'statue': return 'statue'
@@ -1168,7 +1183,7 @@ function spriteOf(p: Prop): Sprite | null {
 
 /** A sprite standing on the bottom of the prop's footprint, centred; what rises above the footprint goes on the overlay. */
 function bakeSprite(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, p: Prop, name: Sprite) {
-  const [img, [sx, sy, sw, sh]] = name in STORM ? [stormAtlas!, STORM[name as keyof typeof STORM]] : name in ICE ? [iceAtlas!, ICE[name as keyof typeof ICE]] : [atlas!, ATLAS[name as keyof typeof ATLAS]]
+  const [img, [sx, sy, sw, sh]] = name in STORM ? [stormAtlas!, STORM[name as keyof typeof STORM]] : name in ICE ? [iceAtlas!, ICE[name as keyof typeof ICE]] : name in SKY ? [skyAtlas!, SKY[name as keyof typeof SKY]] : [atlas!, ATLAS[name as keyof typeof ATLAS]]
   const x = p.x * TILE, y = p.y * TILE, W = p.w * TILE, H = p.h * TILE
   const dx = Math.round(x + W / 2 - sw / 2), dy = y + H - sh
   if (!ON_WALL.has(p.kind) && p.kind !== 'carcass') {
@@ -1199,7 +1214,7 @@ function bakeProp(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, w: W
   }
   const faceTile = faceTile0
   if (p.kind === 'legends') return wallOfLegends(g, o, x, y, W, H)
-  if (p.kind in STORM || p.kind in ICE) {
+  if (p.kind in STORM || p.kind in ICE || p.kind in SKY) {
     // Its sprite isn't there (yet): a plain block of stone so it still reads as in the way
     if (!BLOCKS.has(p.kind)) return
     shadow(x + W / 2, y + H - 2, W / 2, 4)
