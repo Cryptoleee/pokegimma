@@ -2,7 +2,8 @@ import { RAID_TIME, type BossAttack } from '../data/bosses'
 import { TAKEN } from '../data/difficulty'
 import { fightsIn, type DungeonDef, type FoeSpec, type Rect, type Relic, type Warden } from '../data/dungeons'
 import { TYPE_COLOR } from '../data/types'
-import { both, inBoth, L, tx } from '../i18n'
+import { both, inBoth, L, tx, type Txt } from '../i18n'
+import type { MoveFx } from '../data/moves'
 import { roleOf } from '../data/roles'
 import { addHazard, raidIntro, type RaidState } from './boss'
 import { Mon, type Trainer } from './entities'
@@ -354,6 +355,21 @@ function roomHazards(g: Game, d: DungeonRun, deco: string, dt: number) {
   const cold = { ...base, type: 'ice' as const }
   const sky = { ...base, type: 'dragon' as const }
   const psy = { ...base, type: 'psychic' as const }
+  const sea = { ...base, type: 'water' as const }
+  const ghost = { ...base, type: 'ghost' as const }
+  /** A shove one way for the whole room (each player moves their own): the wind, the current, gravity tipping over. */
+  const shove = (force: number, toast: (dir: number) => Txt, color: string, fx: MoveFx) => {
+    if (!here().length || d.gust) return
+    const dir = Math.floor(Math.random() * 4)
+    d.gust = { dx: dir === 0 ? force : dir === 1 ? -force : 0, dy: dir === 2 ? force : dir === 3 ? -force : 0, delay: 1.4, t: 2.6 }
+    for (const v of g.viewers) if (here().includes(v.tr)) {
+      v.hooks.toast(toast(dir), color)
+      v.sfx('warn')
+    }
+    g.soundAt(rect.x + rect.w / 2, rect.y + rect.h / 2, 'boss', ['wind', fx, 0.8, 4], { range: 30 })
+  }
+  /** Where it pushes you: 0 east, 1 west, 2 south, 3 north. */
+  const TO = [['the east', 'het oosten'], ['the west', 'het westen'], ['the south', 'het zuiden'], ['the north', 'het noorden']]
   const here = () => g.trainers.filter((t) => t.alive && !t.mon.fainted && inRoom(t))
   d.ventT -= dt
   if (d.ventT > 0) return
@@ -425,6 +441,56 @@ function roomHazards(g: Game, d: DungeonRun, deco: string, dt: number) {
       v.sfx('warn')
     }
     g.soundAt(rect.x + rect.w / 2, rect.y + rect.h / 2, 'boss', ['wind', 'hurricane', 0.8, 4], { range: 30 })
+  } else if (deco === 'tidepool') {
+    // The tide surges through the pools: a band of rushing water across the room, through where you stand
+    d.ventT = 5 + Math.random() * 1.8
+    const t = here()[Math.floor(Math.random() * here().length)]
+    if (!t) return
+    const flat = Math.random() < 0.5, off = (Math.random() - 0.5) * 1.2
+    addHazard(g, { ...sea, shape: 'line', x: flat ? rect.x : t.x + off, y: flat ? t.y + off : rect.y, ang: flat ? 0 : Math.PI / 2, r: flat ? rect.w : rect.h, width: 1.6, t: 1.6, dmg: 0.14, fx: 'surf', atk: 'vent' })
+  } else if (deco === 'wreck') {
+    // The old wreck creaks: planks and barrels come down from the deck above
+    d.ventT = 3.4 + Math.random() * 1.4
+    const t = here()[Math.floor(Math.random() * here().length)]
+    if (!t) return
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * Math.PI * 2, r = i ? 2 + Math.random() * 3.5 : Math.random()
+      addHazard(g, { ...sea, shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 1.5, t: 1.3 + i * 0.3, dmg: 0.14, fx: 'rocktomb', atk: 'icicle' })
+    }
+  } else if (deco === 'falls') {
+    // Under the falls the current takes you along: walk against it
+    d.ventT = 6 + Math.random() * 2.5
+    shove(1.6, (dir) => both(`The current pulls you to ${TO[dir][0]}: swim against it!`, `De stroming trekt je naar ${TO[dir][1]}: zwem ertegenin!`), '#80d0ff', 'surf')
+  } else if ((deco === 'sanctum' || deco === 'abyss') && d.gauntlet) {
+    // While the waves come: waterspouts in the sanctum, shadow orbs over the abyss
+    d.ventT = 3 + Math.random() * 1.4
+    const all = here()
+    const t = all[Math.floor(Math.random() * all.length)]
+    if (!t) return
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * Math.PI * 2, r = i ? 2 + Math.random() * 3 : Math.random() * 1.5
+      addHazard(g, { ...(deco === 'sanctum' ? sea : ghost), shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 1.8, t: 1.25 + i * 0.3, dmg: 0.15, fx: deco === 'sanctum' ? 'surf' : 'shadowforce', atk: 'vent' })
+    }
+  } else if (deco === 'upside') {
+    // Gravity tips over: everyone slides one way for a moment
+    d.ventT = 6 + Math.random() * 2.5
+    shove(1.7, (dir) => both(`Gravity tips over: you fall toward ${TO[dir][0]}!`, `De zwaartekracht kantelt: je valt naar ${TO[dir][1]}!`), '#c8a0ff', 'shadowforce')
+  } else if (deco === 'mirror') {
+    // Shadow hands reach out of the mirrors: right where you stand and close by
+    d.ventT = 3.6 + Math.random() * 1.4
+    const t = here()[Math.floor(Math.random() * here().length)]
+    if (!t) return
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * Math.PI * 2, r = i ? 2 + Math.random() * 3 : Math.random()
+      addHazard(g, { ...ghost, shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 1.5, t: 1.3 + i * 0.3, dmg: 0.14, fx: 'shadowforce', atk: 'vent' })
+    }
+  } else if (deco === 'spiral') {
+    // Tears open in the twisted stair and stay a while
+    d.ventT = 6.5 + Math.random() * 2
+    const t = here()[Math.floor(Math.random() * here().length)]
+    if (!t) return
+    const a = Math.random() * Math.PI * 2, r = 1 + Math.random() * 2
+    addHazard(g, { ...ghost, shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, ang: 0, r: 2, t: 1.4, dmg: 0.12, fx: 'shadowforce', atk: 'rift_pool', dur: 5, dps: 0.07 })
   } else if (deco === 'belfry') {
     // Loose masonry falls from the bell tower: a shadow grows where it lands
     d.ventT = 3.2 + Math.random() * 1.4
@@ -1185,7 +1251,7 @@ export function drawBrazier(ctx: CanvasRenderingContext2D, x: number, y: number,
   // The Storm Tower's braziers burn with caught lightning
   const st = coldLook()
   // (the Sky Pillar's burn gold and white in the wind)
-  const [c0, c1, c2, c3] = dungeonLook() === 'lab' ? ['#e080ff', 'rgba(190,80,255,0.85)', 'rgba(240,160,255,0.9)', 'rgba(255,235,255,0.9)'] : dungeonLook() === 'sky' ? ['#ffd860', 'rgba(255,190,80,0.85)', 'rgba(255,235,150,0.9)', 'rgba(255,255,235,0.9)'] : st ? ['#5ac8ff', 'rgba(60,120,255,0.85)', 'rgba(120,215,255,0.9)', 'rgba(235,250,255,0.9)'] : ['#ff6020', 'rgba(255,90,20,0.85)', 'rgba(255,190,60,0.9)', 'rgba(255,250,200,0.9)']
+  const [c0, c1, c2, c3] = dungeonLook() === 'sea' ? ['#70e8f0', 'rgba(60,200,230,0.85)', 'rgba(160,240,250,0.9)', 'rgba(240,255,255,0.9)'] : dungeonLook() === 'void' ? ['#c070ff', 'rgba(150,60,240,0.85)', 'rgba(210,150,255,0.9)', 'rgba(250,235,255,0.9)'] : dungeonLook() === 'lab' ? ['#e080ff', 'rgba(190,80,255,0.85)', 'rgba(240,160,255,0.9)', 'rgba(255,235,255,0.9)'] : dungeonLook() === 'sky' ? ['#ffd860', 'rgba(255,190,80,0.85)', 'rgba(255,235,150,0.9)', 'rgba(255,255,235,0.9)'] : st ? ['#5ac8ff', 'rgba(60,120,255,0.85)', 'rgba(120,215,255,0.9)', 'rgba(235,250,255,0.9)'] : ['#ff6020', 'rgba(255,90,20,0.85)', 'rgba(255,190,60,0.9)', 'rgba(255,250,200,0.9)']
   ctx.fillStyle = 'rgba(0,0,0,0.35)'
   ctx.fillRect(px - 5, py - 1, 10, 3)
   // Stand and bowl

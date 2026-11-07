@@ -163,7 +163,7 @@ export function render(g: Game, ctx: CanvasRenderingContext2D, cw: number, ch: n
   // Raid dungeon: deep underground, lit by braziers, lava and the fight
   if (g.world.gates.length) {
     // (the Sky Pillar is high in the open air: only a breath of shade)
-    ctx.fillStyle = dungeonLook() === 'lab' ? 'rgba(8,4,22,0.3)' : dungeonLook() === 'sky' ? 'rgba(10,30,30,0.08)' : dungeonLook() === 'ice' ? 'rgba(6,14,30,0.26)' : coldLook() ? 'rgba(2,6,16,0.36)' : 'rgba(10,3,6,0.32)'
+    ctx.fillStyle = dungeonLook() === 'sea' ? 'rgba(4,16,30,0.26)' : dungeonLook() === 'void' ? 'rgba(6,2,14,0.34)' : dungeonLook() === 'lab' ? 'rgba(8,4,22,0.3)' : dungeonLook() === 'sky' ? 'rgba(10,30,30,0.08)' : dungeonLook() === 'ice' ? 'rgba(6,14,30,0.26)' : coldLook() ? 'rgba(2,6,16,0.36)' : 'rgba(10,3,6,0.32)'
     ctx.fillRect(ox - 2, oy - 2, vw + 4, vh + 4)
   }
 
@@ -2009,7 +2009,7 @@ function drawLights(g: Game, ctx: CanvasRenderingContext2D, inView: (x: number, 
   const storm = coldLook()
   for (const b of g.world.braziers) {
     const fl = 0.85 + 0.15 * Math.sin(time * 9 + b.x * 3) * Math.sin(time * 13 + b.y)
-    add(b.x * T, (b.y - 0.6) * T, 30 * fl, dungeonLook() === 'lab' ? '#d890ff' : dungeonLook() === 'sky' ? '#ffe090' : storm ? '#5ac8ff' : '#ff8a30', 0.45 * fl)
+    add(b.x * T, (b.y - 0.6) * T, 30 * fl, dungeonLook() === 'sea' ? '#80e8f0' : dungeonLook() === 'void' ? '#c080ff' : dungeonLook() === 'lab' ? '#d890ff' : dungeonLook() === 'sky' ? '#ffe090' : storm ? '#5ac8ff' : '#ff8a30', 0.45 * fl)
   }
   if (!pool.length) return
   const lw = Math.ceil(cw / LIGHT_RES), lh = Math.ceil(ch / LIGHT_RES)

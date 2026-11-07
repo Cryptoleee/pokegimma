@@ -3,6 +3,8 @@ import stormUrl from '../assets/dungeon/props-storm.png'
 import iceUrl from '../assets/dungeon/props-ice.png'
 import skyUrl from '../assets/dungeon/props-sky.png'
 import labUrl from '../assets/dungeon/props-lab.png'
+import seaUrl from '../assets/dungeon/props-sea.png'
+import voidUrl from '../assets/dungeon/props-void.png'
 import type { DungeonDef, Rect, Room } from '../data/dungeons'
 import type { Rng } from './rng'
 import { SUPPORTER_NAMES } from '../data/support'
@@ -41,6 +43,10 @@ export type PropKind =
   | 'sstatue' | 'scolumn' | 'sbell' | 'snest' | 'saltar' | 'sbrazier' | 'swindow' | 'skybanner' | 'surn' | 'srubble' | 'sflag' | 'slantern'
   // The Forsaken Lab
   | 'xtank' | 'xconsole' | 'xserver' | 'xcore' | 'xshelf' | 'xdesk' | 'xgas' | 'xcrate' | 'xscreen' | 'xsign' | 'xpapers' | 'xholo'
+  // The Whirl Islands
+  | 'wcoral' | 'wbarrel' | 'wanchor' | 'wmast' | 'wchest' | 'wclam' | 'wrock' | 'wlantern' | 'wstatue' | 'wweed' | 'wnet' | 'wbones'
+  // The Distortion World
+  | 'vfloat' | 'vtree' | 'vportal' | 'vpillar' | 'vtorch' | 'vstatue' | 'vstairs' | 'vmirror' | 'vcrystal' | 'vgrave' | 'vrune' | 'vchains'
   // Every dungeon's last stand: the Wall of Legends (supporters' names)
   | 'legends'
 
@@ -61,7 +67,9 @@ const BLOCKS = new Set<PropKind>(['statue', 'column', 'crate', 'barrel', 'anvil'
   'coil', 'rod', 'bell', 'dstatue', 'dynamo', 'lthrone', 'spool', 'masonry', 'lcrate', 'hbarrel', 'pedestal',
   'icecrystal', 'icepillar', 'frozenmon', 'istatue', 'fountain', 'ithrone', 'ibrazier', 'sled', 'snowpile', 'icerubble', 'scrate', 'ibarrel', 'legends',
   'sstatue', 'scolumn', 'sbell', 'saltar', 'sbrazier', 'surn', 'slantern',
-  'xtank', 'xconsole', 'xserver', 'xcore', 'xshelf', 'xdesk', 'xgas', 'xcrate', 'xholo'])
+  'xtank', 'xconsole', 'xserver', 'xcore', 'xshelf', 'xdesk', 'xgas', 'xcrate', 'xholo',
+  'wcoral', 'wbarrel', 'wanchor', 'wmast', 'wchest', 'wclam', 'wrock', 'wlantern', 'wstatue', 'wbones',
+  'vfloat', 'vtree', 'vportal', 'vpillar', 'vtorch', 'vstatue', 'vstairs', 'vmirror', 'vcrystal', 'vgrave'])
 /** Moving parts, drawn every frame. */
 export const ANIMATED = new Set<PropKind>(['campfire', 'rune', 'treasure', 'crucible', 'chimney', 'crystal', 'lavafall', 'steam', 'trough', 'firebowl', 'sconce', 'torchstand', 'coil', 'orb', 'pedestal', 'lthrone', 'dynamo', 'ibrazier', 'icecrystal', 'fountain', 'ithrone'])
 
@@ -73,17 +81,20 @@ export const ANIMATED = new Set<PropKind>(['campfire', 'rune', 'treasure', 'cruc
  * frosted stone, glowing orange to electric cyan or to icy white-blue) and
  * everything that burns sparks or glitters instead.
  */
-export type DungeonLook = 'fire' | 'electric' | 'ice' | 'sky' | 'lab'
+export type DungeonLook = 'fire' | 'electric' | 'ice' | 'sky' | 'lab' | 'sea' | 'void'
 let look: DungeonLook = 'fire'
-let elec = false, icy = false, sky = false, lab = false
+let elec = false, icy = false, sky = false, lab = false, sea = false, vd = false
 /** The Sky Pillar (its element is 'dragon'): weathered green-grey stone, gold and jade light, open sky where the floor broke away. */
 /** The Forsaken Lab (its element is 'psychic'): blue-grey steel, violet and cyan light, glowing psychic coolant where the floor broke open. */
-export const setDungeonLook = (type: DungeonLook | 'dragon' | 'psychic') => {
-  look = type === 'dragon' ? 'sky' : type === 'psychic' ? 'lab' : type
+/** The Whirl Islands (element 'water'): wet blue-grey rock, aqua light, the sea. The Distortion World ('ghost'): violet-grey stone, violet and gold light, the void. */
+export const setDungeonLook = (type: DungeonLook | 'dragon' | 'psychic' | 'water' | 'ghost') => {
+  look = type === 'dragon' ? 'sky' : type === 'psychic' ? 'lab' : type === 'water' ? 'sea' : type === 'ghost' ? 'void' : type
   elec = look === 'electric'
   icy = look === 'ice'
   sky = look === 'sky'
   lab = look === 'lab'
+  sea = look === 'sea'
+  vd = look === 'void'
 }
 /** Not the Depths: braziers, gates and the dark burn cold blue. */
 export const coldLook = () => look !== 'fire'
@@ -95,11 +106,15 @@ const heat = () => elec
     ? { hot: '255,252,220', mid: '150,240,190', low: '60,170,130', spark: '255,230,140' }
   : lab
     ? { hot: '255,235,255', mid: '225,130,255', low: '140,60,230', spark: '255,170,240' }
+  : sea
+    ? { hot: '235,255,255', mid: '120,230,240', low: '40,150,210', spark: '200,255,250' }
+  : vd
+    ? { hot: '255,230,255', mid: '200,120,255', low: '110,40,200', spark: '255,200,120' }
   : icy
     ? { hot: '240,252,255', mid: '150,220,255', low: '80,140,230', spark: '255,255,255' }
     : { hot: '255,240,170', mid: '255,160,50', low: '230,70,20', spark: '255,170,60' }
 /** A light's colour in this dungeon (every warm light turns electric in the storm, icy in the citadel). */
-const lit = (c: string) => (elec ? (c === '#ffd060' ? '#ffe46a' : '#5ac8ff') : icy ? (c === '#ffd060' ? '#e8f8ff' : '#9ad8ff') : sky ? (c === '#ffd060' ? '#fff0b0' : '#8ef0c0') : lab ? (c === '#ffd060' ? '#a8f0ff' : '#d890ff') : c)
+const lit = (c: string) => (elec ? (c === '#ffd060' ? '#ffe46a' : '#5ac8ff') : icy ? (c === '#ffd060' ? '#e8f8ff' : '#9ad8ff') : sky ? (c === '#ffd060' ? '#fff0b0' : '#8ef0c0') : lab ? (c === '#ffd060' ? '#a8f0ff' : '#d890ff') : sea ? (c === '#ffd060' ? '#d0fff8' : '#70e0f0') : vd ? (c === '#ffd060' ? '#ffd070' : '#c080ff') : c)
 
 interface Ctx {
   w: World
@@ -179,7 +194,7 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
   const rock = (x: number, y: number, s = 1) => {
     for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) if (!c.nearHall(x + dx, y + dy, 3) && floorTile(w.at(x + dx, y + dy))) w.set(x + dx, y + dy, T.ROCK)
   }
-  const BASE: Partial<Record<Room['deco'], number>> = { airlock: FM.grate, archive: FM.paving, cloning: FM.flag, reactor: FM.grate, mind: FM.obsidian, core: FM.flag, skygate: FM.flag, cloister: FM.paving, aerie: FM.dirt, gallery: FM.flag, belfry: FM.flag, peak: FM.paving, gate: FM.flag, river: FM.cave, hall: FM.obsidian, forge: FM.flag, den: FM.dirt, sgate: FM.flag, flooded: FM.cave, chapel: FM.obsidian, dynamo: FM.grate, cistern: FM.cave, igate: FM.flag, frozen: FM.cave, pillars: FM.obsidian, icelake: FM.cave }
+  const BASE: Partial<Record<Room['deco'], number>> = { shore: FM.dirt, tidepool: FM.cave, grotto: FM.cave, wreck: FM.paving, falls: FM.cave, sanctum: FM.flag, portal: FM.obsidian, upside: FM.cave, crypt: FM.flag, mirror: FM.obsidian, spiral: FM.paving, abyss: FM.obsidian, airlock: FM.grate, archive: FM.paving, cloning: FM.flag, reactor: FM.grate, mind: FM.obsidian, core: FM.flag, skygate: FM.flag, cloister: FM.paving, aerie: FM.dirt, gallery: FM.flag, belfry: FM.flag, peak: FM.paving, gate: FM.flag, river: FM.cave, hall: FM.obsidian, forge: FM.flag, den: FM.dirt, sgate: FM.flag, flooded: FM.cave, chapel: FM.obsidian, dynamo: FM.grate, cistern: FM.cave, igate: FM.flag, frozen: FM.cave, pillars: FM.obsidian, icelake: FM.cave }
   const base = BASE[room.deco] ?? FM.paving
   mat(c, rx - 4, ry - 4, rw + 8, rh + 8, base)
   // Wall decorations on the north wall (drawn on its face, if there is one)
@@ -382,7 +397,7 @@ export function furnishRoom(w: World, room: Room, def: DungeonDef, rng: Rng) {
       coldRoom(c, room, rw, rh, rx, ry, cx, cy, rock, wallDeco)
   }
   // The last stand of every dungeon has the Wall of Legends: the first free spot of a few
-  if (room.deco === 'bastion' || room.deco === 'ramparts' || room.deco === 'summit' || room.deco === 'peak' || room.deco === 'core')
+  if (room.deco === 'bastion' || room.deco === 'ramparts' || room.deco === 'summit' || room.deco === 'peak' || room.deco === 'core' || room.deco === 'sanctum' || room.deco === 'abyss')
     for (const [x, y] of [[cx - 2, ry + 2], [cx - 2, ry + rh - 4], [rx + 2, cy - 1], [rx + rw - 6, cy - 1], [cx + 3, cy + 3], [cx - 7, cy - 6]])
       if (put(c, 'legends', x, y, 4, 2)) break
 }
@@ -760,6 +775,157 @@ function coldRoom(c: Ctx, room: Room, rw: number, rh: number, rx: number, ry: nu
       break
     }
     // ---- The Forsaken Lab: glowing psychic coolant wherever the floor broke open (its "lava")
+    // ---- The Whirl Islands: the sea wherever the cave floor dips (its "lava")
+    case 'shore': {
+      // The cave shore: wet sand, rocks and seaweed, lanterns lighting the way in, the sea lapping at the sides
+      for (const [x, y] of [[rx + 3, ry + 4], [rx + rw - 5, ry + 5], [rx + 4, ry + rh - 6]]) put(c, 'wrock', x, y, 2, 1)
+      for (const [x, y] of [[cx - 6, cy - 3], [cx + 5, cy + 2], [rx + 3, cy + 1], [rx + rw - 4, cy - 4]]) put(c, 'wweed', x, y, 1, 1)
+      put(c, 'wcoral', cx + 3, ry + rh - 4, 2, 1)
+      put(c, 'wbarrel', rx + rw - 5, ry + rh - 4, 2, 1)
+      put(c, 'wlantern', cx - 4, ry + 2, 1, 1)
+      put(c, 'wlantern', cx + 4, ry + 2, 1, 1)
+      pool(rx + 3, cy - 5, 1.8)
+      pool(rx + rw - 4, cy + 5, 1.6, false)
+      wallDeco(['wnet', 'sconce', 'wnet', 'sconce'], 3)
+      break
+    }
+    case 'tidepool': {
+      // The tide pools: little basins of sea everywhere, coral and giant clams between them
+      for (const [x, y, r] of [[cx - 6, cy - 4, 1.6], [cx + 5, cy - 5, 1.4], [cx - 4, cy + 5, 1.5], [cx + 6, cy + 4, 1.6], [cx, cy, 1.3]] as const) pool(x, y, r)
+      for (const [x, y] of [[rx + 3, ry + 3], [rx + rw - 5, ry + rh - 4], [cx - 1, ry + 3]]) put(c, 'wcoral', x, y, 2, 1)
+      put(c, 'wclam', rx + rw - 4, ry + 4, 1, 1)
+      put(c, 'wclam', rx + 3, ry + rh - 5, 1, 1)
+      for (const [x, y] of [[cx + 2, cy + 7], [rx + 2, cy], [rx + rw - 3, cy - 1]]) put(c, 'wweed', x, y, 1, 1)
+      put(c, 'wrock', cx - 9, cy + 1, 2, 1)
+      wallDeco(['wnet', 'sconce', 'wnet', 'sconce'], 3)
+      break
+    }
+    case 'grotto': {
+      // The coral grotto: the warden's dais under a statue of the sea guardian, coral and pearls all round
+      mat(c, cx - 5, ry + 2, 11, 7, FM.dais)
+      put(c, 'wstatue', cx - 1, ry + 2, 2, 2)
+      for (const [x, y] of [[rx + 3, ry + 4], [rx + rw - 5, ry + 4], [rx + 3, ry + rh - 5], [rx + rw - 5, ry + rh - 5]]) put(c, 'wcoral', x, y, 2, 1)
+      put(c, 'wclam', cx - 7, cy + 2, 1, 1)
+      put(c, 'wclam', cx + 6, cy - 1, 1, 1)
+      put(c, 'wlantern', cx - 4, ry + 3, 1, 1)
+      put(c, 'wlantern', cx + 4, ry + 3, 1, 1)
+      pool(cx - 6, cy + 6, 1.7)
+      pool(cx + 6, cy + 5, 1.6)
+      wallDeco(['wnet', 'sconce', 'sconce', 'wnet'], 3)
+      break
+    }
+    case 'wreck': {
+      // The wreck: a ship broken on the rocks, masts down, cargo and treasure spilled, the sea in through the hull
+      put(c, 'wmast', cx - 5, cy - 3, 2, 1)
+      put(c, 'wmast', cx + 4, cy + 3, 2, 1)
+      for (const [x, y] of [[rx + 3, ry + 3], [rx + rw - 5, ry + 4], [cx - 1, ry + rh - 4]]) put(c, 'wbarrel', x, y, 2, 1)
+      put(c, 'wchest', rx + rw - 4, ry + rh - 5, 1, 1)
+      put(c, 'wanchor', rx + 3, ry + rh - 5, 2, 1)
+      put(c, 'wbones', cx + 1, cy - 6, 2, 1)
+      strip(rx + 1, ry + 3, 2, rh - 6)
+      wallDeco(['wnet', 'sconce', 'wnet', 'sconce'], 3)
+      break
+    }
+    case 'falls': {
+      // Under the falls: the sea pours down both sides, slick rocks to hold on to when the current takes you
+      strip(rx + 1, ry + 3, 2, rh - 6)
+      strip(rx + rw - 3, ry + 3, 2, rh - 6)
+      for (const y of [ry + 6, cy, ry + rh - 7]) {
+        put(c, 'wrock', rx + 6, y, 2, 1)
+        put(c, 'wrock', rx + rw - 8, y, 2, 1)
+      }
+      put(c, 'wlantern', cx - 3, ry + 2, 1, 1)
+      put(c, 'wlantern', cx + 3, ry + 2, 1, 1)
+      for (const [x, y] of [[cx - 2, cy + 3], [cx + 2, cy - 4]]) put(c, 'wweed', x, y, 1, 1)
+      wallDeco(['sconce', 'wnet', 'sconce', 'wnet'], 3)
+      break
+    }
+    case 'sanctum': {
+      // The sanctum of the sea: two guardian statues, a ring of lanterns, the sea welling up, the Wall of Legends
+      put(c, 'wstatue', rx + 3, ry + 3, 2, 2)
+      put(c, 'wstatue', rx + rw - 5, ry + 3, 2, 2)
+      for (const [x, y] of [[cx - 6, cy - 5], [cx + 6, cy - 5], [cx - 6, cy + 5], [cx + 6, cy + 5]]) put(c, 'wlantern', x, y, 1, 1)
+      put(c, 'wcoral', rx + 3, ry + rh - 4, 2, 1)
+      put(c, 'wclam', rx + rw - 4, ry + rh - 5, 1, 1)
+      pool(cx - 1, cy + 1, 1.5, false)
+      pool(rx + rw - 7, cy, 1.4, false)
+      wallDeco(['wnet', 'sconce', 'sconce', 'wnet'], 3)
+      break
+    }
+    // ---- The Distortion World: the void wherever the floor falls away (its "lava")
+    case 'portal': {
+      // The tear you came in through: a portal in the middle, ghost-fire torches, chunks of rock adrift
+      put(c, 'vportal', cx - 1, cy - 1, 2, 2)
+      for (const [x, y] of [[cx - 5, cy - 4], [cx + 5, cy - 4], [cx - 5, cy + 4], [cx + 5, cy + 4]]) put(c, 'vtorch', x, y, 1, 1)
+      put(c, 'vfloat', rx + 3, ry + 4, 2, 1)
+      put(c, 'vfloat', rx + rw - 5, ry + rh - 5, 2, 1)
+      put(c, 'vgrave', rx + rw - 4, ry + 3, 1, 1)
+      put(c, 'vgrave', rx + 3, ry + rh - 5, 1, 1)
+      pool(rx + 3, cy, 1.6, false)
+      wallDeco(['vrune', 'sconce', 'vchains', 'sconce'], 3)
+      break
+    }
+    case 'upside': {
+      // The upside-down hall: trees growing down from the ceiling, stairs to nowhere, gravity that tips over
+      for (const [x, y] of [[rx + 4, ry + 4], [rx + rw - 6, ry + 5], [cx - 1, ry + rh - 6]]) put(c, 'vtree', x, y, 2, 1)
+      for (const [x, y] of [[cx - 7, cy], [cx + 6, cy - 2], [rx + 3, ry + rh - 5]]) put(c, 'vfloat', x, y, 2, 1)
+      put(c, 'vstairs', cx + 3, cy + 4, 2, 1)
+      put(c, 'vstairs', cx - 5, cy - 6, 2, 1)
+      pool(cx - 4, cy + 3, 1.6)
+      pool(cx + 5, cy - 6, 1.5)
+      wallDeco(['vchains', 'sconce', 'vrune', 'sconce'], 3)
+      break
+    }
+    case 'crypt': {
+      // The crypt of shadows: rows of graves, the warden's dais under a dark dragon statue, crystals glowing red
+      mat(c, cx - 5, ry + 2, 11, 7, FM.dais)
+      put(c, 'vstatue', cx - 1, ry + 2, 2, 2)
+      for (const y of [cy - 1, cy + 4]) for (const x of [rx + 3, rx + 6, rx + rw - 7, rx + rw - 4]) put(c, 'vgrave', x, y, 1, 1)
+      put(c, 'vtorch', cx - 4, ry + 3, 1, 1)
+      put(c, 'vtorch', cx + 4, ry + 3, 1, 1)
+      put(c, 'vcrystal', rx + 3, ry + rh - 4, 1, 1)
+      put(c, 'vcrystal', rx + rw - 4, ry + rh - 4, 1, 1)
+      pool(cx, ry + rh - 4, 1.5, false)
+      wallDeco(['vrune', 'vchains', 'sconce', 'vrune'], 3)
+      break
+    }
+    case 'mirror': {
+      // The hall of mirrors: tall cracked mirrors down both sides, shadows reaching out of them
+      for (let y = ry + 4; y < ry + rh - 3; y += 5) {
+        put(c, 'vmirror', rx + 2, y, 1, 1)
+        put(c, 'vmirror', rx + rw - 3, y, 1, 1)
+      }
+      put(c, 'vtorch', cx - 3, ry + 2, 1, 1)
+      put(c, 'vtorch', cx + 3, ry + 2, 1, 1)
+      put(c, 'vcrystal', cx - 6, cy + 3, 1, 1)
+      put(c, 'vcrystal', cx + 5, cy - 4, 1, 1)
+      pool(cx, cy, 1.5, false)
+      wallDeco(['vchains', 'sconce', 'vchains', 'sconce'], 3)
+      break
+    }
+    case 'spiral': {
+      // The twisted stair: broken flights of steps adrift, banded pillars, a small portal, tears that open
+      for (const [x, y] of [[rx + 3, ry + 3], [rx + rw - 4, ry + 3], [rx + 3, ry + rh - 4], [rx + rw - 4, ry + rh - 4]]) put(c, 'vpillar', x, y, 1, 1)
+      put(c, 'vstairs', cx - 6, cy - 3, 2, 1)
+      put(c, 'vstairs', cx + 5, cy + 3, 2, 1)
+      put(c, 'vstairs', cx - 1, ry + rh - 5, 2, 1)
+      put(c, 'vportal', rx + rw - 6, cy - 6, 2, 2)
+      put(c, 'vfloat', rx + 4, cy + 4, 2, 1)
+      pool(cx + 2, cy - 1, 1.6)
+      wallDeco(['vrune', 'sconce', 'vrune', 'vchains'], 3)
+      break
+    }
+    case 'abyss': {
+      // The edge of the abyss: the void all round, a dark dragon statue, banded pillars, the Wall of Legends
+      put(c, 'vstatue', rx + 3, ry + 3, 2, 2)
+      for (const [x, y] of [[cx - 6, cy - 5], [cx + 6, cy - 5], [cx - 6, cy + 5], [cx + 6, cy + 5]]) put(c, 'vpillar', x, y, 1, 1)
+      put(c, 'vcrystal', rx + rw - 4, ry + 3, 1, 1)
+      put(c, 'vcrystal', rx + 3, ry + rh - 4, 1, 1)
+      pool(cx - 1, cy + 1, 1.5, false)
+      pool(rx + rw - 7, ry + rh - 6, 1.4, false)
+      wallDeco(['vrune', 'sconce', 'vchains', 'sconce'], 3)
+      break
+    }
     case 'airlock': {
       // The airlock: a walkway in from the sealed door, supply crates and gas bottles stacked along the walls, a leak
       mat(c, cx - 2, ry, 5, rh, FM.paving)
@@ -1144,7 +1310,7 @@ export function bakeProps(g: CanvasRenderingContext2D, o: CanvasRenderingContext
     return
   }
   // The Storm Tower and the Citadel: everything drawn for the Depths is recoloured; their own sprites go on after, in their own colours
-  const own = (p: Prop) => p.kind in STORM || p.kind in ICE || p.kind in SKY || p.kind in LAB || p.kind === 'legends'
+  const own = (p: Prop) => p.kind in STORM || p.kind in ICE || p.kind in SKY || p.kind in LAB || p.kind in SEA || p.kind in VOID || p.kind === 'legends'
   for (const p of props) if (!own(p)) bakeProp(g, o, w, p)
   coolDown(g)
   coolDown(o)
@@ -1170,7 +1336,15 @@ function coolDown(ctx: CanvasRenderingContext2D) {
     if (h > 80 && h < 320) continue
     let s = c / mx
     let v = mx / 255
-    if (lab) {
+    if (sea) {
+      // Warm stone turns wet blue-grey rock; gold turns sea-foam white, every other glow turns aqua
+      if (s > 0.5 && v > 0.6) { if (h > 36 && h <= 80) { h = 175; s *= 0.45 } else { h = 188; s *= 0.8 } }
+      else { h = 205; s = Math.max(s * 0.35, 0.08); v = Math.min(1, v * 1.08) }
+    } else if (vd) {
+      // Warm stone turns dark violet-grey; gold stays an old gold, every other glow turns violet
+      if (s > 0.5 && v > 0.6) { if (h > 36 && h <= 80) { h = 44; s *= 0.8 } else { h = 278; s *= 0.85 } }
+      else { h = 262; s = Math.max(s * 0.3, 0.1); v = Math.min(1, v * 0.88) }
+    } else if (lab) {
       // Warm stone turns blue-grey steel; gold turns screen cyan, every other glow turns psychic violet
       if (s > 0.5 && v > 0.6) { if (h > 36 && h <= 80) { h = 190; s *= 0.75 } else { h = 288; s *= 0.8 } }
       else { h = 228; s = Math.max(s * 0.3, 0.08); v = Math.min(1, v * 1.12) }
@@ -1232,7 +1406,15 @@ const SKY = {
 const LAB = {
   xtank: [0, 0, 26, 44], xconsole: [27, 0, 43, 30], xserver: [71, 0, 22, 40], xcore: [94, 0, 33, 44], xshelf: [128, 0, 26, 38], xdesk: [0, 45, 32, 26], xgas: [33, 45, 27, 36], xcrate: [61, 45, 23, 22], xscreen: [85, 45, 23, 18], xsign: [109, 45, 17, 16], xpapers: [127, 45, 27, 18], xholo: [0, 82, 25, 30],
 } as const satisfies Record<string, readonly [number, number, number, number]>
-type Sprite = keyof typeof ATLAS | keyof typeof STORM | keyof typeof ICE | keyof typeof SKY | keyof typeof LAB
+/** The Whirl Islands' own sprites. */
+const SEA = {
+  wcoral: [0, 0, 28, 22], wbarrel: [29, 0, 28, 24], wanchor: [58, 0, 27, 24], wmast: [86, 0, 37, 40], wchest: [124, 0, 22, 24], wclam: [0, 41, 24, 24], wrock: [25, 41, 30, 26], wlantern: [56, 41, 13, 34], wstatue: [70, 41, 48, 48], wweed: [119, 41, 15, 20], wnet: [135, 41, 30, 22], wbones: [0, 90, 36, 28],
+} as const satisfies Record<string, readonly [number, number, number, number]>
+/** The Distortion World's own sprites. */
+const VOID = {
+  vfloat: [0, 0, 27, 26], vtree: [28, 0, 31, 36], vportal: [60, 0, 34, 34], vpillar: [95, 0, 18, 44], vtorch: [114, 0, 18, 32], vstatue: [0, 45, 49, 48], vstairs: [50, 45, 23, 30], vmirror: [74, 45, 20, 38], vcrystal: [95, 45, 25, 30], vgrave: [121, 45, 23, 26], vrune: [145, 45, 18, 18], vchains: [0, 94, 22, 20],
+} as const satisfies Record<string, readonly [number, number, number, number]>
+type Sprite = keyof typeof ATLAS | keyof typeof STORM | keyof typeof ICE | keyof typeof SKY | keyof typeof LAB | keyof typeof SEA | keyof typeof VOID
 const image = (url: string) => {
   if (typeof Image === 'undefined') return null
   const i = new Image()
@@ -1244,18 +1426,22 @@ const stormAtlas = image(stormUrl)
 const iceAtlas = image(iceUrl)
 const skyAtlas = image(skyUrl)
 const labAtlas = image(labUrl)
+const seaAtlas = image(seaUrl)
+const voidAtlas = image(voidUrl)
 const ready = (i: HTMLImageElement | null) => !!i && i.complete && i.naturalWidth > 0
 const atlasReady = () => ready(atlas)
 /** Flat on the ground: nothing of it stands over the actors. */
-const FLAT = new Set<Sprite>(['gold', 'carcass', 'banner', 'bones', 'sbanner', 'window', 'cocoon', 'masonry', 'ibanner', 'iwindow', 'icerubble', 'swindow', 'srubble', 'snest', 'skybanner', 'xscreen', 'xsign', 'xpapers'])
+const FLAT = new Set<Sprite>(['gold', 'carcass', 'banner', 'bones', 'sbanner', 'window', 'cocoon', 'masonry', 'ibanner', 'iwindow', 'icerubble', 'swindow', 'srubble', 'snest', 'skybanner', 'xscreen', 'xsign', 'xpapers', 'wweed', 'wnet', 'vrune', 'vchains'])
 /** Hung on a wall face. */
-const ON_WALL = new Set<PropKind>(['banner', 'sbanner', 'window', 'cocoon', 'ibanner', 'iwindow', 'swindow', 'skybanner', 'xscreen', 'xsign'])
+const ON_WALL = new Set<PropKind>(['banner', 'sbanner', 'window', 'cocoon', 'ibanner', 'iwindow', 'swindow', 'skybanner', 'xscreen', 'xsign', 'wnet', 'vrune', 'vchains'])
 
 function spriteOf(p: Prop): Sprite | null {
   if (p.kind in STORM) return ready(stormAtlas) ? (p.kind as keyof typeof STORM) : null
   if (p.kind in ICE) return ready(iceAtlas) ? (p.kind as keyof typeof ICE) : null
   if (p.kind in SKY) return ready(skyAtlas) ? (p.kind as keyof typeof SKY) : null
   if (p.kind in LAB) return ready(labAtlas) ? (p.kind as keyof typeof LAB) : null
+  if (p.kind in SEA) return ready(seaAtlas) ? (p.kind as keyof typeof SEA) : null
+  if (p.kind in VOID) return ready(voidAtlas) ? (p.kind as keyof typeof VOID) : null
   if (!atlasReady()) return null
   switch (p.kind) {
     case 'statue': return 'statue'
@@ -1284,7 +1470,7 @@ function spriteOf(p: Prop): Sprite | null {
 
 /** A sprite standing on the bottom of the prop's footprint, centred; what rises above the footprint goes on the overlay. */
 function bakeSprite(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, p: Prop, name: Sprite) {
-  const [img, [sx, sy, sw, sh]] = name in STORM ? [stormAtlas!, STORM[name as keyof typeof STORM]] : name in ICE ? [iceAtlas!, ICE[name as keyof typeof ICE]] : name in SKY ? [skyAtlas!, SKY[name as keyof typeof SKY]] : name in LAB ? [labAtlas!, LAB[name as keyof typeof LAB]] : [atlas!, ATLAS[name as keyof typeof ATLAS]]
+  const [img, [sx, sy, sw, sh]] = name in STORM ? [stormAtlas!, STORM[name as keyof typeof STORM]] : name in ICE ? [iceAtlas!, ICE[name as keyof typeof ICE]] : name in SKY ? [skyAtlas!, SKY[name as keyof typeof SKY]] : name in LAB ? [labAtlas!, LAB[name as keyof typeof LAB]] : name in SEA ? [seaAtlas!, SEA[name as keyof typeof SEA]] : name in VOID ? [voidAtlas!, VOID[name as keyof typeof VOID]] : [atlas!, ATLAS[name as keyof typeof ATLAS]]
   const x = p.x * TILE, y = p.y * TILE, W = p.w * TILE, H = p.h * TILE
   const dx = Math.round(x + W / 2 - sw / 2), dy = y + H - sh
   if (!ON_WALL.has(p.kind) && p.kind !== 'carcass') {
@@ -1315,7 +1501,7 @@ function bakeProp(g: CanvasRenderingContext2D, o: CanvasRenderingContext2D, w: W
   }
   const faceTile = faceTile0
   if (p.kind === 'legends') return wallOfLegends(g, o, x, y, W, H)
-  if (p.kind in STORM || p.kind in ICE || p.kind in SKY || p.kind in LAB) {
+  if (p.kind in STORM || p.kind in ICE || p.kind in SKY || p.kind in LAB || p.kind in SEA || p.kind in VOID) {
     // Its sprite isn't there (yet): a plain block of stone so it still reads as in the way
     if (!BLOCKS.has(p.kind)) return
     shadow(x + W / 2, y + H - 2, W / 2, 4)
@@ -1909,7 +2095,12 @@ function lavaTexture() {
   // The citadel's freezing water: deep blue, with floes of white ice drifting in it
   // The Sky Pillar's gaps: open sky far below, clouds drifting through
   // The lab's psychic coolant: deep violet, glowing pink-white where it churns
-  const stops: [number, number, number, number][] = lab
+  // The Whirl Islands' sea: deep blue-green, foam where it churns. The Distortion World's void: black, violet glimmers
+  const stops: [number, number, number, number][] = sea
+    ? [[0, 6, 30, 60], [0.4, 12, 60, 100], [0.6, 24, 110, 150], [0.76, 70, 180, 200], [0.88, 170, 235, 240], [1, 240, 255, 255]]
+    : vd
+    ? [[0, 4, 2, 10], [0.45, 14, 6, 30], [0.62, 40, 16, 80], [0.75, 90, 40, 150], [0.86, 180, 120, 230], [1, 250, 230, 255]]
+    : lab
     ? [[0, 26, 8, 48], [0.35, 64, 18, 112], [0.55, 120, 40, 184], [0.72, 196, 90, 236], [0.88, 248, 170, 255], [1, 255, 238, 255]]
     : elec
     ? [[0, 6, 16, 30], [0.35, 10, 34, 58], [0.55, 16, 62, 96], [0.72, 30, 120, 170], [0.88, 120, 220, 255], [1, 240, 255, 230]]
@@ -2029,7 +2220,7 @@ export function drawLavaLayer(ctx: CanvasRenderingContext2D, mask: HTMLCanvasEle
   const pat = b.createPattern(tex, 'repeat')!
   // Slow base flow
   // (Freezing water barely moves)
-  const drift = icy ? time * 0.3 : sky ? time * 0.7 : lab ? time * 0.5 : time
+  const drift = icy ? time * 0.3 : sky ? time * 0.7 : lab ? time * 0.5 : sea ? time * 0.6 : vd ? time * 0.35 : time
   pat.setTransform(new DOMMatrix([1.5, 0, 0, 1.5, -sx + drift * 6, -sy + drift * 3.5]))
   b.fillStyle = pat
   b.fillRect(0, 0, W, H)
@@ -2037,7 +2228,7 @@ export function drawLavaLayer(ctx: CanvasRenderingContext2D, mask: HTMLCanvasEle
   const pat2 = b.createPattern(tex, 'repeat')!
   pat2.setTransform(new DOMMatrix([1.1, 0, 0, 1.1, -sx - drift * 9, -sy + drift * 5]))
   b.globalCompositeOperation = 'lighter'
-  b.globalAlpha = elec ? 0.3 + 0.35 * flick(time, 1) : icy ? 0.2 : sky ? 0.28 : lab ? 0.3 + 0.12 * Math.sin(time * 2.3) : 0.35 + 0.08 * Math.sin(time * 1.7)
+  b.globalAlpha = elec ? 0.3 + 0.35 * flick(time, 1) : icy ? 0.2 : sky ? 0.28 : lab ? 0.3 + 0.12 * Math.sin(time * 2.3) : sea ? 0.25 : vd ? 0.3 + 0.1 * Math.sin(time * 1.3) : 0.35 + 0.08 * Math.sin(time * 1.7)
   b.fillStyle = pat2
   b.fillRect(0, 0, W, H)
   b.globalAlpha = 1
@@ -2179,7 +2370,9 @@ const CRYSTAL_STORM: [string, string, string][] = [['#8ae0ff', '#4ab8ff', '#e0f8
 const CRYSTAL_ICE: [string, string, string][] = [['#d8f6ff', '#8ad8ff', '#ffffff'], ['#bfe8ff', '#6ab8f0', '#ffffff'], ['#d0c8ff', '#a090f0', '#f0e8ff']]
 const CRYSTAL_SKY: [string, string, string][] = [['#a8f0c8', '#58d090', '#f0fff6'], ['#ffe8a0', '#e0c050', '#fffbe8'], ['#c8e0ff', '#80b0f0', '#f4f8ff']]
 const CRYSTAL_LAB: [string, string, string][] = [['#e0a0ff', '#b060ff', '#f8e8ff'], ['#ff90e0', '#e050c0', '#ffe0f6'], ['#90e8ff', '#40b8f0', '#e8fbff']]
-const crystal = (v: number) => (elec ? CRYSTAL_STORM : icy ? CRYSTAL_ICE : sky ? CRYSTAL_SKY : lab ? CRYSTAL_LAB : CRYSTAL_FIRE)[v % 3]
+const CRYSTAL_SEA: [string, string, string][] = [['#a0f0ff', '#40c8e0', '#e8ffff'], ['#ffb0c8', '#f07090', '#ffe8f0'], ['#c8e8ff', '#70a8f0', '#f4faff']]
+const CRYSTAL_VOID: [string, string, string][] = [['#d0a0ff', '#9050e0', '#f4e8ff'], ['#ff8080', '#d03030', '#ffe0e0'], ['#ffe080', '#d0a020', '#fff8e0']]
+const crystal = (v: number) => (elec ? CRYSTAL_STORM : icy ? CRYSTAL_ICE : sky ? CRYSTAL_SKY : lab ? CRYSTAL_LAB : sea ? CRYSTAL_SEA : vd ? CRYSTAL_VOID : CRYSTAL_FIRE)[v % 3]
 
 /** The props that move, every frame (y-sorted by the caller through `drawAnimProp`). */
 export function drawAnimProp(ctx: CanvasRenderingContext2D, p: Prop, time: number) {

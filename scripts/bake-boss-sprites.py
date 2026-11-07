@@ -11,7 +11,7 @@ Run: python3 scripts/bake-boss-sprites.py
 import io, math, os, subprocess, tempfile, urllib.request
 from PIL import Image
 
-IDS = [643, 644, 646, 10022, 384, 10079, 150, 10044]
+IDS = [643, 644, 646, 10022, 384, 10079, 150, 10044, 249, 487, 10007]
 BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated'
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAX_FRAMES = 96

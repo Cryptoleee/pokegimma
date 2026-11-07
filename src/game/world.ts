@@ -51,7 +51,7 @@ export interface Town {
 const TOWN_NAMES = ['Nuvema', 'Accumula', 'Striaton', 'Nacrene', 'Castelia', 'Nimbasa', 'Driftveil', 'Icirrus', 'Opelucid']
 
 /** Raid arenas carved out of the middle of the map. */
-export type ArenaKind = 'crater' | 'icecave' | 'plateau' | 'sky' | 'lab'
+export type ArenaKind = 'crater' | 'icecave' | 'plateau' | 'sky' | 'lab' | 'cove' | 'rift'
 
 export interface WorldOpts {
   theme?: ThemeId
@@ -391,6 +391,21 @@ export class World {
         const rx = Math.floor(c + Math.cos(a) * 9.5), ry = Math.floor(c + Math.sin(a) * 9.5)
         this.set(rx, ry, T.ROD)
         this.rods.push({ x: rx, y: ry })
+      }
+    } else if (kind === 'cove') {
+      // The Whirl Islands: a ring of sea rocks for cover, clear of the spawn at the bottom
+      for (let i = 0; i < 7; i++) {
+        if (i === 2) continue
+        const a = (i / 7) * Math.PI * 2 + 0.3
+        const x = Math.floor(c + Math.cos(a) * 8.5), y = Math.floor(c + Math.sin(a) * 8.5)
+        this.set(x, y, T.ROCK)
+        if (i % 2) this.set(x + 1, y, T.ROCK)
+      }
+    } else if (kind === 'rift') {
+      // The Distortion World: floating chunks of rock, clear of the spawn at the bottom
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 - Math.PI / 2
+        this.set(Math.floor(c + Math.cos(a) * 7), Math.floor(c + Math.sin(a) * 7), T.ROCK)
       }
     } else if (kind === 'sky') {
       // Broken pillars of the Sky Pillar's roof: a little cover, clear of the

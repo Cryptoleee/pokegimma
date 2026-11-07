@@ -215,6 +215,10 @@ export function updateRaid(g: Game, dt: number) {
         ? { n: 2, speed: 3, dir: -Math.PI / 2, spread: 1.4, cols: ['#ffffff', '#8ae0ff'], shape: 'streak', s0: 2.5, s1: 0.5, life: 0.3 }
         : kind === 'ice'
           ? { n: 2, speed: 1.5, dir: -Math.PI / 2, spread: 1.2, cols: ['#ffffff', '#bfeaff'], shape: 'shard', s0: 2.5, s1: 0.5, life: 0.5 }
+        : kind === 'water'
+          ? { n: 2, speed: 1.6, dir: -Math.PI / 2, spread: 1.2, cols: ['#ffffff', '#a8e8ff', '#50b0f0'], shape: 'star', s0: 2.2, s1: 0.5, life: 0.45 }
+        : kind === 'ghost'
+          ? { n: 2, speed: 1.4, dir: -Math.PI / 2, spread: 1.2, cols: ['#e8d8ff', '#a070e0', '#402878'], shape: 'smoke', s0: 2.5, s1: 1.5, life: 0.6 }
         : kind === 'psychic'
           ? { n: 2, speed: 1.8, dir: -Math.PI / 2, spread: 1.2, cols: ['#ffffff', '#ff98e8', '#c070ff'], shape: 'star', s0: 2.5, s1: 0.5, life: 0.45 }
           : { n: 2, speed: 2, dir: -Math.PI / 2, spread: 0.6, cols: ['#ffb030', '#ff6020'], shape: 'flame', s0: 2.5, s1: 0.5, life: 0.4 })
@@ -413,6 +417,28 @@ function arenaHazard(g: Game, r: RaidState) {
       g.soundAt(ARENA_C, ARENA_C, 'boss', ['charge', 'psychic', 0.8, 1.8], { global: true })
       break
     }
+    case 'cove': {
+      // The Whirl Islands: a waterspout rises out of the sea, or a breaker rolls over the shore
+      r.envT = [11, 9, 7.5][r.phase]
+      if (Math.random() < 0.5) spawnTornado(g, { n: 1, speed: 1.5, dur: 5, dps: 0.24 }, 1.4, 0.25, 'waterspout')
+      else {
+        const flat = Math.random() < 0.5, off = (Math.random() - 0.5) * ARENA_R * 1.2
+        addHazard(g, { shape: 'line', x: flat ? ARENA_C : ARENA_C + off, y: flat ? ARENA_C + off : ARENA_C, ang: flat ? 0 : Math.PI / 2, r: ARENA_R + 2, inner: 0, width: 3, t: 1.7, dmg: 0.3, fx: 'surf', type: 'water', freeze: 0, cover: false, both: true, atk: 'vent' })
+        for (const v of g.viewers) v.hooks.toast(both('A breaker is rolling in: get out of its way!', 'Er rolt een golf aan: ga opzij!'), '#80c8ff')
+        g.soundAt(ARENA_C, ARENA_C, 'boss', ['charge', 'surf', 0.8, 1.7], { global: true })
+      }
+      break
+    }
+    case 'rift': {
+      // The Distortion World: tears open in the floor near the players and stay a while
+      r.envT = [13, 11, 9][r.phase]
+      for (const m of targets(g).sort(() => Math.random() - 0.5).slice(0, r.phase ? 2 : 1)) {
+        const a = Math.random() * Math.PI * 2, d = 1 + Math.random() * 2
+        addHazard(g, { shape: 'circle', x: m.x + Math.cos(a) * d, y: m.y + Math.sin(a) * d, ang: 0, r: 2.2, inner: 0, width: 0, t: 1.4, dmg: 0.15, fx: 'shadowforce', type: 'ghost', freeze: 0, cover: false, both: false, atk: 'rift_pool', dur: 5, dps: 0.08 })
+      }
+      g.soundAt(ARENA_C, ARENA_C, 'boss', ['charge', 'shadowforce', 0.7, 1.4], { global: true })
+      break
+    }
     default:
       r.envT = 10
   }
@@ -450,7 +476,8 @@ function spawnTornado(g: Game, tw: { n: number; speed: number; dur: number; dps:
 export const isPool = (h: Hazard) => h.atk === 'pool' || h.atk.endsWith('_pool')
 
 function updatePool(g: Game, h: Hazard, dt: number) {
-  if (Math.random() < dt * 6) g.vfx.burst(h.x + (Math.random() - 0.5) * h.r * 1.4, h.y + (Math.random() - 0.5) * h.r * 0.8, { n: 1, speed: 1.5, dir: -Math.PI / 2, spread: 0.5, cols: ['#ffd060', '#ff8030'], shape: 'flame', add: true, s0: 2.5, s1: 0.5, life: 0.5 })
+  const fire = h.type === 'fire'
+  if (Math.random() < dt * 6) g.vfx.burst(h.x + (Math.random() - 0.5) * h.r * 1.4, h.y + (Math.random() - 0.5) * h.r * 0.8, { n: 1, speed: 1.5, dir: -Math.PI / 2, spread: 0.5, cols: fire ? ['#ffd060', '#ff8030'] : palOf(h.type).cols.slice(1, 3), shape: fire ? 'flame' : 'star', add: true, s0: 2.5, s1: 0.5, life: 0.5 })
   h.tick = (h.tick ?? 0) - dt
   if (h.tick > 0) return
   h.tick = 0.5
@@ -633,7 +660,9 @@ function castFrom(g: Game, r: RaidState, a: BossAttack, foes: Mon[], ox: number,
         const ra = Math.random() * Math.PI * 2, rd = Math.sqrt(Math.random()) * (ARENA_R - 2)
         spots.push([ARENA_C + Math.cos(ra) * rd, ARENA_C + Math.sin(ra) * rd])
       }
-      spots.forEach(([x, y], i) => addHazard(g, { ...base, shape: 'circle', x, y, t: a.warn + i * (a.stagger ?? 0) }))
+      // (an attack with linger leaves pools behind: its id ends in _pool, see isPool)
+      const linger = a.linger ? { dur: a.linger.dur, dps: a.linger.dps } : {}
+      spots.forEach(([x, y], i) => addHazard(g, { ...base, ...linger, shape: 'circle', x, y, t: a.warn + i * (a.stagger ?? 0) }))
       break
     }
     case 'ring':
@@ -895,13 +924,14 @@ const PAL = {
   flying: { cols: ['#ffffff', '#f0fcff', '#c8f0f0', '#90dcd8', '#58b8c0'], glow: '#b0f4ec', rgb: '160,235,225', spike: ['#ffffff', '#70c0c8'] },
   psychic: { cols: ['#ffffff', '#ffe0f4', '#ff98d8', '#e060c0', '#a040b0'], glow: '#ff70d0', rgb: '240,100,210', spike: ['#ffc8ec', '#a03890'] },
   ghost: { cols: ['#ffffff', '#e8d8ff', '#a888e0', '#7050b8', '#402878'], glow: '#9060e0', rgb: '125,75,210', spike: ['#d0c0ff', '#402878'] },
+  water: { cols: ['#ffffff', '#e0f6ff', '#90d8ff', '#40a8f0', '#2070d0'], glow: '#60c0ff', rgb: '60,160,240', spike: ['#d8f4ff', '#2068c0'] },
 }
 type Pal = (typeof PAL)['fire']
 const palOf = (t: PType, atk = ''): Pal =>
   atk === 'blueflare' ? PAL.blue
   : atk === 'dragonascent' || atk === 'outrage' ? PAL.emerald
   : t === 'ice' ? PAL.ice : t === 'dragon' ? PAL.dragon : t === 'electric' ? PAL.electric
-  : t === 'flying' ? PAL.flying : t === 'psychic' ? PAL.psychic : t === 'ghost' ? PAL.ghost : PAL.fire
+  : t === 'flying' ? PAL.flying : t === 'psychic' ? PAL.psychic : t === 'ghost' ? PAL.ghost : t === 'water' ? PAL.water : PAL.fire
 const rand = (a: number, b: number) => a + Math.random() * (b - a)
 
 /** The boss attack behind a hazard (none for the crater's own vents). */
@@ -911,7 +941,7 @@ export function bossAttack(g: Game, atk: string): BossAttack | undefined {
 
 /** Particle shape and ground mark that go with an attack type. */
 const shapeOf = (t: PType): Shape => (t === 'ice' ? 'shard' : t === 'fire' ? 'flame' : t === 'electric' ? 'streak' : t === 'flying' ? 'smoke' : 'star')
-const decalOf = (t: PType): DecalKind | null => (t === 'ice' ? 'frost' : t === 'fire' || t === 'electric' ? 'scorch' : t === 'flying' ? null : t === 'psychic' ? 'glass' : 'crack')
+const decalOf = (t: PType): DecalKind | null => (t === 'ice' ? 'frost' : t === 'fire' || t === 'electric' ? 'scorch' : t === 'flying' || t === 'water' ? null : t === 'psychic' ? 'glass' : 'crack')
 
 /** Big impacts that fill the whole shape and leave marks on the ground. */
 function impactFx(g: Game, h: Hazard) {
@@ -1113,18 +1143,27 @@ function hazardPath(ctx: CanvasRenderingContext2D, h: Hazard) {
 
 /** A whirlwind on the ground: dust spinning round, darker in the middle. */
 /** A pool of magma: a glowing, bubbling puddle that cools at the edges as it runs out. */
+/** Pools that aren't fire, ice or lightning: inner, middle, edge, outside colours and the bubbles (r,g,b). */
+const POOL_COLS: Partial<Record<PType, [string, string, string, string, string]>> = {
+  psychic: ['rgba(255,235,255,0.85)', 'rgba(230,120,255,0.7)', 'rgba(120,40,190,0.6)', 'rgba(40,10,60,0)', '255,190,250'],
+  ghost: ['rgba(200,180,255,0.75)', 'rgba(110,60,200,0.7)', 'rgba(40,10,80,0.7)', 'rgba(10,0,20,0)', '210,180,255'],
+  water: ['rgba(235,250,255,0.85)', 'rgba(90,180,255,0.7)', 'rgba(20,80,180,0.6)', 'rgba(10,30,70,0)', '220,245,255'],
+  dragon: ['rgba(240,255,245,0.8)', 'rgba(110,230,170,0.6)', 'rgba(30,120,90,0.55)', 'rgba(10,40,30,0)', '200,255,225'],
+}
+
 function drawPool(ctx: CanvasRenderingContext2D, h: Hazard, time: number) {
   const x = h.x * TILE, y = h.y * TILE, R = h.r * TILE
   const fade = Math.min(1, h.dur / 1.2)
   ctx.save()
   ctx.globalAlpha = fade
   const grd = ctx.createRadialGradient(x, y, R * 0.1, x, y, R)
-  // Molten fire, or a crackling electric field
+  // Molten fire, a crackling electric field, frost, or a field of psychic / shadow / sea energy
   const zap = h.type === 'electric', ice = h.type === 'ice'
-  grd.addColorStop(0, zap ? 'rgba(235,250,255,0.85)' : ice ? 'rgba(250,254,255,0.85)' : 'rgba(255,230,140,0.9)')
-  grd.addColorStop(0.45, zap ? 'rgba(80,190,255,0.7)' : ice ? 'rgba(170,225,255,0.7)' : 'rgba(255,120,30,0.8)')
-  grd.addColorStop(0.85, zap ? 'rgba(30,70,170,0.6)' : ice ? 'rgba(70,130,200,0.55)' : 'rgba(160,40,10,0.7)')
-  grd.addColorStop(1, zap ? 'rgba(10,20,60,0)' : ice ? 'rgba(20,40,80,0)' : 'rgba(40,10,6,0)')
+  const own = POOL_COLS[h.type]
+  grd.addColorStop(0, own ? own[0] : zap ? 'rgba(235,250,255,0.85)' : ice ? 'rgba(250,254,255,0.85)' : 'rgba(255,230,140,0.9)')
+  grd.addColorStop(0.45, own ? own[1] : zap ? 'rgba(80,190,255,0.7)' : ice ? 'rgba(170,225,255,0.7)' : 'rgba(255,120,30,0.8)')
+  grd.addColorStop(0.85, own ? own[2] : zap ? 'rgba(30,70,170,0.6)' : ice ? 'rgba(70,130,200,0.55)' : 'rgba(160,40,10,0.7)')
+  grd.addColorStop(1, own ? own[3] : zap ? 'rgba(10,20,60,0)' : ice ? 'rgba(20,40,80,0)' : 'rgba(40,10,6,0)')
   ctx.fillStyle = grd
   ctx.beginPath()
   for (let i = 0; i <= 24; i++) {
@@ -1141,7 +1180,7 @@ function drawPool(ctx: CanvasRenderingContext2D, h: Hazard, time: number) {
   for (let i = 0; i < 5; i++) {
     const k = (time * 0.8 + i / 5 + h.id * 0.13) % 1
     const a = i * 2.4 + h.id
-    ctx.fillStyle = zap ? `rgba(255,245,140,${(1 - k) * 0.9})` : ice ? `rgba(255,255,255,${(1 - k) * 0.8})` : `rgba(255,240,170,${(1 - k) * 0.8})`
+    ctx.fillStyle = own ? `rgba(${own[4]},${(1 - k) * 0.85})` : zap ? `rgba(255,245,140,${(1 - k) * 0.9})` : ice ? `rgba(255,255,255,${(1 - k) * 0.8})` : `rgba(255,240,170,${(1 - k) * 0.8})`
     ctx.beginPath()
     ctx.arc(x + Math.cos(a) * R * 0.5, y + Math.sin(a) * R * 0.3, 1 + k * 2.5, 0, Math.PI * 2)
     ctx.fill()

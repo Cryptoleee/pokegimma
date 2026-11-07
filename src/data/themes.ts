@@ -5,7 +5,7 @@ import { L } from '../i18n'
  * pick one per match; raid arenas have their own.
  */
 
-export type ThemeId = 'forest' | 'desert' | 'snow' | 'volcano' | 'night' | 'island' | 'swamp' | 'autumn' | 'blossom' | 'crater' | 'icecave' | 'plateau' | 'sky' | 'lab'
+export type ThemeId = 'forest' | 'desert' | 'snow' | 'volcano' | 'night' | 'island' | 'swamp' | 'autumn' | 'blossom' | 'crater' | 'icecave' | 'plateau' | 'sky' | 'lab' | 'cove' | 'rift'
 
 /** What stands where trees would: also decides how the blocked border looks. */
 export type DecorStyle = 'oak' | 'pine' | 'cactus' | 'dead' | 'palm' | 'willow' | 'cliff' | 'icewall' | 'sky' | 'labwall'
@@ -294,6 +294,40 @@ export const THEMES: Record<ThemeId, WorldTheme> = {
     weather: 'psy',
     tint: 'rgba(150,80,255,0.08)',
     mini: { grass: '#3a2e58', tall: '#3a2e58', path: '#443666', sand: '#2e2448', water: '#5a3a8a', tree: '#140e22' },
+  },
+  cove: {
+    ...FOREST, id: 'cove', get name() { return L('Whirl Islands', 'Draaikolkeilanden') }, icon: '🌊', royale: false,
+    // Wet slate and tide-pool rock in a sea cave, cliffs of blue-black stone around
+    grass: ['#6e8494', '#5e7484', '#7e94a4'],
+    tall: ['#6e8494', '#5e7484', '#7e94a4'],
+    path: ['#64788a', '#566a7c', '#768a9c'],
+    sand: ['#5a6e80', '#4e6274'],
+    decor: 'cliff',
+    canopy: ['#0c1a2a', '#1c3450', '#244060', '#2c4c70', '#8ac8f0'],
+    trunk: ['#101e30', '#2a4a6a', '#1c3450'],
+    rock: ['#1c3044', '#4a6a88', '#9cc4e0'],
+    border: '#08121e',
+    weather: 'rain',
+    tint: 'rgba(40,110,200,0.10)',
+    dark: true,
+    mini: { grass: '#6e8494', tall: '#6e8494', path: '#64788a', sand: '#5a6e80', water: '#2a5a8a', tree: '#0c1a2a' },
+  },
+  rift: {
+    ...FOREST, id: 'rift', get name() { return L('Distortion World', 'Verwrongen Wereld') }, icon: '🌀', royale: false,
+    // Grey-violet floating stone in a dark void, walls of twisted rock
+    grass: ['#4a4658', '#3e3a4c', '#5a5668'],
+    tall: ['#4a4658', '#3e3a4c', '#5a5668'],
+    path: ['#524e62', '#46425a', '#625e74'],
+    sand: ['#3a3648', '#302c3e'],
+    decor: 'cliff',
+    canopy: ['#06040c', '#140e22', '#1c1430', '#24183c', '#c84040'],
+    trunk: ['#0a0614', '#2a2040', '#1a1228'],
+    rock: ['#1a1428', '#4a4064', '#a090c8'],
+    border: '#030206',
+    weather: 'psy',
+    tint: 'rgba(90,40,160,0.12)',
+    dark: true,
+    mini: { grass: '#4a4658', tall: '#4a4658', path: '#524e62', sand: '#3a3648', water: '#3a2a5a', tree: '#06040c' },
   },
 }
 

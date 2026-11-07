@@ -9,7 +9,7 @@ import { L } from '../i18n'
  * be dodged; damage is a share of the target's max HP.
  */
 
-export type BossId = 'reshiram' | 'kyurem' | 'zekrom' | 'rayquaza' | 'mewtwo'
+export type BossId = 'reshiram' | 'kyurem' | 'zekrom' | 'rayquaza' | 'mewtwo' | 'lugia' | 'giratina'
 /** 'grid' is a checkerboard over the whole arena (cell size = width, parity = inner). */
 export type HazardShape = 'circle' | 'cone' | 'line' | 'ring' | 'grid'
 
@@ -202,9 +202,44 @@ export const BOSSES: Record<BossId, BossDef> = {
       { id: 'aurasphere', name: 'Aura Sphere', shape: 'circle', warn: 1.25, cd: 7, dmg: 0.45, phase: 2, weight: 3, target: 'players', r: 1.9, extra: 3, stagger: 0.1, fx: 'focusblast', type: 'fighting' },
     ],
   },
+  lugia: {
+    id: 'lugia', species: 249, name: 'Lugia', get title() { return L('Guardian of the Whirl Islands', 'Hoeder van de Draaikolkeilanden') }, arena: 'cove',
+    level: 60, hp: 9.6, phases: [0.66, 0.33], color: '#8ab8f0',
+    get finalSub() { return L('Storm from the deep · the sea rises!', 'Storm uit de diepte · de zee stijgt!') },
+    looks: [CALM, { grade: 'rgba(30,70,140,0.10)', edge: '#6aa8f0', aura: '#a8d0ff', weather: 2, fx: 'storm' }, { grade: 'rgba(10,30,70,0.20)', edge: '#c0e4ff', aura: '#e0f4ff', weather: 3, fx: 'gale' }],
+    get blurb() { return L('Aeroblast, waterspouts and breakers that roll over the whole cave.', 'Aeroblast, waterhozen en golven die over de hele grot rollen.') },
+    get envTip() { return L('Waterspouts drift through the cave and breakers roll over the shore: walk around them, and behind the sea rocks you are safe from the beams.', 'Waterhozen trekken door de grot en golven rollen over het strand: loop eromheen. Achter de zeerotsen ben je even veilig.') },
+    attacks: [
+      { id: 'aeroblast', name: 'Aeroblast', shape: 'line', warn: 1.15, cd: 7, dmg: 0.5, phase: 0, weight: 3, target: 'nearest', len: 16, width: 2.2, fx: 'hyperbeam', type: 'flying' },
+      { id: 'hydropump', name: 'Hydro Pump', shape: 'cone', warn: 1.25, cd: 6, dmg: 0.45, phase: 0, weight: 3, target: 'nearest', len: 10, width: 0.45, fx: 'hydropump', type: 'water' },
+      { id: 'extrasensory', name: 'Extrasensory', shape: 'circle', warn: 1.3, cd: 7, dmg: 0.45, phase: 0, weight: 2, target: 'players', r: 2.1, extra: 2, stagger: 0.12, fx: 'psychic', type: 'psychic' },
+      { id: 'skydive', get name() { return L('Sky Dive', 'Duikvlucht') }, shape: 'circle', warn: 1.7, cd: 9, dmg: 0.55, phase: 1, weight: 2, target: 'nearest', r: 3.4, move: 'land', fx: 'surf', type: 'water' },
+      { id: 'whirlpool', name: 'Whirlpool', shape: 'circle', warn: 1.1, cd: 12, dmg: 0.3, phase: 1, weight: 2, target: 'players', r: 1.7, tornado: { n: 2, speed: 1.7, dur: 5, dps: 0.24 }, fx: 'surf', type: 'water' },
+      { id: 'tempest', get name() { return L('Tempest', 'Noodweer') }, shape: 'circle', warn: 1.1, cd: 15, dmg: 0.3, phase: 2, weight: 3, target: 'players', r: 1.7, wind: { dur: 3, force: 2.3 }, tornado: { n: 2, speed: 1.4, dur: 4.5, dps: 0.22 }, fx: 'hurricane', type: 'flying' },
+      { id: 'aerostorm', get name() { return L('Aeroblast Barrage', 'Aeroblast-salvo') }, shape: 'line', warn: 1.05, cd: 10, dmg: 0.42, phase: 2, weight: 3, target: 'nearest', len: 14, width: 1.8, sweep: { count: 4, step: 0.4 }, stagger: 0.3, oneWay: true, fx: 'hyperbeam', type: 'flying' },
+    ],
+  },
+  giratina: {
+    id: 'giratina', species: 487, name: 'Giratina', get title() { return L('Lord of the Distortion World', 'Heer van de Verwrongen Wereld') }, arena: 'rift',
+    level: 60, hp: 8.8, phases: [0.66, 0.33], color: '#a070e0',
+    forms: [487, 487, 10007], finalName: 'Giratina Origin',
+    get finalSub() { return L('Origin Forme · the world turns inside out!', 'Oervorm · de wereld keert binnenstebuiten!') },
+    looks: [CALM, { grade: 'rgba(40,10,80,0.12)', edge: '#a070e0', aura: '#b890ff', weather: 2, fx: 'warp' }, { grade: 'rgba(20,0,30,0.24)', edge: '#e04848', aura: '#ff6a6a', weather: 3, fx: 'warp' }],
+    get blurb() { return L('Shadow Force, tears in reality and a world that turns inside out.', 'Shadow Force, scheuren in de werkelijkheid en een wereld die binnenstebuiten keert.') },
+    get envTip() { return L('Tears open in the floor near you and stay a while: step out of them. When Giratina vanishes with Shadow Force, it comes back right next to someone.', 'Er scheuren gaten in de vloer vlak bij je die even blijven: stap eruit. Verdwijnt Giratina met Shadow Force, dan duikt het vlak naast iemand weer op.') },
+    attacks: [
+      { id: 'shadowclaw', name: 'Shadow Claw', shape: 'cone', warn: 1.2, cd: 6, dmg: 0.4, phase: 0, weight: 3, target: 'nearest', len: 8, width: 0.5, fx: 'nightdaze', type: 'ghost' },
+      { id: 'shadowforce', name: 'Shadow Force', shape: 'circle', warn: 1.15, cd: 10, dmg: 0.5, phase: 0, weight: 2, target: 'self', r: 3.4, move: 'teleport', fx: 'shadowforce', type: 'ghost' },
+      { id: 'ominouswind', name: 'Ominous Wind', shape: 'circle', warn: 1.3, cd: 7, dmg: 0.4, phase: 0, weight: 3, target: 'players', r: 2.0, extra: 2, stagger: 0.12, fx: 'shadowforce', type: 'ghost' },
+      { id: 'dragonpulse2', name: 'Dragon Pulse', shape: 'line', warn: 1.05, cd: 7, dmg: 0.5, phase: 1, weight: 2, target: 'random', len: 18, width: 1.8, fx: 'dragonpulse', type: 'dragon' },
+      { id: 'distortion', get name() { return L('Distortion', 'Vervorming') }, shape: 'ring', warn: 1.4, cd: 10, dmg: 0.5, phase: 1, weight: 2, target: 'self', inner: 5.5, r: 10.5, fx: 'nightdaze', type: 'ghost' },
+      { id: 'shadowsneak', name: 'Shadow Sneak', shape: 'line', warn: 1.1, cd: 8, dmg: 0.5, phase: 2, weight: 3, target: 'nearest', len: 15, width: 2.2, move: 'dash', fx: 'shadowsneak', type: 'ghost' },
+      { id: 'void_pool', get name() { return L('Rift in Reality', 'Scheur in de werkelijkheid') }, shape: 'circle', warn: 1.3, cd: 11, dmg: 0.3, phase: 2, weight: 3, target: 'players', r: 2.2, extra: 2, stagger: 0.15, linger: { dur: 5, dps: 0.07 }, fx: 'shadowforce', type: 'ghost' },
+    ],
+  },
 }
 
-export const BOSS_LIST: BossId[] = ['reshiram', 'kyurem', 'zekrom', 'rayquaza', 'mewtwo']
+export const BOSS_LIST: BossId[] = ['reshiram', 'kyurem', 'zekrom', 'rayquaza', 'mewtwo', 'lugia', 'giratina']
 
 /** Raid rules */
 export const RAID_LEVEL = 50

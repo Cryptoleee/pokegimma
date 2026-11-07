@@ -84,11 +84,15 @@ export type RoomDeco =
   | 'skygate' | 'cloister' | 'aerie' | 'gallery' | 'belfry' | 'peak'
   // The Forsaken Lab
   | 'airlock' | 'archive' | 'cloning' | 'reactor' | 'mind' | 'core'
+  // The Whirl Islands
+  | 'shore' | 'tidepool' | 'grotto' | 'wreck' | 'falls' | 'sanctum'
+  // The Distortion World
+  | 'portal' | 'upside' | 'crypt' | 'mirror' | 'spiral' | 'abyss'
 
 /** A dungeon's element: what its casters throw, how its foes arrive, what its relics are called. */
 export interface DungeonTheme {
   /** Hazard type of its casters' bolts, pools and room hazards. */
-  type: 'fire' | 'electric' | 'ice' | 'dragon' | 'psychic'
+  type: 'fire' | 'electric' | 'ice' | 'dragon' | 'psychic' | 'water' | 'ghost'
   /** Effect (and sound) of its casters' bolts and its foes' arrival. */
   fx: MoveFx
   /** Colours of a foe's arrival burst, hot to cool. */
@@ -163,6 +167,14 @@ const fl = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<Boss
 const mt = (r: Rect): Rect => ({ x: r.y, y: r.x, w: r.h, h: r.w })
 const mta = (at: [number, number]): [number, number] => [at[1], at[0]]
 const ps = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'psychic', phase: 0, weight: 1, ...a })
+/** The Whirl Islands: the Storm Tower turned over its diagonal (you start bottom right, head west along the bottom, then up). */
+const mtx = (r: Rect): Rect => mt(mx(r))
+const mtxa = (w: number, at: [number, number]): [number, number] => mta(ma(w, at))
+/** The Distortion World: the Frozen Citadel turned over its diagonal (you start top left, head east along the top, then down). */
+const mty = (r: Rect): Rect => mt(my(r))
+const mtya = (h: number, at: [number, number]): [number, number] => mta(mya(h, at))
+const wa = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'water', phase: 0, weight: 1, ...a })
+const gh = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'ghost', phase: 0, weight: 1, ...a })
 const el = (a: Omit<BossAttack, 'type' | 'phase' | 'weight'> & Partial<Pick<BossAttack, 'weight'>>): BossAttack => ({ type: 'electric', phase: 0, weight: 1, ...a })
 
 export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
@@ -789,7 +801,7 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
           attacks: [
             ps({ id: 'm_wave', get name() { return L('Psychic Wave', 'Psychische Golf') }, shape: 'ring', warn: 1.4, cd: 7, dmg: 0.34, target: 'self', inner: 3.2, r: 8, weight: 2, fx: 'psychic' }),
             ps({ id: 'm_cannon', name: 'Flash Cannon', shape: 'line', warn: 1.35, cd: 7, dmg: 0.34, target: 'nearest', len: 13, width: 1.5, weight: 3, fx: 'flashcannon' }),
-            ps({ id: 'm_field', get name() { return L('Psychic Field', 'Psychisch Veld') }, shape: 'circle', warn: 1.5, cd: 9, dmg: 0.22, target: 'players', r: 2.4, extra: 2, stagger: 0.2, weight: 3, linger: { dur: 9, dps: 0.1 }, fx: 'psychic' }),
+            ps({ id: 'm_field_pool', get name() { return L('Psychic Field', 'Psychisch Veld') }, shape: 'circle', warn: 1.5, cd: 9, dmg: 0.22, target: 'players', r: 2.4, extra: 2, stagger: 0.2, weight: 3, linger: { dur: 9, dps: 0.1 }, fx: 'psychic' }),
             ps({ id: 'm_meteor', name: 'Meteor Mash', shape: 'circle', warn: 1.25, cd: 6, dmg: 0.25, target: 'players', r: 2, extra: 3, stagger: 0.12, weight: 2, fx: 'meteormash' }),
           ],
         },
@@ -818,6 +830,222 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
       mt({ x: 81, y: 18, w: 2, h: 5 }),
       mt({ x: 106, y: 36, w: 5, h: 2 }),
       mt({ x: 89, y: 62, w: 2, h: 5 }),
+    ],
+  },
+  lugia: {
+    id: 'whirl',
+    boss: 'lugia',
+    theme: {
+      type: 'water', fx: 'surf', burst: ['#ffffff', '#c8f0ff', '#50b0f0'], accent: '#6ab0f0',
+      bolts: () => L('water bolts', 'waterstralen'),
+      relics: { ember: () => L('Pearl of the Tide', 'Parel van het Getij'), shell: () => L('Shell of the Deep', 'Schelp van de Diepte') },
+      icon: '🌊', dark: '#123048',
+      toBoss: () => L('To the eye of the storm', 'Naar het oog van de storm'),
+      tips: {
+        wardens: () => L('Two wardens guard the islands, each with their own tricks: a Whirlpool that follows you, Hydro Pump in a cone, a Hyper Beam in a straight line, a Twister that roams the room. They call help and enrage after two minutes. Beat one for a relic for the team and a life back.', 'Twee wachters bewaken de eilanden, elk met eigen trucs: een Draaikolk die je volgt, Hydro Pump in een kegel, een Hyper Beam in een rechte lijn, een Twister die door de zaal zwerft. Ze roepen hulp en worden na twee minuten woedend. Versla er een voor een reliek voor het team en een leven terug.'),
+        liquid: () => L('The sea comes into the cave: stay out of the deep water. The tide surges through the pools, the old wreck sheds planks and barrels, and under the falls the current pulls you along.', 'De zee loopt de grot in: blijf uit het diepe water. Het getij raast door de poelen, het oude wrak verliest planken en vaten, en onder de watervallen trekt de stroming je mee.'),
+        partner: () => L('Everything here is water. Types still count, but no more than 1.5× either way: no partner carries you through.', 'Alles hier is water. Types tellen mee, maar nooit meer dan 1,5× (beide kanten op): geen partner sleept je erdoorheen.'),
+        boss: (n) => L(`After the sanctum the way to the eye of the storm opens. Step in and ${n} rises from the sea: you have 4 minutes. `, `Na het heiligdom gaat de weg naar het oog van de storm open. Stap erin en ${n} rijst op uit de zee: je hebt 4 minuten. `),
+      },
+    },
+    get name() { return L('The Whirl Islands', 'De Draaikolkeilanden') },
+    get blurb() { return L('Wade into a sea cave under a stormy island: tide pools, a coral grotto, a wreck on the rocks, the roaring falls, and Lugia rising from the sea at the eye of the storm.', 'Waad een zeegrot in onder een stormachtig eiland: getijdenpoelen, een koraalgrot, een wrak op de rotsen, de razende watervallen, en Lugia rijst op uit de zee in het oog van de storm.') },
+    start: [117, 106],
+    lives: 3,
+    arenaEntry: [64, 52],
+    rooms: [
+      {
+        get name() { return L('The Cave Shore', 'De Grotkust') }, deco: 'shore', rect: mtx({ x: 8, y: 98, w: 26, h: 24 }),
+        packs: [
+          { at: mtxa(26, [13, 10]), foes: [f(98, 2, 41), f(120, 1, 41, 'caster')] },
+          { at: mtxa(26, [5, 4]), foes: [f(318, 1, 42, 'brute'), f(222, 1, 41, 'mender'), f(72, 1, 41)] },
+          { at: mtxa(26, [20, 4]), foes: [f(98, 1, 41), f(120, 2, 41, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('The Tide Pools', 'De Getijdenpoelen') }, deco: 'tidepool', rect: mtx({ x: 8, y: 60, w: 26, h: 24 }),
+        packs: [
+          { at: mtxa(26, [7, 18]), foes: [f(72, 2, 42), f(222, 1, 42, 'mender')] },
+          { at: mtxa(26, [20, 18]), foes: [f(121, 1, 44, 'caster', true), f(98, 2, 42)] },
+          { at: mtxa(26, [5, 6]), patrol: mtxa(26, [21, 6]), foes: [f(72, 1, 43), f(318, 1, 42)] },
+          { at: mtxa(26, [13, 3]), link: 2, foes: [f(99, 1, 43, 'brute'), f(90, 1, 42, 'guard'), f(170, 1, 42, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('The Coral Grotto', 'De Koraalgrot') }, deco: 'grotto', rect: mtx({ x: 5, y: 16, w: 32, h: 30 }),
+        packs: [
+          { at: mtxa(32, [8, 22]), foes: [f(116, 2, 43), f(594, 1, 43, 'mender')] },
+          { at: mtxa(32, [24, 22]), foes: [f(319, 1, 44, 'brute'), f(171, 1, 43, 'caster')] },
+        ],
+        warden: {
+          sp: 230, lv: 48, hp: 5.5, at: mtxa(32, [16, 7]), enrage: 120, relic: 'ember', get title() { return L('Lord of the Deep', 'Heer van de Diepte') },
+          calls: [{ at: 0.6, foes: [f(117, 1, 43, 'caster'), f(116, 1, 42)] }, { at: 0.3, foes: [f(319, 1, 44, 'brute'), f(594, 1, 43, 'mender')] }],
+          attacks: [
+            wa({ id: 'k_pump', name: 'Hydro Pump', shape: 'cone', warn: 1.1, cd: 4, dmg: 0.32, target: 'nearest', len: 8, width: 0.45, weight: 3, fx: 'hydropump' }),
+            wa({ id: 'k_whirl', get name() { return L('Whirlpool', 'Draaikolk') }, shape: 'circle', warn: 3.6, cd: 16, dmg: 0.3, target: 'random', r: 2.4, weight: 2, follow: true, linger: { dur: 5, dps: 0.1 }, fx: 'surf' }),
+            wa({ id: 'k_pulse', name: 'Water Pulse', shape: 'circle', warn: 1.3, cd: 6, dmg: 0.3, target: 'players', r: 2.1, extra: 2, stagger: 0.15, weight: 2, fx: 'surf' }),
+            dr({ id: 'k_dragon', name: 'Dragon Pulse', shape: 'circle', warn: 1.4, cd: 9, dmg: 0.34, target: 'self', r: 3.8, weight: 2, fx: 'dragonpulse' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Wreck', 'Het Wrak') }, deco: 'wreck', rect: mtx({ x: 53, y: 8, w: 28, h: 28 }),
+        packs: [
+          { at: mtxa(28, [7, 13]), foes: [f(170, 2, 44, 'caster'), f(116, 1, 44)] },
+          { at: mtxa(28, [14, 22]), foes: [f(91, 1, 46, 'guard', true), f(99, 1, 44, 'brute'), f(120, 1, 44, 'caster')] },
+          { at: mtxa(28, [14, 5]), foes: [f(72, 2, 44), f(594, 1, 44, 'mender')] },
+          { at: mtxa(28, [22, 14]), link: 2, foes: [f(99, 1, 45, 'brute'), f(318, 1, 44), f(222, 1, 44, 'mender')] },
+        ],
+      },
+      {
+        get name() { return L('Under the Falls', 'Onder de Watervallen') }, deco: 'falls', rect: mtx({ x: 96, y: 6, w: 26, h: 30 }),
+        packs: [
+          { at: mtxa(26, [5, 6]), foes: [f(73, 2, 44), f(72, 1, 44)] },
+          { at: mtxa(26, [5, 24]), foes: [f(593, 1, 46, 'guard', true), f(319, 1, 44, 'brute'), f(594, 1, 44, 'mender')] },
+        ],
+        warden: {
+          sp: 130, lv: 49, hp: 6.5, at: mtxa(26, [14, 16]), enrage: 130, relic: 'shell', get title() { return L('Terror of the Falls', 'Schrik van de Watervallen') },
+          calls: [{ at: 0.65, foes: [f(73, 2, 44)] }, { at: 0.35, foes: [f(320, 1, 46, 'brute', true), f(594, 1, 44, 'mender')] }],
+          attacks: [
+            wa({ id: 'g_surf', name: 'Surf', shape: 'ring', warn: 1.4, cd: 7, dmg: 0.34, target: 'self', inner: 3.2, r: 8, weight: 2, fx: 'surf' }),
+            wa({ id: 'g_beam', name: 'Hyper Beam', shape: 'line', warn: 1.35, cd: 7, dmg: 0.34, target: 'nearest', len: 13, width: 1.5, weight: 3, fx: 'hyperbeam' }),
+            dr({ id: 'g_twister', name: 'Twister', shape: 'circle', warn: 1.5, cd: 9, dmg: 0.22, target: 'players', r: 2.4, extra: 2, stagger: 0.2, weight: 3, linger: { dur: 9, dps: 0.1 }, fx: 'hurricane' }),
+            wa({ id: 'g_fall', name: 'Waterfall', shape: 'circle', warn: 1.25, cd: 6, dmg: 0.25, target: 'players', r: 2, extra: 3, stagger: 0.12, weight: 2, fx: 'surf' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Sanctum of the Sea', 'Het Heiligdom van de Zee') }, deco: 'sanctum', rect: mtx({ x: 92, y: 54, w: 30, h: 28 }),
+        waves: [
+          { foes: [f(99, 2, 45), f(90, 1, 44, 'guard'), f(171, 1, 44, 'caster')] },
+          { foes: [f(319, 1, 46, 'brute', true), f(121, 2, 45, 'caster'), f(594, 1, 45, 'mender')] },
+          { final: true, foes: [f(130, 1, 47, 'brute', true), f(593, 1, 47, 'caster', true), f(594, 1, 45, 'mender'), f(73, 2, 45), f(91, 1, 45, 'guard')] },
+        ],
+      },
+    ],
+    halls: [
+      mtx({ x: 18, y: 84, w: 5, h: 14 }),
+      mtx({ x: 18, y: 46, w: 5, h: 14 }),
+      mtx({ x: 37, y: 26, w: 16, h: 5 }),
+      mtx({ x: 81, y: 18, w: 15, h: 5 }),
+      mtx({ x: 106, y: 36, w: 5, h: 18 }),
+      mtx({ x: 76, y: 62, w: 16, h: 5 }),
+    ],
+    gates: [
+      mtx({ x: 18, y: 96, w: 5, h: 2 }),
+      mtx({ x: 18, y: 58, w: 5, h: 2 }),
+      mtx({ x: 37, y: 26, w: 2, h: 5 }),
+      mtx({ x: 81, y: 18, w: 2, h: 5 }),
+      mtx({ x: 106, y: 36, w: 5, h: 2 }),
+      mtx({ x: 89, y: 62, w: 2, h: 5 }),
+    ],
+  },
+  giratina: {
+    id: 'distortion',
+    boss: 'giratina',
+    theme: {
+      type: 'ghost', fx: 'shadowforce', burst: ['#ffffff', '#d8c0ff', '#8050d0'], accent: '#a070e0',
+      bolts: () => L('shadow orbs', 'schaduwbollen'),
+      relics: { ember: () => L('Shard of the Void', 'Scherf van de Leegte'), shell: () => L('Chain of the Grave', 'Keten van het Graf') },
+      icon: '🌀', dark: '#24163a',
+      toBoss: () => L('Through the last tear', 'Door de laatste scheur'),
+      tips: {
+        wardens: () => L('Two wardens guard the way through, each with their own tricks: a Curse that follows you, Shadow Punch in a cone, a beam of darkness in a straight line, pools of Grudge that stay. They call help and enrage after two minutes. Beat one for a relic for the team and a life back.', 'Twee wachters bewaken de weg erdoor, elk met eigen trucs: een Vloek die je volgt, Shadow Punch in een kegel, een straal duisternis in een rechte lijn, poelen van Wrok die blijven liggen. Ze roepen hulp en worden na twee minuten woedend. Versla er een voor een reliek voor het team en een leven terug.'),
+        liquid: () => L('Where the floor falls away there is only the void: don\'t step in. Gravity tips over in the upside-down hall, shadows reach out of the mirrors, and on the twisted stair tears open under your feet.', 'Waar de vloer wegvalt is alleen de leegte: stap er niet in. In de omgekeerde hal kantelt de zwaartekracht, uit de spiegels grijpen schaduwen naar je, en op de verwrongen trap scheurt de vloer onder je voeten open.'),
+        partner: () => L('Everything here is ghost and dark. Types still count, but no more than 1.5× either way: no partner carries you through.', 'Alles hier is geest en duister. Types tellen mee, maar nooit meer dan 1,5× (beide kanten op): geen partner sleept je erdoorheen.'),
+        boss: (n) => L(`After the abyss the last tear opens. Step through and ${n} comes out of the shadows: you have 4 minutes. `, `Na de afgrond gaat de laatste scheur open. Stap erdoor en ${n} komt uit de schaduw: je hebt 4 minuten. `),
+      },
+    },
+    get name() { return L('The Distortion World', 'De Verwrongen Wereld') },
+    get blurb() { return L('Step through a tear into a world turned inside out: a hall where gravity tips over, a crypt of shadows, mirrors that reach for you, a stair to nowhere, and Giratina waiting at the edge of the abyss.', 'Stap door een scheur een wereld binnen die binnenstebuiten is gekeerd: een hal waar de zwaartekracht kantelt, een crypte vol schimmen, spiegels die naar je grijpen, een trap naar nergens, en Giratina wacht aan de rand van de afgrond.') },
+    start: [10, 21],
+    lives: 3,
+    arenaEntry: [63, 76],
+    rooms: [
+      {
+        get name() { return L('The Tear', 'De Scheur') }, deco: 'portal', rect: mty({ x: 8, y: 98, w: 26, h: 24 }),
+        packs: [
+          { at: mtya(24, [13, 10]), foes: [f(92, 2, 41), f(200, 1, 41, 'caster')] },
+          { at: mtya(24, [5, 4]), foes: [f(353, 1, 42, 'brute'), f(425, 1, 41, 'mender'), f(198, 1, 41)] },
+          { at: mtya(24, [20, 4]), foes: [f(92, 1, 41), f(200, 2, 41, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('The Upside-Down Hall', 'De Omgekeerde Hal') }, deco: 'upside', rect: mty({ x: 8, y: 60, w: 26, h: 24 }),
+        packs: [
+          { at: mtya(24, [7, 18]), foes: [f(198, 2, 42), f(425, 1, 42, 'mender')] },
+          { at: mtya(24, [20, 18]), foes: [f(93, 1, 44, 'caster', true), f(353, 2, 42)] },
+          { at: mtya(24, [5, 6]), patrol: mtya(24, [21, 6]), foes: [f(92, 1, 43), f(198, 1, 42)] },
+          { at: mtya(24, [13, 3]), link: 2, foes: [f(354, 1, 43, 'brute'), f(562, 1, 42, 'guard'), f(200, 1, 42, 'caster')] },
+        ],
+      },
+      {
+        get name() { return L('The Crypt of Shadows', 'De Schimmencrypte') }, deco: 'crypt', rect: mty({ x: 5, y: 16, w: 32, h: 30 }),
+        packs: [
+          { at: mtya(30, [8, 22]), foes: [f(355, 2, 43), f(425, 1, 43, 'mender')] },
+          { at: mtya(30, [24, 22]), foes: [f(302, 1, 44, 'brute'), f(608, 1, 43, 'caster')] },
+        ],
+        warden: {
+          sp: 477, lv: 48, hp: 5.5, at: mtya(30, [16, 7]), enrage: 120, relic: 'ember', get title() { return L('Warden of Shadows', 'Wachter van de Schimmen') },
+          calls: [{ at: 0.6, foes: [f(356, 1, 43, 'caster'), f(355, 1, 42)] }, { at: 0.3, foes: [f(302, 1, 44, 'brute'), f(426, 1, 43, 'mender')] }],
+          attacks: [
+            gh({ id: 'd_punch', name: 'Shadow Punch', shape: 'cone', warn: 1.1, cd: 4, dmg: 0.32, target: 'nearest', len: 7, width: 0.5, weight: 3, fx: 'nightdaze' }),
+            gh({ id: 'd_curse', get name() { return L('Curse', 'Vloek') }, shape: 'circle', warn: 3.6, cd: 16, dmg: 0.3, target: 'random', r: 2.4, weight: 2, follow: true, linger: { dur: 5, dps: 0.1 }, fx: 'shadowforce' }),
+            gh({ id: 'd_wind', name: 'Ominous Wind', shape: 'circle', warn: 1.3, cd: 6, dmg: 0.3, target: 'players', r: 2.1, extra: 2, stagger: 0.15, weight: 2, fx: 'shadowforce' }),
+            gh({ id: 'd_quake', get name() { return L('Shadow Quake', 'Schaduwbeving') }, shape: 'circle', warn: 1.4, cd: 9, dmg: 0.34, target: 'self', r: 3.8, weight: 2, fx: 'nightdaze' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Hall of Mirrors', 'De Spiegelzaal') }, deco: 'mirror', rect: mty({ x: 53, y: 8, w: 28, h: 28 }),
+        packs: [
+          { at: mtya(28, [7, 13]), foes: [f(200, 2, 44, 'caster'), f(355, 1, 44)] },
+          { at: mtya(28, [14, 22]), foes: [f(442, 1, 46, 'guard', true), f(354, 1, 44, 'brute'), f(200, 1, 44, 'caster')] },
+          { at: mtya(28, [14, 5]), foes: [f(198, 2, 44), f(426, 1, 44, 'mender')] },
+          { at: mtya(28, [22, 14]), link: 2, foes: [f(354, 1, 45, 'brute'), f(92, 1, 44), f(426, 1, 44, 'mender')] },
+        ],
+      },
+      {
+        get name() { return L('The Twisted Stair', 'De Verwrongen Trap') }, deco: 'spiral', rect: mty({ x: 96, y: 6, w: 26, h: 30 }),
+        packs: [
+          { at: mtya(30, [5, 6]), foes: [f(430, 2, 44), f(198, 1, 44)] },
+          { at: mtya(30, [5, 24]), foes: [f(442, 1, 46, 'guard', true), f(302, 1, 44, 'brute'), f(426, 1, 44, 'mender')] },
+        ],
+        warden: {
+          sp: 563, lv: 49, hp: 6.5, at: mtya(30, [14, 16]), enrage: 130, relic: 'shell', get title() { return L('Keeper of the Tomb', 'Bewaker van de Tombe') },
+          calls: [{ at: 0.65, foes: [f(430, 2, 44)] }, { at: 0.35, foes: [f(94, 1, 46, 'brute', true), f(429, 1, 44, 'mender')] }],
+          attacks: [
+            gh({ id: 'c_shade', get name() { return L('Night Shade', 'Nachtschaduw') }, shape: 'ring', warn: 1.4, cd: 7, dmg: 0.34, target: 'self', inner: 3.2, r: 8, weight: 2, fx: 'nightdaze' }),
+            gh({ id: 'c_beam', get name() { return L('Dark Beam', 'Duistere Straal') }, shape: 'line', warn: 1.35, cd: 7, dmg: 0.34, target: 'nearest', len: 13, width: 1.5, weight: 3, fx: 'nightdaze' }),
+            gh({ id: 'c_grudge_pool', get name() { return L('Grudge', 'Wrok') }, shape: 'circle', warn: 1.5, cd: 9, dmg: 0.22, target: 'players', r: 2.4, extra: 2, stagger: 0.2, weight: 3, linger: { dur: 9, dps: 0.1 }, fx: 'shadowforce' }),
+            gh({ id: 'c_hex', name: 'Hex', shape: 'circle', warn: 1.25, cd: 6, dmg: 0.25, target: 'players', r: 2, extra: 3, stagger: 0.12, weight: 2, fx: 'shadowforce' }),
+          ],
+        },
+      },
+      {
+        get name() { return L('The Edge of the Abyss', 'De Rand van de Afgrond') }, deco: 'abyss', rect: mty({ x: 92, y: 54, w: 30, h: 28 }),
+        waves: [
+          { foes: [f(354, 2, 45), f(562, 1, 44, 'guard'), f(429, 1, 44, 'caster')] },
+          { foes: [f(94, 1, 46, 'brute', true), f(429, 2, 45, 'caster'), f(426, 1, 45, 'mender')] },
+          { final: true, foes: [f(430, 1, 47, 'brute', true), f(609, 1, 47, 'caster', true), f(426, 1, 45, 'mender'), f(354, 2, 45), f(563, 1, 45, 'guard')] },
+        ],
+      },
+    ],
+    halls: [
+      mty({ x: 18, y: 84, w: 5, h: 14 }),
+      mty({ x: 18, y: 46, w: 5, h: 14 }),
+      mty({ x: 37, y: 26, w: 16, h: 5 }),
+      mty({ x: 81, y: 18, w: 15, h: 5 }),
+      mty({ x: 106, y: 36, w: 5, h: 18 }),
+      mty({ x: 76, y: 62, w: 16, h: 5 }),
+    ],
+    gates: [
+      mty({ x: 18, y: 96, w: 5, h: 2 }),
+      mty({ x: 18, y: 58, w: 5, h: 2 }),
+      mty({ x: 37, y: 26, w: 2, h: 5 }),
+      mty({ x: 81, y: 18, w: 2, h: 5 }),
+      mty({ x: 106, y: 36, w: 5, h: 2 }),
+      mty({ x: 89, y: 62, w: 2, h: 5 }),
     ],
   },
 }

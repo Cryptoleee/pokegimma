@@ -28,6 +28,8 @@ export const PETS: Pet[] = [
   { id: 'kyurem', sp: 646, dungeon: 'citadel', how: () => L('Clear The Frozen Citadel without losing a life', 'Haal De IJscitadel zonder een leven te verliezen') },
   { id: 'rayquaza', sp: 384, dungeon: 'pillar', how: () => L('Clear The Sky Pillar without losing a life', 'Haal De Hemelpilaar zonder een leven te verliezen') },
   { id: 'mewtwo', sp: 150, dungeon: 'lab', how: () => L('Clear The Forsaken Lab without losing a life', 'Haal Het Verlaten Lab zonder een leven te verliezen') },
+  { id: 'lugia', sp: 249, dungeon: 'whirl', how: () => L('Clear The Whirl Islands without losing a life', 'Haal De Draaikolkeilanden zonder een leven te verliezen') },
+  { id: 'giratina', sp: 487, dungeon: 'distortion', how: () => L('Clear The Distortion World without losing a life', 'Haal De Verwrongen Wereld zonder een leven te verliezen') },
 ]
 
 const KEY = 'sb:pet'
