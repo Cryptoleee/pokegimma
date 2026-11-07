@@ -852,6 +852,29 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
     get blurb() { return L('Wade into a sea cave under a stormy island: tide pools, a coral grotto, a wreck on the rocks, the roaring falls, and Lugia rising from the sea at the eye of the storm.', 'Waad een zeegrot in onder een stormachtig eiland: getijdenpoelen, een koraalgrot, een wrak op de rotsen, de razende watervallen, en Lugia rijst op uit de zee in het oog van de storm.') },
     start: [117, 106],
     lives: 3,
+    intro: {
+      id: 'whirl-intro',
+      look: 'sea',
+      shots: [
+        {
+          src: 'whirl-intro', len: 22.5, lines: [
+            { at: 0.6, until: 3.2, title: true, text: () => L('THE WHIRL ISLANDS', 'DE DRAAIKOLKEILANDEN'), kicker: () => L('Raid dungeon', 'Raid-dungeon') },
+            { at: 18.4, until: 22.5, title: true, text: () => 'LUGIA', kicker: () => L('Guardian of the sea', 'Hoeder van de zee') },
+          ],
+        },
+      ],
+    },
+    outro: {
+      id: 'whirl-outro',
+      look: 'sea',
+      shots: [
+        {
+          src: 'whirl-outro', len: 12.2, lines: [
+            { at: 8.2, until: 12.2, title: true, heroes: true, text: () => L('LUGIA DEFEATED', 'LUGIA VERSLAGEN'), kicker: () => L('The storm dies down', 'De storm gaat liggen') },
+          ],
+        },
+      ],
+    },
     arenaEntry: [64, 52],
     rooms: [
       {
@@ -960,6 +983,29 @@ export const DUNGEONS: Partial<Record<BossId, DungeonDef>> = {
     get blurb() { return L('Step through a tear into a world turned inside out: a hall where gravity tips over, a crypt of shadows, mirrors that reach for you, a stair to nowhere, and Giratina waiting at the edge of the abyss.', 'Stap door een scheur een wereld binnen die binnenstebuiten is gekeerd: een hal waar de zwaartekracht kantelt, een crypte vol schimmen, spiegels die naar je grijpen, een trap naar nergens, en Giratina wacht aan de rand van de afgrond.') },
     start: [10, 21],
     lives: 3,
+    intro: {
+      id: 'distortion-intro',
+      look: 'void',
+      shots: [
+        {
+          src: 'distortion-intro', len: 22.5, lines: [
+            { at: 0.6, until: 3.2, title: true, text: () => L('THE DISTORTION WORLD', 'DE VERWRONGEN WERELD'), kicker: () => L('Raid dungeon', 'Raid-dungeon') },
+            { at: 18.4, until: 22.5, title: true, text: () => 'GIRATINA', kicker: () => L('Lord of the other side', 'Heer van de andere kant') },
+          ],
+        },
+      ],
+    },
+    outro: {
+      id: 'distortion-outro',
+      look: 'void',
+      shots: [
+        {
+          src: 'distortion-outro', len: 12.2, lines: [
+            { at: 8.2, until: 12.2, title: true, heroes: true, text: () => L('GIRATINA DEFEATED', 'GIRATINA VERSLAGEN'), kicker: () => L('The world turns right again', 'De wereld keert terug') },
+          ],
+        },
+      ],
+    },
     arenaEntry: [63, 76],
     rooms: [
       {

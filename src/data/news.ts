@@ -22,6 +22,20 @@ export interface NewsEntry {
 
 export const NEWS: NewsEntry[] = [
   {
+    id: '2026-11-07',
+    title: ['Lugia and Giratina', 'Lugia en Giratina'],
+    intro: [
+      'Two new legendaries to face in raids, each with a dungeon of its own: seven raid dungeons now.',
+      'Twee nieuwe legendarische Pokémon om in raids te verslaan, elk met een eigen dungeon: nu zeven raid-dungeons.',
+    ],
+    items: [
+      { icon: '🌊', text: ['New dungeon: The Whirl Islands. Wade through a sea cave past tide surges, a creaking wreck and a current that pulls you along, beat the wardens Kingdra and Gyarados, and face Lugia in the eye of the storm. Unlocks after The Forsaken Lab', 'Nieuwe dungeon: De Draaikolkeilanden. Waad door een zeegrot langs vloedgolven, een krakend wrak en een stroming die je meesleurt, versla de wachters Kingdra en Gyarados, en neem het in het oog van de storm op tegen Lugia. Gaat open na Het Verlaten Lab'] },
+      { icon: '🌀', text: ['New dungeon: The Distortion World. Step through a tear into a world turned inside out, where gravity tips over and shadows reach out of mirrors, beat the wardens Dusknoir and Cofagrigus, and face Giratina at the edge of the abyss. Unlocks after The Whirl Islands', 'Nieuwe dungeon: De Verwrongen Wereld. Stap door een scheur een wereld binnen die binnenstebuiten is gekeerd, waar de zwaartekracht kantelt en schaduwen uit spiegels grijpen, versla de wachters Dusknoir en Cofagrigus, en neem het aan de rand van de afgrond op tegen Giratina. Gaat open na De Draaikolkeilanden'] },
+      { icon: '🐉', text: ['Lugia and Giratina also join the random bosses of the classic raid. Giratina changes into its Origin Forme in the last phase', 'Lugia en Giratina doen ook mee als willekeurige baas in de klassieke raid. Giratina verandert in de laatste fase in zijn Oervorm'] },
+      { icon: '🎁', text: ['New rewards: Horsea (grows into Kingdra) and Duskull (grows into Dusknoir) as partners, the titles Tidecaller and Voidwalker, and a Mini Lugia and Mini Giratina follower for a clear without losing a life', 'Nieuwe beloningen: Horsea (groeit uit tot Kingdra) en Duskull (groeit uit tot Dusknoir) als partner, de titels Getijdenroeper en Leegtereiziger, en een Mini-Lugia en Mini-Giratina als volger als je hem haalt zonder een leven te verliezen'] },
+    ],
+  },
+  {
     id: '2026-11-01',
     title: ['Two new raid dungeons', 'Twee nieuwe raid-dungeons'],
     intro: [

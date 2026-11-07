@@ -1137,9 +1137,10 @@
   flex-shrink: 0;
 }
 .n-mystery .n-sil img {
-  width: 48px;
-  height: 48px;
-  margin-left: -22px;
+  /* (seven bosses now: they overlap a little more) */
+  width: 46px;
+  height: 46px;
+  margin-left: -27px;
   filter: brightness(0) invert(0.32);
 }
 .n-mystery .n-sil img:first-child {

@@ -9191,6 +9191,13 @@ body:not(.desk) #hud.duel-mode .feed:not(.spec-feed) {
 /* The Forsaken Lab's cutscenes: titles in pale lilac with a psychic violet glow */
 .cin.lab .cin-title { color: #fbf0ff; }
 .cin.lab .cin-title b { text-shadow: 0 0 24px rgba(200, 110, 255, 0.95), 0 0 60px rgba(160, 60, 240, 0.55), 0 4px 0 #2a0c40, 0 0 2px #000; }
+.cin.sea .cin-title { color: #f2fcff; }
+.cin.sea .cin-title b { text-shadow: 0 0 24px rgba(110, 200, 255, 0.95), 0 0 60px rgba(40, 140, 230, 0.55), 0 4px 0 #0a2238, 0 0 2px #000; }
+.cin.sea .cin-title small { color: #b8e4ff; text-shadow: 0 2px 0 #000, 0 0 10px rgba(100, 190, 255, 0.7); }
+/* The Distortion World's cutscenes: titles in old gold over a violet glow */
+.cin.void .cin-title { color: #fff2d8; }
+.cin.void .cin-title b { text-shadow: 0 0 24px rgba(170, 100, 255, 0.95), 0 0 60px rgba(200, 50, 60, 0.45), 0 4px 0 #1a0a26, 0 0 2px #000; }
+.cin.void .cin-title small { color: #e0c8ff; text-shadow: 0 2px 0 #000, 0 0 10px rgba(170, 110, 255, 0.7); }
 .cin.lab .cin-title small { color: #e6c4ff; text-shadow: 0 2px 0 #000, 0 0 10px rgba(190, 110, 255, 0.7); }
 .cin-title.tall {
   top: 36%;
